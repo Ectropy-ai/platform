@@ -1,0 +1,360 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:dashboard:data-layer",
+  "title": "Dashboard Data Layer Schema",
+  "description": "Schema-first architecture defining real-time data sources for all stakeholder dashboards (Sprint 5 - 2026-01-24)",
+  "version": "1.0.0",
+  "type": "object",
+  "definitions": {
+    "DataSource": {
+      "type": "object",
+      "required": ["id", "type", "status", "endpoint"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique data source identifier"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["api", "websocket", "cache", "derived"],
+          "description": "Data source type"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["integrated", "planned", "unavailable"],
+          "description": "Integration status"
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "API endpoint or service path"
+        },
+        "hook": {
+          "type": "string",
+          "description": "React Query hook name"
+        },
+        "refreshInterval": {
+          "type": "integer",
+          "description": "Auto-refresh interval in milliseconds"
+        },
+        "cacheTime": {
+          "type": "integer",
+          "description": "Cache duration in milliseconds"
+        }
+      }
+    },
+    "DashboardDataConfig": {
+      "type": "object",
+      "required": ["dashboardId", "stakeholderRole", "dataSources"],
+      "properties": {
+        "dashboardId": {
+          "type": "string",
+          "description": "Dashboard component identifier"
+        },
+        "stakeholderRole": {
+          "type": "string",
+          "enum": ["architect", "engineer", "contractor", "owner", "admin"],
+          "description": "Target stakeholder role"
+        },
+        "authorityLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6,
+          "description": "SEPPA authority level (0=none, 6=full)"
+        },
+        "dataSources": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/DataSource" },
+          "description": "Data sources used by this dashboard"
+        },
+        "seppaIntegration": {
+          "type": "boolean",
+          "description": "Whether SEPPA AI assistant is integrated"
+        }
+      }
+    }
+  },
+  "properties": {
+    "dashboards": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/DashboardDataConfig" },
+      "description": "All dashboard data configurations"
+    },
+    "sharedDataSources": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/DataSource" },
+      "description": "Data sources shared across multiple dashboards"
+    }
+  },
+  "dashboards": [
+    {
+      "dashboardId": "ArchitectDashboard",
+      "stakeholderRole": "architect",
+      "authorityLevel": 4,
+      "seppaIntegration": true,
+      "dataSources": [
+        {
+          "id": "projects",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/projects",
+          "hook": "useProjects",
+          "refreshInterval": 60000,
+          "cacheTime": 300000
+        },
+        {
+          "id": "elements",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/projects/{projectId}/elements",
+          "hook": "useElements",
+          "refreshInterval": 30000,
+          "cacheTime": 120000
+        },
+        {
+          "id": "alerts",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/alerts",
+          "hook": "useStructuralAlerts",
+          "refreshInterval": 30000,
+          "cacheTime": 60000
+        },
+        {
+          "id": "activityLog",
+          "type": "api",
+          "status": "unavailable",
+          "endpoint": "/api/v1/activity",
+          "hook": "useActivityLog",
+          "note": "Requires audit log service integration"
+        }
+      ]
+    },
+    {
+      "dashboardId": "EngineerDashboard",
+      "stakeholderRole": "engineer",
+      "authorityLevel": 5,
+      "seppaIntegration": true,
+      "dataSources": [
+        {
+          "id": "projects",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/projects",
+          "hook": "useProjects"
+        },
+        {
+          "id": "elements",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/projects/{projectId}/elements",
+          "hook": "useElements"
+        },
+        {
+          "id": "engineeringTasks",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/tasks",
+          "hook": "useEngineeringTasks",
+          "refreshInterval": 30000,
+          "cacheTime": 60000
+        },
+        {
+          "id": "structuralAlerts",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/alerts",
+          "hook": "useStructuralAlerts",
+          "refreshInterval": 30000,
+          "cacheTime": 60000
+        }
+      ]
+    },
+    {
+      "dashboardId": "ContractorDashboard",
+      "stakeholderRole": "contractor",
+      "authorityLevel": 3,
+      "seppaIntegration": true,
+      "dataSources": [
+        {
+          "id": "projects",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/projects",
+          "hook": "useProjects"
+        },
+        {
+          "id": "elements",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/projects/{projectId}/elements",
+          "hook": "useElements"
+        },
+        {
+          "id": "siteAlerts",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/alerts",
+          "hook": "useStructuralAlerts"
+        },
+        {
+          "id": "constructionTasks",
+          "type": "api",
+          "status": "unavailable",
+          "endpoint": "/api/v1/construction/tasks",
+          "hook": "useConstructionTasks",
+          "note": "Requires construction scheduling API integration"
+        },
+        {
+          "id": "crewManagement",
+          "type": "api",
+          "status": "unavailable",
+          "endpoint": "/api/v1/workforce/crews",
+          "hook": "useCrewMembers",
+          "note": "Requires workforce management system integration"
+        }
+      ]
+    },
+    {
+      "dashboardId": "OwnerDashboard",
+      "stakeholderRole": "owner",
+      "authorityLevel": 6,
+      "seppaIntegration": true,
+      "dataSources": [
+        {
+          "id": "projects",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/projects",
+          "hook": "useProjects"
+        },
+        {
+          "id": "elements",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/projects/{projectId}/elements",
+          "hook": "useElements"
+        },
+        {
+          "id": "proposals",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/governance/proposals",
+          "hook": "useProposals"
+        },
+        {
+          "id": "projectAlerts",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/alerts",
+          "hook": "useStructuralAlerts"
+        },
+        {
+          "id": "budgetTracking",
+          "type": "api",
+          "status": "unavailable",
+          "endpoint": "/api/v1/finance/budget",
+          "hook": "useBudgetTracking",
+          "note": "Requires ERP/accounting system integration"
+        }
+      ]
+    },
+    {
+      "dashboardId": "AdminDashboard",
+      "stakeholderRole": "admin",
+      "authorityLevel": 6,
+      "seppaIntegration": true,
+      "dataSources": [
+        {
+          "id": "systemHealth",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/health",
+          "hook": "useSystemHealth"
+        },
+        {
+          "id": "users",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/admin/users",
+          "hook": "useAdminUsers"
+        },
+        {
+          "id": "projects",
+          "type": "api",
+          "status": "integrated",
+          "endpoint": "/api/v1/projects",
+          "hook": "useProjects"
+        }
+      ]
+    }
+  ],
+  "sharedDataSources": [
+    {
+      "id": "projects",
+      "type": "api",
+      "status": "integrated",
+      "endpoint": "/api/v1/projects",
+      "hook": "useProjects",
+      "refreshInterval": 60000,
+      "cacheTime": 300000,
+      "description": "Core project listing - used by all dashboards"
+    },
+    {
+      "id": "elements",
+      "type": "api",
+      "status": "integrated",
+      "endpoint": "/api/v1/projects/{projectId}/elements",
+      "hook": "useElements",
+      "refreshInterval": 30000,
+      "cacheTime": 120000,
+      "description": "BIM elements for selected project"
+    },
+    {
+      "id": "structuralAlerts",
+      "type": "api",
+      "status": "integrated",
+      "endpoint": "/api/v1/alerts",
+      "hook": "useStructuralAlerts",
+      "refreshInterval": 30000,
+      "cacheTime": 60000,
+      "description": "Project alerts using VoxelAlert model"
+    },
+    {
+      "id": "engineeringTasks",
+      "type": "api",
+      "status": "integrated",
+      "endpoint": "/api/v1/tasks",
+      "hook": "useEngineeringTasks",
+      "refreshInterval": 30000,
+      "cacheTime": 60000,
+      "description": "Engineering tasks using PMDecision model"
+    },
+    {
+      "id": "proposals",
+      "type": "api",
+      "status": "integrated",
+      "endpoint": "/api/v1/governance/proposals",
+      "hook": "useProposals",
+      "refreshInterval": 30000,
+      "cacheTime": 60000,
+      "description": "DAO governance proposals"
+    }
+  ],
+  "integrationMatrix": {
+    "description": "Data visibility matrix showing API integration status",
+    "integrated": [
+      "Projects (useProjects)",
+      "Elements (useElements)",
+      "Proposals (useProposals)",
+      "Structural Alerts (useStructuralAlerts)",
+      "Engineering Tasks (useEngineeringTasks)",
+      "System Health (fetch /health)"
+    ],
+    "planned": [
+      "Construction Tasks - requires scheduling API",
+      "Crew Management - requires workforce system",
+      "Budget Tracking - requires ERP integration",
+      "Activity Logs - requires audit service"
+    ]
+  }
+}

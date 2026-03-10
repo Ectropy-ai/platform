@@ -1,0 +1,799 @@
+{
+  "version": "1.0.0",
+  "environment": "production",
+  "runbookType": "deployment",
+  "metadata": {
+    "catalogId": "deployment-runbook-v1-0-0",
+    "name": "Blue-Green Deployment - Enterprise Full Stack",
+    "type": "deployment",
+    "purpose": "Enterprise-grade blue-green deployment with comprehensive service management, defensive gates, and production-ready validation for API Gateway and Web Dashboard",
+    "maintainer": "DevOps Team",
+    "author": "Ectropy Engineering",
+    "created": "2025-11-16T00:00:00Z",
+    "lastUpdated": "2025-11-16T00:00:00Z",
+    "estimatedDuration": "30 minutes",
+    "complexity": "high",
+    "priority": "critical",
+    "relatedDocuments": [
+      "docker-compose.production.yml",
+      "infrastructure/nginx/production.conf",
+      "scripts/deployment/discover-services.sh",
+      "scripts/deployment/cleanup-all-services.sh"
+    ],
+    "sourceFile": "scripts/deployment/blue-green-deploy-full.sh",
+    "conversionDate": "2025-11-16T00:00:00Z",
+    "schemaVersion": "1.0.0"
+  },
+  "executiveSummary": {
+    "description": "Enterprise blue-green deployment orchestrating zero-downtime deployment of API Gateway and Web Dashboard. Includes comprehensive pre-deployment service management, defensive port verification gates, health validation, smoke testing, and automatic rollback with post-cutover verification.",
+    "status": "READY_FOR_PRODUCTION",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "LOW",
+    "keyChanges": [
+      "Pre-deployment database backup",
+      "Native service conflict detection and resolution",
+      "Defensive port verification gates",
+      "Parallel deployment of API Gateway and Web Dashboard to standby environment",
+      "Container health validation with retry logic",
+      "Smoke tests before traffic switch",
+      "Nginx configuration update for traffic cutover",
+      "Post-cutover production health verification",
+      "Automatic rollback on any failure"
+    ],
+    "prerequisites": [
+      "Docker and Docker Compose installed",
+      "Nginx running as reverse proxy",
+      "Valid production environment configuration",
+      "PostgreSQL database (Docker or native)",
+      "No port conflicts on standby ports"
+    ],
+    "impact": {
+      "systems": [
+        "API Gateway (blue/green)",
+        "Web Dashboard (blue/green)",
+        "Nginx Reverse Proxy",
+        "PostgreSQL Database",
+        "Docker Containers"
+      ],
+      "downtime": "Zero - seamless Nginx reload",
+      "rollbackTime": "2-3 minutes"
+    }
+  },
+  "preFlightChecks": [
+    {
+      "id": "service-discovery",
+      "order": 1,
+      "category": "infrastructure",
+      "name": "Service Discovery",
+      "description": "Discover and catalog all existing services",
+      "command": "bash scripts/deployment/discover-services.sh",
+      "expectedResult": "Service inventory created",
+      "severity": "info",
+      "required": false,
+      "automatable": true,
+      "onFailure": {
+        "action": "warn",
+        "message": "Discovery completed with warnings"
+      }
+    },
+    {
+      "id": "database-backup",
+      "order": 2,
+      "category": "infrastructure",
+      "name": "Database Backup",
+      "description": "Create production database backup before deployment",
+      "command": "sudo -u postgres pg_dump ectropy_production > /tmp/ectropy_production_backup_$(date +%Y%m%d_%H%M%S).sql",
+      "expectedResult": "Backup file created in /tmp",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "onFailure": {
+        "action": "warn",
+        "message": "Database backup failed or no database exists"
+      }
+    },
+    {
+      "id": "native-service-check",
+      "order": 3,
+      "category": "infrastructure",
+      "name": "Native Service Conflict Detection",
+      "description": "Check for native services on standby ports",
+      "commands": [],
+      "expectedResult": "No native services on standby ports",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Check ports using lsof -Pi:$port -sTCP:LISTEN",
+      "onFailure": {
+        "action": "abort",
+        "message": "Native services detected on standby ports. Run: bash scripts/deployment/cleanup-all-services.sh --force"
+      }
+    },
+    {
+      "id": "port-verification",
+      "order": 4,
+      "category": "infrastructure",
+      "name": "Defensive Port Verification Gate",
+      "description": "Verify all standby ports are free for deployment",
+      "commands": [],
+      "expectedResult": "All standby ports available",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Verify standby API and Web ports are not in use",
+      "onFailure": {
+        "action": "abort",
+        "message": "Port conflicts detected - standby ports must be free for blue-green deployment"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Pre-Deployment Service Management",
+      "description": "Enterprise service discovery, backup, and conflict resolution",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Service Discovery",
+          "command": "bash scripts/deployment/discover-services.sh",
+          "purpose": "Discover existing services for inventory",
+          "required": false,
+          "automatable": true,
+          "timeout": "60s",
+          "expectedStatus": [0, 1],
+          "onFailure": {
+            "action": "skip",
+            "message": "Discovery completed with warnings"
+          }
+        },
+        {
+          "step": "1.2",
+          "name": "Backup Production Database",
+          "commands": [
+            "systemctl is-active --quiet postgresql",
+            "sudo -u postgres pg_dump ectropy_production > /tmp/ectropy_production_backup_$(date +%Y%m%d_%H%M%S).sql"
+          ],
+          "purpose": "Create database backup before deployment",
+          "required": false,
+          "automatable": true,
+          "timeout": "300s",
+          "expectedStatus": [0, 1],
+          "validation": {
+            "type": "fileExists",
+            "criteria": "Backup file created in /tmp"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "PostgreSQL running in Docker (backup handled by Docker)"
+          }
+        },
+        {
+          "step": "1.3",
+          "name": "Check for Native Service Conflicts",
+          "description": "Verify no native services on standby ports",
+          "commands": [
+            "lsof -Pi:$STANDBY_PORT_API -sTCP:LISTEN -t",
+            "lsof -Pi:$STANDBY_PORT_WEB -sTCP:LISTEN -t"
+          ],
+          "purpose": "Detect port conflicts that would block deployment",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 1,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 1 means no service listening (expected)"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Native services detected on standby ports. Run cleanup script."
+          }
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Defensive Port Verification Gate",
+      "description": "Critical gate to ensure standby ports are available",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Verify Standby API Port",
+          "command": "lsof -Pi:$STANDBY_PORT_API -sTCP:LISTEN -t",
+          "purpose": "Ensure API port is free for deployment",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 1,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 1 indicates port is free"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Standby API port is in use - deployment blocked"
+          }
+        },
+        {
+          "step": "2.2",
+          "name": "Verify Standby Web Port",
+          "command": "lsof -Pi:$STANDBY_PORT_WEB -sTCP:LISTEN -t",
+          "purpose": "Ensure Web port is free for deployment",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 1,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 1 indicates port is free"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Standby Web port is in use - deployment blocked"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Deploy to Standby Environment",
+      "description": "Deploy API Gateway and Web Dashboard to inactive color slot",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Determine deployment colors",
+          "description": "Calculate active and standby colors with port mappings",
+          "commands": [],
+          "purpose": "Establish which environment (blue/green) to deploy to",
+          "required": true,
+          "automatable": true,
+          "validation": {
+            "type": "output",
+            "criteria": "Active and standby colors determined with port assignments"
+          }
+        },
+        {
+          "step": "3.2",
+          "name": "Start standby containers",
+          "command": "docker-compose -f docker-compose.production.yml up -d api-gateway-${STANDBY_COLOR} web-dashboard-${STANDBY_COLOR}",
+          "purpose": "Deploy new version to standby environment",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to start standby containers"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Standby Environment Health Checks",
+      "description": "Validate standby containers are healthy before cutover",
+      "estimatedDuration": "10 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Wait for container health",
+          "description": "Poll Docker health status with 30 retries at 10s intervals",
+          "commands": [
+            "docker inspect --format='{{.State.Health.Status}}' ectropy-api-${STANDBY_COLOR}",
+            "docker inspect --format='{{.State.Health.Status}}' ectropy-web-${STANDBY_COLOR}"
+          ],
+          "purpose": "Ensure both API and Web containers report healthy status",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": true,
+          "maxRetries": 10,
+          "expectedOutput": "healthy",
+          "validation": {
+            "type": "output",
+            "criteria": "Both containers must report 'healthy' status"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "rollbackStep": "7.1",
+            "message": "Standby environment failed to become healthy"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Smoke Tests on Standby",
+      "description": "Execute smoke tests before traffic switch",
+      "estimatedDuration": "2 minutes",
+      "parallel": true,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "5.1",
+          "name": "API Health Endpoint Test",
+          "command": "curl --fail --silent http://localhost:${STANDBY_PORT_API}/health",
+          "purpose": "Verify API responds to health checks",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "HTTP 200 response"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "rollbackStep": "7.1",
+            "message": "API health check failed on standby"
+          }
+        },
+        {
+          "step": "5.2",
+          "name": "Web Dashboard Test",
+          "command": "curl --fail --silent http://localhost:${STANDBY_PORT_WEB}",
+          "purpose": "Verify Web Dashboard is serving content",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "HTTP 200 response"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "rollbackStep": "7.1",
+            "message": "Web health check failed on standby"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Traffic Cutover",
+      "description": "Switch production traffic to standby environment",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "6.1",
+          "name": "Update Nginx API Gateway routing",
+          "command": "sed -i \"s/server api-gateway-${ACTIVE_COLOR}:.*; *# Active/server api-gateway-${STANDBY_COLOR}:${STANDBY_PORT_API};  # Active/\" infrastructure/nginx/production.conf",
+          "purpose": "Point Nginx to standby API Gateway",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0,
+          "relatedFiles": ["infrastructure/nginx/production.conf"]
+        },
+        {
+          "step": "6.2",
+          "name": "Update Nginx Web Dashboard routing",
+          "command": "sed -i \"s/server web-dashboard-${ACTIVE_COLOR}:.*; *# Active/server web-dashboard-${STANDBY_COLOR}:${STANDBY_PORT_WEB};  # Active/\" infrastructure/nginx/production.conf",
+          "purpose": "Point Nginx to standby Web Dashboard",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0,
+          "relatedFiles": ["infrastructure/nginx/production.conf"]
+        },
+        {
+          "step": "6.3",
+          "name": "Reload Nginx configuration",
+          "command": "docker exec ectropy-nginx nginx -s reload",
+          "purpose": "Apply new routing configuration with zero downtime",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "rollback",
+            "rollbackStep": "7.2",
+            "message": "Failed to reload Nginx configuration"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 7,
+      "name": "Post-Cutover Verification",
+      "description": "Verify production health after traffic switch",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "7.1",
+          "name": "Wait for traffic to settle",
+          "command": "sleep 5",
+          "purpose": "Allow connection draining and new connections to establish",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s"
+        },
+        {
+          "step": "7.2",
+          "name": "Production health verification",
+          "command": "curl --fail --silent ${HEALTH_CHECK_URL}",
+          "purpose": "Verify production endpoint responds correctly",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "Production URL returns HTTP 200"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "rollbackStep": "7.2",
+            "message": "Production health check FAILED after cutover - initiating rollback"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 8,
+      "name": "Post-Deployment Cleanup",
+      "description": "Optional cleanup of previous environment",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "8.1",
+          "name": "Review deployment state",
+          "description": "Display current active and standby environments",
+          "commands": [],
+          "purpose": "Provide deployment summary and cleanup options",
+          "required": true,
+          "automatable": true,
+          "expectedOutput": "Active environment confirmed, standby options displayed"
+        },
+        {
+          "step": "8.2",
+          "name": "Optional: Stop old environment",
+          "command": "docker-compose -f docker-compose.production.yml stop api-gateway-${ACTIVE_COLOR} web-dashboard-${ACTIVE_COLOR}",
+          "purpose": "Free resources by stopping old deployment (optional - recommended to keep for instant rollback)",
+          "required": false,
+          "automatable": true,
+          "timeout": "60s"
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "healthChecks": [
+      {
+        "service": "API Gateway - Blue",
+        "endpoint": "http://localhost:4000/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "API Gateway - Green",
+        "endpoint": "http://localhost:4001/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "Web Dashboard - Blue",
+        "endpoint": "http://localhost:3000",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "Web Dashboard - Green",
+        "endpoint": "http://localhost:3001",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "Production URL",
+        "endpoint": "https://ectropy.ai/api/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      }
+    ],
+    "smokeTests": [
+      {
+        "test": "API Health",
+        "endpoint": "http://localhost:${STANDBY_PORT_API}/health",
+        "expectedBehavior": "Returns HTTP 200",
+        "priority": "P0"
+      },
+      {
+        "test": "Web Dashboard Loading",
+        "endpoint": "http://localhost:${STANDBY_PORT_WEB}",
+        "expectedBehavior": "Returns HTTP 200 with HTML content",
+        "priority": "P0"
+      },
+      {
+        "test": "Production Health",
+        "endpoint": "https://ectropy.ai/api/health",
+        "expectedBehavior": "Returns HTTP 200 from new deployment",
+        "priority": "P0"
+      }
+    ]
+  },
+  "rollback": {
+    "supported": true,
+    "estimatedTime": "3 minutes",
+    "dataLossRisk": "none",
+    "triggerConditions": [
+      "Container health check failure (Phase 3)",
+      "Smoke test failure (Phase 4)",
+      "Nginx reload failure (Phase 5)",
+      "Post-cutover production health check failure (Phase 6)"
+    ],
+    "decisionMaker": "Automated with logged decision rationale",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Revert Nginx API routing",
+        "command": "sed -i \"s/server api-gateway-${STANDBY_COLOR}:.*; *# Active/server api-gateway-${ACTIVE_COLOR}:${ACTIVE_PORT_API};  # Active/\" infrastructure/nginx/production.conf",
+        "purpose": "Restore API Gateway routing to previous environment",
+        "required": true
+      },
+      {
+        "step": 2,
+        "name": "Revert Nginx Web routing",
+        "command": "sed -i \"s/server web-dashboard-${STANDBY_COLOR}:.*; *# Active/server web-dashboard-${ACTIVE_COLOR}:${ACTIVE_PORT_WEB};  # Active/\" infrastructure/nginx/production.conf",
+        "purpose": "Restore Web Dashboard routing to previous environment",
+        "required": true
+      },
+      {
+        "step": 3,
+        "name": "Reload Nginx",
+        "command": "docker exec ectropy-nginx nginx -s reload",
+        "purpose": "Apply rollback configuration",
+        "required": true
+      },
+      {
+        "step": 4,
+        "name": "Verify rollback health",
+        "command": "curl --fail --silent ${HEALTH_CHECK_URL}",
+        "purpose": "Confirm previous environment is serving traffic",
+        "required": true
+      },
+      {
+        "step": 5,
+        "name": "Stop failed deployment",
+        "command": "docker-compose -f docker-compose.production.yml down api-gateway-${STANDBY_COLOR} web-dashboard-${STANDBY_COLOR}",
+        "purpose": "Clean up failed deployment containers",
+        "required": true
+      }
+    ],
+    "verification": {
+      "healthCheck": "https://ectropy.ai/api/health",
+      "expectedStatus": 200,
+      "successCriteria": "Production returns to previous stable state with HTTP 200 responses"
+    }
+  },
+  "monitoring": {
+    "duration": "1 hour post-deployment",
+    "keyMetrics": [
+      {
+        "metric": "API Response Time",
+        "threshold": "< 200ms",
+        "alertOn": "> 500ms",
+        "severity": "warning"
+      },
+      {
+        "metric": "Web Page Load Time",
+        "threshold": "< 2s",
+        "alertOn": "> 5s",
+        "severity": "warning"
+      },
+      {
+        "metric": "Error Rate",
+        "threshold": "< 0.1%",
+        "alertOn": "> 1%",
+        "severity": "critical"
+      },
+      {
+        "metric": "Container Health Status",
+        "threshold": "healthy",
+        "alertOn": "unhealthy or starting",
+        "severity": "critical"
+      },
+      {
+        "metric": "Memory Usage",
+        "threshold": "< 80%",
+        "alertOn": "> 90%",
+        "severity": "warning"
+      }
+    ],
+    "alertThresholds": [
+      {
+        "condition": "Error rate > 5%",
+        "severity": "critical",
+        "action": "Immediate rollback",
+        "escalation": "Page on-call engineer"
+      },
+      {
+        "condition": "Response time > 1s sustained",
+        "severity": "warning",
+        "action": "Monitor closely",
+        "escalation": "Notify team in Slack"
+      }
+    ]
+  },
+  "successCriteria": [
+    {
+      "criterion": "Pre-deployment database backup created",
+      "status": "RECOMMENDED",
+      "validation": "Backup file exists in /tmp"
+    },
+    {
+      "criterion": "No native service port conflicts",
+      "status": "REQUIRED",
+      "validation": "lsof returns no listeners on standby ports"
+    },
+    {
+      "criterion": "Standby containers reach healthy status",
+      "status": "REQUIRED",
+      "validation": "Docker inspect shows 'healthy'"
+    },
+    {
+      "criterion": "Smoke tests pass on standby",
+      "status": "REQUIRED",
+      "validation": "Both API and Web return HTTP 200"
+    },
+    {
+      "criterion": "Nginx configuration updated and reloaded",
+      "status": "REQUIRED",
+      "validation": "nginx -s reload succeeds"
+    },
+    {
+      "criterion": "Production health check passes after cutover",
+      "status": "REQUIRED",
+      "validation": "Production URL returns HTTP 200"
+    },
+    {
+      "criterion": "Zero errors during deployment",
+      "status": "REQUIRED",
+      "validation": "All phases complete with exit code 0"
+    }
+  ],
+  "mcpIntegration": {
+    "queryableFields": [
+      "environment",
+      "runbookType",
+      "metadata.catalogId",
+      "metadata.complexity",
+      "metadata.estimatedDuration",
+      "executiveSummary.riskAssessment",
+      "phases[].name",
+      "rollback.supported",
+      "preFlightChecks[].category"
+    ],
+    "supportedQueries": [
+      {
+        "query": "What is the enterprise deployment process?",
+        "returns": "7-phase blue-green deployment with defensive gates and automatic rollback",
+        "purpose": "Explain comprehensive deployment workflow"
+      },
+      {
+        "query": "How are port conflicts handled?",
+        "returns": "Pre-deployment native service detection with defensive port verification gates",
+        "purpose": "Service conflict resolution strategy"
+      },
+      {
+        "query": "What ports are used for blue and green deployments?",
+        "returns": "Blue: API-4000, Web-3000; Green: API-4001, Web-3001",
+        "purpose": "Infrastructure port allocation"
+      },
+      {
+        "query": "How long does a full deployment take?",
+        "returns": "Approximately 30 minutes including all validation phases",
+        "purpose": "Time planning for deployment windows"
+      },
+      {
+        "query": "What triggers automatic rollback?",
+        "returns": "Health check failure, smoke test failure, Nginx reload failure, or post-cutover verification failure",
+        "purpose": "Risk mitigation and failure handling"
+      },
+      {
+        "query": "Is database backup required?",
+        "returns": "Recommended but not required - automatic backup for native PostgreSQL",
+        "purpose": "Data protection strategy"
+      }
+    ],
+    "decisionSupport": [
+      "Automatically determines active and standby colors based on current state",
+      "Defensive gates prevent deployment if ports are in use",
+      "Comprehensive health validation before traffic switch",
+      "Automatic rollback preserves production stability",
+      "Post-cutover verification ensures deployment success",
+      "Optional cleanup allows instant rollback capability"
+    ],
+    "architectureAlignment": {
+      "routingConfig": "Nginx-based routing with sed-based configuration updates",
+      "portAllocation": "Blue (API:4000, Web:3000), Green (API:4001, Web:3001)",
+      "oauthConfig": "N/A - handled at application layer"
+    }
+  },
+  "knownIssues": [
+    {
+      "id": "KI-001",
+      "title": "Native PostgreSQL backup may fail if database doesn't exist",
+      "severity": "LOW",
+      "impact": "Backup step may report error on first deployment",
+      "mitigation": "Check is informational only - Docker-based PostgreSQL backup handled separately",
+      "action": "No action required",
+      "priority": "P3"
+    },
+    {
+      "id": "KI-002",
+      "title": "Service discovery script may not exist in all environments",
+      "severity": "LOW",
+      "impact": "Step 0.1 may be skipped",
+      "mitigation": "Service discovery is informational - deployment continues",
+      "action": "Ensure scripts/deployment/discover-services.sh exists if needed",
+      "priority": "P3"
+    }
+  ],
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "COLOR_TO_DEPLOY",
+        "description": "Target deployment color (blue or green)",
+        "example": "green",
+        "required": false,
+        "environment": "production",
+        "secret": false
+      },
+      {
+        "name": "HEALTH_CHECK_URL",
+        "description": "Production health check endpoint URL",
+        "example": "https://ectropy.ai/api/health",
+        "required": false,
+        "environment": "production",
+        "secret": false
+      },
+      {
+        "name": "MAX_HEALTH_RETRIES",
+        "description": "Maximum health check retry attempts",
+        "example": "30",
+        "required": false,
+        "environment": "production",
+        "secret": false
+      },
+      {
+        "name": "HEALTH_CHECK_INTERVAL",
+        "description": "Seconds between health check retries",
+        "example": "10",
+        "required": false,
+        "environment": "production",
+        "secret": false
+      }
+    ]
+  }
+}

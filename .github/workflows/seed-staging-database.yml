@@ -1,0 +1,647 @@
+name: Seed Staging Database
+
+# Manual workflow dispatch for seeding staging database with demo data
+# ZERO-SSH ARCHITECTURE: Direct PostgreSQL connection from GitHub Actions runner
+# No SSH required - connects directly to DigitalOcean managed PostgreSQL
+#
+# WORKFLOW SEQUENCE:
+#   1. Setup Node.js and pnpm for Prisma CLI
+#   2. Install project dependencies
+#   3. Deploy Prisma migrations (creates all database tables)
+#   4. Execute seed script (populates demo data)
+#   5. Validate via direct database queries
+#   6. Verify via API endpoints
+#
+# This workflow populates staging with:
+#   - Database schema (via Prisma migrate deploy)
+#   - Demo users (demo@ectropy.com, admin@ectropy.com, test@ectropy.com)
+#   - Demo projects (Demo Office Building, Sample Residential Complex)
+#   - Multi-tenant demo organization (ectropy-demo)
+#   - ROS MRO demo data (voxels, decisions, building profiles)
+
+on:
+  workflow_dispatch:
+    inputs:
+      seed_type:
+        description: 'Type of seed data to create'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - users-only
+          - ros-mro-only
+
+  # ENTERPRISE PATTERN: Reusable workflow for deployment pipeline integration
+  # Called from deploy-staging.yml after deployment and before E2E tests
+  # Ensures E2E tests always have demo data to validate (projects, streams, users)
+  workflow_call:
+    inputs:
+      seed_type:
+        description: 'Type of seed data to create'
+        required: false
+        default: 'full'
+        type: string
+    secrets:
+      DB_PASSWORD:
+        required: true
+      SPECKLE_ADMIN_PASSWORD:
+        required: true
+
+jobs:
+  seed-database:
+    name: Seed Staging Database
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+
+    env:
+      # Construct DATABASE_URL from GitHub Variables/Secrets
+      # Pattern: postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require
+      DATABASE_URL: postgresql://${{ vars.DATABASE_USER }}:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}?sslmode=require
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        run: |
+          echo "📦 Installing pnpm package manager..."
+          npm install -g pnpm@9
+          pnpm --version
+          echo "✅ pnpm installed"
+
+      - name: Install Dependencies
+        run: |
+          echo "📦 Installing project dependencies..."
+          pnpm install --no-frozen-lockfile --no-strict-peer-dependencies
+          echo "✅ Dependencies installed"
+
+      - name: Install PostgreSQL Client
+        run: |
+          echo "📦 Installing PostgreSQL client..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          echo "✅ PostgreSQL client installed"
+
+          # Verify installation
+          psql --version
+
+      - name: Validate Database Connection
+        run: |
+          echo "🔍 Validating database connection..."
+          echo ""
+          echo "Database: DigitalOcean Managed PostgreSQL"
+          echo "Host: ${{ vars.DATABASE_HOST }}"
+          echo "Port: ${{ vars.DATABASE_PORT }}"
+          echo "Database: ${{ vars.DATABASE_NAME }}"
+          echo "User: ${{ vars.DATABASE_USER }}"
+          echo "SSL Mode: require"
+          echo ""
+
+          # Test connection with simple query
+          if psql "$DATABASE_URL" -c "SELECT version();" > /dev/null 2>&1; then
+            echo "✅ Database connection successful"
+          else
+            echo "❌ Database connection failed"
+            echo "   Check DATABASE_URL construction and credentials"
+            exit 1
+          fi
+
+      - name: Deploy Prisma Migrations
+        run: |
+          echo "========================================="
+          echo "DEPLOYING PRISMA MIGRATIONS"
+          echo "========================================="
+          echo ""
+          echo "Database: DigitalOcean Managed PostgreSQL"
+          echo "Environment: Staging"
+          echo "Migration Strategy: prisma migrate deploy"
+          echo "Connection: Zero-SSH (direct from GitHub Actions)"
+          echo ""
+
+          echo "🔄 Running Prisma migrations..."
+          pnpm prisma migrate deploy
+
+          echo ""
+          echo "✅ Prisma migrations deployed successfully"
+          echo ""
+
+          echo "📊 Verifying schema deployment:"
+          psql "$DATABASE_URL" -c "\dt" | head -20
+
+      - name: Database Pre-Seed State
+        run: |
+          echo "========================================="
+          echo "DATABASE STATE BEFORE SEEDING"
+          echo "========================================="
+          echo ""
+
+          echo "📊 Current database state:"
+          psql "$DATABASE_URL" -c "SELECT COUNT(*) as tenant_count FROM tenants;" 2>/dev/null || echo "Tenants table may not exist yet"
+          psql "$DATABASE_URL" -c "SELECT COUNT(*) as user_count FROM users;" 2>/dev/null || echo "Users table may not exist yet"
+          psql "$DATABASE_URL" -c "SELECT COUNT(*) as project_count FROM projects;" 2>/dev/null || echo "Projects table may not exist yet"
+
+      - name: Seed Multi-Tenant Demo Data
+        if: inputs.seed_type == 'full' || inputs.seed_type == 'users-only'
+        run: |
+          echo "========================================="
+          echo "SEEDING MULTI-TENANT DEMO DATA"
+          echo "========================================="
+          echo ""
+          echo "Database: DigitalOcean Managed PostgreSQL"
+          echo "Environment: Staging"
+          echo "Seed Script: database/seed-multi-tenant-demo.sql"
+          echo "Connection: Zero-SSH (direct from GitHub Actions)"
+          echo ""
+
+          echo "🌱 Running multi-tenant seed script..."
+          psql "$DATABASE_URL" -f database/seed-multi-tenant-demo.sql
+
+          echo ""
+          echo "✅ Multi-tenant seed completed successfully"
+
+      - name: Authenticate with Speckle
+        if: inputs.seed_type == 'full'
+        env:
+          SPECKLE_URL: https://staging.ectropy.ai/speckle
+          SPECKLE_ADMIN_EMAIL: ${{ vars.SPECKLE_ADMIN_EMAIL }}
+          SPECKLE_ADMIN_PASSWORD: ${{ secrets.SPECKLE_ADMIN_PASSWORD }}
+        run: |
+          echo "========================================="
+          echo "SPECKLE AUTHENTICATION"
+          echo "========================================="
+          echo ""
+          echo "Speckle URL: ${SPECKLE_URL}"
+          echo "Pattern: Credential-based ephemeral token (Five Why 2026-02-23)"
+          echo ""
+
+          # ---------------------------------------------------------------
+          # Phase 1: Wait for Speckle GraphQL endpoint to be reachable
+          # ---------------------------------------------------------------
+          echo "Phase 1: Waiting for Speckle GraphQL endpoint..."
+          RETRIES=0
+          MAX_SERVER_RETRIES=90
+          until curl -sf "${SPECKLE_URL}/graphql" \
+            -H "Content-Type: application/json" \
+            -d '{"query":"{ serverInfo { name version } }"}' > /dev/null 2>&1; do
+            RETRIES=$((RETRIES + 1))
+            if [ $RETRIES -gt $MAX_SERVER_RETRIES ]; then
+              echo "FAIL: Speckle server not reachable after $((MAX_SERVER_RETRIES * 2))s"
+              echo "   URL: ${SPECKLE_URL}/graphql"
+              exit 1
+            fi
+            if [ $((RETRIES % 15)) -eq 0 ]; then
+              echo "   ...still waiting ($((RETRIES * 2))s elapsed)"
+            fi
+            sleep 2
+          done
+          echo "OK: Speckle GraphQL endpoint reachable"
+          echo ""
+
+          # ---------------------------------------------------------------
+          # Phase 2: Authenticate with admin credentials (with bootstrap sync)
+          # ---------------------------------------------------------------
+          # Industry pattern: service account credentials → ephemeral token.
+          # Eliminates the split-secret-path problem entirely.
+          # The bootstrap now generates its own Speckle-managed PAT for api-gateway.
+          # The seed workflow authenticates independently with email + password.
+          #
+          # SYNCHRONIZATION GATE (Five Why 2026-02-24):
+          # The speckle-admin-bootstrap init container creates the admin user ON THE SERVER.
+          # This seed workflow runs IN GITHUB ACTIONS after smoke-tests pass.
+          # These are independent timelines — bootstrap may not have completed yet.
+          # Solution: Retry login until bootstrap creates the admin user (bounded retries).
+          echo "Phase 2: Authenticating with admin credentials..."
+          echo "  (Retry loop handles timing gap with server-side bootstrap)"
+          echo ""
+
+          if [ -z "${SPECKLE_ADMIN_PASSWORD}" ]; then
+            echo "FATAL: SPECKLE_ADMIN_PASSWORD (secret) is required"
+            exit 1
+          fi
+          SPECKLE_ADMIN_EMAIL="${SPECKLE_ADMIN_EMAIL:-speckle-admin@ectropy.ai}"
+
+          # Speckle v2 requires a challenge parameter for auth (middleware.ts)
+          CHALLENGE=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32)
+          echo "  Generated challenge: ${CHALLENGE:0:8}..."
+
+          # Retry loop: wait for bootstrap to create admin user
+          # Max wait: 30 retries × 10s avg = ~5 minutes (covers typical bootstrap time)
+          MAX_AUTH_RETRIES=30
+          AUTH_RETRY=0
+          AUTH_BACKOFF=5
+          ACCESS_CODE=""
+
+          while [ $AUTH_RETRY -lt $MAX_AUTH_RETRIES ]; do
+            AUTH_RETRY=$((AUTH_RETRY + 1))
+
+            LOGIN_RESP=$(curl -s -o /dev/null -w "%{redirect_url}" \
+              -X POST "${SPECKLE_URL}/auth/local/login?challenge=${CHALLENGE}" \
+              -H "Content-Type: application/json" \
+              -d "{\"email\":\"${SPECKLE_ADMIN_EMAIL}\",\"password\":\"${SPECKLE_ADMIN_PASSWORD}\"}")
+            ACCESS_CODE=$(echo "${LOGIN_RESP}" | grep -oE "access_code=[^&]+" | cut -d= -f2)
+
+            if [ -n "${ACCESS_CODE}" ]; then
+              echo "  Login succeeded on attempt ${AUTH_RETRY}/${MAX_AUTH_RETRIES}"
+              break
+            fi
+
+            if [ $AUTH_RETRY -lt $MAX_AUTH_RETRIES ]; then
+              echo "  Attempt ${AUTH_RETRY}/${MAX_AUTH_RETRIES}: Login failed (admin user may not exist yet)"
+              echo "    Waiting ${AUTH_BACKOFF}s for bootstrap to complete..."
+              sleep $AUTH_BACKOFF
+              # Exponential backoff: 5 → 10 → 20 → 30 (capped)
+              AUTH_BACKOFF=$((AUTH_BACKOFF * 2))
+              if [ $AUTH_BACKOFF -gt 30 ]; then AUTH_BACKOFF=30; fi
+            fi
+          done
+
+          if [ -z "${ACCESS_CODE}" ]; then
+            echo ""
+            echo "========================================="
+            echo "FATAL: Could not obtain access_code after ${MAX_AUTH_RETRIES} attempts"
+            echo "========================================="
+            echo ""
+            echo "Diagnosis (Five Why 2026-02-24):"
+            echo "  The speckle-admin-bootstrap init container on the server"
+            echo "  may have failed to create the admin user."
+            echo ""
+            echo "Check:"
+            echo "  1. SPECKLE_ADMIN_EMAIL: ${SPECKLE_ADMIN_EMAIL}"
+            echo "  2. SPECKLE_ADMIN_PASSWORD: (secret — verify in GitHub Settings)"
+            echo "  3. Bootstrap container logs: docker logs ectropy-speckle-admin-bootstrap"
+            echo "  4. Speckle server health: ${SPECKLE_URL}/graphql"
+            echo ""
+            echo "Resolution:"
+            echo "  - If bootstrap failed: Fix and restart: docker-compose up -d --force-recreate speckle-admin-bootstrap"
+            echo "  - If credentials wrong: Update GitHub Secret SPECKLE_ADMIN_PASSWORD to match server .env"
+            echo "  - Re-run this workflow after fixing"
+            exit 1
+          fi
+          echo "  Got access_code: ${ACCESS_CODE:0:8}..."
+
+          TOKEN_RESP=$(curl -sf "${SPECKLE_URL}/auth/token" \
+            -H "Content-Type: application/json" \
+            -d "{\"appId\":\"spklwebapp\",\"appSecret\":\"spklwebapp\",\"accessCode\":\"${ACCESS_CODE}\",\"challenge\":\"${CHALLENGE}\"}")
+          SPECKLE_TOKEN=$(echo "${TOKEN_RESP}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null)
+
+          if [ -z "${SPECKLE_TOKEN}" ]; then
+            echo "FATAL: Could not obtain token from Speckle auth/token"
+            echo "  Response: ${TOKEN_RESP}"
+            exit 1
+          fi
+          echo "  Got token: ${SPECKLE_TOKEN:0:10}..."
+
+          # Verify token works
+          ACTIVE_USER_RESP=$(curl -s "${SPECKLE_URL}/graphql" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${SPECKLE_TOKEN}" \
+            -d '{"query":"{ activeUser { id email name } }"}')
+
+          if echo "${ACTIVE_USER_RESP}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['activeUser']['email'])" 2>/dev/null; then
+            echo "OK: Authenticated as $(echo "${ACTIVE_USER_RESP}" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['activeUser']['email'])" 2>/dev/null)"
+          else
+            echo "FATAL: Token obtained but activeUser query failed"
+            echo "  Response: ${ACTIVE_USER_RESP}"
+            exit 1
+          fi
+
+          # Export token for subsequent steps
+          echo "SPECKLE_TOKEN=${SPECKLE_TOKEN}" >> $GITHUB_ENV
+
+      - name: Seed Speckle BIM Demo Data
+        if: inputs.seed_type == 'full'
+        env:
+          SPECKLE_URL: https://staging.ectropy.ai/speckle
+          # ENTERPRISE FIX (2026-03-07): Bypass Cloudflare for file uploads
+          # Cloudflare proxy has 100s timeout (non-Enterprise plan).
+          # Speckle file upload can take >100s to respond.
+          # Direct LB access (HTTP) has 300s timeout — no Cloudflare in path.
+          SPECKLE_UPLOAD_URL: http://${{ vars.STAGING_LB_IP }}/speckle
+          SPECKLE_TOKEN: ${{ env.SPECKLE_TOKEN }}
+        run: |
+          echo "========================================="
+          echo "SEEDING SPECKLE BIM DEMO DATA"
+          echo "========================================="
+          echo ""
+          echo "Environment: Staging"
+          echo "Speckle URL: ${SPECKLE_URL}"
+          echo "Speckle Upload URL: ${SPECKLE_UPLOAD_URL} (bypasses Cloudflare 100s timeout)"
+          echo "IFC Files: test-data/demo-office-building.ifc, test-data/Ifc4_SampleHouse.ifc"
+          echo ""
+
+          # Validate IFC files exist
+          echo "🔍 Validating IFC files..."
+          if [ ! -f "test-data/demo-office-building.ifc" ]; then
+            echo "❌ ERROR: demo-office-building.ifc not found"
+            exit 1
+          fi
+          if [ ! -f "test-data/Ifc4_SampleHouse.ifc" ]; then
+            echo "❌ ERROR: Ifc4_SampleHouse.ifc not found"
+            exit 1
+          fi
+          echo "✅ IFC files validated"
+          echo ""
+
+          # Query demo project IDs from database
+          echo "📊 Querying demo project IDs..."
+          OFFICE_PROJECT_ID=$(psql "$DATABASE_URL" -t -c "SELECT id FROM projects WHERE name = 'Demo Office Building' LIMIT 1;" | xargs)
+          RESIDENTIAL_PROJECT_ID=$(psql "$DATABASE_URL" -t -c "SELECT id FROM projects WHERE name = 'Sample Residential Complex' LIMIT 1;" | xargs)
+
+          if [ -z "$OFFICE_PROJECT_ID" ] || [ -z "$RESIDENTIAL_PROJECT_ID" ]; then
+            echo "❌ ERROR: Could not find demo projects in database"
+            echo "   Office Project ID: ${OFFICE_PROJECT_ID:-NOT FOUND}"
+            echo "   Residential Project ID: ${RESIDENTIAL_PROJECT_ID:-NOT FOUND}"
+            exit 1
+          fi
+
+          echo "✅ Demo projects found:"
+          echo "   Demo Office Building: $OFFICE_PROJECT_ID"
+          echo "   Sample Residential Complex: $RESIDENTIAL_PROJECT_ID"
+          echo ""
+
+          # Create Speckle stream for Demo Office Building
+          echo "🌱 Creating Speckle stream: Demo Office Building..."
+          GRAPHQL_ENDPOINT="${SPECKLE_URL}/graphql"
+
+          OFFICE_STREAM_RESULT=$(curl -s -X POST "${GRAPHQL_ENDPOINT}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${SPECKLE_TOKEN}" \
+            -d '{"query":"mutation { streamCreate(stream: { name: \"Demo Office Building - IFC Model\", description: \"BIM model for Demo Office Building project ($2.5M commercial development)\", isPublic: false }) }"}')
+
+          OFFICE_STREAM_ID=$(echo "$OFFICE_STREAM_RESULT" | jq -r '.data.streamCreate // empty')
+
+          if [ -z "$OFFICE_STREAM_ID" ]; then
+            echo "❌ ERROR: Failed to create Speckle stream for Office Building"
+            echo "$OFFICE_STREAM_RESULT" | jq .
+            exit 1
+          fi
+
+          echo "✅ Stream created: $OFFICE_STREAM_ID"
+          echo ""
+
+          # Upload IFC file for Demo Office Building
+          echo "📤 Uploading IFC: demo-office-building.ifc..."
+          OFFICE_UPLOAD_URL="${SPECKLE_UPLOAD_URL}/api/file/autodetect/${OFFICE_STREAM_ID}/main"
+
+          OFFICE_HTTP_CODE=$(curl -s -o /tmp/office_upload.json -w "%{http_code}" \
+            --max-time 300 \
+            -X POST "${OFFICE_UPLOAD_URL}" \
+            -H "Authorization: Bearer ${SPECKLE_TOKEN}" \
+            -F "file=@test-data/demo-office-building.ifc")
+          OFFICE_UPLOAD_RESULT=$(cat /tmp/office_upload.json)
+
+          echo "  HTTP status: $OFFICE_HTTP_CODE"
+          echo "  Raw response: $OFFICE_UPLOAD_RESULT"
+
+          OFFICE_BLOB_ID=$(echo "$OFFICE_UPLOAD_RESULT" | jq -r '.uploadResults[0].blobId // empty' 2>/dev/null)
+
+          if [ -z "$OFFICE_BLOB_ID" ]; then
+            echo "❌ ERROR: Failed to upload IFC for Office Building (HTTP $OFFICE_HTTP_CODE)"
+            echo "$OFFICE_UPLOAD_RESULT" | jq . 2>/dev/null || echo "$OFFICE_UPLOAD_RESULT"
+            exit 1
+          fi
+
+          echo "✅ IFC uploaded: $OFFICE_BLOB_ID"
+          echo ""
+
+          # Create Speckle stream for Sample Residential Complex
+          echo "🌱 Creating Speckle stream: Sample Residential Complex..."
+
+          RESIDENTIAL_STREAM_RESULT=$(curl -s -X POST "${GRAPHQL_ENDPOINT}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${SPECKLE_TOKEN}" \
+            -d '{"query":"mutation { streamCreate(stream: { name: \"Sample Residential Complex - IFC Model\", description: \"BIM model for Sample Residential Complex project ($1.8M residential development)\", isPublic: false }) }"}')
+
+          RESIDENTIAL_STREAM_ID=$(echo "$RESIDENTIAL_STREAM_RESULT" | jq -r '.data.streamCreate // empty')
+
+          if [ -z "$RESIDENTIAL_STREAM_ID" ]; then
+            echo "❌ ERROR: Failed to create Speckle stream for Residential Complex"
+            echo "$RESIDENTIAL_STREAM_RESULT" | jq .
+            exit 1
+          fi
+
+          echo "✅ Stream created: $RESIDENTIAL_STREAM_ID"
+          echo ""
+
+          # Upload IFC file for Sample Residential Complex
+          echo "📤 Uploading IFC: Ifc4_SampleHouse.ifc..."
+          RESIDENTIAL_UPLOAD_URL="${SPECKLE_UPLOAD_URL}/api/file/autodetect/${RESIDENTIAL_STREAM_ID}/main"
+
+          RESIDENTIAL_HTTP_CODE=$(curl -s -o /tmp/residential_upload.json -w "%{http_code}" \
+            --max-time 300 \
+            -X POST "${RESIDENTIAL_UPLOAD_URL}" \
+            -H "Authorization: Bearer ${SPECKLE_TOKEN}" \
+            -F "file=@test-data/Ifc4_SampleHouse.ifc")
+          RESIDENTIAL_UPLOAD_RESULT=$(cat /tmp/residential_upload.json)
+
+          echo "  HTTP status: $RESIDENTIAL_HTTP_CODE"
+          echo "  Raw response: $RESIDENTIAL_UPLOAD_RESULT"
+
+          RESIDENTIAL_BLOB_ID=$(echo "$RESIDENTIAL_UPLOAD_RESULT" | jq -r '.uploadResults[0].blobId // empty' 2>/dev/null)
+
+          if [ -z "$RESIDENTIAL_BLOB_ID" ]; then
+            echo "❌ ERROR: Failed to upload IFC for Residential Complex (HTTP $RESIDENTIAL_HTTP_CODE)"
+            echo "$RESIDENTIAL_UPLOAD_RESULT" | jq . 2>/dev/null || echo "$RESIDENTIAL_UPLOAD_RESULT"
+            exit 1
+          fi
+
+          echo "✅ IFC uploaded: $RESIDENTIAL_BLOB_ID"
+          echo ""
+
+          # Clean up orphaned SpeckleStream records from prior seed runs
+          # Five Why 2026-03-03: Stale rows from previous demo project UUIDs
+          # accumulate because ON CONFLICT only matches construction_project_id.
+          # If project was recreated with new UUID, old row persists as orphan.
+          echo "🧹 Cleaning orphaned SpeckleStream records..."
+          DELETED_COUNT=$(psql "$DATABASE_URL" -t -c "DELETE FROM speckle_streams WHERE construction_project_id NOT IN ('$OFFICE_PROJECT_ID'::uuid, '$RESIDENTIAL_PROJECT_ID'::uuid) RETURNING id;" | grep -c . || echo "0")
+          echo "   Removed $DELETED_COUNT orphaned record(s)"
+          echo ""
+
+          # Insert SpeckleStream records into database
+          echo "💾 Creating SpeckleStream database records..."
+
+          psql "$DATABASE_URL" <<SQL
+            INSERT INTO speckle_streams (id, construction_project_id, stream_id, stream_name, created_at, updated_at)
+            VALUES
+              (gen_random_uuid(), '$OFFICE_PROJECT_ID'::uuid, '$OFFICE_STREAM_ID', 'Demo Office Building - IFC Model', NOW(), NOW()),
+              (gen_random_uuid(), '$RESIDENTIAL_PROJECT_ID'::uuid, '$RESIDENTIAL_STREAM_ID', 'Sample Residential Complex - IFC Model', NOW(), NOW())
+            ON CONFLICT (construction_project_id) DO UPDATE
+              SET stream_id = EXCLUDED.stream_id,
+                  stream_name = EXCLUDED.stream_name,
+                  updated_at = NOW();
+          SQL
+
+          echo "✅ SpeckleStream records created"
+          echo ""
+
+          # Validate Speckle integration (scoped to demo projects only)
+          # Five Why 2026-03-03: Previous COUNT(*) counted ALL rows including orphans.
+          # Scoped query validates only the 2 demo project rows we just upserted.
+          echo "🔍 Validating Speckle integration..."
+          STREAM_COUNT=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM speckle_streams WHERE construction_project_id IN ('$OFFICE_PROJECT_ID'::uuid, '$RESIDENTIAL_PROJECT_ID'::uuid);" | xargs)
+          echo "   SpeckleStream records (demo projects): $STREAM_COUNT"
+
+          TOTAL_STREAMS=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM speckle_streams;" | xargs)
+          echo "   SpeckleStream records (total): $TOTAL_STREAMS"
+
+          if [ "$STREAM_COUNT" -ne 2 ]; then
+            echo "❌ ERROR: Expected 2 SpeckleStream records for demo projects, found $STREAM_COUNT"
+            exit 1
+          fi
+
+          echo "✅ Speckle BIM seeding complete"
+          echo ""
+          echo "📋 Speckle Configuration:"
+          echo "   Demo Office Building:"
+          echo "     - Stream ID: $OFFICE_STREAM_ID"
+          echo "     - Blob ID: $OFFICE_BLOB_ID"
+          echo "     - Project ID: $OFFICE_PROJECT_ID"
+          echo ""
+          echo "   Sample Residential Complex:"
+          echo "     - Stream ID: $RESIDENTIAL_STREAM_ID"
+          echo "     - Blob ID: $RESIDENTIAL_BLOB_ID"
+          echo "     - Project ID: $RESIDENTIAL_PROJECT_ID"
+          echo ""
+
+      - name: Database Post-Seed State
+        if: inputs.seed_type == 'full' || inputs.seed_type == 'users-only'
+        run: |
+          echo "========================================="
+          echo "DATABASE STATE AFTER SEEDING"
+          echo "========================================="
+          echo ""
+
+          echo "📊 Record counts:"
+          psql "$DATABASE_URL" -c "SELECT COUNT(*) as tenant_count FROM tenants;"
+          psql "$DATABASE_URL" -c "SELECT COUNT(*) as user_count FROM users;"
+          psql "$DATABASE_URL" -c "SELECT COUNT(*) as project_count FROM projects;"
+
+          if [ "${{ inputs.seed_type }}" = "full" ]; then
+            psql "$DATABASE_URL" -c "SELECT COUNT(*) as speckle_stream_count FROM speckle_streams;"
+          fi
+
+          echo ""
+          echo "🏢 Seeded tenants:"
+          psql "$DATABASE_URL" -c "SELECT slug, name, status, subscription_tier FROM tenants ORDER BY created_at;"
+
+          echo ""
+          echo "👥 Seeded users:"
+          psql "$DATABASE_URL" -c "SELECT email, full_name, role, is_platform_admin, tenant_id FROM users ORDER BY email;"
+
+          echo ""
+          echo "🏗️ Seeded projects:"
+          psql "$DATABASE_URL" -c "SELECT name, status, tenant_id FROM projects ORDER BY name;"
+
+          if [ "${{ inputs.seed_type }}" = "full" ]; then
+            echo ""
+            echo "🏗️ Seeded Speckle streams:"
+            psql "$DATABASE_URL" -c "SELECT ss.stream_name, ss.stream_id, p.name as project_name FROM speckle_streams ss JOIN projects p ON ss.construction_project_id = p.id ORDER BY p.name;"
+          fi
+
+      - name: Validate Multi-Tenant Database State
+        if: inputs.seed_type == 'full' || inputs.seed_type == 'users-only'
+        run: |
+          echo "========================================="
+          echo "VALIDATING MULTI-TENANT DATABASE STATE"
+          echo "========================================="
+          echo ""
+
+          echo "🔍 Running comprehensive audit validation..."
+          echo ""
+
+          psql "$DATABASE_URL" -f scripts/database/audit-multi-tenant-state.sql
+
+          echo ""
+          echo "✅ Multi-tenant validation complete"
+
+      - name: Verify Seeded Data via API
+        if: inputs.seed_type == 'full' || inputs.seed_type == 'users-only'
+        run: |
+          echo "========================================="
+          echo "VERIFYING SEEDED DATA VIA API"
+          echo "========================================="
+
+          # Wait for API to be ready
+          echo "⏳ Waiting for API to be ready..."
+          sleep 5
+
+          # Test health endpoint
+          echo "🔍 Testing GET /api/health..."
+          HEALTH_RESPONSE=$(curl -s https://staging.ectropy.ai/api/health || echo '{"error": "API health check failed"}')
+          echo "Health Response:"
+          echo "$HEALTH_RESPONSE" | jq '.' || echo "$HEALTH_RESPONSE"
+
+          echo ""
+
+          # Test projects endpoint (note: may require authentication)
+          echo "🔍 Testing GET /api/projects..."
+          PROJECTS_RESPONSE=$(curl -s https://staging.ectropy.ai/api/projects || echo '{"error": "API request failed"}')
+          echo "Projects Response:"
+          echo "$PROJECTS_RESPONSE" | jq '.' || echo "$PROJECTS_RESPONSE"
+
+          # Count projects
+          PROJECT_COUNT=$(echo "$PROJECTS_RESPONSE" | jq -r '.data | length' 2>/dev/null || echo "0")
+          echo ""
+          echo "📊 Projects accessible via API: $PROJECT_COUNT"
+
+          if [ "$PROJECT_COUNT" -gt 0 ]; then
+            echo "✅ Database seeding successful - projects are accessible via API"
+          else
+            echo "⚠️  Warning: No projects returned from API"
+            echo "   This may indicate API authentication is required or data is tenant-isolated"
+            echo "   Database seeding was successful - verification via direct database query passed"
+          fi
+
+      - name: Seeding Summary
+        if: always()
+        run: |
+          echo "========================================="
+          echo "MULTI-TENANT DATABASE SEEDING SUMMARY"
+          echo "========================================="
+          echo ""
+          echo "Environment: Staging"
+          echo "Database: DigitalOcean Managed PostgreSQL"
+          echo "Database ID: 8fc39980-bbca-4e80-91c6-b6788b445b5a"
+          echo "Connection: Zero-SSH (direct from GitHub Actions)"
+          echo "Seed Script: database/seed-multi-tenant-demo.sql"
+          echo "Audit Script: scripts/database/audit-multi-tenant-state.sql"
+          echo ""
+          echo "Demo Accounts Created:"
+          echo "  Platform Admin: admin@ectropy.com / admin123"
+          echo "  Tenant User:    demo@ectropy.com / demo123"
+          echo "  Tenant User:    test@ectropy.com / test123"
+          echo ""
+          echo "Demo Tenant:"
+          echo "  Slug: ectropy-demo"
+          echo "  Name: Ectropy Demo Organization"
+          echo "  Tier: ENTERPRISE (unlimited)"
+          echo ""
+          echo "Demo Projects:"
+          echo "  - Demo Office Building ($2.5M, active) with Speckle BIM model"
+          echo "  - Sample Residential Complex ($1.8M, planning) with Speckle BIM model"
+          echo ""
+
+          if [ "${{ inputs.seed_type }}" = "full" ]; then
+            echo "Speckle BIM Integration:"
+            echo "  - 2 Speckle streams created with IFC models"
+            echo "  - Database records linking projects to streams"
+            echo "  - BIM viewer ready for E2E testing"
+            echo ""
+          fi
+
+          echo "Next Steps:"
+          echo "  1. Verify API: curl https://staging.ectropy.ai/api/health"
+          echo "  2. Login: https://staging.ectropy.ai (demo@ectropy.com / demo123)"
+          echo "  3. Navigate to viewer: https://staging.ectropy.ai/viewer"
+          echo "  4. Select project → View 3D BIM model"
+          echo "  5. Test role switcher (contractor ↔ owner)"
+          echo "  6. Run E2E tests: pnpm nx e2e web-dashboard-e2e"
+          echo ""
+          echo "✅ Multi-tenant + BIM seeding workflow complete"

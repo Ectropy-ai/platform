@@ -1,0 +1,151 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://luhtech.dev/schemas/eil/assistant-conversation.schema.json",
+  "title": "Assistant Conversation Schema",
+  "description": "Conversation container for Seppä assistant sessions",
+  "type": "object",
+  "definitions": {
+    "AssistantMessage": {
+      "type": "object",
+      "required": ["messageId", "role", "content", "timestamp"],
+      "properties": {
+        "messageId": { "type": "string", "description": "Unique message identifier" },
+        "conversationId": { "type": "string", "description": "Parent conversation identifier" },
+        "role": { "type": "string", "enum": ["user", "assistant", "system", "tool"] },
+        "content": { "type": "string", "description": "Message text content" },
+        "toolCalls": { "type": "array", "items": { "type": "object" } },
+        "toolResults": { "type": "array", "items": { "type": "object" } },
+        "citations": { "type": "array", "items": { "type": "object" } },
+        "metadata": { "type": "object" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "required": ["conversationId", "tenantId", "userId", "createdAt"],
+  "properties": {
+    "conversationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique conversation identifier"
+    },
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:conversation:.+$",
+      "description": "URN identifier for graph integration"
+    },
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Tenant (organization) identifier"
+    },
+    "userId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "User identifier"
+    },
+    "projectId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Active project context"
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["web", "sms", "voice", "teams", "slack", "email"],
+      "description": "Communication channel"
+    },
+    "context": {
+      "type": "object",
+      "description": "Session context for Claude",
+      "properties": {
+        "activeVoxels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Currently selected voxel IDs"
+        },
+        "viewerState": {
+          "type": "object",
+          "properties": {
+            "position": {
+              "type": "array",
+              "items": { "type": "number" },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "target": {
+              "type": "array",
+              "items": { "type": "number" },
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        },
+        "authorityLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6,
+          "description": "User's authority level (0=Field, 6=Regulatory)"
+        },
+        "userRole": {
+          "type": "string",
+          "description": "User's role name"
+        }
+      }
+    },
+    "ragContext": {
+      "type": "object",
+      "description": "RAG context assembled for this conversation",
+      "properties": {
+        "recentDecisions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "URNs of recently discussed decisions"
+        },
+        "activeZone": {
+          "type": "string",
+          "description": "Current zone context"
+        },
+        "todaysTasks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tasks assigned for today"
+        },
+        "tokenBudget": {
+          "type": "integer",
+          "description": "Token budget based on authority level"
+        }
+      }
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/AssistantMessage"
+      },
+      "description": "Conversation message history"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "idle", "closed", "archived"],
+      "default": "active"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Conversation timeout (default 30 min for SMS)"
+    },
+    "graphMetadata": {
+      "type": "object",
+      "properties": {
+        "inEdges": { "type": "array", "items": { "type": "string" } },
+        "outEdges": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

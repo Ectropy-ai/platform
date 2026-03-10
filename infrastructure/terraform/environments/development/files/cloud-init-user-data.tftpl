@@ -1,0 +1,107 @@
+#!/bin/bash
+set -euo pipefail
+
+# Suppress interactive apt prompts
+export DEBIAN_FRONTEND=noninteractive
+
+# Log all output for cloud-init debugging
+exec > >(tee /var/log/user-data.log)
+exec 2>&1
+
+echo "=== Starting cloud-init provisioning: $(date) ==="
+
+# System updates (security patches only — full upgrade causes OOM on small droplets)
+apt-get update
+
+# Install Docker
+echo "Installing Docker..."
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+systemctl enable docker
+systemctl start docker
+
+# Install Docker Compose
+echo "Installing Docker Compose..."
+curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+
+# Configure Docker daemon
+echo "Configuring Docker daemon..."
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<DOCKER_CONFIG
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "live-restore": true
+}
+DOCKER_CONFIG
+systemctl restart docker
+
+# Create application directory
+mkdir -p /opt/ectropy
+
+# Configure automated Docker cleanup (weekly)
+cat > /etc/cron.weekly/docker-cleanup <<CLEANUP
+#!/bin/bash
+docker system prune -af --filter 'until=168h'
+docker builder prune -af
+CLEANUP
+chmod +x /etc/cron.weekly/docker-cleanup
+
+# Install monitoring tools
+echo "Installing monitoring tools..."
+apt-get install -y htop iotop nethogs sysstat curl wget git jq netcat-openbsd
+
+# ============================================================================
+# Zero-SSH Config Sync Service
+# ============================================================================
+
+echo "=== Installing Zero-SSH Config Sync Service ==="
+
+# Install AWS CLI for DigitalOcean Spaces access
+echo "Installing AWS CLI..."
+apt-get install -y awscli
+
+# Create scripts directory
+mkdir -p /opt/ectropy/scripts
+
+# Deploy config-sync files (base64-encoded to avoid shell escaping issues)
+echo "Deploying config-sync.sh..."
+echo "${config_sync_script_base64}" | base64 -d > /opt/ectropy/scripts/config-sync.sh
+chmod +x /opt/ectropy/scripts/config-sync.sh
+
+echo "Deploying config-sync.service..."
+echo "${config_sync_service_base64}" | base64 -d > /etc/systemd/system/config-sync.service
+
+echo "Deploying config-sync.timer..."
+echo "${config_sync_timer_base64}" | base64 -d > /etc/systemd/system/config-sync.timer
+
+# Create AWS credentials file for DigitalOcean Spaces
+echo "Creating AWS credentials for Spaces access..."
+cat > /etc/default/config-sync <<SPACES_CREDENTIALS
+AWS_ACCESS_KEY_ID=${spaces_access_key}
+AWS_SECRET_ACCESS_KEY=${spaces_secret_key}
+AWS_ENDPOINT_URL=https://sfo3.digitaloceanspaces.com
+DOCR_CONFIG_JSON=${docr_config_json}
+SPACES_CREDENTIALS
+
+# Reload systemd and start config-sync
+echo "Enabling config-sync.timer..."
+systemctl daemon-reload
+systemctl enable config-sync.timer
+systemctl start config-sync.timer
+
+systemctl status config-sync.timer --no-pager || true
+
+echo "=== Zero-SSH Config Sync Service Active ==="
+
+# Verify installations
+echo "Verifying installations..."
+docker --version
+docker-compose --version
+aws --version
+
+echo "=== Development server provisioned successfully: $(date) ===" | tee /opt/ectropy/provisioned.txt

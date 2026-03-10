@@ -1,0 +1,31 @@
+--- a/node_modules/@nx/webpack/src/utils/webpack/resolve-user-defined-webpack-config.js
++++ b/node_modules/@nx/webpack/src/utils/webpack/resolve-user-defined-webpack-config.js
+@@
+-    if (!/\.(ts|mts|cts)$/.test(path)) {
+-        return require(path);
+-    }
+-    const cleanupTranspiler = (0, internal_1.registerTsProject)(tsConfig);
+-    const maybeCustomWebpackConfig = require(path);
+-    cleanupTranspiler();
++    if (!/\.(ts|mts|cts)$/.test(path)) {
++        const maybeCustomWebpackConfig = require(path);
++        return 'default' in maybeCustomWebpackConfig
++            ? maybeCustomWebpackConfig.default
++            : maybeCustomWebpackConfig;
++    }
++    const cleanupTranspiler = (0, internal_1.registerTsProject)(tsConfig);
++    const maybeCustomWebpackConfig = require(path);
++    cleanupTranspiler();
+@@
+-    const customWebpackConfig = 'default' in maybeCustomWebpackConfig
+-        ? 'default' in maybeCustomWebpackConfig.default
+-            ? maybeCustomWebpackConfig.default.default
+-            : maybeCustomWebpackConfig.default
+-        : maybeCustomWebpackConfig;
+-    return customWebpackConfig;
++    const customWebpackConfig = 'default' in maybeCustomWebpackConfig
++        ? 'default' in maybeCustomWebpackConfig.default
++            ? maybeCustomWebpackConfig.default.default
++            : maybeCustomWebpackConfig.default
++        : maybeCustomWebpackConfig;
++    return customWebpackConfig;

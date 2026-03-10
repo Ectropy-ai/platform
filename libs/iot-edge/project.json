@@ -1,0 +1,33 @@
+{
+  "name": "@ectropy/iot-edge",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/iot-edge/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "libs/iot-edge/dist",
+        "main": "libs/iot-edge/src/index.ts",
+        "tsConfig": "libs/iot-edge/tsconfig.lib.json",
+        "assets": ["libs/iot-edge/*.md"]
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/iot-edge/**/*.js"]
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --passWithNoTests=false libs/iot-edge/src",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  },
+  "tags": ["scope:iot", "type:lib"]
+}

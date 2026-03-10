@@ -1,0 +1,160 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:warranty",
+  "title": "Warranty Schema",
+  "description": "Equipment or system warranty with expiration tracking",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "warrantyId",
+    "projectRef",
+    "itemType",
+    "startDate",
+    "expirationDate",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:warranty:WAR-[0-9]{4}-[0-9]{4}$"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:warranty"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "warrantyId": {
+      "type": "string",
+      "pattern": "^WAR-[0-9]{4}-[0-9]{4}$"
+    },
+    "projectRef": { "$ref": "#/$defs/urn" },
+    "closeoutRef": { "$ref": "#/$defs/urn" },
+    "voxelRefs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "itemType": {
+      "type": "string",
+      "enum": [
+        "GENERAL_CONSTRUCTION",
+        "ROOFING",
+        "HVAC_EQUIPMENT",
+        "ELEVATOR",
+        "GENERATOR",
+        "CONTROLS",
+        "PLUMBING_FIXTURES",
+        "ELECTRICAL_EQUIPMENT",
+        "SPECIALTY"
+      ]
+    },
+    "itemDescription": { "type": "string" },
+    "manufacturer": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "contact": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string", "format": "email" }
+      }
+    },
+    "installer": {
+      "type": "object",
+      "properties": {
+        "partyRef": { "$ref": "#/$defs/urn" },
+        "name": { "type": "string" },
+        "contact": { "type": "string" },
+        "phone": { "type": "string" }
+      }
+    },
+    "startDate": { "type": "string", "format": "date" },
+    "expirationDate": { "type": "string", "format": "date" },
+    "warrantyPeriodMonths": { "type": "integer" },
+    "warrantyType": {
+      "type": "string",
+      "enum": [
+        "STANDARD",
+        "EXTENDED",
+        "MANUFACTURER",
+        "LABOR_ONLY",
+        "PARTS_ONLY",
+        "FULL"
+      ]
+    },
+    "coverage": {
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "exclusions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "laborIncluded": { "type": "boolean" },
+        "partsIncluded": { "type": "boolean" }
+      }
+    },
+    "documentation": {
+      "type": "object",
+      "properties": {
+        "warrantyDocument": { "type": "string", "format": "uri" },
+        "serialNumbers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "modelNumbers": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ACTIVE", "EXPIRING_SOON", "EXPIRED", "VOIDED"]
+    },
+    "notifications": {
+      "type": "object",
+      "properties": {
+        "expirationWarningDays": { "type": "integer" },
+        "notifyParties": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" }
+        }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    }
+  }
+}

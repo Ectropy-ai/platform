@@ -1,0 +1,205 @@
+# Enterprise Load Testing Configuration for Ectropy Platform
+# Tests sustained load of 100 concurrent users across all services
+
+config:
+  target: "http://localhost:4000"
+  processor: "./load-test-processor.js"
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: "Warm up - Initial connection establishment"
+    - duration: 120
+      arrivalRate: 50
+      name: "Ramp up - Gradual load increase"
+    - duration: 300
+      arrivalRate: 100
+      name: "Sustained load - Peak traffic simulation"
+    - duration: 60
+      arrivalRate: 50
+      name: "Cool down - Gradual load decrease"
+  environments:
+    production:
+      target: "https://api.ectropy.com"
+    staging:
+      target: "https://staging-api.ectropy.com"
+  variables:
+    mcp_server_url: "http://localhost:3001"
+
+scenarios:
+  - name: "Construction Stakeholder Workflow"
+    weight: 70
+    flow:
+      # Authentication
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            email: "{{ $randomEmail() }}"
+            password: "demo123"
+          headers:
+            Content-Type: "application/json"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+            - json: "$.user.id"
+              as: "userId"
+            - json: "$.user.role"
+              as: "userRole"
+          expect:
+            - statusCode: 200
+            - hasProperty: "token"
+
+      # Project Management
+      - get:
+          url: "/api/v1/projects"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+            Content-Type: "application/json"
+          capture:
+            - json: "$[0].id"
+              as: "projectId"
+          expect:
+            - statusCode: 200
+
+      # BIM Elements Access
+      - get:
+          url: "/api/v1/projects/{{ projectId }}/elements"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+
+      # Create Construction Element (based on role)
+      - post:
+          url: "/api/v1/projects/{{ projectId }}/elements"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+            Content-Type: "application/json"
+          json:
+            name: "Load Test Element {{ $randomString() }}"
+            type: "{{ $randomFromArray(['IfcWall', 'IfcBeam', 'IfcColumn', 'IfcSlab']) }}"
+            properties:
+              material: "{{ $randomFromArray(['Steel', 'Concrete', 'Timber', 'Masonry']) }}"
+              dimensions:
+                length: "{{ $randomInt(1, 20) }}"
+                width: "{{ $randomInt(1, 10) }}"
+                height: "{{ $randomInt(1, 5) }}"
+          expect:
+            - statusCode: 201
+
+      # Stakeholder Collaboration
+      - get:
+          url: "/api/v1/projects/{{ projectId }}/stakeholders"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+
+      # Real-time Updates (WebSocket simulation via polling)
+      - get:
+          url: "/api/v1/projects/{{ projectId }}/updates"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          expect:
+            - statusCode: 200
+
+  - name: "MCP Server AI Operations"
+    weight: 20
+    flow:
+      # Health Check
+      - get:
+          url: "{{ mcp_server_url }}/health"
+          expect:
+            - statusCode: 200
+
+      # Semantic Search
+      - post:
+          url: "{{ mcp_server_url }}/api/semantic-search"
+          json:
+            query: "{{ $randomFromArray(['construction safety', 'building codes', 'structural analysis', 'material specifications', 'project timeline']) }}"
+            limit: 10
+            filters:
+              type: "{{ $randomFromArray(['document', 'drawing', 'specification', 'regulation']) }}"
+          headers:
+            Content-Type: "application/json"
+          expect:
+            - statusCode: 200
+            - hasProperty: "results"
+
+      # Document Processing
+      - post:
+          url: "{{ mcp_server_url }}/api/document/analyze"
+          json:
+            documentType: "{{ $randomFromArray(['pdf', 'ifc', 'dwg']) }}"
+            analysisType: "{{ $randomFromArray(['content_extraction', 'compliance_check', 'cost_estimation']) }}"
+            priority: "{{ $randomFromArray(['high', 'medium', 'low']) }}"
+          headers:
+            Content-Type: "application/json"
+          expect:
+            - statusCode: 200
+
+      # Agent Task Execution
+      - post:
+          url: "{{ mcp_server_url }}/api/agents/task"
+          json:
+            agentType: "{{ $randomFromArray(['compliance', 'procurement', 'task-manager', 'performance']) }}"
+            task:
+              action: "{{ $randomFromArray(['analyze', 'estimate', 'validate', 'optimize']) }}"
+              parameters:
+                projectId: "{{ $randomString() }}"
+                scope: "{{ $randomFromArray(['full', 'partial', 'summary']) }}"
+          headers:
+            Content-Type: "application/json"
+          expect:
+            - statusCode: 200
+
+  - name: "File Upload and Processing"
+    weight: 10
+    flow:
+      # Simulate IFC file upload
+      - post:
+          url: "/api/v1/files/upload"
+          formData:
+            file: "@./test-data/sample.ifc"
+            projectId: "{{ $randomString() }}"
+            fileType: "ifc"
+          headers:
+            Authorization: "Bearer demo_token"
+          expect:
+            - statusCode: 201
+
+      # Check processing status
+      - get:
+          url: "/api/v1/files/{{ $responseBody.fileId }}/status"
+          headers:
+            Authorization: "Bearer demo_token"
+          expect:
+            - statusCode: 200
+
+# Performance Thresholds
+thresholds:
+  http_req_duration:
+    - threshold: p(95) < 200
+      abortOnFail: true
+    - threshold: p(99) < 500
+      abortOnFail: false
+  http_req_failed:
+    - threshold: rate < 0.1
+      abortOnFail: true
+  http_reqs:
+    - threshold: rate > 100
+      abortOnFail: false
+
+# Metrics Collection
+metrics:
+  - construction_elements_created: 
+      type: Counter
+      description: "Number of construction elements created"
+  - ai_operations_completed:
+      type: Counter  
+      description: "Number of AI operations completed"
+  - file_uploads_processed:
+      type: Counter
+      description: "Number of file uploads processed"
+  - stakeholder_interactions:
+      type: Counter
+      description: "Number of stakeholder interactions"

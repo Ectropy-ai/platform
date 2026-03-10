@@ -1,0 +1,262 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://luhtech.dev/schemas/pm/schedule-proposal.schema.json",
+  "title": "Schedule Proposal Schema",
+  "description": "Proposed change to the 10-day look-ahead schedule by field teams",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "proposalId",
+    "proposerRef",
+    "proposedChanges",
+    "justification",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:schedule-proposal:PROP-[0-9]{4}-[0-9]{4}$",
+      "description": "URN identifier for this schedule proposal"
+    },
+    "$schema": {
+      "const": "https://luhtech.dev/schemas/pm/schedule-proposal.schema.json"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string" },
+        "sourceOfTruth": { "type": "string" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      }
+    },
+    "proposalId": {
+      "type": "string",
+      "pattern": "^PROP-[0-9]{4}-[0-9]{4}$"
+    },
+    "proposerRef": {
+      "$ref": "#/$defs/urn",
+      "description": "URN of the participant proposing the change"
+    },
+    "sourceDecisionRef": {
+      "$ref": "#/$defs/urn",
+      "description": "URN of the PM decision that created this proposal"
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "SUBMITTED",
+        "UNDER_REVIEW",
+        "APPROVED",
+        "REJECTED",
+        "WITHDRAWN"
+      ],
+      "default": "DRAFT"
+    },
+    "proposedChanges": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["taskId", "changeType"],
+        "properties": {
+          "taskId": { "type": "string" },
+          "taskName": { "type": "string" },
+          "changeType": {
+            "type": "string",
+            "enum": [
+              "RESCHEDULE",
+              "RESEQUENCE",
+              "ADD",
+              "REMOVE",
+              "MODIFY_SCOPE",
+              "SWAP_LOCATION"
+            ]
+          },
+          "currentStart": { "type": "string", "format": "date" },
+          "currentEnd": { "type": "string", "format": "date" },
+          "proposedStart": { "type": "string", "format": "date" },
+          "proposedEnd": { "type": "string", "format": "date" },
+          "currentLocation": { "type": "string" },
+          "proposedLocation": { "type": "string" },
+          "affectedVoxelRefs": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/urn" }
+          },
+          "scopeChange": { "type": "string" }
+        }
+      }
+    },
+    "justification": {
+      "type": "object",
+      "required": ["summary"],
+      "properties": {
+        "summary": { "type": "string" },
+        "benefits": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "risks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "affectedParties": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" }
+        },
+        "coordinationNeeded": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["trade", "reason", "contactStatus"],
+            "properties": {
+              "trade": { "type": "string" },
+              "contactPersonRef": { "$ref": "#/$defs/urn" },
+              "reason": { "type": "string" },
+              "contactStatus": {
+                "type": "string",
+                "enum": [
+                  "NOT_CONTACTED",
+                  "CONTACTED",
+                  "AGREED",
+                  "DISAGREED",
+                  "PENDING_RESPONSE"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "aiAnalysis": {
+      "type": "object",
+      "properties": {
+        "conflictsDetected": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rippleEffects": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "recommendation": {
+          "type": "string",
+          "enum": ["APPROVE", "REJECT", "MODIFY"]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "similarProposals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "proposalRef": { "$ref": "#/$defs/urn" },
+              "outcome": { "type": "string" },
+              "similarity": { "type": "number" }
+            }
+          }
+        },
+        "alternativeProposals": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      }
+    },
+    "approvalWorkflow": {
+      "type": "object",
+      "properties": {
+        "requiredApprovers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" }
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["approverRef", "status"],
+            "properties": {
+              "approverRef": { "$ref": "#/$defs/urn" },
+              "status": {
+                "type": "string",
+                "enum": ["PENDING", "APPROVED", "REJECTED"]
+              },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "comments": { "type": "string" }
+            }
+          }
+        },
+        "allApproved": { "type": "boolean" }
+      }
+    },
+    "resultingDecisionRef": {
+      "$ref": "#/$defs/urn",
+      "description": "URN of the decision created if proposal is approved"
+    },
+    "lookAheadWeek": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2,
+      "description": "Which week of the 10-day look-ahead (1 or 2)"
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "decidedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to", "type"],
+            "properties": {
+              "from": { "$ref": "#/$defs/urn" },
+              "to": { "$ref": "#/$defs/urn" },
+              "type": {
+                "type": "string",
+                "enum": ["proposes", "authored-by", "approved-by", "affects"]
+              },
+              "weight": { "type": "number", "minimum": 0, "maximum": 1 },
+              "label": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    }
+  }
+}

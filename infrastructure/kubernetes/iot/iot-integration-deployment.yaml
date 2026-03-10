@@ -1,0 +1,482 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ectropy-iot
+  labels:
+    ectropy.io/component: iot-integration
+    ectropy.io/deployment-type: enterprise
+    ectropy.io/security-level: enhanced
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iot-data-collector
+  namespace: ectropy-iot
+  labels:
+    app: iot-data-collector
+    ectropy.io/service: iot-data
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: iot-data-collector
+  template:
+    metadata:
+      labels:
+        app: iot-data-collector
+        ectropy.io/service: iot-data
+    spec:
+      serviceAccountName: ectropy-iot-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+        - name: data-collector
+          image: node:20
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: NODE_ENV
+              value: 'production'
+            - name: PORT
+              value: '3004'
+            - name: LOG_LEVEL
+              value: 'info'
+            - name: MQTT_BROKER_URL
+              value: 'mqtt://iot-broker:1883'
+            - name: REDIS_URL
+              value: 'redis://redis-service.ectropy-production:6379'
+            - name: POSTGRES_HOST
+              value: 'postgresql-service.ectropy-production.svc.cluster.local'
+            - name: IOT_DATA_RETENTION_DAYS
+              value: '30'
+            - name: ALERT_THRESHOLD_TEMPERATURE
+              value: '35'
+            - name: ALERT_THRESHOLD_VIBRATION
+              value: '7'
+            - name: ALERT_THRESHOLD_NOISE
+              value: '70'
+          ports:
+            - containerPort: 3004
+              name: http
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: '256Mi'
+              cpu: '250m'
+            limits:
+              memory: '512Mi'
+              cpu: '500m'
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: app-cache
+              mountPath: /app/.cache
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: app-cache
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iot-data-service
+  namespace: ectropy-iot
+  labels:
+    app: iot-data-collector
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3004
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: iot-data-collector
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iot-broker
+  namespace: ectropy-iot
+  labels:
+    app: iot-broker
+    ectropy.io/service: mqtt-broker
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: iot-broker
+  template:
+    metadata:
+      labels:
+        app: iot-broker
+        ectropy.io/service: mqtt-broker
+    spec:
+      serviceAccountName: ectropy-iot-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1883
+        fsGroup: 1883
+      containers:
+        - name: mosquitto
+          image: eclipse-mosquitto:2.0
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - containerPort: 1883
+              name: mqtt
+              protocol: TCP
+            - containerPort: 9001
+              name: websockets
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: mqtt
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: mqtt
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: '128Mi'
+              cpu: '100m'
+            limits:
+              memory: '256Mi'
+              cpu: '200m'
+          volumeMounts:
+            - name: mosquitto-config
+              mountPath: /mosquitto/config
+              readOnly: true
+            - name: mosquitto-data
+              mountPath: /mosquitto/data
+            - name: mosquitto-logs
+              mountPath: /mosquitto/log
+      volumes:
+        - name: mosquitto-config
+          configMap:
+            name: mosquitto-config
+        - name: mosquitto-data
+          persistentVolumeClaim:
+            claimName: mosquitto-data-pvc
+        - name: mosquitto-logs
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: iot-broker
+  namespace: ectropy-iot
+  labels:
+    app: iot-broker
+spec:
+  type: ClusterIP
+  ports:
+    - name: mqtt
+      port: 1883
+      targetPort: mqtt
+      protocol: TCP
+    - name: websockets
+      port: 9001
+      targetPort: websockets
+      protocol: TCP
+  selector:
+    app: iot-broker
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mosquitto-config
+  namespace: ectropy-iot
+data:
+  mosquitto.conf: |
+    # Mosquitto Configuration for Ectropy IoT
+
+    # Network listeners
+    listener 1883
+    allow_anonymous false
+    password_file /mosquitto/config/passwd
+
+    # WebSocket listener for web clients
+    listener 9001
+    protocol websockets
+    allow_anonymous false
+    password_file /mosquitto/config/passwd
+
+    # Persistence
+    persistence true
+    persistence_location /mosquitto/data/
+
+    # Logging
+    log_dest file /mosquitto/log/mosquitto.log
+    log_type error
+    log_type warning
+    log_type notice
+    log_type information
+
+    # Security
+    require_certificate false
+    use_identity_as_username false
+
+    # Performance tuning
+    max_connections 1000
+    max_inflight_messages 20
+    max_queued_messages 100
+    message_size_limit 100MB
+
+    # Bridge configuration for cross-region sync
+    # connection bridge-to-primary
+    # address primary-region-broker:1883
+    # topic iot/sensors/+/data out 1
+    # topic iot/alerts/+/data out 1
+
+  passwd: |
+    # MQTT user authentication (password: ectropy123)
+    ectropy_iot:$7$101$VGCJZelEbV1LgLV2$H5CGGWL1mYhAZrn+jKnZC9L+Js9VGhDQ8Q==
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mosquitto-data-pvc
+  namespace: ectropy-iot
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iot-sensor-simulator
+  namespace: ectropy-iot
+  labels:
+    app: iot-sensor-simulator
+    ectropy.io/service: sensor-simulator
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: iot-sensor-simulator
+  template:
+    metadata:
+      labels:
+        app: iot-sensor-simulator
+        ectropy.io/service: sensor-simulator
+    spec:
+      serviceAccountName: ectropy-iot-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+        - name: sensor-simulator
+          image: python:3.11-slim
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: PYTHONUNBUFFERED
+              value: '1'
+            - name: MQTT_BROKER_HOST
+              value: 'iot-broker'
+            - name: MQTT_BROKER_PORT
+              value: '1883'
+            - name: MQTT_USERNAME
+              value: 'ectropy_iot'
+            - name: MQTT_PASSWORD
+              value: 'ectropy123'
+            - name: SENSOR_TYPE
+              value: 'construction_site'
+            - name: SIMULATION_INTERVAL
+              value: '30' # seconds
+            - name: DEVICE_ID_PREFIX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          resources:
+            requests:
+              memory: '64Mi'
+              cpu: '50m'
+            limits:
+              memory: '128Mi'
+              cpu: '100m'
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ectropy-iot-service-account
+  namespace: ectropy-iot
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: ectropy-iot
+  name: ectropy-iot-role
+rules:
+  - apiGroups: ['']
+    resources: ['pods', 'services', 'configmaps', 'secrets']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['apps']
+    resources: ['deployments']
+    verbs: ['get', 'list', 'watch']
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ectropy-iot-rolebinding
+  namespace: ectropy-iot
+subjects:
+  - kind: ServiceAccount
+    name: ectropy-iot-service-account
+    namespace: ectropy-iot
+roleRef:
+  kind: Role
+  name: ectropy-iot-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: iot-data-collector-pdb
+  namespace: ectropy-iot
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: iot-data-collector
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: iot-data-collector-hpa
+  namespace: ectropy-iot
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: iot-data-collector
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: iot-network-policy
+  namespace: ectropy-iot
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ectropy-production
+        - namespaceSelector:
+            matchLabels:
+              name: ectropy-monitoring
+      ports:
+        - protocol: TCP
+          port: 3004
+        - protocol: TCP
+          port: 1883
+        - protocol: TCP
+          port: 9001
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: ectropy-production
+      ports:
+        - protocol: TCP
+          port: 5432 # PostgreSQL
+        - protocol: TCP
+          port: 6379 # Redis
+    - to: [] # Allow all outbound for external IoT devices
+      ports:
+        - protocol: TCP
+          port: 443 # HTTPS
+        - protocol: TCP
+          port: 80 # HTTP

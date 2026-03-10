@@ -1,0 +1,355 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:gaas:compliance-charter",
+  "title": "Compliance Charter",
+  "description": "Contract-level compliance requirements including AIA codes, regulatory constraints, and carbon budgets",
+  "type": "object",
+  "required": ["id", "contractId", "version", "effectiveDate", "requirements"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^CC-[0-9]{4}-[0-9]{4,}$",
+      "description": "Unique compliance charter identifier (e.g., CC-2026-0001)"
+    },
+    "contractId": {
+      "type": "string",
+      "description": "Reference to parent contract"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of charter (e.g., 1.0.0)"
+    },
+    "effectiveDate": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this charter becomes effective"
+    },
+    "expirationDate": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional expiration date for charter"
+    },
+    "requirements": {
+      "$ref": "#/definitions/ComplianceRequirements",
+      "description": "All compliance requirements from contract"
+    },
+    "carbonCompliance": {
+      "$ref": "#/definitions/CarbonCompliance",
+      "description": "Carbon budget and embodied carbon limits"
+    },
+    "safetyCompliance": {
+      "$ref": "#/definitions/SafetyCompliance",
+      "description": "OSHA and safety requirements"
+    },
+    "regulatoryCompliance": {
+      "$ref": "#/definitions/RegulatoryCompliance",
+      "description": "Building codes, permits, and regulatory requirements"
+    },
+    "qualityStandards": {
+      "$ref": "#/definitions/QualityStandards",
+      "description": "Quality assurance and testing requirements"
+    },
+    "metadata": {
+      "$ref": "#/definitions/ChapterMetadata",
+      "description": "Charter creation and modification metadata"
+    }
+  },
+  "definitions": {
+    "ComplianceRequirements": {
+      "type": "object",
+      "properties": {
+        "aiaDocuments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "documentId": {
+                "type": "string",
+                "description": "AIA document number (e.g., A201-2017)"
+              },
+              "sections": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Applicable sections from document"
+              },
+              "required": { "type": "boolean" }
+            },
+            "required": ["documentId"]
+          },
+          "description": "AIA contract documents and sections"
+        },
+        "deliverableSchedule": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "deliverableType": {
+                "type": "string",
+                "description": "Type of deliverable (BIM model, submittals, etc.)"
+              },
+              "dueDate": { "type": "string", "format": "date-time" },
+              "requiredBy": {
+                "type": "string",
+                "description": "Authority requiring deliverable"
+              },
+              "penalty": {
+                "type": "string",
+                "description": "Penalty for missing deadline"
+              }
+            },
+            "required": ["deliverableType", "dueDate"]
+          }
+        }
+      }
+    },
+    "CarbonCompliance": {
+      "type": "object",
+      "properties": {
+        "projectCarbonBudget": {
+          "type": "number",
+          "description": "Total project carbon budget in kgCO2e"
+        },
+        "standards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "standardId": {
+                "type": "string",
+                "enum": [
+                  "calgreen_tier1",
+                  "calgreen_tier2",
+                  "buy_clean_ca",
+                  "nyc_ll97",
+                  "leed_v4_mrc2",
+                  "eu_csrd",
+                  "sbti_1.5c"
+                ]
+              },
+              "jurisdiction": { "type": "string" },
+              "metric": { "type": "string" },
+              "offsetsAllowed": { "type": "boolean" },
+              "maxOffsetPercent": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": ["standardId", "metric"]
+          },
+          "description": "Applicable carbon compliance standards"
+        },
+        "materialRestrictions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "material": {
+                "type": "string",
+                "description": "Material type (concrete, steel, etc.)"
+              },
+              "maxGWP": {
+                "type": "number",
+                "description": "Maximum GWP in kgCO2e/unit"
+              },
+              "unit": { "type": "string", "description": "Unit of measure" },
+              "source": {
+                "type": "string",
+                "description": "Regulation source (Buy Clean CA, etc.)"
+              }
+            },
+            "required": ["material", "maxGWP"]
+          }
+        }
+      }
+    },
+    "SafetyCompliance": {
+      "type": "object",
+      "properties": {
+        "oshaPrograms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "OSHA_30",
+              "OSHA_10",
+              "HAZWOPER",
+              "CONFINED_SPACE",
+              "FALL_PROTECTION"
+            ]
+          },
+          "description": "Required OSHA training programs"
+        },
+        "siteSafetyPlan": {
+          "type": "boolean",
+          "description": "Whether site-specific safety plan is required"
+        },
+        "dailyInspections": {
+          "type": "boolean",
+          "description": "Whether daily safety inspections are required"
+        },
+        "incidentReportingWindow": {
+          "type": "number",
+          "description": "Hours within which incidents must be reported"
+        }
+      }
+    },
+    "RegulatoryCompliance": {
+      "type": "object",
+      "properties": {
+        "buildingCodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Building code name (IBC 2021, etc.)"
+              },
+              "jurisdiction": { "type": "string" },
+              "amendments": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Local amendments to code"
+              }
+            },
+            "required": ["code", "jurisdiction"]
+          }
+        },
+        "permits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "permitType": { "type": "string" },
+              "issuingAuthority": { "type": "string" },
+              "applicationDeadline": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "NOT_STARTED",
+                  "IN_PROGRESS",
+                  "SUBMITTED",
+                  "APPROVED",
+                  "REJECTED"
+                ]
+              }
+            },
+            "required": ["permitType", "issuingAuthority"]
+          }
+        },
+        "inspections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "inspectionType": { "type": "string" },
+              "frequency": {
+                "type": "string",
+                "description": "Inspection frequency (daily, weekly, etc.)"
+              },
+              "inspector": {
+                "type": "string",
+                "description": "Required inspector qualification"
+              }
+            },
+            "required": ["inspectionType"]
+          }
+        }
+      }
+    },
+    "QualityStandards": {
+      "type": "object",
+      "properties": {
+        "certifications": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "LEED",
+              "WELL",
+              "GREEN_GLOBES",
+              "LIVING_BUILDING_CHALLENGE",
+              "BREEAM"
+            ]
+          },
+          "description": "Required building certifications"
+        },
+        "testingRequirements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "system": {
+                "type": "string",
+                "description": "System requiring testing (HVAC, etc.)"
+              },
+              "testStandard": {
+                "type": "string",
+                "description": "Testing standard (ASHRAE, etc.)"
+              },
+              "frequency": { "type": "string" },
+              "acceptanceCriteria": { "type": "string" }
+            },
+            "required": ["system", "testStandard"]
+          }
+        },
+        "submittals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "submittalType": { "type": "string" },
+              "reviewAuthority": {
+                "type": "string",
+                "description": "Who reviews submittal (architect, engineer, etc.)"
+              },
+              "leadTime": {
+                "type": "number",
+                "description": "Days before installation"
+              },
+              "resubmittalLimit": {
+                "type": "number",
+                "description": "Maximum resubmittals allowed"
+              }
+            },
+            "required": ["submittalType", "reviewAuthority"]
+          }
+        }
+      }
+    },
+    "ChapterMetadata": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": {
+          "type": "string",
+          "description": "User who created charter"
+        },
+        "lastModified": { "type": "string", "format": "date-time" },
+        "modifiedBy": { "type": "string" },
+        "approvedBy": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "role": { "type": "string" },
+              "approvalDate": { "type": "string", "format": "date-time" },
+              "signature": {
+                "type": "string",
+                "description": "Digital signature hash"
+              }
+            },
+            "required": ["name", "role", "approvalDate"]
+          },
+          "description": "Signatories who approved this charter"
+        }
+      }
+    }
+  }
+}

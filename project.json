@@ -1,0 +1,41 @@
+{
+  "name": "federated-construction-platform",
+  "$schema": "./node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": ".",
+  "targets": {
+    "health": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bash tools/dev-setup/health-check.sh",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "health:detailed": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "bash tools/dev-setup/health-check.sh",
+          "curl -f -s http://localhost:3002/ > /dev/null && echo '✅ Web Dashboard (port 3002): Healthy' || echo '❌ Web Dashboard (port 3002): Not accessible'",
+          "curl -f -s http://localhost:4000/health > /dev/null && echo '✅ API Gateway (port 4000): Healthy' || echo '⚠️  API Gateway (port 4000): Not accessible'"
+        ],
+        "cwd": "{workspaceRoot}",
+        "parallel": false
+      }
+    },
+    "health:services": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "echo '🔍 Checking service health...'",
+          "curl -f -s http://localhost:3002/ > /dev/null && echo '✅ Web Dashboard: Running on port 3002' || echo '❌ Web Dashboard: Not running'",
+          "pnpm nx test --passWithNoTests > /dev/null 2>&1 && echo '✅ Test Suite: All tests passing' || echo '⚠️  Test Suite: Issues detected'",
+          "echo '🎯 Service health check complete'"
+        ],
+        "cwd": "{workspaceRoot}",
+        "parallel": false
+      }
+    }
+  },
+  "tags": ["scope:root", "type:workspace"]
+}

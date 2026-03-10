@@ -1,0 +1,478 @@
+name: Terraform Drift Detection
+
+on:
+  schedule:
+    - cron: '0 0,8,16 * * *' # Every 8 hours (staggered from production-validation)
+  workflow_dispatch:
+
+env:
+  TF_VERSION: '1.14.0' # Standardized across all Terraform workflows (aligned with local development)
+  TF_WORKING_DIR: './terraform'
+  # AWS_REGION is required by Terraform's S3 backend even for S3-compatible services like DigitalOcean Spaces
+  # The actual region (sfo3) is configured in backend.tf endpoint URL
+  AWS_REGION: 'us-east-1'
+  DO_SPACES_REGION: 'sfo3' # DigitalOcean Spaces region - must match backend.tf
+
+# Enterprise Security: Explicit least-privilege permissions
+# READ + DEPLOY + ISSUES: Drift detection needs read state, trigger remediation, and manage drift issues
+permissions:
+  contents: read
+  deployments: write
+  issues: write # Required for creating, updating, and closing drift detection issues
+
+jobs:
+  detect-drift:
+    name: Detect Configuration Drift
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Validate Required Secrets
+        run: |
+          echo "🔍 Validating required secrets and variables..."
+          MISSING_SECRETS=""
+
+          if [ -z "${{ secrets.SPACES_ACCESS_KEY_ID }}" ]; then
+            echo "❌ AWS_ACCESS_KEY_ID secret is missing"
+            MISSING_SECRETS="AWS_ACCESS_KEY_ID"
+          fi
+
+          if [ -z "${{ secrets.SPACES_SECRET_ACCESS_KEY }}" ]; then
+            echo "❌ AWS_SECRET_ACCESS_KEY secret is missing"
+            MISSING_SECRETS="$MISSING_SECRETS AWS_SECRET_ACCESS_KEY"
+          fi
+
+          if [ -z "${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}" ]; then
+            echo "⚠️ DIGITALOCEAN_ACCESS_TOKEN secret is missing (drift detection may fail)"
+          fi
+
+          if [ -n "$MISSING_SECRETS" ]; then
+            echo "::error::Missing required secrets:$MISSING_SECRETS"
+            exit 1
+          fi
+
+          echo "✅ All required secrets are configured"
+
+      - name: Initialize DigitalOcean Spaces Backend
+        id: init-backend
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "🔧 Initializing DigitalOcean Spaces backend..."
+          echo "This ensures the Terraform state bucket exists and is accessible"
+
+          if ! bash scripts/terraform/init-digitalocean-backend.sh; then
+            echo "❌ Backend initialization failed"
+            echo "This usually indicates:"
+            echo "  - DigitalOcean Spaces credentials are incorrect or expired"
+            echo "  - Network connectivity issues"
+            echo "  - Insufficient permissions to create/access Spaces bucket"
+            exit 1
+          fi
+
+          echo "✅ DigitalOcean Spaces backend initialized successfully"
+
+      - name: Terraform Init
+        id: init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "🔧 Initializing Terraform..."
+          echo "Working directory: $(pwd)"
+          echo "Backend: DigitalOcean Spaces (S3-compatible)"
+          echo "Bucket: ectropy-terraform-state"
+          echo "Endpoint: https://${{ env.DO_SPACES_REGION }}.digitaloceanspaces.com"
+
+          # Run terraform init with detailed output
+          set +e
+          INIT_LOG=$(mktemp)
+          terraform init -input=false > "$INIT_LOG" 2>&1
+          INIT_EXIT_CODE=$?
+          set -e
+
+          # Show output
+          cat "$INIT_LOG"
+
+          if [ $INIT_EXIT_CODE -ne 0 ]; then
+            echo ""
+            echo "❌ Terraform init failed with exit code $INIT_EXIT_CODE"
+            echo ""
+            echo "Common causes and solutions:"
+            echo "  1. Bucket doesn't exist:"
+            echo "     - Backend initialization step should have created it"
+            echo "     - Check DigitalOcean Spaces console"
+            echo "  2. Credentials invalid:"
+            echo "     - Verify AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY secrets"
+            echo "     - Ensure they are DigitalOcean Spaces credentials"
+            echo "  3. Network connectivity:"
+            echo "     - GitHub Actions should have internet access"
+            echo "     - Check DigitalOcean Spaces status"
+            echo "  4. Backend configuration mismatch:"
+            echo "     - Verify backend.tf configuration"
+            echo "     - Check endpoint URL and region settings"
+            echo ""
+            echo "For detailed troubleshooting, see:"
+            echo "  - Log output above"
+            echo "  - docs/runbooks/terraform-operations.md"
+            rm -f "$INIT_LOG"
+            exit 1
+          fi
+
+          rm -f "$INIT_LOG"
+          echo ""
+          echo "✅ Terraform initialized successfully with DigitalOcean Spaces backend"
+
+      - name: Detect Drift
+        id: drift
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          TF_VAR_do_token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          TF_VAR_ssh_key_fingerprint: ${{ vars.TF_VAR_SSH_KEY_FINGERPRINT }}
+          TF_VAR_admin_ip: ${{ vars.TF_VAR_ADMIN_IP }}
+          TF_VAR_ssl_certificate_name: ${{ vars.TF_VAR_SSL_CERTIFICATE_NAME || 'ectropy-production-cert' }}
+          TF_VAR_alert_email: ${{ vars.TF_VAR_ALERT_EMAIL || 'alerts@ectropy.ai' }}
+        run: |
+          echo "🔍 Checking for configuration drift..."
+
+          # terraform plan -detailed-exitcode exits with:
+          # 0 = no changes
+          # 1 = error
+          # 2 = changes detected (drift)
+          set +e
+          # ENTERPRISE FIX (2026-01-02): Load production environment configuration
+          # Uses production tfvars for environment/project_id and all production-specific config
+          # Prevents "No value for required variable" errors
+          terraform plan -var-file=environments/production/terraform.tfvars -detailed-exitcode -no-color -input=false -out=tfplan > drift_output.txt 2>&1
+          EXIT_CODE=$?
+          set -e
+
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+          cat drift_output.txt
+
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "✅ No drift detected - infrastructure matches Terraform state"
+            echo "drift_detected=false" >> $GITHUB_OUTPUT
+          elif [ $EXIT_CODE -eq 2 ]; then
+            echo "⚠️ Configuration drift detected!"
+            echo "drift_detected=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Error running Terraform plan"
+            echo "drift_detected=error" >> $GITHUB_OUTPUT
+            # DO NOT exit 1 here - allow artifact upload and issue creation
+            echo "::warning::Terraform plan failed with exit code $EXIT_CODE - see drift_output.txt artifact"
+          fi
+
+      - name: Save Drift Output
+        if: always()
+        run: |
+          DRIFT_OUTPUT=$(cat ${{ env.TF_WORKING_DIR }}/drift_output.txt 2>/dev/null || echo "No drift output available")
+          echo "drift_details<<EOF" >> $GITHUB_OUTPUT
+          echo "$DRIFT_OUTPUT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        id: drift-output
+
+      - name: Upload Drift Report
+        if: always() && steps.drift.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-drift-plan-${{ github.run_number }}
+          path: |
+            ${{ env.TF_WORKING_DIR }}/drift_output.txt
+            ${{ env.TF_WORKING_DIR }}/tfplan
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Check for Existing Drift Issue
+        if: steps.drift.outputs.drift_detected == 'true'
+        id: check-issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'terraform-drift'
+            });
+
+            const existingIssue = issues.data[0];
+            if (existingIssue) {
+              console.log(`Found existing drift issue: #${existingIssue.number}`);
+              core.setOutput('issue_number', existingIssue.number);
+              core.setOutput('issue_exists', 'true');
+            } else {
+              console.log('No existing drift issue found');
+              core.setOutput('issue_exists', 'false');
+            }
+
+      - name: Create Drift Issue
+        if: |
+          steps.drift.outputs.drift_detected == 'true' &&
+          steps.check-issue.outputs.issue_exists == 'false'
+        id: create-drift-issue
+        uses: actions/github-script@v7
+        env:
+          DRIFT_OUTPUT: ${{ steps.drift-output.outputs.drift_details }}
+        with:
+          script: |
+            const driftOutput = process.env.DRIFT_OUTPUT || 'No details available';
+
+            const issueBody = `## 🚨 Infrastructure Drift Detected
+
+            **Detection Time:** ${new Date().toISOString()}
+            **Workflow Run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
+
+            **Next Steps:**
+            1. Download drift plan artifact from workflow run
+            2. Review changes: \`terraform show tfplan\`
+            3. Determine if drift is expected or requires remediation
+            4. If remediation needed, create PR with corrective changes
+            5. Close this issue after drift is resolved
+
+            **Artifact:**
+            - Name: \`terraform-drift-plan-${context.runNumber}\`
+            - Retention: 30 days
+
+            **Commands:**
+            \`\`\`bash
+            # Download and review drift
+            gh run download ${context.runId} --name terraform-drift-plan-${context.runNumber}
+            terraform show tfplan
+
+            # If drift is acceptable, update terraform state
+            terraform apply tfplan
+            \`\`\`
+
+            ### What is Configuration Drift?
+
+            Configuration drift occurs when the actual infrastructure state differs from what's defined in Terraform code. This can happen when:
+            - Manual changes are made via AWS/DigitalOcean console
+            - Changes are made through other tools or APIs
+            - Resources are modified outside of Terraform workflow
+
+            ### Detected Changes
+
+            <details>
+            <summary>Click to view drift details</summary>
+
+            \`\`\`terraform
+            ${driftOutput.substring(0, 60000)}
+            \`\`\`
+
+            </details>
+
+            ### Investigation Steps
+
+            1. **Review the drift details above** to understand what changed
+            2. **Determine the root cause**:
+               - Was this an intentional manual change?
+               - Was this an unauthorized change?
+               - Is this a Terraform state synchronization issue?
+            3. **Decide on resolution**:
+               - **Option A**: Update Terraform code to match actual state
+               - **Option B**: Apply Terraform to revert to desired state
+               - **Option C**: Import changes into Terraform state
+            4. **Document the incident** in \`docs/CURRENT_TRUTH.md\`
+
+            ### Resolution Workflow
+
+            **To accept the drift** (update Terraform to match reality):
+            1. Create a PR with Terraform changes matching the actual infrastructure
+            2. Follow standard PR review and approval process
+            3. Merge PR to apply changes
+            4. This issue will auto-close once drift is resolved
+
+            **To revert the drift** (restore infrastructure to Terraform state):
+            1. Trigger \`terraform apply\` via GitHub Actions
+            2. Review and approve the changes
+            3. Monitor the apply operation
+            4. This issue will auto-close once drift is resolved
+
+            ### Emergency Contact
+
+            If this drift represents a security issue or critical misconfiguration, contact the DevOps team immediately.
+
+            ---
+
+            *This issue was automatically created by the Terraform Drift Detection workflow.*
+            *It will automatically close when the next drift scan detects no changes.*`;
+
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Terraform Drift Detected`,
+              body: issueBody,
+              labels: ['terraform-drift', 'infrastructure', 'P1', 'automated']
+            });
+
+            console.log(`✅ Created drift detection issue #${issue.data.number}`);
+            core.setOutput('issue_number', issue.data.number);
+
+      - name: Update Existing Drift Issue
+        if: |
+          steps.drift.outputs.drift_detected == 'true' &&
+          steps.check-issue.outputs.issue_exists == 'true'
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ steps.check-issue.outputs.issue_number }}
+        with:
+          script: |
+            const issueNumber = parseInt(process.env.ISSUE_NUMBER);
+
+            const comment = `### 🔄 Drift Still Present
+
+            **Detection Time**: ${new Date().toISOString()}
+            **Workflow Run**: [#${context.runId}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+
+            Configuration drift is still detected. See [workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for details.`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: comment
+            });
+
+            console.log(`✅ Updated existing drift issue #${issueNumber}`);
+
+      - name: Check for Issue to Close
+        if: steps.drift.outputs.drift_detected == 'false'
+        id: check-close
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'terraform-drift'
+            });
+
+            if (issues.data.length > 0) {
+              const issue = issues.data[0];
+              console.log(`Found drift issue to close: #${issue.number}`);
+              core.setOutput('issue_number', issue.number);
+              core.setOutput('should_close', 'true');
+            } else {
+              console.log('No open drift issues found');
+              core.setOutput('should_close', 'false');
+            }
+
+      - name: Close Resolved Drift Issue
+        if: |
+          steps.drift.outputs.drift_detected == 'false' &&
+          steps.check-close.outputs.should_close == 'true'
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ steps.check-close.outputs.issue_number }}
+        with:
+          script: |
+            const issueNumber = parseInt(process.env.ISSUE_NUMBER);
+
+            const comment = `### ✅ Drift Resolved
+
+            **Resolution Time**: ${new Date().toISOString()}
+            **Workflow Run**: [#${context.runId}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+
+            Configuration drift has been resolved. Infrastructure now matches Terraform state.
+
+            Closing this issue automatically.`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: comment
+            });
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              state: 'closed'
+            });
+
+            console.log(`Closed drift issue #${issueNumber}`);
+
+      - name: Drift Detection Summary
+        if: always()
+        run: |
+          echo "## Terraform Drift Detection Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.drift.outputs.drift_detected }}" == "true" ]; then
+            echo "⚠️ **Status:** Drift Detected" >> $GITHUB_STEP_SUMMARY
+            echo "📦 **Artifact:** terraform-drift-plan-${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ steps.check-issue.outputs.issue_exists }}" == "false" ]; then
+              echo "📝 **New Issue Created:** #${{ steps.create-drift-issue.outputs.issue_number }}" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "📝 **Issue Updated:** #${{ steps.check-issue.outputs.issue_number }}" >> $GITHUB_STEP_SUMMARY
+            fi
+          elif [ "${{ steps.drift.outputs.drift_detected }}" == "false" ]; then
+            echo "✅ **Status:** No Drift" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ steps.check-close.outputs.should_close }}" == "true" ]; then
+              echo "🔒 **Issue Closed:** #${{ steps.check-close.outputs.issue_number }}" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "❌ **Status:** Error during drift detection" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Backend:** DigitalOcean Spaces (S3-compatible)" >> $GITHUB_STEP_SUMMARY
+          echo "**Bucket:** ectropy-terraform-state" >> $GITHUB_STEP_SUMMARY
+          echo "**Region:** ${{ env.DO_SPACES_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "**State Path:** production/terraform.tfstate" >> $GITHUB_STEP_SUMMARY
+
+      - name: Checkout (for Slack action)
+        if: steps.drift.outputs.drift_detected == 'true' || steps.drift.outputs.drift_detected == 'error'
+        uses: actions/checkout@v4
+
+      - name: Notify Slack on Drift Detected
+        if: steps.drift.outputs.drift_detected == 'true'
+        uses: ./.github/actions/slack-notify
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: warning
+          workflow-name: 'Terraform Drift Detection'
+          custom-message: |
+            ⚠️ *Infrastructure Drift Detected*
+
+            Configuration drift detected between Terraform state and actual infrastructure.
+
+            **Action Required:**
+            • Review drift details in workflow run
+            • Download artifact: `terraform-drift-plan-${{ github.run_number }}`
+            • Determine if drift needs remediation
+
+            <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>
+
+      - name: Notify Slack on Error
+        if: steps.drift.outputs.drift_detected == 'error'
+        uses: ./.github/actions/slack-notify
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: failure
+          workflow-name: 'Terraform Drift Detection'
+          custom-message: |
+            🚨 *Terraform Drift Detection Failed*
+
+            Unable to complete drift detection. This may indicate:
+            • Backend connectivity issues
+            • Invalid credentials
+            • Terraform configuration errors
+
+            <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>

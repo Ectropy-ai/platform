@@ -1,0 +1,77 @@
+{
+  "extends": "../../tsconfig.enterprise-standard.json",
+  "compilerOptions": {
+    // Override enterprise settings for React development compatibility
+    "allowJs": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "strictNullChecks": true, // Enable for better null safety (issue TS2532 prevention)
+    "strictFunctionTypes": false,
+    "strictBindCallApply": false,
+    "strictPropertyInitialization": false,
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "useUnknownInCatchVariables": false,
+    "noImplicitOverride": false, // Disable to allow override flexibility in React components
+
+    // Override typeRoots to avoid conflicts with mock types
+    "typeRoots": ["./node_modules/@types"],
+    "types": ["node", "react", "react-dom"],
+
+    // Build settings for React (bundler mode for Vite/Webpack compatibility)
+    "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ES2020",
+    "lib": ["dom", "dom.iterable", "ES2020"],
+
+    // React-specific settings
+    "jsx": "react-jsx",
+    "isolatedModules": true,
+    "skipLibCheck": true,
+
+    // Web Dashboard specific paths (relative to project root)
+    "baseUrl": "../../",
+    "paths": {
+      // Web-dashboard specific paths
+      "@/*": ["apps/web-dashboard/src/*"],
+      "@components/*": ["apps/web-dashboard/src/components/*"],
+      "@pages/*": ["apps/web-dashboard/src/pages/*"],
+      "@hooks/*": ["apps/web-dashboard/src/hooks/*"],
+      "@utils/*": ["apps/web-dashboard/src/utils/*"],
+      "@types/*": ["apps/web-dashboard/src/types/*"],
+      "@assets/*": ["apps/web-dashboard/src/assets/*"],
+      // ENTERPRISE FIX P1.0: TypeScript path resolution order
+      // CRITICAL: Specific paths MUST come BEFORE wildcard patterns
+      // Wildcard @ectropy/shared/* was matching before specific /utils/browser path
+      // This caused browser imports to resolve to Node.js modules (winston, fs, crypto)
+      // Resulting in webpack 5 "Module not found" errors (no Node.js polyfills)
+      // Order matters: TypeScript tries patterns top-to-bottom
+      "@ectropy/shared/utils/browser": ["libs/shared/utils/src/browser.ts"],
+      "@ectropy/shared/utils": ["libs/shared/utils/src/index.ts"],
+      "@ectropy/shared/types": ["libs/shared/types/src/index.ts"],
+      "@ectropy/shared": ["libs/shared/src/index.ts"],
+      "@ectropy/shared/*": ["libs/shared/src/*"],
+      "@libs/*": ["libs/*"],
+      "@speckle/viewer": ["apps/web-dashboard/src/types/speckle-stubs.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.js", "src/**/*.jsx"],
+  "exclude": [
+    "node_modules",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/setupTests.*",
+    "**/*.disabled",
+    "**/*.md",
+    "**/*.sql",
+    "**/*.sh",
+    "**/LICENSE*",
+    "**/*.map",
+    "dist",
+    "coverage",
+    "../../recharts.d.ts",
+    "../../types/recharts.d.ts"
+  ]
+}

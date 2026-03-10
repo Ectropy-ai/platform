@@ -1,0 +1,809 @@
+{
+  "$schema": "https://luhtech.dev/schemas/implementation-plan.schema.json",
+  "$id": "urn:luhtech:ectropy:implementation:dual-process-decision",
+  "schemaVersion": "3.0.0",
+  "meta": {
+    "ventureId": "ectropy",
+    "featureId": "dual-process-decision",
+    "createdAt": "2026-01-22T00:00:00Z",
+    "lastUpdated": "2026-01-22T00:00:00Z",
+    "author": "claude",
+    "sourceDoc": ".roadmap/features/dual-process-decision/implementation-plan.json"
+  },
+  "summary": "Implementation plan for Dual-Process Decision Architecture extending USF with Success Stack, SDI, and explicit arbitration",
+  "strategicAlignment": {
+    "currentPhase": "5b",
+    "phaseName": "Pilot Foundation + EIL",
+    "platformProgress": 68,
+    "decisionLifecycleStatus": "IN_DEVELOPMENT",
+    "decisionLifecycleProgress": 45,
+    "efasStatus": "Schema defined, integration pending",
+    "targetIntegration": "Post Decision-Lifecycle M3 (Prisma), Pre M4 (GraphQL)"
+  },
+  "dependencyChain": [
+    {
+      "dependency": "decision-lifecycle-m3",
+      "type": "blocking",
+      "description": "Prisma models must be complete",
+      "status": "IN_PROGRESS"
+    },
+    {
+      "dependency": "efas-eigenmode-schema",
+      "type": "required",
+      "description": "Schema defined, needs activation",
+      "status": "READY"
+    },
+    {
+      "dependency": "usf-event-handler",
+      "type": "required",
+      "description": "Extend existing event system",
+      "status": "READY"
+    },
+    {
+      "dependency": "authority-cascade",
+      "type": "integration",
+      "description": "7-tier cascade for escalations",
+      "status": "READY"
+    }
+  ],
+  "valueProposition": {
+    "problemStatement": "Decision-making expertise remains siloed in individuals and projects, leading to repeated mistakes and inability to scale judgment",
+    "solution": "Compress validated decisions into reusable patterns with explicit arbitration between proven paths and novel exploration",
+    "targetMetrics": {
+      "patternReuseRate": {
+        "target": 0.6,
+        "description": "60%+ decisions match existing patterns"
+      },
+      "explorationSuccessRate": {
+        "target": 0.4,
+        "description": "40%+ exploratory decisions improve on patterns"
+      },
+      "learningVelocity": {
+        "target": 7,
+        "unit": "days",
+        "description": "New patterns emerge within 7 days of validated outcomes"
+      },
+      "auditabilityScore": {
+        "target": 1.0,
+        "description": "100% decisions have rationale documented"
+      }
+    }
+  },
+  "serviceArchitecture": {
+    "newServices": [
+      {
+        "name": "SDICalculatorService",
+        "file": "apps/mcp-server/src/services/sdi-calculator.service.ts",
+        "responsibility": "Compute Solution Density Index and classification",
+        "dependencies": ["EFASService", "ResourceService"],
+        "exports": [
+          "calculateSDI",
+          "getSDIThresholds",
+          "classifySDI",
+          "computeExplorationBudget"
+        ]
+      },
+      {
+        "name": "SuccessStackService",
+        "file": "apps/mcp-server/src/services/success-stack.service.ts",
+        "responsibility": "Engine 1 - Pattern storage and retrieval",
+        "dependencies": ["EigenmodeSimilarityService", "PatternCompressionService"],
+        "exports": [
+          "queryPatterns",
+          "getPatternDetails",
+          "storePattern",
+          "decayPatterns"
+        ]
+      },
+      {
+        "name": "PatternCompressionService",
+        "file": "apps/mcp-server/src/services/pattern-compression.service.ts",
+        "responsibility": "Validate and compress decisions into patterns",
+        "dependencies": ["EigenmodeSimilarityService"],
+        "exports": [
+          "validateForCompression",
+          "compressDecision",
+          "mergePatterns",
+          "prunePatterns"
+        ]
+      },
+      {
+        "name": "EigenmodeSimilarityService",
+        "file": "apps/mcp-server/src/services/eigenmode-similarity.service.ts",
+        "responsibility": "Compute eigenmode vector similarity",
+        "dependencies": [],
+        "exports": [
+          "computeSimilarity",
+          "computeContextSignature",
+          "computeStability"
+        ]
+      },
+      {
+        "name": "PossibilitySpaceService",
+        "file": "apps/mcp-server/src/services/possibility-space.service.ts",
+        "responsibility": "Engine 2 - Option generation",
+        "dependencies": ["SDIProjectorService", "ConstraintService"],
+        "exports": [
+          "generateOptions",
+          "filterByConstraints",
+          "computeRiskProfiles"
+        ]
+      },
+      {
+        "name": "SDIProjectorService",
+        "file": "apps/mcp-server/src/services/sdi-projector.service.ts",
+        "responsibility": "Project SDI impact of proposed actions",
+        "dependencies": ["SDICalculatorService"],
+        "exports": [
+          "projectSDIImpact",
+          "computeCascadingEffects"
+        ]
+      },
+      {
+        "name": "USFMediatorService",
+        "file": "apps/mcp-server/src/services/usf-mediator.service.ts",
+        "responsibility": "Arbitrate between Engine 1 and Engine 2",
+        "dependencies": ["SuccessStackService", "PossibilitySpaceService", "ExplorationBudgetService"],
+        "exports": [
+          "mediate",
+          "selectDecisionPath",
+          "generateRationale"
+        ]
+      },
+      {
+        "name": "ExplorationBudgetService",
+        "file": "apps/mcp-server/src/services/exploration-budget.service.ts",
+        "responsibility": "Calculate exploration budget from state",
+        "dependencies": ["SDICalculatorService", "EigenmodeSimilarityService"],
+        "exports": [
+          "computeBudget",
+          "getBudgetBreakdown"
+        ]
+      },
+      {
+        "name": "MonitoringTriggerService",
+        "file": "apps/mcp-server/src/services/monitoring-trigger.service.ts",
+        "responsibility": "Manage monitoring triggers for exploratory decisions",
+        "dependencies": ["SDICalculatorService"],
+        "exports": [
+          "createTrigger",
+          "checkTriggers",
+          "executeTriggerResponse",
+          "deactivateTrigger"
+        ]
+      },
+      {
+        "name": "DecisionEventHandlerService",
+        "file": "apps/mcp-server/src/services/decision-event-handler.service.ts",
+        "responsibility": "Handle decision event lifecycle",
+        "dependencies": ["USFMediatorService", "PatternCompressionService"],
+        "exports": [
+          "createDecisionEvent",
+          "recordOutcome",
+          "triggerCompression"
+        ]
+      },
+      {
+        "name": "PatternLearningService",
+        "file": "apps/mcp-server/src/services/pattern-learning.service.ts",
+        "responsibility": "Orchestrate pattern learning from outcomes",
+        "dependencies": ["PatternCompressionService", "SuccessStackService"],
+        "exports": [
+          "learnFromOutcome",
+          "runDecayJob",
+          "runPruneJob"
+        ]
+      }
+    ],
+    "extendedServices": [
+      {
+        "name": "USFService",
+        "file": "apps/mcp-server/src/services/usf.service.ts",
+        "additions": [
+          "computeSDIFromUSF",
+          "getSDIComponents"
+        ]
+      },
+      {
+        "name": "USFEventHandlerService",
+        "file": "apps/mcp-server/src/services/usf-event-handler.service.ts",
+        "additions": [
+          "handleDecisionEventCreated",
+          "handleDecisionEventMediated",
+          "handlePatternCompressed",
+          "handleSDIThresholdBreach"
+        ]
+      },
+      {
+        "name": "PMDecisionToolsService",
+        "file": "apps/mcp-server/src/services/pm-decision-tools.ts",
+        "additions": [
+          "calculate_sdi",
+          "get_sdi_thresholds",
+          "query_success_stack",
+          "get_pattern_details",
+          "compress_decision_pattern",
+          "generate_options",
+          "project_sdi_impact",
+          "mediate_decision",
+          "get_exploration_budget",
+          "set_monitoring_trigger",
+          "check_monitoring_triggers",
+          "record_decision_outcome"
+        ]
+      }
+    ]
+  },
+  "typeDefinitions": {
+    "newTypes": [
+      {
+        "name": "DecisionEvent",
+        "file": "apps/mcp-server/src/types/dual-process.types.ts",
+        "description": "Full decision event capture"
+      },
+      {
+        "name": "SuccessPattern",
+        "file": "apps/mcp-server/src/types/dual-process.types.ts",
+        "description": "Compressed validated pattern"
+      },
+      {
+        "name": "SDISnapshot",
+        "file": "apps/mcp-server/src/types/dual-process.types.ts",
+        "description": "SDI calculation snapshot"
+      },
+      {
+        "name": "EigenmodeVector",
+        "file": "apps/mcp-server/src/types/dual-process.types.ts",
+        "description": "12-element eigenmode array"
+      },
+      {
+        "name": "Engine1Output",
+        "file": "apps/mcp-server/src/types/dual-process.types.ts",
+        "description": "Success Stack query result"
+      },
+      {
+        "name": "Engine2Output",
+        "file": "apps/mcp-server/src/types/dual-process.types.ts",
+        "description": "Possibility Space generation result"
+      },
+      {
+        "name": "MediationDecision",
+        "file": "apps/mcp-server/src/types/dual-process.types.ts",
+        "description": "USF Mediator arbitration result"
+      },
+      {
+        "name": "MonitoringTrigger",
+        "file": "apps/mcp-server/src/types/dual-process.types.ts",
+        "description": "Exploration monitoring configuration"
+      },
+      {
+        "name": "DecisionTrigger",
+        "file": "apps/mcp-server/src/types/dual-process.types.ts",
+        "description": "What initiated a decision point"
+      },
+      {
+        "name": "ExplorationBudget",
+        "file": "apps/mcp-server/src/types/dual-process.types.ts",
+        "description": "Exploration allocation with breakdown"
+      }
+    ],
+    "extendedTypes": [
+      {
+        "name": "PMNodeType",
+        "file": "apps/mcp-server/src/types/pm.types.ts",
+        "additions": [
+          "decision-event",
+          "success-pattern",
+          "sdi-snapshot",
+          "monitoring-trigger",
+          "exploration-budget",
+          "mediation-decision",
+          "eigenmode-context",
+          "possibility-option"
+        ]
+      }
+    ]
+  },
+  "databaseModels": {
+    "prismaModels": [
+      {
+        "name": "DecisionEvent",
+        "table": "decision_events",
+        "fields": [
+          { "name": "id", "type": "UUID", "primary": true },
+          { "name": "urn", "type": "String", "unique": true },
+          { "name": "timestamp", "type": "DateTime" },
+          { "name": "projectId", "type": "UUID", "relation": "Project" },
+          { "name": "zoneId", "type": "UUID", "nullable": true },
+          { "name": "actorId", "type": "String" },
+          { "name": "triggerType", "type": "DecisionTriggerType" },
+          { "name": "triggerSource", "type": "String" },
+          { "name": "triggerUrgency", "type": "Float" },
+          { "name": "stateSdi", "type": "Float" },
+          { "name": "stateEigenmodes", "type": "Float[]", "length": 12 },
+          { "name": "engine1Output", "type": "Json" },
+          { "name": "engine2Output", "type": "Json" },
+          { "name": "mediation", "type": "Json" },
+          { "name": "outcome", "type": "Json", "nullable": true }
+        ],
+        "indexes": ["projectId", "timestamp", "actorId"]
+      },
+      {
+        "name": "SuccessPattern",
+        "table": "success_patterns",
+        "fields": [
+          { "name": "id", "type": "UUID", "primary": true },
+          { "name": "urn", "type": "String", "unique": true },
+          { "name": "contextSignature", "type": "Float[]", "length": 12 },
+          { "name": "actionType", "type": "String" },
+          { "name": "outcomeProfile", "type": "Json" },
+          { "name": "confidence", "type": "Float" },
+          { "name": "frequency", "type": "Int", "default": 1 },
+          { "name": "lastApplied", "type": "DateTime" },
+          { "name": "contextBreadth", "type": "Float", "default": 1 },
+          { "name": "sourceDecisions", "type": "String[]" },
+          { "name": "decayFactor", "type": "Float", "default": 1 },
+          { "name": "projectId", "type": "UUID", "nullable": true },
+          { "name": "isGlobal", "type": "Boolean", "default": false }
+        ],
+        "indexes": ["projectId", "actionType", "confidence"]
+      },
+      {
+        "name": "SDISnapshot",
+        "table": "sdi_snapshots",
+        "fields": [
+          { "name": "id", "type": "UUID", "primary": true },
+          { "name": "urn", "type": "String", "unique": true },
+          { "name": "timestamp", "type": "DateTime" },
+          { "name": "projectId", "type": "UUID", "relation": "Project" },
+          { "name": "zoneId", "type": "UUID", "nullable": true },
+          { "name": "sdiValue", "type": "Float" },
+          { "name": "sdiLog", "type": "Float" },
+          { "name": "shannonEntropy", "type": "Float" },
+          { "name": "classification", "type": "SDIClassification" },
+          { "name": "components", "type": "Json" }
+        ],
+        "indexes": ["projectId", "timestamp", "classification"]
+      },
+      {
+        "name": "MonitoringTrigger",
+        "table": "monitoring_triggers",
+        "fields": [
+          { "name": "id", "type": "UUID", "primary": true },
+          { "name": "urn", "type": "String", "unique": true },
+          { "name": "decisionEventId", "type": "UUID" },
+          { "name": "triggerType", "type": "MonitoringTriggerType" },
+          { "name": "conditionMetric", "type": "String" },
+          { "name": "conditionOperator", "type": "String" },
+          { "name": "conditionThreshold", "type": "Float" },
+          { "name": "response", "type": "MonitoringResponse" },
+          { "name": "checkIntervalMs", "type": "Int" },
+          { "name": "isActive", "type": "Boolean", "default": true },
+          { "name": "lastChecked", "type": "DateTime", "nullable": true },
+          { "name": "triggeredAt", "type": "DateTime", "nullable": true }
+        ],
+        "indexes": ["decisionEventId", "isActive"]
+      }
+    ],
+    "prismaEnums": [
+      {
+        "name": "DecisionTriggerType",
+        "values": ["SCHEDULED", "EXCEPTION", "OPPORTUNITY", "ESCALATION"]
+      },
+      {
+        "name": "SDIClassification",
+        "values": ["CRITICAL", "WARNING", "HEALTHY", "ABUNDANT"]
+      },
+      {
+        "name": "MonitoringTriggerType",
+        "values": ["SDI_BREACH", "TIMELINE_DEVIATION", "RESOURCE_EXHAUSTION", "CASCADE_DETECTION", "CONFIDENCE_COLLAPSE"]
+      },
+      {
+        "name": "MonitoringResponse",
+        "values": ["FALLBACK", "ESCALATE", "CONSTRAIN", "RE_MEDIATE"]
+      }
+    ],
+    "migrationFile": "prisma/migrations/20260122_dual_process_decision/migration.sql"
+  },
+  "eventTypes": {
+    "newEvents": [
+      {
+        "type": "usf:decision-event:created",
+        "trigger": "Decision event created",
+        "payload": "DecisionEvent"
+      },
+      {
+        "type": "usf:decision-event:mediated",
+        "trigger": "Mediation completed",
+        "payload": "MediationDecision"
+      },
+      {
+        "type": "usf:decision-event:outcome-recorded",
+        "trigger": "Outcome recorded",
+        "payload": "DecisionOutcome"
+      },
+      {
+        "type": "usf:pattern:compression-started",
+        "trigger": "Compression pipeline started",
+        "payload": "DecisionEvent"
+      },
+      {
+        "type": "usf:pattern:compression-completed",
+        "trigger": "Pattern created/merged",
+        "payload": "SuccessPattern"
+      },
+      {
+        "type": "usf:pattern:merged",
+        "trigger": "Pattern merged with existing",
+        "payload": "SuccessPattern"
+      },
+      {
+        "type": "usf:pattern:decayed",
+        "trigger": "Pattern confidence decayed",
+        "payload": "SuccessPattern"
+      },
+      {
+        "type": "usf:sdi:calculated",
+        "trigger": "SDI snapshot created",
+        "payload": "SDISnapshot"
+      },
+      {
+        "type": "usf:sdi:threshold-breached",
+        "trigger": "SDI crossed threshold",
+        "payload": "SDISnapshot"
+      },
+      {
+        "type": "usf:exploration:triggered",
+        "trigger": "Exploratory path selected",
+        "payload": "MediationDecision"
+      },
+      {
+        "type": "usf:exploration:monitored",
+        "trigger": "Monitoring trigger checked",
+        "payload": "MonitoringTrigger"
+      },
+      {
+        "type": "usf:exploration:fallback",
+        "trigger": "Fallback triggered",
+        "payload": "MonitoringTrigger"
+      },
+      {
+        "type": "usf:mediation:escalated",
+        "trigger": "Mediation escalated to authority",
+        "payload": "MediationDecision"
+      }
+    ]
+  },
+  "testingStrategy": {
+    "unitTests": [
+      {
+        "service": "SDICalculatorService",
+        "coverage": 95,
+        "testFile": "apps/mcp-server/src/services/__tests__/sdi-calculator.spec.ts",
+        "scenarios": [
+          "SDI calculation produces valid range",
+          "Classification thresholds work correctly",
+          "Shannon entropy matches theory",
+          "Exploration budget computation",
+          "Edge cases (zero constraints, max resources)"
+        ]
+      },
+      {
+        "service": "SuccessStackService",
+        "coverage": 90,
+        "testFile": "apps/mcp-server/src/services/__tests__/success-stack.spec.ts",
+        "scenarios": [
+          "Pattern query with similarity threshold",
+          "Pattern storage and retrieval",
+          "Decay mechanism applies correctly",
+          "Empty results handling",
+          "Cross-project pattern access"
+        ]
+      },
+      {
+        "service": "PossibilitySpaceService",
+        "coverage": 85,
+        "testFile": "apps/mcp-server/src/services/__tests__/possibility-space.spec.ts",
+        "scenarios": [
+          "Option generation respects constraints",
+          "SDI projections computed",
+          "Risk profiles generated",
+          "Computation depth limiting",
+          "Empty option handling"
+        ]
+      },
+      {
+        "service": "USFMediatorService",
+        "coverage": 95,
+        "testFile": "apps/mcp-server/src/services/__tests__/usf-mediator.spec.ts",
+        "scenarios": [
+          "Crisis mode path (SDI < critical)",
+          "High confidence match path",
+          "Promising exploration path",
+          "No patterns path",
+          "Default blend path",
+          "Escalation triggers correctly"
+        ]
+      },
+      {
+        "service": "PatternCompressionService",
+        "coverage": 90,
+        "testFile": "apps/mcp-server/src/services/__tests__/pattern-compression.spec.ts",
+        "scenarios": [
+          "All four validation gates",
+          "Compression creates pattern",
+          "Merging with similar pattern",
+          "Rejection reasons tracked"
+        ]
+      }
+    ],
+    "integrationTests": [
+      {
+        "name": "Full Decision Flow",
+        "testFile": "apps/mcp-server/src/services/__tests__/dual-process-integration.spec.ts",
+        "flow": ["Trigger", "SDI Calculation", "Engine 1", "Engine 2", "Mediation", "Execution", "Outcome"]
+      },
+      {
+        "name": "Pattern Learning Cycle",
+        "testFile": "apps/mcp-server/src/services/__tests__/pattern-learning-integration.spec.ts",
+        "flow": ["Decision", "Validation", "Compression", "Storage", "Reuse"]
+      },
+      {
+        "name": "Crisis Mode Escalation",
+        "testFile": "apps/mcp-server/src/services/__tests__/crisis-escalation-integration.spec.ts",
+        "flow": ["Low SDI", "Engine 1 Only", "Authority Cascade"]
+      },
+      {
+        "name": "Exploration with Fallback",
+        "testFile": "apps/mcp-server/src/services/__tests__/exploration-fallback-integration.spec.ts",
+        "flow": ["Engine 2 Selection", "Monitoring Setup", "Trigger Fire", "Fallback Execute"]
+      }
+    ],
+    "performanceBenchmarks": [
+      {
+        "metric": "SDI Calculation",
+        "target": "10ms p99",
+        "benchmarkFile": "apps/mcp-server/benchmarks/sdi-calculation.bench.ts"
+      },
+      {
+        "metric": "Pattern Query",
+        "target": "50ms p99 for 10^6 patterns",
+        "benchmarkFile": "apps/mcp-server/benchmarks/pattern-query.bench.ts"
+      },
+      {
+        "metric": "Option Generation",
+        "target": "100ms p99",
+        "benchmarkFile": "apps/mcp-server/benchmarks/option-generation.bench.ts"
+      },
+      {
+        "metric": "End-to-End Mediation",
+        "target": "100ms p99",
+        "benchmarkFile": "apps/mcp-server/benchmarks/mediation-e2e.bench.ts"
+      },
+      {
+        "metric": "Pattern Compression",
+        "target": "500ms p99",
+        "benchmarkFile": "apps/mcp-server/benchmarks/pattern-compression.bench.ts"
+      }
+    ]
+  },
+  "configurationOptions": [
+    {
+      "name": "SDI_CRITICAL_THRESHOLD",
+      "envVar": "DUAL_PROCESS_SDI_CRITICAL",
+      "default": 100,
+      "type": "number",
+      "description": "SDI below which crisis mode activates"
+    },
+    {
+      "name": "SDI_WARNING_THRESHOLD",
+      "envVar": "DUAL_PROCESS_SDI_WARNING",
+      "default": 1000,
+      "type": "number",
+      "description": "SDI below which exploration is constrained"
+    },
+    {
+      "name": "SDI_HEALTHY_THRESHOLD",
+      "envVar": "DUAL_PROCESS_SDI_HEALTHY",
+      "default": 10000,
+      "type": "number",
+      "description": "SDI above which normal operations apply"
+    },
+    {
+      "name": "SDI_ABUNDANT_THRESHOLD",
+      "envVar": "DUAL_PROCESS_SDI_ABUNDANT",
+      "default": 100000,
+      "type": "number",
+      "description": "SDI above which full exploration is enabled"
+    },
+    {
+      "name": "PATTERN_SIMILARITY_THRESHOLD",
+      "envVar": "DUAL_PROCESS_SIMILARITY_THRESHOLD",
+      "default": 0.85,
+      "type": "number",
+      "description": "Minimum eigenmode similarity for pattern matching"
+    },
+    {
+      "name": "PATTERN_DECAY_HALF_LIFE_DAYS",
+      "envVar": "DUAL_PROCESS_DECAY_HALF_LIFE",
+      "default": 180,
+      "type": "number",
+      "description": "Half-life for pattern confidence decay"
+    },
+    {
+      "name": "PATTERN_PRUNE_THRESHOLD",
+      "envVar": "DUAL_PROCESS_PRUNE_THRESHOLD",
+      "default": 0.1,
+      "type": "number",
+      "description": "Confidence below which patterns are pruned"
+    },
+    {
+      "name": "EXPLORATION_BUDGET_SDI_WEIGHT",
+      "envVar": "DUAL_PROCESS_BUDGET_SDI_WEIGHT",
+      "default": 0.4,
+      "type": "number",
+      "description": "Weight of SDI factor in budget calculation"
+    },
+    {
+      "name": "EXPLORATION_BUDGET_STABILITY_WEIGHT",
+      "envVar": "DUAL_PROCESS_BUDGET_STABILITY_WEIGHT",
+      "default": 0.35,
+      "type": "number",
+      "description": "Weight of stability factor in budget calculation"
+    },
+    {
+      "name": "EXPLORATION_BUDGET_RESOURCE_WEIGHT",
+      "envVar": "DUAL_PROCESS_BUDGET_RESOURCE_WEIGHT",
+      "default": 0.25,
+      "type": "number",
+      "description": "Weight of resource factor in budget calculation"
+    },
+    {
+      "name": "MAX_PATTERN_QUERY_RESULTS",
+      "envVar": "DUAL_PROCESS_MAX_PATTERN_RESULTS",
+      "default": 10,
+      "type": "number",
+      "description": "Maximum patterns returned from Success Stack query"
+    },
+    {
+      "name": "ENGINE2_COMPUTATION_DEPTH",
+      "envVar": "DUAL_PROCESS_COMPUTATION_DEPTH",
+      "default": 3,
+      "type": "number",
+      "description": "Default search depth for option generation"
+    },
+    {
+      "name": "ENABLE_GLOBAL_PATTERNS",
+      "envVar": "DUAL_PROCESS_GLOBAL_PATTERNS",
+      "default": true,
+      "type": "boolean",
+      "description": "Allow patterns to be shared across projects"
+    }
+  ],
+  "openQuestions": [
+    {
+      "id": "OQ-1",
+      "question": "Should pattern decay rate vary by domain (electrical vs. mechanical)?",
+      "currentAssumption": "Uniform 180-day half-life",
+      "resolutionStrategy": "Calibrate during pilot, add domain-specific decay if needed",
+      "priority": "medium"
+    },
+    {
+      "id": "OQ-2",
+      "question": "What SDI thresholds work for different project types (commercial vs residential)?",
+      "currentAssumption": "Single threshold set, configurable per project",
+      "resolutionStrategy": "Collect data during pilot, develop project-type presets",
+      "priority": "high"
+    },
+    {
+      "id": "OQ-3",
+      "question": "How to handle cross-project pattern sharing with multi-tenant isolation?",
+      "currentAssumption": "Global patterns are opt-in, project patterns are isolated",
+      "resolutionStrategy": "Privacy review required, implement tenant-aware pattern namespacing",
+      "priority": "high"
+    },
+    {
+      "id": "OQ-4",
+      "question": "How should exploration budget weights be calibrated?",
+      "currentAssumption": "0.4/0.35/0.25 split (SDI/stability/resources)",
+      "resolutionStrategy": "A/B testing during pilot, outcome correlation analysis",
+      "priority": "medium"
+    },
+    {
+      "id": "OQ-5",
+      "question": "What is the optimal eigenmode similarity threshold?",
+      "currentAssumption": "0.85 threshold",
+      "resolutionStrategy": "Precision/recall analysis on pilot data",
+      "priority": "medium"
+    }
+  ],
+  "riskMitigation": {
+    "technicalRisks": [
+      {
+        "risk": "Eigenmode computation expensive",
+        "probability": "medium",
+        "impact": "high",
+        "mitigation": "Implement caching, async computation, incremental updates"
+      },
+      {
+        "risk": "Pattern storage grows unbounded",
+        "probability": "high",
+        "impact": "medium",
+        "mitigation": "Decay mechanism, pruning job, archival to cold storage"
+      },
+      {
+        "risk": "SDI thresholds miscalibrated",
+        "probability": "medium",
+        "impact": "high",
+        "mitigation": "Make thresholds configurable, monitor outcomes, auto-adjust"
+      },
+      {
+        "risk": "Engine 2 computation timeout",
+        "probability": "low",
+        "impact": "medium",
+        "mitigation": "Depth limits, timeout fallback to Engine 1, async generation"
+      }
+    ],
+    "integrationRisks": [
+      {
+        "risk": "Breaks existing USF flow",
+        "probability": "low",
+        "impact": "high",
+        "mitigation": "Comprehensive integration tests, feature flag rollout, backward compatibility"
+      },
+      {
+        "risk": "Authority cascade conflicts",
+        "probability": "low",
+        "impact": "medium",
+        "mitigation": "Explicit precedence rules, escalation always available"
+      },
+      {
+        "risk": "Event system overload",
+        "probability": "medium",
+        "impact": "medium",
+        "mitigation": "Event batching, async processing, dead letter queue"
+      }
+    ]
+  },
+  "successCriteria": [
+    {
+      "criterion": "Decision events captured",
+      "measurement": "All agent-initiated decisions create decision events",
+      "target": "100%"
+    },
+    {
+      "criterion": "Patterns emerge and reuse",
+      "measurement": "Validated decisions compress to patterns, patterns match new decisions",
+      "target": "60% pattern reuse after 30 days"
+    },
+    {
+      "criterion": "Mediation rationale helpful",
+      "measurement": "User satisfaction with rationale explanations",
+      "target": "4/5 average rating"
+    },
+    {
+      "criterion": "Exploration budget correlation",
+      "measurement": "Higher budget correlates with successful exploration outcomes",
+      "target": "Pearson r > 0.5"
+    },
+    {
+      "criterion": "System performance",
+      "measurement": "End-to-end mediation latency",
+      "target": "<100ms p99"
+    },
+    {
+      "criterion": "Human override decrease",
+      "measurement": "Percentage of decisions requiring human override",
+      "target": "20% reduction after 60 days"
+    },
+    {
+      "criterion": "Test coverage",
+      "measurement": "Unit and integration test coverage",
+      "target": ">80%"
+    }
+  ],
+  "graphMetadata": {
+    "inEdges": ["urn:luhtech:ectropy:feature:dual-process-decision"],
+    "outEdges": []
+  }
+}

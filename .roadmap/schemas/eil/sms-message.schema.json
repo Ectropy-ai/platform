@@ -1,0 +1,138 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://luhtech.dev/schemas/eil/sms-message.schema.json",
+  "title": "SMS Message Schema",
+  "description": "Inbound and outbound SMS message format for Phone Agent Service",
+  "type": "object",
+  "required": ["messageId", "direction", "phoneNumber", "body", "timestamp"],
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "description": "Twilio MessageSid or internal ID"
+    },
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:sms-message:.+$",
+      "description": "URN identifier for graph integration"
+    },
+    "sessionId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Parent conversation session"
+    },
+    "direction": {
+      "type": "string",
+      "enum": ["inbound", "outbound"],
+      "description": "Message direction"
+    },
+    "phoneNumber": {
+      "type": "string",
+      "pattern": "^\\+[1-9]\\d{1,14}$",
+      "description": "E.164 format phone number (sender for inbound, recipient for outbound)"
+    },
+    "twilioNumber": {
+      "type": "string",
+      "pattern": "^\\+[1-9]\\d{1,14}$",
+      "description": "Twilio phone number for this project"
+    },
+    "body": {
+      "type": "string",
+      "maxLength": 1600,
+      "description": "Message body text"
+    },
+    "mediaUrls": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      },
+      "description": "MMS media attachment URLs"
+    },
+    "mediaContentTypes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "MIME types of media attachments"
+    },
+    "numSegments": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of SMS segments (160 char each)"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["queued", "sent", "delivered", "failed", "received", "read"],
+      "description": "Message delivery status"
+    },
+    "twilioData": {
+      "type": "object",
+      "description": "Raw Twilio webhook data",
+      "properties": {
+        "messageSid": { "type": "string" },
+        "accountSid": { "type": "string" },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "fromCity": { "type": "string" },
+        "fromState": { "type": "string" },
+        "fromCountry": { "type": "string" }
+      }
+    },
+    "parsedIntent": {
+      "type": "object",
+      "description": "AI-extracted intent from message",
+      "properties": {
+        "intent": {
+          "type": "string",
+          "enum": [
+            "report_completion",
+            "request_decision",
+            "query_status",
+            "approve_decision",
+            "escalate_decision",
+            "capture_evidence",
+            "schedule_inspection",
+            "unknown"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "entities": {
+          "type": "object",
+          "properties": {
+            "voxelId": { "type": "string" },
+            "zone": { "type": "string" },
+            "trade": { "type": "string" },
+            "amount": { "type": "number" },
+            "date": { "type": "string", "format": "date" }
+          }
+        }
+      }
+    },
+    "userId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Resolved user ID from phone number"
+    },
+    "projectId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Associated project"
+    },
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Tenant (organization)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "processedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When message was processed by assistant"
+    }
+  }
+}

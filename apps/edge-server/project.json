@@ -1,0 +1,39 @@
+{
+  "name": "edge-server",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "tags": ["scope:apps", "type:application", "platform:iot"],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/apps/edge-server",
+        "main": "apps/edge-server/src/main.ts",
+        "tsConfig": "apps/edge-server/tsconfig.app.json",
+        "assets": ["apps/edge-server/src/assets"]
+      }
+    },
+    "serve": {
+      "executor": "@nx/node:node",
+      "options": {
+        "buildTarget": "edge-server:build"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "options": {
+        "lintFilePatterns": ["apps/edge-server/**/*.ts"],
+        "noErrorOnUnmatchedPattern": true,
+        "eslintConfig": "eslint.config.js"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --passWithNoTests apps/edge-server/src",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

@@ -1,0 +1,267 @@
+# ============================================================================
+# Enterprise Disk Cleanup - Unified Multi-Environment Architecture
+# ============================================================================
+#
+# PURPOSE:
+#   Automated disk space management for all Ectropy environments
+#   Prevents disk exhaustion, maintains system health, supports future monitoring
+#
+# FEATURES:
+#   - Multi-environment support (staging, production future)
+#   - Automated weekly scheduling (Monday 2AM UTC low-traffic period)
+#   - Manual emergency override (workflow_dispatch)
+#   - Conservative defaults (7-day retention for safety)
+#   - Monitoring-ready (outputs metrics for future dashboard integration)
+#   - No duplicate routines (replaces environment-specific workflows)
+#
+# ENTERPRISE BENEFITS:
+#   - Consistent cleanup strategy across all environments
+#   - Predictable automated maintenance windows
+#   - Audit trail for compliance (SOC2/ISO27001)
+#   - Prevents cascading failures from disk exhaustion
+#   - Reduces operational toil (no manual cleanup needed)
+#
+# INDUSTRY ALIGNMENT:
+#   - SRE best practices (Google, Netflix, Amazon patterns)
+#   - Infrastructure as Code principles
+#   - GitOps methodology (all config in version control)
+#
+# ============================================================================
+
+name: Disk Cleanup - Unified Enterprise
+
+on:
+  # Automated weekly cleanup - Monday 2:00 AM UTC (Sunday night low traffic)
+  schedule:
+    - cron: '0 2 * * 1' # Weekly on Monday at 2 AM UTC
+
+  # Manual trigger for emergency cleanup
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to clean'
+        required: true
+        type: choice
+        options:
+          - 'staging'
+          - 'production'
+        default: 'staging'
+
+      cleanup_level:
+        description: 'Cleanup aggressiveness level'
+        required: true
+        type: choice
+        options:
+          - 'conservative' # Safe - 7 day retention, automated default
+          - 'aggressive' # Emergency - 3 day retention, manual only
+        default: 'conservative'
+
+# Ensure only one cleanup runs at a time per environment
+concurrency:
+  group: disk-cleanup-${{ inputs.environment || 'staging' }}
+  cancel-in-progress: false # Let cleanup complete, don't cancel mid-operation
+
+jobs:
+  cleanup:
+    name: Clean ${{ inputs.environment || 'staging' }} (${{ inputs.cleanup_level || 'conservative' }})
+    runs-on: ubuntu-latest
+
+    # Safety: Only run on main branch for production
+    # Allows develop branch for staging
+    if: |
+      (inputs.environment != 'production' || github.ref == 'refs/heads/main') &&
+      (inputs.environment == 'production' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
+
+    env:
+      # Environment-aware configuration with enterprise defaults
+      # Cron triggers default to staging/conservative for safety
+      ENVIRONMENT: ${{ github.event.inputs.environment || 'staging' }}
+      CLEANUP_LEVEL: ${{ github.event.inputs.cleanup_level || 'conservative' }}
+      # Retention policies - conservative by default (7-day retention)
+      DOCKER_IMAGE_RETENTION: ${{ github.event.inputs.cleanup_level == 'aggressive' && '72h' || '168h' }} # 3d aggressive, 7d conservative
+      JOURNAL_RETENTION: ${{ github.event.inputs.cleanup_level == 'aggressive' && '3d' || '7d' }}
+
+    steps:
+      - name: Determine Target Server
+        id: server
+        run: |
+          if [ "${{ env.ENVIRONMENT }}" == "production" ]; then
+            echo "host=${{ secrets.PRODUCTION_HOST }}" >> $GITHUB_OUTPUT
+            echo "ssh_key=PRODUCTION_SSH_KEY" >> $GITHUB_OUTPUT
+          else
+            echo "host=${{ secrets.DO_HOST }}" >> $GITHUB_OUTPUT
+            echo "ssh_key=DO_SSH_KEY" >> $GITHUB_OUTPUT
+          fi
+          echo "✅ Target: ${{ env.ENVIRONMENT }} environment"
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          # Use environment-specific SSH key
+          if [ "${{ env.ENVIRONMENT }}" == "production" ]; then
+            echo "${{ secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/ectropy_deploy
+          else
+            echo "${{ secrets.DO_SSH_KEY }}" > ~/.ssh/ectropy_deploy
+          fi
+
+          chmod 600 ~/.ssh/ectropy_deploy
+          ssh-keyscan -H ${{ steps.server.outputs.host }} >> ~/.ssh/known_hosts
+
+          echo "✅ SSH key configured for ${{ env.ENVIRONMENT }}"
+
+      - name: Pre-Cleanup Metrics
+        id: before
+        run: |
+          echo "========================================="
+          echo "PRE-CLEANUP SYSTEM METRICS"
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "========================================="
+
+          # Capture metrics for monitoring integration
+          DISK_USAGE=$(ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "df -h / | tail -1 | awk '{print \$5}' | sed 's/%//'")
+          DOCKER_IMAGES=$(ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "docker images -q | wc -l")
+          DOCKER_CONTAINERS=$(ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "docker ps -aq | wc -l")
+
+          echo "disk_usage_percent=$DISK_USAGE" >> $GITHUB_OUTPUT
+          echo "docker_images_count=$DOCKER_IMAGES" >> $GITHUB_OUTPUT
+          echo "docker_containers_count=$DOCKER_CONTAINERS" >> $GITHUB_OUTPUT
+
+          # Display detailed metrics
+          ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "df -h /"
+          ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "docker system df"
+
+          echo ""
+          echo "📊 Metrics Summary:"
+          echo "  Disk Usage: ${DISK_USAGE}%"
+          echo "  Docker Images: ${DOCKER_IMAGES}"
+          echo "  Docker Containers: ${DOCKER_CONTAINERS}"
+
+      - name: Docker Cleanup
+        run: |
+          echo "========================================="
+          echo "DOCKER CLEANUP (${{ env.CLEANUP_LEVEL }} mode)"
+          echo "Image Retention: ${{ env.DOCKER_IMAGE_RETENTION }}"
+          echo "========================================="
+
+          # Conservative cleanup - preserves recent images
+          ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "echo '1. Removing stopped containers...' && docker container prune -f"
+          ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "echo '2. Removing unused images (retain ${{ env.DOCKER_IMAGE_RETENTION }})...' && docker image prune -af --filter 'until=${{ env.DOCKER_IMAGE_RETENTION }}'"
+          ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "echo '3. Removing unused volumes (preserve labeled)...' && docker volume prune -f --filter 'label!=keep'"
+          ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "echo '4. Removing build cache...' && docker builder prune -af"
+          ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "echo '5. Removing unused networks...' && docker network prune -f"
+
+          echo "✅ Docker cleanup complete"
+
+      - name: System Cleanup
+        run: |
+          echo "========================================="
+          echo "SYSTEM CLEANUP (${{ env.CLEANUP_LEVEL }} mode)"
+          echo "Journal Retention: ${{ env.JOURNAL_RETENTION }}"
+          echo "========================================="
+
+          # Log rotation
+          ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "echo '1. Rotating system journals (${{ env.JOURNAL_RETENTION }})...' && journalctl --vacuum-time=${{ env.JOURNAL_RETENTION }}"
+
+          # Docker container logs cleanup (aggressive mode only)
+          if [ "${{ env.CLEANUP_LEVEL }}" == "aggressive" ]; then
+            ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "echo '2. Truncating Docker container logs...' && truncate -s 0 /var/lib/docker/containers/*/*-json.log 2>/dev/null || true"
+          fi
+
+          # APT cache cleanup
+          ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "echo '3. Cleaning APT cache...' && apt-get clean"
+          ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "echo '4. Removing unused packages...' && apt-get autoremove -y --purge"
+
+          echo "✅ System cleanup complete"
+
+      - name: Post-Cleanup Metrics
+        id: after
+        run: |
+          echo "========================================="
+          echo "POST-CLEANUP SYSTEM METRICS"
+          echo "========================================="
+
+          # Capture post-cleanup metrics
+          DISK_USAGE=$(ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "df -h / | tail -1 | awk '{print \$5}' | sed 's/%//'")
+          DOCKER_IMAGES=$(ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "docker images -q | wc -l")
+          DOCKER_CONTAINERS=$(ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "docker ps -aq | wc -l")
+
+          echo "disk_usage_percent=$DISK_USAGE" >> $GITHUB_OUTPUT
+          echo "docker_images_count=$DOCKER_IMAGES" >> $GITHUB_OUTPUT
+          echo "docker_containers_count=$DOCKER_CONTAINERS" >> $GITHUB_OUTPUT
+
+          # Calculate space freed
+          BEFORE_USAGE=${{ steps.before.outputs.disk_usage_percent }}
+          SPACE_FREED=$((BEFORE_USAGE - DISK_USAGE))
+          echo "space_freed_percent=$SPACE_FREED" >> $GITHUB_OUTPUT
+
+          # Display results
+          ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "df -h /"
+          ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "docker system df"
+
+          echo ""
+          echo "📊 Results Summary:"
+          echo "  Disk Usage: ${BEFORE_USAGE}% → ${DISK_USAGE}% (freed ${SPACE_FREED}%)"
+          echo "  Docker Images: ${{ steps.before.outputs.docker_images_count }} → ${DOCKER_IMAGES}"
+          echo "  Docker Containers: ${{ steps.before.outputs.docker_containers_count }} → ${DOCKER_CONTAINERS}"
+
+      - name: Health Check
+        run: |
+          echo "========================================="
+          echo "VERIFYING SYSTEM HEALTH"
+          echo "========================================="
+
+          # Verify critical services are still running
+          RUNNING_CONTAINERS=$(ssh -i ~/.ssh/ectropy_deploy -o StrictHostKeyChecking=no root@${{ steps.server.outputs.host }} "docker ps --filter 'name=ectropy' --format '{{.Names}}' | wc -l")
+
+          echo "✅ Ectropy containers running: ${RUNNING_CONTAINERS}"
+
+          # Warn if no containers running (might need redeployment after aggressive cleanup)
+          if [ "$RUNNING_CONTAINERS" -eq "0" ]; then
+            echo "⚠️  WARNING: No Ectropy containers running"
+            echo "   This may be expected after aggressive cleanup"
+            echo "   Run deploy-${{ env.ENVIRONMENT }}.yml to restore services"
+          fi
+
+      - name: Report Summary
+        run: |
+          echo "========================================="
+          echo "CLEANUP COMPLETE - SUMMARY REPORT"
+          echo "========================================="
+          echo "Environment: ${{ env.ENVIRONMENT }}"
+          echo "Cleanup Level: ${{ env.CLEANUP_LEVEL }}"
+          echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Triggered By: ${{ github.event_name }}"
+          echo "========================================="
+          echo ""
+          echo "📊 Space Freed: ${{ steps.after.outputs.space_freed_percent }}%"
+          echo "📈 Final Disk Usage: ${{ steps.after.outputs.disk_usage_percent }}%"
+          echo ""
+          echo "🔄 Next Scheduled Cleanup: Monday 2:00 AM UTC"
+          echo ""
+          echo "📚 For manual cleanup, use:"
+          echo "   workflow_dispatch → Select environment & cleanup level"
+          echo ""
+          echo "🚨 If disk usage > 85%, consider:"
+          echo "   1. Run aggressive cleanup manually"
+          echo "   2. Upgrade droplet disk size"
+          echo "   3. Investigate storage growth patterns"
+          echo "========================================="
+
+      # Future: Integration with monitoring systems
+      # - name: Send Metrics to Datadog
+      #   if: env.MONITORING_ENABLED == 'true'
+      #   run: |
+      #     curl -X POST "https://api.datadoghq.com/api/v1/series" \
+      #       -H "DD-API-KEY: ${{ secrets.DATADOG_API_KEY }}" \
+      #       -d @- <<EOF
+      #     {
+      #       "series": [{
+      #         "metric": "ectropy.disk.cleanup.space_freed",
+      #         "points": [[$(date +%s), ${{ steps.after.outputs.space_freed_percent }}]],
+      #         "tags": ["env:${{ env.ENVIRONMENT }}", "level:${{ env.CLEANUP_LEVEL }}"]
+      #       }]
+      #     }
+      #     EOF

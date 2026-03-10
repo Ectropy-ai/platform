@@ -1,0 +1,53 @@
+{
+  "name": "@ectropy/console",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ectropy Employee Console - Platform administration interface for Ectropy staff",
+  "scripts": {
+    "dev": "vite --port 3001",
+    "build": "tsc && vite build",
+    "preview": "vite preview --port 3001",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^6.4.9",
+    "@mui/material": "^6.4.9",
+    "@mui/x-data-grid": "^7.28.0",
+    "@tanstack/react-query": "^5.66.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.4.1",
+    "typescript": "^5.9.2",
+    "vite": "^5.4.21"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luhtech/Ectropy.git",
+    "directory": "apps/ectropy-console"
+  },
+  "keywords": [
+    "ectropy",
+    "admin",
+    "console",
+    "platform-management"
+  ],
+  "author": "Ectropy Team",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/luhtech/Ectropy/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "_migrationNote": "This package will migrate to ectropy-business repository post-split"
+}

@@ -1,0 +1,209 @@
+name: 'Setup Node.js + pnpm'
+description: 'Standardized Node.js and pnpm setup with caching - Enterprise Pattern'
+author: 'Ectropy Engineering'
+
+inputs:
+  node-version:
+    description: 'Node.js version to install'
+    required: false
+    default: '20.18.1' # Exact version, updated quarterly per enterprise policy
+
+  skip-install:
+    description: 'Skip pnpm install step (useful for cache-only restore)'
+    required: false
+    default: 'false'
+
+outputs:
+  node-version:
+    description: 'Installed Node.js version'
+    value: ${{ steps.setup-node.outputs.node-version }}
+
+  pnpm-version:
+    description: 'Installed pnpm version from package.json'
+    value: ${{ steps.install-pnpm.outputs.pnpm-version }}
+
+  cache-hit:
+    description: 'Whether pnpm cache was hit'
+    value: ${{ steps.pnpm-cache.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    # ========================================================================
+    # Step 1: Setup Node.js with Exact Version
+    # ========================================================================
+    - name: Setup Node.js
+      id: setup-node
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    # ========================================================================
+    # Step 2: Enable Corepack (Modern Node.js Package Manager Support)
+    # ========================================================================
+    - name: Enable Corepack
+      shell: bash
+      run: |
+        echo "🔧 Enabling Corepack for pnpm management..."
+        corepack enable
+        echo "✅ Corepack enabled"
+
+    # ========================================================================
+    # Step 3: Install pnpm from package.json (Single Source of Truth)
+    # ========================================================================
+    - name: Install pnpm from package.json
+      id: install-pnpm
+      shell: bash
+      run: |
+        echo "📦 Installing pnpm from package.json packageManager field..."
+
+        # Extract version from package.json (format: "pnpm@9.14.4")
+        if [ -f "package.json" ]; then
+          PNPM_VERSION=$(node -p "require('./package.json').packageManager?.split('@')[1] || ''" 2>/dev/null)
+
+          if [ -z "$PNPM_VERSION" ]; then
+            echo "❌ ERROR: packageManager field not found in package.json"
+            echo "  Expected format: \"packageManager\": \"pnpm@9.14.4\""
+            exit 1
+          fi
+
+          echo "  Detected pnpm version: $PNPM_VERSION"
+
+          # Prepare and activate specific pnpm version
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+
+          # Verify installation
+          INSTALLED_VERSION=$(pnpm --version)
+          echo "  Installed pnpm version: $INSTALLED_VERSION"
+
+          if [ "$INSTALLED_VERSION" != "$PNPM_VERSION" ]; then
+            echo "⚠️  Warning: Version mismatch (expected $PNPM_VERSION, got $INSTALLED_VERSION)"
+          fi
+
+          echo "✅ pnpm ${INSTALLED_VERSION} installed"
+          echo "pnpm-version=${INSTALLED_VERSION}" >> $GITHUB_OUTPUT
+        else
+          echo "❌ ERROR: package.json not found in current directory"
+          pwd
+          ls -la
+          exit 1
+        fi
+
+    # ========================================================================
+    # Step 4: Configure pnpm with Enterprise Settings
+    # ========================================================================
+    - name: Configure pnpm
+      shell: bash
+      run: |
+        echo "⚙️  Configuring pnpm with enterprise settings..."
+
+        # Set store directory for cache consistency
+        pnpm config set store-dir ~/.pnpm-store
+
+        # Network resilience: Retry up to 5 times on fetch failures
+        pnpm config set fetch-retries 5
+
+        # Network timeout: 60 seconds (CI environments can be slower)
+        pnpm config set fetch-timeout 60000
+
+        # Strict peer dependencies: Fail fast on version mismatches
+        pnpm config set strict-peer-dependencies true
+
+        echo "✅ pnpm configured for enterprise reliability"
+        echo ""
+        echo "📊 pnpm configuration:"
+        pnpm config list
+
+    # ========================================================================
+    # Step 5: Setup pnpm Cache (GitHub Actions Cache)
+    # ========================================================================
+    - name: Setup pnpm Cache
+      id: pnpm-cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.pnpm-store
+          **/node_modules
+        key: pnpm-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          pnpm-${{ runner.os }}-
+
+    # ========================================================================
+    # Step 6: Install Dependencies (Conditional)
+    # ========================================================================
+    - name: Install Dependencies
+      if: inputs.skip-install != 'true'
+      shell: bash
+      run: |
+        echo "📥 Installing dependencies..."
+
+        # Use frozen lockfile in CI to ensure reproducibility
+        if [ "$CI" = "true" ]; then
+          echo "  CI environment detected - using frozen lockfile"
+          pnpm install --frozen-lockfile
+        else
+          echo "  Local environment detected - allowing lockfile updates"
+          pnpm install
+        fi
+
+        echo "✅ Dependencies installed"
+        echo ""
+        echo "📊 Dependency statistics:"
+        pnpm list --depth=0
+
+    # ========================================================================
+    # Step 7: Verify Nx Workspace (Enterprise Pattern - Fail Fast)
+    # ========================================================================
+    - name: Verify Nx Workspace
+      if: inputs.skip-install != 'true'
+      shell: bash
+      run: |
+        echo "🔍 Verifying Nx workspace integrity..."
+
+        # ROOT CAUSE FIX: Nx CLI availability verification (workflow 21339419036)
+        # The composite action must verify Nx is functional after pnpm install
+        # Prevents silent failures in downstream jobs that depend on Nx
+
+        if ! pnpm nx --version &> /dev/null; then
+          echo "⚠️  WARNING: Nx CLI not available after dependency installation"
+          echo ""
+          echo "This may indicate:"
+          echo "  - Nx is not installed in this workspace"
+          echo "  - pnpm install failed to install Nx"
+          echo "  - This is not an Nx monorepo"
+          echo ""
+          echo "Checking for Nx in package.json:"
+          if grep -q '"nx"' package.json 2>/dev/null; then
+            echo "  ✓ Nx found in package.json"
+            echo "  ✗ But Nx CLI is not available - installation may have failed"
+          else
+            echo "  ℹ️  Nx not found in package.json - this may not be an Nx workspace"
+          fi
+        else
+          NX_VERSION=$(pnpm nx --version)
+          echo "✅ Nx CLI verified (version: $NX_VERSION)"
+        fi
+
+    # ========================================================================
+    # Step 8: Validation Summary
+    # ========================================================================
+    - name: Validation Summary
+      shell: bash
+      run: |
+        echo "🎉 Node.js + pnpm setup complete!"
+        echo ""
+        echo "📊 Environment Summary:"
+        echo "  Node.js: $(node --version)"
+        echo "  pnpm: $(pnpm --version)"
+        echo "  npm: $(npm --version)"
+        echo "  Platform: ${{ runner.os }}"
+        echo "  Cache hit: ${{ steps.pnpm-cache.outputs.cache-hit }}"
+        echo ""
+
+        # Check if Nx is available (informational)
+        if pnpm nx --version &> /dev/null; then
+          echo "  Nx: $(pnpm nx --version)"
+        fi
+
+        echo ""
+        echo "✅ Ready for build and test operations"

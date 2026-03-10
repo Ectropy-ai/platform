@@ -1,0 +1,63 @@
+# 🔐 ENHANCED CONFIGURATION MAP - SECURITY INTEGRATED
+# Integration with your enhanced security configuration system
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ectropy-config
+  namespace: ectropy-production
+  annotations:
+    security.ectropy.io/config-version: '1.0'
+    security.ectropy.io/validated: 'true'
+    security.ectropy.io/config-validator: 'libs/shared/config/src/config.validator.ts'
+data:
+  # Core Application Configuration
+  NODE_ENV: 'production'
+  LOG_LEVEL: 'info'
+
+  # API Gateway Configuration (from your enhanced server)
+  API_GATEWAY_PORT: '4000'
+  API_GATEWAY_HOST: '0.0.0.0'
+  HEALTH_CHECK_ENABLED: 'true'
+
+  # Security Configuration (leveraging your security middleware)
+  RATE_LIMIT_WINDOW_MS: '900000' # 15 minutes
+  RATE_LIMIT_MAX: '1000'
+  CORS_ORIGIN: 'https://app.ectropy.io'
+  HELMET_ENABLED: 'true'
+
+  # Database Configuration
+  DB_HOST: 'postgresql-service'
+  DB_PORT: '5432'
+  DB_NAME: 'ectropy_federated_platform'
+  DB_POOL_SIZE: '20'
+
+  # Redis Configuration
+  REDIS_HOST: 'redis-service'
+  REDIS_PORT: '6379'
+  REDIS_MAX_CONNECTIONS: '50'
+
+  # Speckle Integration
+  SPECKLE_SERVER_URL: 'http://speckle-server-service:3000'
+  CANONICAL_URL: 'https://speckle.ectropy.io'
+
+  # S3/MinIO Configuration (leveraging your secure config)
+  S3_ENDPOINT: 'http://minio-service:9000'
+  S3_BUCKET: 'ectropy-federated-platform'
+  S3_CREATE_BUCKET: 'true'
+  FILE_SIZE_LIMIT_MB: '1000'
+
+  # DAO Governance Configuration
+  DAO_GOVERNANCE_ENABLED: 'true'
+  BLOCKCHAIN_NETWORK: 'production'
+
+  # Manufacturer API Configuration
+  MANUFACTURER_API_ENABLED: 'true'
+  MANUFACTURER_RATE_LIMIT: '100'
+
+  # Performance Configuration
+  CACHE_TTL: '3600'
+  COMPRESSION_ENABLED: 'true'
+
+  # BIM Processing Configuration
+  FILEIMPORT_TIMEOUT: '3600' # 1 hour for large enterprise models
+  MAX_FILE_SIZE_BYTES: '5368709120' # 5GB for enterprise BIM files

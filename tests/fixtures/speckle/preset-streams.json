@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "version": "1.0.0",
+  "description": "Preset Speckle streams for E2E testing and demos - Enterprise Test Data Strategy",
+  "lastUpdated": "2025-12-10T21:00:00Z",
+  "metadata": {
+    "purpose": "Single source of truth for demo BIM models used in testing and demonstrations",
+    "usage": "Referenced by E2E tests, development env vars, and demo configurations",
+    "validation": "All streams validated against live Speckle Server (v2.25.4)",
+    "source": "apps/mcp-server/data/preset-test-data/speckle-streams.json"
+  },
+  "speckleServer": {
+    "url": "http://localhost:3333",
+    "graphqlEndpoint": "http://localhost:3333/graphql",
+    "objectsApiEndpoint": "http://localhost:3333/objects/{streamId}/{objectId}",
+    "version": "2.25.4",
+    "status": "✅ Running and validated (2025-12-10)"
+  },
+  "streams": [
+    {
+      "id": "ea14da05a6",
+      "name": "Demo Building - Duplex Architecture",
+      "description": "2.27MB IFC file (Ifc2x3_Duplex_Architecture.ifc) for standard testing",
+      "objectId": "e088abab5fcffca60885b5c31a23c7e8",
+      "purpose": "PRIMARY DEMO STREAM - Used for all E2E tests and developer demos",
+      "metadata": {
+        "fileSize": "2.27 MB",
+        "ifcVersion": "IFC2x3",
+        "modelType": "Architecture",
+        "complexity": "Medium",
+        "loadTime": "~5s",
+        "elementCount": "Multiple building elements with __closure data",
+        "hasClosure": true,
+        "hasDisplayValue": true,
+        "hasElements": true
+      },
+      "validation": {
+        "streamExists": true,
+        "objectExists": true,
+        "graphqlAccessible": true,
+        "objectDataReturned": true,
+        "lastChecked": "2025-12-10T21:00:00Z"
+      },
+      "usage": {
+        "envVar": "REACT_APP_DEMO_STREAM_ID",
+        "envVarObject": "REACT_APP_DEMO_OBJECT_ID",
+        "tests": [
+          "tests/playwright/bim-viewer-*.spec.ts",
+          "tests/playwright/api-health-assessment.spec.ts"
+        ],
+        "components": [
+          "apps/web-dashboard/src/components/BIMViewer/SpeckleBIMViewer.tsx",
+          "apps/web-dashboard/src/pages/ArchitectDashboard.tsx",
+          "apps/web-dashboard/src/pages/OwnerDashboard.tsx"
+        ]
+      },
+      "speckleUser": {
+        "id": "1cc889c494",
+        "name": "e",
+        "note": "Test user account in Speckle Server"
+      },
+      "apiExamples": {
+        "graphqlIntrospection": {
+          "url": "http://localhost:3333/graphql",
+          "query": "{ __schema { queryType { name } } }",
+          "expectedResponse": {
+            "data": {
+              "__schema": {
+                "queryType": {
+                  "name": "Query"
+                }
+              }
+            }
+          }
+        },
+        "objectsApi": {
+          "url": "http://localhost:3333/objects/ea14da05a6/e088abab5fcffca60885b5c31a23c7e8",
+          "method": "GET",
+          "authentication": "Optional (Bearer token)",
+          "expectedStatus": 200,
+          "expectedData": {
+            "id": "e088abab5fcffca60885b5c31a23c7e8",
+            "@elements": "array of referenced objects",
+            "__closure": "dictionary of object data",
+            "speckle_type": "string indicating object type"
+          }
+        }
+      }
+    }
+  ],
+  "futureStreams": [
+    {
+      "placeholder": "simple-cube",
+      "name": "Demo Building - Simple Cube",
+      "description": "50KB basic geometry for quick smoke tests",
+      "purpose": "Fast rendering validation (target: ~1s load time)",
+      "status": "PLANNED - To be created",
+      "priority": "P1",
+      "estimatedEffort": "1 hour (create cube in Blender, export IFC, upload to Speckle)"
+    },
+    {
+      "placeholder": "large-infrastructure",
+      "name": "Demo Building - Large Infrastructure",
+      "description": "50MB+ bridge with terrain and heavy geometry",
+      "purpose": "Performance testing and memory management validation",
+      "status": "PLANNED - To be created",
+      "priority": "P2",
+      "estimatedEffort": "2 hours (find open-source bridge model, convert to IFC)"
+    }
+  ],
+  "testDataStrategy": {
+    "principle": "One Primary Stream, Multiple Test Cases",
+    "rationale": "Single high-quality demo model covers most E2E scenarios without data proliferation",
+    "expansionTriggers": [
+      "Performance testing requires larger models",
+      "Smoke tests need faster load times (<1s)",
+      "Specific IFC features need validation (e.g., MEP, structural)",
+      "Multi-project testing requires multiple streams"
+    ]
+  },
+  "setupInstructions": {
+    "automated": "Stream ea14da05a6 already exists in Speckle Server - no setup required",
+    "manual": [
+      "If stream is missing:",
+      "1. Navigate to http://localhost:8080",
+      "2. Create new stream with ID: ea14da05a6",
+      "3. Upload test-data/Ifc2x3_Duplex_Architecture.ifc",
+      "4. Note the object ID from Speckle UI",
+      "5. Update this file with new object ID"
+    ],
+    "validation": [
+      "Run: curl http://localhost:3333/objects/ea14da05a6/e088abab5fcffca60885b5c31a23c7e8",
+      "Expected: HTTP 200 with JSON object data",
+      "Alternative: Run E2E tests - tests/playwright/api-health-assessment.spec.ts validates Speckle connectivity"
+    ]
+  },
+  "troubleshooting": {
+    "streamNotFound": {
+      "symptoms": "HTTP 404 when accessing stream URL",
+      "causes": [
+        "Speckle Server not running",
+        "Stream was deleted or ID changed",
+        "Database migration cleared data"
+      ],
+      "solutions": [
+        "Check Speckle Server is running: docker ps | grep speckle-server",
+        "Re-upload IFC file from test-data/Ifc2x3_Duplex_Architecture.ifc",
+        "Verify stream exists in Speckle UI: http://localhost:8080"
+      ]
+    },
+    "objectNotFound": {
+      "symptoms": "HTTP 404 when accessing object URL",
+      "causes": [
+        "Object ID changed after re-upload",
+        "Object was deleted",
+        "Speckle version incompatibility"
+      ],
+      "solutions": [
+        "Get latest object ID from Speckle UI",
+        "Update this file and .env.development with new object ID",
+        "Re-run tests to validate"
+      ]
+    },
+    "viewerNotRendering": {
+      "symptoms": "BIM viewer shows 'Upload an IFC file' message",
+      "causes": [
+        "Environment variables not set (REACT_APP_DEMO_STREAM_ID)",
+        "React app not rebuilt after env var changes",
+        "Stream/object ID mismatch"
+      ],
+      "solutions": [
+        "Verify .env.development has REACT_APP_DEMO_STREAM_ID=ea14da05a6",
+        "Rebuild web-dashboard: pnpm nx build web-dashboard",
+        "Restart dev server: docker compose restart web-dashboard",
+        "Check browser console for detailed error messages"
+      ]
+    }
+  },
+  "references": {
+    "documentation": [
+      "evidence/FEATURE_IMPLEMENTATION_MATRIX_2025-12-10.md (Section 3: Test Data Assessment)",
+      "evidence/QA_FRAMEWORK_ARCHITECTURE_2025-12-10.md (Section 5.2: Proposed Test Data Structure)",
+      "evidence/NGINX_SPECKLE_ENTERPRISE_FIXES_2025-12-10.md (Speckle BIM Stack Validation)"
+    ],
+    "implementation": [
+      "apps/web-dashboard/src/components/BIMViewer/SpeckleBIMViewer.tsx (Lines 141-143: Stream prop handling)",
+      "apps/web-dashboard/src/pages/ArchitectDashboard.tsx (Lines 501-502: Stream prop usage)",
+      ".env.development (Lines 90-91: Environment variable configuration)"
+    ],
+    "validation": [
+      "tests/playwright/api-health-assessment.spec.ts (Speckle Server connectivity tests)",
+      "tests/playwright/bim-viewer-upload.spec.ts (Lines 219-287: Known stream rendering test)",
+      "scripts/validate-development-stack-enterprise.sh (Phase 7: Speckle BIM Stack validation)"
+    ]
+  }
+}

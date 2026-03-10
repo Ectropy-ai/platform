@@ -1,0 +1,399 @@
+# ============================================================================
+# ⚠️ DEPRECATED - Archived 2025-12-16 (Session 5)
+# ============================================================================
+#
+# This workflow has been DEPRECATED and integrated into deploy-infrastructure.yml
+#
+# CONSOLIDATION RATIONALE:
+# - Nginx configuration IS infrastructure (reverse proxy, routing, SSL/TLS)
+# - Reduces workflow sprawl (41→34→33 workflows toward target of 25)
+# - Provides unified infrastructure deployment interface
+# - Maintains all validation and deployment functionality
+#
+# MIGRATION PATH:
+# Use deploy-infrastructure.yml with deployment_mode: nginx-only
+#
+# Example:
+#   Environment: staging/development/production
+#   Deployment Mode: nginx-only
+#   Confirm: DEPLOY
+#
+# FUNCTIONALITY PRESERVED:
+# ✅ Nginx configuration validation (syntax, upstreams, routes)
+# ✅ Automated deployment via scripts/deployment/deploy-nginx-config.sh
+# ✅ Multi-environment support (development, staging, production)
+# ✅ Endpoint verification (health checks, routing validation)
+# ✅ SSH credential management
+#
+# WORKFLOW MATRIX REFERENCE:
+# apps/mcp-server/data/cicd-environment-workflow-matrix.json v1.5.0
+#
+# ARCHIVED: 2025-12-16T03:00:00Z
+# SESSION: 5 (Workflow Consolidation Phase 1)
+# REPLACEMENT: .github/workflows/deploy-infrastructure.yml (nginx-only mode)
+# ============================================================================
+
+name: Deploy Nginx Configuration (Staging)
+
+# ============================================================================
+# Purpose: Automated deployment of nginx dual-config pattern
+# Issue: luhtech/Ectropy#1951 - Document & automate dual-config deployment
+# Reference: docs/INFRASTRUCTURE_CATALOG.md - Section 7.4
+# ============================================================================
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'nginx.conf'
+      - 'infrastructure/nginx/**'
+      - 'scripts/deployment/deploy-nginx-config.sh'
+
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'nginx.conf'
+      - 'infrastructure/nginx/**'
+      - 'scripts/deployment/deploy-nginx-config.sh'
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  ENVIRONMENT: ${{ github.event.inputs.environment || 'staging' }}
+
+jobs:
+  # ============================================================================
+  # Validation Job (runs on PRs and pushes)
+  # ============================================================================
+  validate:
+    name: Validate Nginx Configuration
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate nginx.conf syntax
+        run: |
+          echo "🔍 Validating nginx.conf syntax..."
+
+          # ENTERPRISE: Skip nginx -t validation in CI
+          # Root nginx.conf references upstream servers (web_dashboard, api_gateway, mcp_server)
+          # These upstreams only resolve in Docker Compose environment, not in CI
+          # Validation will occur on actual server during deployment
+
+          echo "⚠️  Skipping nginx -t validation (requires Docker network)"
+          echo "   Upstream servers (mcp_server, api_gateway, web_dashboard) not available in CI"
+          echo "   Validation will occur during actual deployment with docker-compose"
+
+          # Basic syntax check - ensure file exists and is readable
+          if [[ ! -f "nginx.conf" ]]; then
+            echo "❌ nginx.conf not found"
+            exit 1
+          fi
+
+          echo "✅ nginx.conf file exists and is readable"
+          echo "   Full validation deferred to deployment environment"
+
+      - name: Validate sites-available config syntax
+        run: |
+          echo "🔍 Validating sites-available config syntax..."
+
+          CONFIG_FILE="infrastructure/nginx/ectropy-staging.conf"
+
+          if [[ ! -f "$CONFIG_FILE" ]]; then
+            echo "❌ Config file not found: $CONFIG_FILE"
+            exit 1
+          fi
+
+          # Check for basic nginx syntax issues in the file
+          # The sites-available config is meant to be included in http context
+          # so we just check for obvious syntax errors
+
+          # Check for required sections
+          if ! grep -q "server {" "$CONFIG_FILE"; then
+            echo "❌ No server block found in sites-available config"
+            exit 1
+          fi
+
+          # Check for basic syntax issues (unmatched braces)
+          OPEN_BRACES=$(grep -o "{" "$CONFIG_FILE" | wc -l)
+          CLOSE_BRACES=$(grep -o "}" "$CONFIG_FILE" | wc -l)
+
+          if [ "$OPEN_BRACES" -ne "$CLOSE_BRACES" ]; then
+            echo "❌ Unmatched braces in sites-available config"
+            echo "   Open braces: $OPEN_BRACES, Close braces: $CLOSE_BRACES"
+            exit 1
+          fi
+
+          echo "✅ Sites-available config basic validation passed"
+
+      - name: Check for required upstreams
+        run: |
+          echo "🔍 Checking for required upstream definitions..."
+
+          REQUIRED_UPSTREAMS=("web_dashboard" "api_gateway" "mcp_server")
+          MISSING_UPSTREAMS=()
+
+          for upstream in "${REQUIRED_UPSTREAMS[@]}"; do
+            if ! grep -q "upstream $upstream" infrastructure/nginx/ectropy-staging.conf; then
+              MISSING_UPSTREAMS+=("$upstream")
+            fi
+          done
+
+          if [ ${#MISSING_UPSTREAMS[@]} -gt 0 ]; then
+            echo "❌ Missing required upstreams: ${MISSING_UPSTREAMS[*]}"
+            exit 1
+          fi
+
+          echo "✅ All required upstreams are defined"
+
+      - name: Check for required routes
+        run: |
+          echo "🔍 Checking for required location blocks..."
+
+          REQUIRED_ROUTES=(
+            "location /health"
+            "location /api/tools"
+            "location /api/mcp/"
+            "location /api/"
+            "location /"
+          )
+
+          MISSING_ROUTES=()
+
+          for route in "${REQUIRED_ROUTES[@]}"; do
+            if ! grep -q "$route" infrastructure/nginx/ectropy-staging.conf; then
+              MISSING_ROUTES+=("$route")
+            fi
+          done
+
+          if [ ${#MISSING_ROUTES[@]} -gt 0 ]; then
+            echo "❌ Missing required routes: ${MISSING_ROUTES[*]}"
+            exit 1
+          fi
+
+          echo "✅ All required routes are defined"
+
+      - name: Generate validation summary
+        if: always()
+        run: |
+          echo "## Nginx Configuration Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Files Validated" >> $GITHUB_STEP_SUMMARY
+          echo "- \`nginx.conf\` - Main nginx configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- \`infrastructure/nginx/ectropy-staging.conf\` - Sites-available config" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ **Status:** All validations passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Status:** Validation failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Reference:** [INFRASTRUCTURE_CATALOG.md - Section 7.4](../docs/INFRASTRUCTURE_CATALOG.md#74-nginx-configuration-architecture-dual-config-pattern)" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # Deploy Job (runs only on push to main/develop, not on PRs)
+  # ============================================================================
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment || 'staging' }}
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name != 'pull_request'
+    environment: staging
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        env:
+          DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
+          DO_HOST: ${{ secrets.DO_HOST }}
+        run: |
+          echo "🔑 Setting up SSH key..."
+          mkdir -p ~/.ssh
+          echo "${DO_SSH_KEY}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          # Add server to known hosts
+          ssh-keyscan -H ${DO_HOST} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          echo "✅ SSH key configured"
+
+      - name: Deploy nginx configurations
+        env:
+          SERVER_IP: ${{ secrets.DO_HOST }}
+          DO_SSH_KEY: ${{ secrets.DO_SSH_KEY }}
+        run: |
+          echo "🚀 Deploying nginx dual-config to staging..."
+          bash scripts/deployment/deploy-nginx-config.sh staging
+
+      - name: Verify deployment
+        env:
+          DO_HOST: ${{ secrets.DO_HOST }}
+        run: |
+          echo "🔍 Verifying deployment..."
+
+          # Wait a moment for nginx to fully reload
+          sleep 5
+
+          # Test critical endpoints
+          BASE_URL="https://staging.ectropy.ai"
+
+          echo "Testing endpoints:"
+
+          # Test load balancer health
+          curl -f -s -o /dev/null -w "Load Balancer Health: %{http_code}\n" "${BASE_URL}/lb-health" || {
+            echo "❌ Load balancer health check failed"
+            exit 1
+          }
+
+          # Test MCP Server health
+          curl -f -s -o /dev/null -w "MCP Server Health: %{http_code}\n" "${BASE_URL}/health" || {
+            echo "❌ MCP Server health check failed"
+            exit 1
+          }
+
+          # Test API Gateway health
+          curl -f -s -o /dev/null -w "API Gateway Health: %{http_code}\n" "${BASE_URL}/api/health" || {
+            echo "❌ API Gateway health check failed"
+            exit 1
+          }
+
+          # Test Web Dashboard
+          curl -f -s -o /dev/null -w "Web Dashboard: %{http_code}\n" "${BASE_URL}/" || {
+            echo "❌ Web Dashboard check failed"
+            exit 1
+          }
+
+          echo "✅ All endpoints verified successfully"
+
+      - name: Create success issue
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '✅ Nginx Configuration Deployed Successfully';
+            const body = `## Nginx Dual-Config Deployment
+
+            **Status:** ✅ Success
+            **Environment:** ${{ env.ENVIRONMENT }}
+            **Commit:** ${{ github.sha }}
+            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            ### Deployed Configurations
+            - ✅ \`/etc/nginx/nginx.conf\` (Main config)
+            - ✅ \`/etc/nginx/sites-available/ectropy-staging\` (Sites config)
+            - ✅ \`/etc/nginx/sites-enabled/ectropy-staging\` (Symlink)
+
+            ### Validated Endpoints
+            - ✅ Load Balancer Health: \`https://staging.ectropy.ai/lb-health\`
+            - ✅ MCP Server Health: \`https://staging.ectropy.ai/health\`
+            - ✅ API Gateway Health: \`https://staging.ectropy.ai/api/health\`
+            - ✅ Web Dashboard: \`https://staging.ectropy.ai/\`
+
+            ### Next Steps
+            - Monitor error logs for any issues
+            - Check application functionality
+            - Close this issue once verified
+
+            **Reference:** [INFRASTRUCTURE_CATALOG.md - Section 7.4](https://github.com/${{ github.repository }}/blob/main/docs/INFRASTRUCTURE_CATALOG.md#74-nginx-configuration-architecture-dual-config-pattern)
+            `;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['infrastructure', 'nginx', 'deployment', 'automated']
+            });
+
+      - name: Create failure issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '🚨 Nginx Configuration Deployment Failed';
+            const body = `## Nginx Dual-Config Deployment
+
+            **Status:** ❌ Failed
+            **Environment:** ${{ env.ENVIRONMENT }}
+            **Commit:** ${{ github.sha }}
+            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            ### Failure Details
+            The nginx dual-config deployment failed. Check the workflow logs for details.
+
+            ### Possible Causes
+            - Configuration syntax error
+            - SSH connection failure
+            - Nginx test failure (\`nginx -t\`)
+            - Endpoint validation failure
+            - Server unavailable
+
+            ### Resolution Steps
+            1. Check workflow logs: [View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            2. Review nginx error logs: \`ssh root@staging 'tail -50 /var/log/nginx/error.log'\`
+            3. Check nginx status: \`ssh root@staging 'systemctl status nginx'\`
+            4. Verify backups exist: Configs are backed up with timestamp
+            5. Manual rollback if needed: \`ssh root@staging 'cp /etc/nginx/nginx.conf.backup.* /etc/nginx/nginx.conf && systemctl reload nginx'\`
+
+            ### Manual Deployment
+            If automatic deployment continues to fail, deploy manually:
+            \`\`\`bash
+            # ENTERPRISE FIX (2025-12-10): Use GitHub Variable instead of hardcoded IP
+            export SERVER_IP=${{ vars.STAGING_IP }}
+            bash scripts/deployment/deploy-nginx-config.sh staging
+            \`\`\`
+
+            **Reference:** [INFRASTRUCTURE_CATALOG.md - Section 7.4](https://github.com/${{ github.repository }}/blob/main/docs/INFRASTRUCTURE_CATALOG.md#74-nginx-configuration-architecture-dual-config-pattern)
+
+            **Priority:** P0 - Blocking deployments
+            `;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['infrastructure', 'nginx', 'deployment', 'automated', 'P0', 'bug']
+            });
+
+      - name: Generate deployment summary
+        if: always()
+        run: |
+          echo "## Nginx Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ env.ENVIRONMENT }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ **Status:** Deployment successful" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Deployed Files" >> $GITHUB_STEP_SUMMARY
+            echo "- \`/etc/nginx/nginx.conf\`" >> $GITHUB_STEP_SUMMARY
+            echo "- \`/etc/nginx/sites-available/ectropy-staging\`" >> $GITHUB_STEP_SUMMARY
+            echo "- \`/etc/nginx/sites-enabled/ectropy-staging\` (symlink)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Status:** Deployment failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Check the logs above for error details." >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,0 +1,10 @@
+# Add files here to ignore them from prettier formatting
+/dist
+/coverage
+/.nx/cache
+/.nx/workspace-data
+
+# ROOT CAUSE #94 - GitHub Actions workflows with extensive bash scripts cause YAML parser errors
+.github/workflows/update-monitoring-metrics.yml
+.github/workflows/update-cicd-metrics.yml
+.github/workflows/roadmap-v3-validation.yml

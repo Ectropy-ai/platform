@@ -1,0 +1,35 @@
+{
+  "name": "@ectropy/ai-agents",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/ai-agents/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "libs/ai-agents/dist",
+        "main": "libs/ai-agents/src/index.ts",
+        "tsConfig": "libs/ai-agents/tsconfig.lib.json",
+        "assets": ["libs/ai-agents/*.md"]
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/ai-agents/**/*.js"]
+      }
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "outputs": ["{workspaceRoot}/coverage/libs/ai-agents"],
+      "options": {
+        "config": "libs/ai-agents/vitest.config.ts",
+        "passWithNoTests": false,
+        "reportsDirectory": "{workspaceRoot}/coverage/libs/ai-agents"
+      }
+    }
+  },
+  "tags": ["scope:ai", "type:lib"]
+}

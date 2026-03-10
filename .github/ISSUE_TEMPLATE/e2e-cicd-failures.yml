@@ -1,0 +1,326 @@
+name: E2E Test & CI/CD Pipeline Failures
+description: Enterprise-standard template for addressing E2E test and CI/CD pipeline failures
+title: "[E2E/CI] "
+labels: ["e2e", "ci-cd", "P0-critical", "enterprise"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # E2E Test & CI/CD Pipeline Failure Template
+        
+        **Priority:** P0 Critical
+        **Enterprise Standards:** Follow AGENT_GUIDE.md template
+        **Evidence-Based:** All claims backed by log outputs
+        **No Shortcuts:** Proper fixes, not workarounds
+        
+        ---
+  
+  - type: textarea
+    id: executive-summary
+    attributes:
+      label: "📋 Executive Summary"
+      description: Clear P0 critical priority issue description
+      placeholder: |
+        **Current State:**
+        - E2E test suite: X% failing (target: 100% passing)
+        - CI/CD pipeline: X minutes (target: < 40 minutes)
+        - MCP health score: X/100 (target: > 80)
+        
+        **Impact:**
+        - Deployment pipeline blocked
+        - Development velocity reduced by X%
+        - Stakeholder demos at risk
+    validations:
+      required: true
+  
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: "🔍 Problem Statement"
+      description: Evidence-based problem description with actual error outputs
+      placeholder: |
+        **Observable Symptoms:**
+        ```
+        [Paste actual error messages from CI/CD logs]
+        ```
+        
+        **Affected Components:**
+        - [ ] E2E tests (Playwright)
+        - [ ] Unit tests
+        - [ ] Integration tests
+        - [ ] Build process
+        - [ ] Deployment workflow
+        - [ ] Health endpoints
+        
+        **Current Performance:**
+        - Test execution time: X minutes
+        - Test pass rate: X%
+        - Pipeline execution time: X minutes
+        - Failure rate: X%
+    validations:
+      required: true
+  
+  - type: textarea
+    id: root-cause
+    attributes:
+      label: "🎯 Root Cause Analysis"
+      description: Identified root causes with impact assessment
+      placeholder: |
+        1. **[Root Cause 1]**
+           - Impact: [High/Medium/Low]
+           - Evidence: [Log reference, file location]
+           - Why it happened: [Explanation]
+        
+        2. **[Root Cause 2]**
+           - Impact: [High/Medium/Low]
+           - Evidence: [Log reference, file location]
+           - Why it happened: [Explanation]
+        
+        3. **[Root Cause 3]**
+           - Impact: [High/Medium/Low]
+           - Evidence: [Log reference, file location]
+           - Why it happened: [Explanation]
+    validations:
+      required: true
+  
+  - type: textarea
+    id: solution
+    attributes:
+      label: "✅ Solution"
+      description: Detailed implementation plan with code examples
+      placeholder: |
+        ### 1. Fix Health Endpoint Schema
+        
+        **File:** `apps/api-gateway/src/routes/health.routes.ts`
+        
+        ```typescript
+        // BEFORE (workaround)
+        app.get('/health', (req, res) => res.send('OK'));
+        
+        // AFTER (proper implementation)
+        interface HealthResponse {
+          status: 'healthy' | 'degraded' | 'unhealthy';
+          timestamp: string;
+          version: string;
+          services: {
+            database: { status: string; latency: number };
+            redis: { status: string; latency: number };
+          };
+        }
+        
+        app.get('/health', async (req, res) => {
+          const health = await checkAllServices();
+          res.json(health);
+        });
+        ```
+        
+        **Why:** Structured health checks enable proper monitoring and retry logic
+        
+        ### 2. Add Server Readiness Checks
+        
+        **File:** `.github/workflows/e2e-tests.yml`
+        
+        ```yaml
+        - name: Wait for server ready
+          run: |
+            max_attempts=30
+            attempt=0
+            while [ $attempt -lt $max_attempts ]; do
+              if curl -f http://localhost:4000/health; then
+                echo "✅ Server ready"
+                exit 0
+              fi
+              attempt=$((attempt + 1))
+              sleep 2
+            done
+            exit 1
+        ```
+        
+        **Why:** Eliminates race conditions in test startup
+        
+        ### 3. Implement Exponential Backoff Retry Logic
+        
+        **File:** `apps/web-dashboard/tests/e2e/helpers/retry.ts`
+        
+        ```typescript
+        export async function retryWithBackoff<T>(
+          fn: () => Promise<T>,
+          maxAttempts: number = 3,
+          baseDelay: number = 1000
+        ): Promise<T> {
+          for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            try {
+              return await fn();
+            } catch (error) {
+              if (attempt === maxAttempts - 1) throw error;
+              const delay = baseDelay * Math.pow(2, attempt);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
+          throw new Error('Retry failed');
+        }
+        ```
+        
+        **Why:** Handles transient failures gracefully without flakiness
+    validations:
+      required: true
+  
+  - type: textarea
+    id: performance-improvements
+    attributes:
+      label: "📊 Expected Performance Improvements"
+      description: Quantified improvements with metrics
+      placeholder: |
+        - **E2E Test Pass Rate:** X% → 100% (+Y% improvement)
+        - **E2E Test Duration:** X min → Y min (Z% faster)
+        - **CI/CD Pipeline Duration:** X min → Y min (target: < 40 min)
+        - **MCP Health Score:** X/100 → 80+/100
+        - **Deployment Success Rate:** X% → 95%+
+        - **Developer Feedback Loop:** X min → Y min
+        
+        **Total Time Savings:** X hours/week across team
+        **Cost Savings:** $X/month in CI/CD compute
+    validations:
+      required: true
+  
+  - type: checkboxes
+    id: success-criteria
+    attributes:
+      label: "🎯 Success Criteria"
+      description: Specific measurable outcomes
+      options:
+        - label: E2E test suite 100% passing
+        - label: CI/CD pipeline completes in < 40 minutes
+        - label: MCP health score ≥ 80/100
+        - label: Zero undeclared dependencies
+        - label: All health endpoints return proper JSON schemas
+        - label: Server readiness checks implemented
+        - label: Retry logic with exponential backoff added
+        - label: TypeScript strict mode (no `any` types)
+        - label: Test coverage ≥ 80%
+        - label: CURRENT_TRUTH.md updated
+        - label: Evidence files created
+  
+  - type: textarea
+    id: mcp-workflow
+    attributes:
+      label: "🤖 MCP Workflow (MANDATORY)"
+      description: Required MCP-guided development steps
+      value: |
+        1. **Query MCP:** "How to fix E2E test failures and optimize CI/CD pipeline?"
+        2. **Create work plan:** Document proposed approach with file list
+        3. **Validate plan:** Score ≥ 70/100 required to proceed
+        4. **Implement:** Follow approved plan with evidence at each step
+        5. **Test:** Run full test suite + CI/CD validation
+        6. **Collect evidence:** 
+           - `evidence/e2e-cicd-fix/before-metrics.json`
+           - `evidence/e2e-cicd-fix/after-metrics.json`
+           - `evidence/e2e-cicd-fix/test-results.json`
+           - `evidence/e2e-cicd-fix/workflow-timing.json`
+        7. **Update CURRENT_TRUTH.md:** Inline documentation update
+        8. **Deploy:** Run full CI/CD pipeline validation
+        9. **Verify:** Confirm all success criteria met
+      placeholder: Document your MCP workflow execution here
+    validations:
+      required: true
+  
+  - type: checkboxes
+    id: testing-checklist
+    attributes:
+      label: "🧪 Testing Checklist"
+      description: Required testing and validation
+      options:
+        - label: "Health endpoints: `curl http://localhost:4000/health` returns valid JSON"
+        - label: "Database connectivity: Health check shows DB status"
+        - label: "Redis connectivity: Health check shows Redis status"
+        - label: "E2E tests: `pnpm test:e2e:ci` completes successfully"
+        - label: "Build process: `pnpm nx build --all` succeeds"
+        - label: "Workflow validation: All GitHub Actions workflows pass"
+        - label: "Performance test: CI/CD pipeline < 40 minutes"
+        - label: "Regression test: Existing functionality unaffected"
+        - label: "Evidence collection: All evidence files created"
+        - label: "Documentation: CURRENT_TRUTH.md updated with changes"
+  
+  - type: textarea
+    id: files-modified
+    attributes:
+      label: "📁 Files Modified"
+      description: List of files to be changed
+      placeholder: |
+        - `apps/api-gateway/src/routes/health.routes.ts` - Proper health endpoint schema
+        - `apps/mcp-server/src/routes/health.routes.ts` - Structured health response
+        - `apps/web-dashboard/tests/e2e/helpers/retry.ts` - Exponential backoff retry logic
+        - `.github/workflows/e2e-tests.yml` - Server readiness checks
+        - `.github/workflows/foundation.yml` - Optimized build caching
+        - `playwright.ci.config.ts` - CI-optimized test configuration
+        - `package.json` - Updated test scripts
+        - `docs/CURRENT_TRUTH.md` - Inline documentation update
+    validations:
+      required: true
+  
+  - type: dropdown
+    id: estimated-timeline
+    attributes:
+      label: "⏱️ Estimated Timeline"
+      description: How long will this take to implement?
+      options:
+        - "Day 1: Environment & API fixes (8 hours)"
+        - "Day 2: E2E tests & validation (8 hours)"
+        - "Day 3: Testing & deployment (8 hours)"
+        - "Total: 2-3 days to full production deployment"
+    validations:
+      required: true
+  
+  - type: textarea
+    id: anti-patterns
+    attributes:
+      label: "⛔ Anti-Patterns to Avoid"
+      description: Common pitfalls documented
+      value: |
+        **❌ NEVER DO:**
+        - Skip health endpoint schema (use proper interfaces)
+        - Use `setTimeout()` instead of readiness checks
+        - Use `any` TypeScript types
+        - Add `console.log` instead of proper logging
+        - Create workarounds instead of root cause fixes
+        - Skip retry logic (implement exponential backoff)
+        - Skip MCP validation gates
+        - Create separate documentation files (update CURRENT_TRUTH.md only)
+        - Commit without evidence files
+        
+        **✅ ALWAYS DO:**
+        - Implement proper health endpoints with schemas
+        - Add server readiness checks with polling
+        - Use TypeScript strict types
+        - Implement structured logging
+        - Fix root causes, not symptoms
+        - Add retry logic with exponential backoff
+        - Follow MCP-guided workflow
+        - Update CURRENT_TRUTH.md inline
+        - Create evidence files for all changes
+      placeholder: Add any additional anti-patterns specific to this issue
+  
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        
+        ## 📚 References
+        
+        - **Agent Guide:** `docs/AGENT_GUIDE.md`
+        - **AI Protocol:** `docs/AI_AGENT_PROTOCOL.md`
+        - **Current Truth:** `docs/CURRENT_TRUTH.md`
+        - **E2E Optimization:** `docs/E2E_TEST_OPTIMIZATION.md`
+        - **Workflow Template:** `.github/workflows/AGENT_WORKFLOW_TEMPLATE.yml`
+        
+        ## 🎓 How AI Dev Agents Should Use This Issue
+        
+        1. **Read** all sections carefully (15 min)
+        2. **Execute MCP workflow** (query → plan → validate → implement)
+        3. **Implement fixes** following code examples (4-6 hours)
+        4. **Collect evidence** at each step (ongoing)
+        5. **Validate** all success criteria (1 hour)
+        6. **Update documentation** (CURRENT_TRUTH.md only) (30 min)
+        7. **Deploy & monitor** (ongoing)
+        
+        **Total Estimated Time:** 2-3 days for complete implementation and validation

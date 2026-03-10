@@ -1,0 +1,103 @@
+name: 'Validate OAuth Secrets'
+description: 'Validate required OAuth secrets for E2E tests with detailed diagnostics'
+author: 'Ectropy Platform Team'
+
+inputs:
+  google-client-id:
+    description: 'Google OAuth Client ID'
+    required: true
+  google-client-secret:
+    description: 'Google OAuth Client Secret'
+    required: true
+  test-google-email:
+    description: 'Test Google account email'
+    required: true
+  test-google-password:
+    description: 'Test Google account password'
+    required: true
+  environment-name:
+    description: 'Environment name for diagnostic messages (e.g., staging, production)'
+    required: false
+    default: 'staging'
+  fail-on-missing:
+    description: 'Whether to fail if secrets are missing (true/false)'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 🔍 Pre-Flight Environment Validation
+      shell: bash
+      env:
+        GOOGLE_CLIENT_ID: ${{ inputs.google-client-id }}
+        GOOGLE_CLIENT_SECRET: ${{ inputs.google-client-secret }}
+        TEST_GOOGLE_EMAIL: ${{ inputs.test-google-email }}
+        TEST_GOOGLE_PASSWORD: ${{ inputs.test-google-password }}
+        ENVIRONMENT_NAME: ${{ inputs.environment-name }}
+        FAIL_ON_MISSING: ${{ inputs.fail-on-missing }}
+      run: |
+        echo "::group::Pre-Flight Environment Validation"
+
+        echo "📊 Environment Context:"
+        echo "  Current environment: $ENVIRONMENT_NAME"
+        echo "  Job name: ${{ github.job }}"
+        echo "  Workflow: ${{ github.workflow }}"
+
+        echo ""
+        echo "🔐 Checking OAuth Secret Accessibility:"
+
+        MISSING_SECRETS=()
+
+        if [ -z "$GOOGLE_CLIENT_ID" ]; then
+          MISSING_SECRETS+=("GOOGLE_CLIENT_ID")
+          echo "  ❌ GOOGLE_CLIENT_ID - NOT ACCESSIBLE"
+        else
+          echo "  ✅ GOOGLE_CLIENT_ID - accessible"
+        fi
+
+        if [ -z "$GOOGLE_CLIENT_SECRET" ]; then
+          MISSING_SECRETS+=("GOOGLE_CLIENT_SECRET")
+          echo "  ❌ GOOGLE_CLIENT_SECRET - NOT ACCESSIBLE"
+        else
+          echo "  ✅ GOOGLE_CLIENT_SECRET - accessible"
+        fi
+
+        if [ -z "$TEST_GOOGLE_EMAIL" ]; then
+          MISSING_SECRETS+=("TEST_GOOGLE_EMAIL")
+          echo "  ❌ TEST_GOOGLE_EMAIL - NOT ACCESSIBLE"
+        else
+          echo "  ✅ TEST_GOOGLE_EMAIL - accessible"
+        fi
+
+        if [ -z "$TEST_GOOGLE_PASSWORD" ]; then
+          MISSING_SECRETS+=("TEST_GOOGLE_PASSWORD")
+          echo "  ❌ TEST_GOOGLE_PASSWORD - NOT ACCESSIBLE"
+        else
+          echo "  ✅ TEST_GOOGLE_PASSWORD - accessible"
+        fi
+
+        if [ ${#MISSING_SECRETS[@]} -gt 0 ]; then
+          echo ""
+          echo "❌ ERROR: Missing required secrets: ${MISSING_SECRETS[*]}"
+          echo ""
+          echo "💡 Root Cause: This job is missing 'environment: $ENVIRONMENT_NAME' declaration"
+          echo ""
+          echo "📝 To Fix:"
+          echo "  1. Ensure this job has 'environment: $ENVIRONMENT_NAME' in the workflow file"
+          echo "  2. Verify secrets exist at: GitHub Settings > Environments > $ENVIRONMENT_NAME > Environment secrets"
+          echo "  3. Required secrets: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, TEST_GOOGLE_EMAIL, TEST_GOOGLE_PASSWORD"
+          echo ""
+          echo "::endgroup::"
+          
+          if [ "$FAIL_ON_MISSING" = "true" ]; then
+            exit 1
+          else
+            echo "⚠️  Continuing despite missing secrets (fail-on-missing=false)"
+          fi
+        else
+          echo ""
+          echo "✅ All required OAuth secrets are accessible"
+        fi
+        
+        echo "::endgroup::"

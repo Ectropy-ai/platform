@@ -1,0 +1,54 @@
+{
+  "name": "Ectropy Enterprise Development Base",
+  "build": {
+    "dockerfile": "Dockerfile.dev",
+    "args": {
+      "BUILDKIT_INLINE_CACHE": "1",
+      "NODE_ENV": "development"
+    },
+    "cacheFrom": [
+      "type=registry,ref=ghcr.io/luhtech/ectropy-devcontainer-cache:latest"
+    ],
+    "target": "development"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": false,
+      "username": "vscode",
+      "userUid": "1000",
+      "userGid": "1000"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20",
+      "nodeGypDependencies": true,
+      "installYarnUsingApt": false
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": true,
+      "dockerDashComposeVersion": "v2",
+      "installDockerBuildx": true
+    }
+  },
+  "containerEnv": {
+    "DOCKER_BUILDKIT": "1",
+    "COMPOSE_DOCKER_CLI_BUILD": "1",
+    "BUILDKIT_PROGRESS": "plain",
+    "NODE_OPTIONS": "--max-old-space-size=4096",
+    "PNPM_HOME": "/home/vscode/.local/share/pnpm",
+    "PATH": "/home/vscode/.local/share/pnpm:${containerEnv:PATH}",
+    "PLAYWRIGHT_BROWSERS_PATH": "/ms-playwright",
+    "CYPRESS_CACHE_FOLDER": "/usr/local/share/cypress-cache"
+  },
+  "mounts": [
+    "source=ectropy-buildkit-cache,target=/home/vscode/.cache/buildkit,type=volume",
+    "source=ectropy-docker-cache,target=/home/vscode/.cache/docker,type=volume"
+  ],
+  "initializeCommand": [
+    "bash", "-c", 
+    "echo 'Initializing devcontainer build caches...' && mkdir -p .devcontainer/cache"
+  ],
+  "postCreateCommand": [
+    "bash", "-c",
+    "echo 'Running enterprise post-create setup...' && bash .devcontainer/post-create.sh"
+  ]
+}

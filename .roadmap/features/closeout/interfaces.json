@@ -1,0 +1,537 @@
+{
+  "$schema": "https://luhtech.dev/schemas/interfaces.schema.json",
+  "$id": "urn:luhtech:ectropy:interfaces:closeout",
+  "schemaVersion": "3.0.0",
+  "meta": {
+    "ventureId": "ectropy",
+    "featureId": "closeout-module",
+    "createdAt": "2026-01-15T23:45:00Z",
+    "lastUpdated": "2026-01-15T23:45:00Z",
+    "author": "erik",
+    "sourceDoc": ".roadmap/features/closeout/interfaces.json"
+  },
+  "summary": "MCP tools for project closeout and final accounting - 3 tools for closeout workflow, G704 certificates, and IPD settlement",
+  "mcpTools": {
+    "totalCount": 3,
+    "categories": [
+      {
+        "name": "Closeout Workflow",
+        "tools": [
+          {
+            "name": "initiate_closeout_sequence_tool",
+            "description": "Start the project closeout workflow, transitioning from construction to pre-substantial completion phase",
+            "authorityRequired": 3,
+            "input": {
+              "projectId": {
+                "type": "string",
+                "required": true,
+                "description": "Project identifier"
+              },
+              "contractRef": {
+                "type": "urn",
+                "required": true,
+                "description": "Reference to governing contract"
+              },
+              "targetSubstantialCompletionDate": {
+                "type": "date",
+                "required": true,
+                "description": "Target date for substantial completion"
+              },
+              "punchListDeadlineDays": {
+                "type": "integer",
+                "default": 30,
+                "description": "Days after substantial completion to complete punch list"
+              },
+              "commissioningSystems": {
+                "type": "array",
+                "items": "string",
+                "description": "List of system types requiring commissioning"
+              },
+              "requiredDocumentation": {
+                "type": "array",
+                "items": {
+                  "type": "enum",
+                  "values": [
+                    "AS_BUILT_DRAWINGS",
+                    "O_AND_M_MANUALS",
+                    "WARRANTY_DOCUMENTS",
+                    "COMMISSIONING_REPORTS",
+                    "LIEN_RELEASES",
+                    "CERTIFICATE_OF_OCCUPANCY",
+                    "ATTIC_STOCK",
+                    "TRAINING_RECORDS"
+                  ]
+                },
+                "description": "Required closeout documentation"
+              },
+              "notifyParties": {
+                "type": "array",
+                "items": "urn",
+                "description": "Parties to notify of closeout initiation"
+              }
+            },
+            "output": {
+              "closeout": {
+                "type": "Closeout",
+                "description": "Created closeout record"
+              },
+              "closeoutUrn": {
+                "type": "urn",
+                "description": "URN of created closeout"
+              },
+              "phases": {
+                "type": "object",
+                "description": "Phase status and milestones"
+              },
+              "commissioningSystems": {
+                "type": "array",
+                "items": "CommissioningSystem",
+                "description": "Created commissioning system records"
+              },
+              "documentationChecklist": {
+                "type": "array",
+                "items": "DocumentationItem",
+                "description": "Required documentation with status"
+              },
+              "notificationsSent": {
+                "type": "array",
+                "items": "NotificationResult"
+              },
+              "timeline": {
+                "type": "object",
+                "properties": {
+                  "preSubstantialStart": { "type": "date" },
+                  "substantialCompletionTarget": { "type": "date" },
+                  "punchListDeadline": { "type": "date" },
+                  "finalCompletionTarget": { "type": "date" }
+                }
+              }
+            }
+          },
+          {
+            "name": "generate_substantial_completion_tool",
+            "description": "Generate AIA G704 Certificate of Substantial Completion with digital signatures",
+            "authorityRequired": 4,
+            "input": {
+              "closeoutUrn": {
+                "type": "urn",
+                "required": true,
+                "description": "Reference to closeout record"
+              },
+              "walkthroughDate": {
+                "type": "datetime",
+                "required": true,
+                "description": "Date of substantial completion walkthrough"
+              },
+              "substantialCompletionDate": {
+                "type": "date",
+                "required": true,
+                "description": "Date of substantial completion"
+              },
+              "punchListItems": {
+                "type": "array",
+                "items": "urn",
+                "description": "URNs of punch list items to include"
+              },
+              "punchListCompletionDeadline": {
+                "type": "date",
+                "required": true,
+                "description": "Deadline for punch list completion"
+              },
+              "exclusions": {
+                "type": "array",
+                "items": "string",
+                "description": "Items excluded from substantial completion"
+              },
+              "specialConditions": {
+                "type": "array",
+                "items": "string",
+                "description": "Special conditions or limitations"
+              },
+              "warrantyStartDate": {
+                "type": "date",
+                "description": "Date warranties begin (defaults to substantial completion date)"
+              },
+              "signatories": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "type": "enum",
+                      "values": ["ARCHITECT", "CONTRACTOR", "OWNER"]
+                    },
+                    "participantUrn": { "type": "urn" },
+                    "required": { "type": "boolean" }
+                  }
+                },
+                "required": true,
+                "description": "Required signatories for certificate"
+              }
+            },
+            "output": {
+              "certificate": {
+                "type": "G704Certificate",
+                "description": "Generated G704 certificate"
+              },
+              "certificateUrn": {
+                "type": "urn",
+                "description": "URN of certificate"
+              },
+              "pdfUrl": {
+                "type": "string",
+                "format": "uri",
+                "description": "URL to download PDF"
+              },
+              "pendingSignatures": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": { "type": "string" },
+                    "participantUrn": { "type": "urn" },
+                    "signatureRequestSent": { "type": "boolean" }
+                  }
+                }
+              },
+              "closeoutUpdated": {
+                "type": "Closeout",
+                "description": "Updated closeout record"
+              },
+              "warrantiesActivated": {
+                "type": "array",
+                "items": "urn",
+                "description": "Warranties that were activated"
+              }
+            }
+          },
+          {
+            "name": "generate_final_accounting_tool",
+            "description": "Generate IPD final accounting with savings/overrun distribution calculation",
+            "authorityRequired": 5,
+            "input": {
+              "closeoutUrn": {
+                "type": "urn",
+                "required": true,
+                "description": "Reference to closeout record"
+              },
+              "targetCostRef": {
+                "type": "urn",
+                "required": true,
+                "description": "Reference to Target Cost record"
+              },
+              "finalActualCost": {
+                "type": "number",
+                "required": true,
+                "description": "Final actual project cost"
+              },
+              "contingencyUsed": {
+                "type": "number",
+                "required": true,
+                "description": "Amount of contingency used"
+              },
+              "contingencyReturned": {
+                "type": "number",
+                "description": "Amount of contingency returned to owner"
+              },
+              "goalAchievements": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "goalId": { "type": "string" },
+                    "description": { "type": "string" },
+                    "achieved": { "type": "boolean" },
+                    "verificationDate": { "type": "date" },
+                    "verifiedBy": { "type": "urn" },
+                    "compensationAmount": { "type": "number" }
+                  }
+                },
+                "description": "Goal achievement verification for GAC compensation"
+              },
+              "adjustments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "description": { "type": "string" },
+                    "amount": { "type": "number" },
+                    "appliesToParty": { "type": "urn" },
+                    "reason": { "type": "string" }
+                  }
+                },
+                "description": "Manual adjustments to distribution"
+              },
+              "requireUnanimousApproval": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether all parties must approve distribution"
+              }
+            },
+            "output": {
+              "savingsDistribution": {
+                "type": "SavingsDistribution",
+                "description": "Final savings distribution record"
+              },
+              "distributionUrn": {
+                "type": "urn"
+              },
+              "financialSummary": {
+                "type": "object",
+                "properties": {
+                  "adjustedTargetCost": { "type": "number" },
+                  "finalActualCost": { "type": "number" },
+                  "savingsOrOverrun": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "enum",
+                        "values": ["SAVINGS", "OVERRUN", "BREAK_EVEN"]
+                      },
+                      "amount": { "type": "number" },
+                      "percentage": { "type": "number" }
+                    }
+                  },
+                  "contingencyUsed": { "type": "number" },
+                  "contingencyReturned": { "type": "number" }
+                }
+              },
+              "distributions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "partyRef": { "type": "urn" },
+                    "partyName": { "type": "string" },
+                    "role": { "type": "string" },
+                    "sharePercentage": { "type": "number" },
+                    "baseAmount": { "type": "number" },
+                    "atRiskDeduction": { "type": "number" },
+                    "goalAchievementBonus": { "type": "number" },
+                    "adjustments": { "type": "number" },
+                    "netAmount": { "type": "number" }
+                  }
+                }
+              },
+              "goalAchievementSummary": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "goalId": { "type": "string" },
+                    "description": { "type": "string" },
+                    "achieved": { "type": "boolean" },
+                    "totalCompensation": { "type": "number" }
+                  }
+                }
+              },
+              "pendingApprovals": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "partyRef": { "type": "urn" },
+                    "partyName": { "type": "string" },
+                    "approvalRequired": { "type": "boolean" },
+                    "notificationSent": { "type": "boolean" }
+                  }
+                }
+              },
+              "reportUrl": {
+                "type": "string",
+                "format": "uri",
+                "description": "URL to download final accounting report"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "restApi": {
+    "baseUrl": "/api/closeout",
+    "endpoints": [
+      {
+        "method": "POST",
+        "path": "/projects/:projectId/closeout",
+        "description": "Initiate closeout sequence",
+        "authorityRequired": 3,
+        "requestBody": "InitiateCloseoutRequest",
+        "response": "CloseoutResponse"
+      },
+      {
+        "method": "GET",
+        "path": "/closeouts/:urn",
+        "description": "Get closeout by URN",
+        "authorityRequired": 0
+      },
+      {
+        "method": "GET",
+        "path": "/closeouts/:urn/status",
+        "description": "Get closeout status summary",
+        "authorityRequired": 0
+      },
+      {
+        "method": "PUT",
+        "path": "/closeouts/:urn/phase",
+        "description": "Update closeout phase status",
+        "authorityRequired": 3
+      },
+      {
+        "method": "POST",
+        "path": "/closeouts/:urn/g704",
+        "description": "Generate G704 certificate",
+        "authorityRequired": 4,
+        "requestBody": "G704GenerationRequest",
+        "response": "G704CertificateResponse"
+      },
+      {
+        "method": "GET",
+        "path": "/closeouts/:urn/g704",
+        "description": "Get G704 certificate",
+        "authorityRequired": 0
+      },
+      {
+        "method": "POST",
+        "path": "/closeouts/:urn/g704/sign",
+        "description": "Sign G704 certificate",
+        "authorityRequired": "varies"
+      },
+      {
+        "method": "POST",
+        "path": "/closeouts/:urn/final-accounting",
+        "description": "Generate final accounting",
+        "authorityRequired": 5,
+        "requestBody": "FinalAccountingRequest",
+        "response": "SavingsDistributionResponse"
+      },
+      {
+        "method": "GET",
+        "path": "/closeouts/:urn/final-accounting",
+        "description": "Get final accounting/distribution",
+        "authorityRequired": 0
+      },
+      {
+        "method": "POST",
+        "path": "/closeouts/:urn/final-accounting/approve",
+        "description": "Approve final accounting",
+        "authorityRequired": "varies"
+      },
+      {
+        "method": "GET",
+        "path": "/closeouts/:urn/documentation",
+        "description": "Get documentation checklist status",
+        "authorityRequired": 0
+      },
+      {
+        "method": "PUT",
+        "path": "/closeouts/:urn/documentation/:docType",
+        "description": "Update documentation status",
+        "authorityRequired": 2
+      }
+    ]
+  },
+  "webhooks": [
+    {
+      "event": "closeout.initiated",
+      "description": "Fired when closeout sequence begins",
+      "payload": "CloseoutEvent"
+    },
+    {
+      "event": "closeout.phase_completed",
+      "description": "Fired when a closeout phase completes",
+      "payload": "CloseoutPhaseEvent"
+    },
+    {
+      "event": "g704.generated",
+      "description": "Fired when G704 certificate is generated",
+      "payload": "G704Event"
+    },
+    {
+      "event": "g704.signed",
+      "description": "Fired when G704 is signed by a party",
+      "payload": "G704SignatureEvent"
+    },
+    {
+      "event": "g704.complete",
+      "description": "Fired when G704 has all required signatures",
+      "payload": "G704Event"
+    },
+    {
+      "event": "final_accounting.generated",
+      "description": "Fired when final accounting is generated",
+      "payload": "FinalAccountingEvent"
+    },
+    {
+      "event": "final_accounting.approved",
+      "description": "Fired when party approves final accounting",
+      "payload": "FinalAccountingApprovalEvent"
+    },
+    {
+      "event": "final_accounting.complete",
+      "description": "Fired when final accounting has all approvals",
+      "payload": "FinalAccountingEvent"
+    },
+    {
+      "event": "closeout.complete",
+      "description": "Fired when entire closeout is complete",
+      "payload": "CloseoutEvent"
+    }
+  ],
+  "errorCodes": [
+    {
+      "code": "CLOSEOUT_NOT_FOUND",
+      "httpStatus": 404,
+      "description": "Closeout URN does not exist"
+    },
+    {
+      "code": "CLOSEOUT_ALREADY_EXISTS",
+      "httpStatus": 409,
+      "description": "Project already has active closeout"
+    },
+    {
+      "code": "INSUFFICIENT_AUTHORITY",
+      "httpStatus": 403,
+      "description": "Authority level too low for operation"
+    },
+    {
+      "code": "INVALID_PHASE_TRANSITION",
+      "httpStatus": 400,
+      "description": "Cannot transition to requested phase"
+    },
+    {
+      "code": "PREREQUISITES_NOT_MET",
+      "httpStatus": 400,
+      "description": "Required prerequisites not completed"
+    },
+    {
+      "code": "COMMISSIONING_INCOMPLETE",
+      "httpStatus": 400,
+      "description": "Cannot issue G704 with incomplete commissioning"
+    },
+    {
+      "code": "PUNCH_LIST_NOT_GENERATED",
+      "httpStatus": 400,
+      "description": "Punch list required before G704"
+    },
+    {
+      "code": "SIGNATURE_REQUIRED",
+      "httpStatus": 400,
+      "description": "Required signature missing"
+    },
+    {
+      "code": "TARGET_COST_NOT_FOUND",
+      "httpStatus": 404,
+      "description": "Target Cost reference not found"
+    },
+    {
+      "code": "APPROVAL_PENDING",
+      "httpStatus": 409,
+      "description": "Distribution pending party approvals"
+    }
+  ],
+  "graphMetadata": {
+    "inEdges": ["urn:luhtech:ectropy:feature:closeout-module"],
+    "outEdges": []
+  }
+}

@@ -1,0 +1,161 @@
+name: Create Terraform Cloud Workspace
+
+# Manual workflow to create HCP Terraform Cloud workspaces
+# ROOT CAUSE #126: Staging VPC Migration - Phase 2
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace_name:
+        description: 'Workspace name (e.g., ectropy-staging)'
+        required: true
+        default: 'ectropy-staging'
+      workspace_tag:
+        description: 'Workspace tag'
+        required: true
+        default: 'ectropy'
+      environment:
+        description: 'Environment (production, staging, development)'
+        required: true
+        default: 'staging'
+
+jobs:
+  create-workspace:
+    name: Create HCP Terraform Cloud Workspace
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Terraform Cloud Workspace
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          ORG_NAME: 'luh-tech-ectropy'
+          WORKSPACE_NAME: ${{ github.event.inputs.workspace_name }}
+          WORKSPACE_TAG: ${{ github.event.inputs.workspace_tag }}
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+        run: |
+          echo "Creating HCP Terraform Cloud workspace"
+          echo "Organization: $ORG_NAME"
+          echo "Workspace: $WORKSPACE_NAME"
+          echo "Tag: $WORKSPACE_TAG"
+          echo "Environment: $ENVIRONMENT"
+          echo ""
+
+          # Create workspace via API
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            --header "Authorization: Bearer $TF_API_TOKEN" \
+            --header "Content-Type: application/vnd.api+json" \
+            --request POST \
+            --data '{
+              "data": {
+                "type": "workspaces",
+                "attributes": {
+                  "name": "'"$WORKSPACE_NAME"'",
+                  "execution-mode": "local",
+                  "terraform-version": "1.6.0",
+                  "auto-apply": false,
+                  "file-triggers-enabled": false,
+                  "queue-all-runs": false,
+                  "speculative-enabled": true,
+                  "tag-names": ["'"$WORKSPACE_TAG"'"],
+                  "description": "'"$ENVIRONMENT"' environment infrastructure (VPC Migration Phase 2)"
+                }
+              }
+            }' \
+            "https://app.terraform.io/api/v2/organizations/$ORG_NAME/workspaces")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" -eq 201 ]; then
+            echo "✅ Workspace created successfully!"
+            echo ""
+            WORKSPACE_ID=$(echo "$BODY" | jq -r '.data.id')
+            echo "Workspace ID: $WORKSPACE_ID"
+            echo "Workspace Name: $WORKSPACE_NAME"
+            echo "Tag: $WORKSPACE_TAG"
+            echo ""
+            echo "::notice title=Workspace Created::Successfully created $WORKSPACE_NAME with tag $WORKSPACE_TAG"
+          elif [ "$HTTP_CODE" -eq 422 ]; then
+            echo "⚠️  Workspace already exists or validation error"
+            echo "Response: $BODY"
+            echo "::warning title=Workspace Exists::$WORKSPACE_NAME may already exist"
+          else
+            echo "❌ Failed to create workspace (HTTP $HTTP_CODE)"
+            echo "Response: $BODY"
+            echo "::error title=Workspace Creation Failed::Failed to create $WORKSPACE_NAME (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+      - name: Configure Workspace Variables
+        if: success()
+        env:
+          TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          ORG_NAME: 'luh-tech-ectropy'
+          WORKSPACE_NAME: ${{ github.event.inputs.workspace_name }}
+          DO_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          SPACES_ACCESS_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          SPACES_SECRET_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "Configuring workspace variables..."
+
+          # Get workspace ID
+          WORKSPACE_RESPONSE=$(curl -s \
+            --header "Authorization: Bearer $TF_API_TOKEN" \
+            --header "Content-Type: application/vnd.api+json" \
+            "https://app.terraform.io/api/v2/organizations/$ORG_NAME/workspaces/$WORKSPACE_NAME")
+
+          WORKSPACE_ID=$(echo "$WORKSPACE_RESPONSE" | jq -r '.data.id')
+
+          if [ -z "$WORKSPACE_ID" ] || [ "$WORKSPACE_ID" = "null" ]; then
+            echo "::error title=Workspace Not Found::Could not find workspace $WORKSPACE_NAME"
+            exit 1
+          fi
+
+          echo "Workspace ID: $WORKSPACE_ID"
+
+          # Function to create variable
+          create_variable() {
+            local key=$1
+            local value=$2
+            local sensitive=$3
+            local category=${4:-"terraform"}
+
+            curl -s \
+              --header "Authorization: Bearer $TF_API_TOKEN" \
+              --header "Content-Type: application/vnd.api+json" \
+              --request POST \
+              --data '{
+                "data": {
+                  "type": "vars",
+                  "attributes": {
+                    "key": "'"$key"'",
+                    "value": "'"$value"'",
+                    "category": "'"$category"'",
+                    "hcl": false,
+                    "sensitive": '"$sensitive"'
+                  }
+                }
+              }' \
+              "https://app.terraform.io/api/v2/workspaces/$WORKSPACE_ID/vars" > /dev/null
+
+            if [ "$sensitive" = "true" ]; then
+              echo "  ✅ Set $key (sensitive)"
+            else
+              echo "  ✅ Set $key = $value"
+            fi
+          }
+
+          # Create variables
+          create_variable "do_token" "$DO_TOKEN" true
+          create_variable "spaces_access_id" "$SPACES_ACCESS_ID" true
+          create_variable "spaces_secret_key" "$SPACES_SECRET_KEY" true
+
+          echo ""
+          echo "✅ Workspace variables configured"
+          echo ""
+          echo "Next steps:"
+          echo "1. Run: cd terraform && terraform init"
+          echo "2. Run: TF_WORKSPACE=$WORKSPACE_NAME terraform plan -var-file=envs/${{ github.event.inputs.environment }}.tfvars"

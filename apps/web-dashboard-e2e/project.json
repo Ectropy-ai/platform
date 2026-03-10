@@ -1,0 +1,39 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "web-dashboard-e2e",
+  "root": "apps/web-dashboard-e2e",
+  "sourceRoot": "apps/web-dashboard-e2e/src",
+  "projectType": "application",
+  "tags": ["scope:e2e", "type:e2e"],
+  "targets": {
+    "e2e": {
+      "executor": "@nx/playwright:playwright",
+      "outputs": [
+        "{workspaceRoot}/blob-report",
+        "{workspaceRoot}/dist/.playwright"
+      ],
+      "options": {
+        "config": "apps/web-dashboard-e2e/playwright.config.ts"
+      },
+      "configurations": {
+        "ci": {
+          "config": "apps/web-dashboard-e2e/playwright.config.ci.ts"
+        }
+      }
+    },
+    "e2e-install": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx playwright install chromium firefox webkit"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["apps/web-dashboard-e2e/**/*.{ts,js}"]
+      }
+    }
+  },
+  "implicitDependencies": ["web-dashboard"]
+}

@@ -1,0 +1,316 @@
+name: Terraform PR Validation
+
+# ENTERPRISE TERRAFORM PATTERN (2026-02-04):
+# PHASE 5 UPDATE: Multi-environment terraform validation (development, staging, production)
+#
+# Consolidated PR and push validation for Terraform infrastructure changes
+#
+# This workflow CONSOLIDATES:
+#   - terraform-validate.yml (basic validation: format, validate, lockfile)
+#   - terraform-plan-pr.yml (full plan with PR comment)
+#
+# Consolidation Rationale:
+#   - Eliminates duplicate terraform init/fmt/validate steps
+#   - Single comprehensive validation workflow for PRs
+#   - Maintains all validation checks from both workflows
+#   - Reduces workflow count while improving DX (single PR check to monitor)
+#
+# Multi-Environment Strategy (PHASE 5):
+#   - Matrix validation across all 3 environments (development, staging, production)
+#   - Isolated state per environment (ROOT CAUSE #165 - state isolation pattern)
+#   - Independent validation prevents cross-environment interference
+#
+# Validation Strategy:
+#   1. Lockfile existence and drift check (prevents provider version mismatch)
+#   2. Terraform format check (enforces code style)
+#   3. Terraform validate (syntax and configuration validation)
+#   4. Terraform plan (change preview with state access)
+#   5. PR comment with plan output (for PR events only)
+#
+# Enterprise Pattern: Shift-Left Validation
+#   - Catch errors before merge (PR validation)
+#   - Validate main branch continuously (push validation)
+#   - Comprehensive plan preview for reviewers
+#   - Artifact retention for audit trail
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'infrastructure/terraform/environments/**'
+      - 'terraform/modules/**'
+      - '.github/workflows/terraform-pr-validation.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'infrastructure/terraform/environments/**'
+      - 'terraform/modules/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  terraform-validation:
+    name: Terraform Validation & Plan - ${{ matrix.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        environment:
+          - development
+          - staging
+          - production
+    environment: ${{ matrix.environment }}-infrastructure
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.0 # Standardized across all Terraform workflows (aligned with local development)
+
+      - name: Check lockfile exists
+        run: |
+          echo "🔍 Checking for Terraform lockfile in ${{ matrix.environment }} environment..."
+          if [ ! -f infrastructure/terraform/environments/${{ matrix.environment }}/.terraform.lock.hcl ]; then
+            echo "❌ ERROR: Terraform lockfile missing for ${{ matrix.environment }}!"
+            echo "Run 'terraform init' in infrastructure/terraform/environments/${{ matrix.environment }}/ and commit .terraform.lock.hcl"
+            exit 1
+          fi
+          echo "✅ Lockfile exists for ${{ matrix.environment }}"
+
+      - name: Configure DigitalOcean Spaces Credentials for Terraform Backend
+        run: |
+          echo "🔧 Configuring DigitalOcean Spaces credentials for Terraform backend..."
+          # DigitalOcean Spaces uses S3-compatible API but does NOT use AWS STS
+          # Setting credentials as environment variables (Terraform S3 backend expects AWS_* variables)
+          echo "AWS_ACCESS_KEY_ID=${{ secrets.SPACES_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.SPACES_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+          echo "✅ Credentials configured (region: sfo3, endpoint: sfo3.digitaloceanspaces.com)"
+
+      - name: Terraform Init
+        id: init
+        working-directory: infrastructure/terraform/environments/${{ matrix.environment }}
+        run: terraform init
+        continue-on-error: true
+
+      - name: Terraform Format Check
+        id: fmt
+        working-directory: infrastructure/terraform/environments/${{ matrix.environment }}
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform Validate
+        id: validate
+        working-directory: infrastructure/terraform/environments/${{ matrix.environment }}
+        run: terraform validate -no-color
+        continue-on-error: true
+
+      - name: Check for provider drift
+        id: provider_drift
+        working-directory: infrastructure/terraform/environments/${{ matrix.environment }}
+        run: |
+          echo "🔍 Checking for provider version drift in ${{ matrix.environment }}..."
+          # Verify lockfile matches provider constraints
+          terraform providers lock -platform=linux_amd64 -platform=darwin_amd64 -platform=windows_amd64
+
+          if git diff --exit-code .terraform.lock.hcl; then
+            echo "✅ Lockfile matches provider constraints for ${{ matrix.environment }}"
+            echo "drift_detected=false" >> $GITHUB_OUTPUT
+          else
+            echo "❌ ERROR: Lockfile drift detected in ${{ matrix.environment }}!"
+            echo "Lockfile was modified during provider lock - this suggests version mismatch"
+            git diff .terraform.lock.hcl
+            echo "drift_detected=true" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
+      # Resolve environment-specific GitHub vars/secrets to generic TF_VAR names
+      # ALIGNED: 2026-02-24 via SECRETS_SOURCE_OF_TRUTH_MATRIX audit
+      - name: Resolve Environment Variables
+        id: env-vars
+        run: |
+          ENV="${{ matrix.environment }}"
+          echo "Resolving variables for environment: $ENV"
+
+          if [ "$ENV" = "production" ]; then
+            echo "app_version=${{ vars.PRODUCTION_APP_VERSION }}" >> $GITHUB_OUTPUT
+            echo "api_url=${{ vars.PRODUCTION_API_URL }}" >> $GITHUB_OUTPUT
+            echo "frontend_url=${{ vars.PRODUCTION_FRONTEND_URL }}" >> $GITHUB_OUTPUT
+          elif [ "$ENV" = "development" ]; then
+            echo "app_version=${{ vars.DEVELOPMENT_APP_VERSION }}" >> $GITHUB_OUTPUT
+            echo "api_url=${{ vars.DEVELOPMENT_API_URL }}" >> $GITHUB_OUTPUT
+            echo "frontend_url=${{ vars.DEVELOPMENT_FRONTEND_URL }}" >> $GITHUB_OUTPUT
+          else
+            echo "app_version=${{ vars.STAGING_APP_VERSION }}" >> $GITHUB_OUTPUT
+            echo "api_url=${{ vars.STAGING_API_URL }}" >> $GITHUB_OUTPUT
+            echo "frontend_url=${{ vars.STAGING_FRONTEND_URL }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Terraform Variables
+        uses: ./.github/actions/setup-terraform-vars
+        with:
+          environment: ${{ matrix.environment }}
+          digitalocean-token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          ssh-private-key: ${{ secrets.TERRAFORM_DEPLOY_PRIVATE_KEY }}
+          ssl-cert-private-key: ${{ secrets.CF_ORIGIN_KEY }}
+          ssl-cert-leaf: ${{ secrets.CF_ORIGIN_CERT }}
+          app-version: ${{ steps.env-vars.outputs.app_version }}
+          api-url: ${{ steps.env-vars.outputs.api_url }}
+          frontend-url: ${{ steps.env-vars.outputs.frontend_url }}
+          database-password: ${{ secrets.DB_PASSWORD }}
+          jwt-secret: ${{ secrets.JWT_SECRET }}
+          jwt-refresh-secret: ${{ secrets.JWT_REFRESH_SECRET }}
+          session-secret: ${{ secrets.SESSION_SECRET }}
+          encryption-key: ${{ secrets.ENCRYPTION_KEY }}
+          google-client-id: ${{ matrix.environment == 'production' && secrets.GOOGLE_CLIENT_ID_PRODUCTION || secrets.GOOGLE_CLIENT_ID_STAGING }}
+          google-client-secret: ${{ matrix.environment == 'production' && secrets.GOOGLE_CLIENT_SECRET_PRODUCTION || secrets.GOOGLE_CLIENT_SECRET_STAGING }}
+          redis-password: ${{ secrets.REDIS_PASSWORD }}
+          mcp-api-key: ${{ secrets.MCP_API_KEY }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          speckle-server-token: ${{ secrets.SPECKLE_SERVER_TOKEN }}
+          speckle-admin-password: ${{ secrets.SPECKLE_ADMIN_PASSWORD }}
+          speckle-session-secret: ${{ secrets.SPECKLE_SESSION_SECRET }}
+          minio-access-key: ${{ secrets.MINIO_ACCESS_KEY }}
+          minio-secret-key: ${{ secrets.MINIO_SECRET_KEY }}
+          resend-api-key: ${{ secrets.RESEND_API_KEY }}
+          watchtower-http-api-token: ${{ secrets.WATCHTOWER_HTTP_API_TOKEN }}
+          spaces-access-key-id: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          spaces-secret-access-key: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          docr-config-json: ${{ secrets.DOCR_CONFIG_JSON }}
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-zone-id: ${{ vars.CLOUDFLARE_ZONE_ID }}
+          platform-database-url: ${{ secrets.PLATFORM_DATABASE_URL }}
+          shared-database-url: ${{ secrets.SHARED_DATABASE_URL }}
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: infrastructure/terraform/environments/${{ matrix.environment }}
+        run: |
+          echo "🔍 Running terraform plan for ${{ matrix.environment }} environment..."
+          # PHASE 5 UPDATE (2026-02-04): Each environment has isolated state and variables
+          # No tfvars file needed - all variables defined in environment-specific variables.tf
+          # Secrets/variables passed via environment variables (TF_VAR_* pattern)
+          terraform plan -no-color -out=tfplan -input=false 2>&1 | tee plan_output.txt
+
+          # Capture exit code
+          EXITCODE=${PIPESTATUS[0]}
+          echo "exitcode=$EXITCODE" >> $GITHUB_OUTPUT
+
+          # Capture output for PR comment (truncate if too large)
+          PLAN_OUTPUT=$(cat plan_output.txt)
+          PLAN_LENGTH=${#PLAN_OUTPUT}
+
+          if [ $PLAN_LENGTH -gt 60000 ]; then
+            # Truncate large plans to avoid GitHub Actions output size limits
+            echo "stdout<<EOF" >> $GITHUB_OUTPUT
+            echo "Plan output too large (${PLAN_LENGTH} chars). Download artifact for full output." >> $GITHUB_OUTPUT
+            head -c 60000 plan_output.txt >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "... (truncated)" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "stdout<<EOF" >> $GITHUB_OUTPUT
+            cat plan_output.txt >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+          # Exit with terraform's exit code
+          exit $EXITCODE
+        continue-on-error: true
+
+      - name: Upload Plan Artifact
+        if: always() && steps.plan.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-${{ matrix.environment }}-${{ github.event.pull_request.number || github.run_number }}
+          path: |
+            infrastructure/terraform/environments/${{ matrix.environment }}/tfplan
+            infrastructure/terraform/environments/${{ matrix.environment }}/plan_output.txt
+          retention-days: 30
+
+      - name: Post Plan to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          PLAN: '${{ steps.plan.outputs.stdout }}'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const driftStatus = '${{ steps.provider_drift.outputs.drift_detected }}' === 'true' ? '⚠️ `drift detected`' : '✅ `no drift`';
+            // ENTERPRISE FIX (2025-12-16): GitHub Actions doesn't support ternary operators in expressions
+            // Move ternary logic to JavaScript instead
+            const lockfileStatus = '${{ steps.provider_drift.outcome }}' === 'success' ? 'success' : 'failure';
+
+            const output = `### Terraform Validation Results - **${{ matrix.environment }}** environment
+
+            #### Lockfile Check 🔒\`${lockfileStatus}\` ${driftStatus}
+            #### Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Format Check 📝\`${{ steps.fmt.outcome }}\`
+            #### Validation 🤖\`${{ steps.validate.outcome }}\`
+            #### Plan 📖\`${{ steps.plan.outcome }}\`
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`terraform
+            ${process.env.PLAN}
+            \`\`\`
+
+            </details>
+
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*
+            *Working Directory: \`infrastructure/terraform/environments/${{ matrix.environment }}\`*
+            *PHASE 5: Multi-environment validation (isolated states)*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Generate Step Summary
+        if: always()
+        run: |
+          echo "## Terraform Validation Summary - ${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment**: ${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Event**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Ref**: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Validation Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Lockfile Check: \`${{ steps.provider_drift.outcome }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Terraform Init: \`${{ steps.init.outcome }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Format Check: \`${{ steps.fmt.outcome }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Validation: \`${{ steps.validate.outcome }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Plan: \`${{ steps.plan.outcome }}\`" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.provider_drift.outputs.drift_detected }}" == "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Provider drift detected in ${{ matrix.environment }}** - lockfile needs update" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Fail if Validation Failed
+        if: |
+          steps.init.outcome == 'failure' ||
+          steps.fmt.outcome == 'failure' ||
+          steps.validate.outcome == 'failure' ||
+          steps.plan.outcome == 'failure' ||
+          steps.provider_drift.outputs.drift_detected == 'true'
+        run: |
+          echo "❌ Terraform validation failed"
+          echo "Lockfile Drift: ${{ steps.provider_drift.outputs.drift_detected }}"
+          echo "Init: ${{ steps.init.outcome }}"
+          echo "Format: ${{ steps.fmt.outcome }}"
+          echo "Validate: ${{ steps.validate.outcome }}"
+          echo "Plan: ${{ steps.plan.outcome }}"
+          exit 1

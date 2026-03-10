@@ -1,0 +1,58 @@
+{
+  "drift_detection_id": "terraform-drift-2025-12-22_19-34-39",
+  "timestamp": "2025-12-23T03:34:46Z",
+  "drift_detected": false,
+
+  "load_balancer": {
+    "id": "f773103b-d40c-43c9-ad8a-fc2cd63f82f1",
+    "name": "ectropy-production-lb-v2",
+
+    "health_check": {
+      "port": {
+        "actual": 80,
+        "terraform": 80,
+        "aligned": true
+      },
+      "path": {
+        "actual": "/lb-health",
+        "terraform": "/lb-health",
+        "aligned": true
+      }
+    },
+
+    "forwarding_rules": {
+      "https_target_port": {
+        "actual": 80,
+        "terraform": 80,
+        "aligned": true
+      },
+      "http_target_port": {
+        "actual": 80,
+        "terraform": 80,
+        "aligned": true
+      }
+    }
+  },
+
+  "droplets": {
+    "blue": {
+      "id": "534912631",
+      "name": "ectropy-production-blue",
+      "size": "c2-4vcpu-8gb"
+    },
+    "green": {
+      "id": "534912633",
+      "name": "ectropy-production-green",
+      "size": "c2-4vcpu-8gb"
+    }
+  },
+
+  "terraform_file": "infrastructure/terraform/production-rebuild.tf",
+  "terraform_last_updated": "2025-12-22 (commit 1c6ef6cf)",
+
+  "enterprise_compliance": {
+    "single_source_of_truth": true,
+    "disaster_recovery_ready": true,
+    "infrastructure_as_code_principle": "maintained"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist/apps/mcp-server",
+    "module": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "skipLibCheck": true,
+    "moduleResolution": "NodeNext",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+
+    // ENTERPRISE STANDARD: Strict mode enabled for production safety
+    // Migrated from all-disabled to enterprise standard (2025-11-20)
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+
+    // Strict type checking - Phase 1: Enable core safety checks
+    "noImplicitAny": true,              // Prevent 'any' type inference
+    "strictNullChecks": true,            // Null/undefined safety (CRITICAL)
+    "strictFunctionTypes": true,         // Function type safety
+    "noImplicitThis": true,              // 'this' must be explicitly typed
+
+    // Code quality checks - Phase 1: Enable basic checks
+    "noUnusedLocals": false,             // Phase 2: Enable after cleanup
+    "noUnusedParameters": false,         // Phase 2: Enable after cleanup
+    "noImplicitReturns": true,           // All code paths must return value
+    "noFallthroughCasesInSwitch": true,  // Prevent switch fallthrough bugs
+
+    // Advanced checks - Phase 2: Enable after Phase 1 stabilizes
+    "noImplicitOverride": false,         // TODO: Enable in Phase 2
+    "noPropertyAccessFromIndexSignature": false,  // TODO: Enable in Phase 2
+    "noUncheckedIndexedAccess": false    // TODO: Enable in Phase 2 (impacts array access)
+  },
+  "files": [],
+  "include": ["src/main.ts"],
+  "exclude": [
+    "jest.config.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts",
+    "**/*.d.ts",
+    "node_modules"
+  ]
+}

@@ -1,0 +1,597 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+  "title": "Voxel Schema",
+  "description": "3D spatial container for construction decisions - the 'decision surface' workers navigate through",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "voxelId",
+    "projectId",
+    "coordinates",
+    "bounds",
+    "status",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:voxel:VOX-[A-Z0-9-]+$",
+      "description": "URN identifier for this voxel"
+    },
+    "$schema": {
+      "const": "https://luhtech.dev/schemas/pm/voxel.schema.json"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "meta": {
+      "$ref": "#/$defs/meta"
+    },
+    "voxelId": {
+      "type": "string",
+      "pattern": "^VOX-[A-Z0-9-]+$",
+      "description": "Human-readable voxel identifier (e.g., VOX-L2-MECH-047)"
+    },
+    "projectId": {
+      "type": "string",
+      "description": "Project this voxel belongs to"
+    },
+    "coordinates": {
+      "$ref": "#/$defs/coordinates"
+    },
+    "bounds": {
+      "$ref": "#/$defs/bounds"
+    },
+    "location": {
+      "$ref": "#/$defs/location"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PLANNED",
+        "IN_PROGRESS",
+        "COMPLETE",
+        "BLOCKED",
+        "INSPECTION_REQUIRED"
+      ],
+      "description": "Current voxel completion status"
+    },
+    "ifcElements": {
+      "type": "array",
+      "description": "IFC element GUIDs contained in or touching this voxel",
+      "items": { "type": "string" }
+    },
+    "decisionSurface": {
+      "$ref": "#/$defs/decisionSurface"
+    },
+    "workStatus": {
+      "$ref": "#/$defs/workStatus"
+    },
+    "inspectionStatus": {
+      "$ref": "#/$defs/inspectionStatus"
+    },
+    "materials": {
+      "type": "array",
+      "description": "Materials installed/planned for this voxel",
+      "items": { "$ref": "#/$defs/material" }
+    },
+    "labor": {
+      "$ref": "#/$defs/labor"
+    },
+    "cost": {
+      "$ref": "#/$defs/cost"
+    },
+    "carbon": {
+      "$ref": "#/$defs/carbon"
+    },
+    "schedule": {
+      "$ref": "#/$defs/schedule"
+    },
+    "dependencies": {
+      "$ref": "#/$defs/dependencies"
+    },
+    "adjacentVoxels": {
+      "type": "array",
+      "description": "URNs of spatially adjacent voxels",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "timestamps": {
+      "$ref": "#/$defs/timestamps"
+    },
+    "graphMetadata": {
+      "$ref": "#/$defs/graphMetadata"
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$",
+      "description": "LuhTech URN identifier"
+    },
+    "meta": {
+      "type": "object",
+      "description": "V3 file metadata for sync tracking",
+      "properties": {
+        "projectId": { "type": "string" },
+        "sourceOfTruth": { "type": "string" },
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "syncStatus": {
+          "type": "object",
+          "properties": {
+            "syncDirection": {
+              "type": "string",
+              "enum": ["v3-is-source-of-truth", "bidirectional"]
+            }
+          }
+        }
+      }
+    },
+    "coordinates": {
+      "type": "object",
+      "description": "Center point of voxel in project coordinates",
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" },
+        "resolution": {
+          "type": "number",
+          "default": 1.0,
+          "description": "Voxel size in meters"
+        },
+        "coordinateSystem": {
+          "type": "string",
+          "description": "Coordinate system reference (e.g., project local, WGS84)"
+        }
+      }
+    },
+    "bounds": {
+      "type": "object",
+      "description": "Bounding box of the voxel",
+      "required": ["minX", "maxX", "minY", "maxY", "minZ", "maxZ"],
+      "properties": {
+        "minX": { "type": "number" },
+        "maxX": { "type": "number" },
+        "minY": { "type": "number" },
+        "maxY": { "type": "number" },
+        "minZ": { "type": "number" },
+        "maxZ": { "type": "number" }
+      }
+    },
+    "location": {
+      "type": "object",
+      "description": "Human-readable location",
+      "properties": {
+        "building": { "type": "string" },
+        "level": { "type": "string" },
+        "zone": { "type": "string" },
+        "room": { "type": "string" },
+        "gridReference": { "type": "string" },
+        "system": {
+          "type": "string",
+          "description": "Primary building system (HVAC, ELEC, PLUMB, etc.)"
+        },
+        "ifcGuid": {
+          "type": "string",
+          "description": "Primary IFC element GUID if applicable"
+        }
+      }
+    },
+    "decisionSurface": {
+      "type": "object",
+      "description": "The accumulated decisions affecting this location",
+      "properties": {
+        "decisions": {
+          "type": "array",
+          "description": "URNs of all decisions attached to this voxel",
+          "items": { "$ref": "#/$defs/urn" }
+        },
+        "attachedDecisions": {
+          "type": "array",
+          "description": "Detailed decision attachments",
+          "items": { "$ref": "#/$defs/attachedDecision" }
+        },
+        "toleranceOverrides": {
+          "type": "array",
+          "description": "Pre-approved tolerance variances",
+          "items": { "$ref": "#/$defs/toleranceOverride" }
+        },
+        "preApprovals": {
+          "type": "array",
+          "description": "Pre-authorized work variations",
+          "items": { "$ref": "#/$defs/preApproval" }
+        },
+        "activeAlerts": {
+          "type": "array",
+          "description": "Current alerts for workers entering this voxel",
+          "items": { "$ref": "#/$defs/voxelAlert" }
+        },
+        "acknowledgments": {
+          "type": "array",
+          "description": "Worker acknowledgments of decisions",
+          "items": { "$ref": "#/$defs/acknowledgment" }
+        },
+        "decisionCount": {
+          "type": "integer",
+          "description": "Total number of attached decisions"
+        },
+        "unacknowledgedCount": {
+          "type": "integer",
+          "description": "Decisions requiring acknowledgment"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "attachedDecision": {
+      "type": "object",
+      "description": "Decision attachment metadata",
+      "required": ["decisionRef", "attachmentType", "attachedAt"],
+      "properties": {
+        "decisionRef": { "$ref": "#/$defs/urn" },
+        "attachmentType": {
+          "type": "string",
+          "enum": ["PRIMARY", "AFFECTED", "ADJACENT", "DOWNSTREAM"]
+        },
+        "attachedAt": { "type": "string", "format": "date-time" },
+        "attachedBy": {
+          "type": "string",
+          "enum": ["SYSTEM", "USER", "AI"]
+        },
+        "affectedTrades": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "summary": { "type": "string" },
+        "requiresAcknowledgment": { "type": "boolean", "default": false },
+        "acknowledged": { "type": "boolean", "default": false }
+      }
+    },
+    "toleranceOverride": {
+      "type": "object",
+      "description": "Pre-approved tolerance variance at this location",
+      "required": ["id", "toleranceType", "approvedValue", "sourceDecisionRef"],
+      "properties": {
+        "id": { "type": "string" },
+        "toleranceType": {
+          "type": "string",
+          "enum": [
+            "WALL_FLATNESS",
+            "CEILING_HEIGHT",
+            "FLOOR_LEVEL",
+            "PROTRUSION",
+            "GAP",
+            "ALIGNMENT",
+            "FINISH_QUALITY",
+            "EQUIPMENT_CLEARANCE",
+            "PIPE_SLOPE",
+            "DUCT_SIZE"
+          ]
+        },
+        "standardValue": {
+          "type": "object",
+          "properties": {
+            "value": { "type": "number" },
+            "unit": { "type": "string" },
+            "direction": { "type": "string", "enum": ["+", "-", "±"] }
+          }
+        },
+        "approvedValue": {
+          "type": "object",
+          "properties": {
+            "value": { "type": "number" },
+            "unit": { "type": "string" },
+            "direction": { "type": "string", "enum": ["+", "-", "±"] }
+          }
+        },
+        "sourceDecisionRef": { "$ref": "#/$defs/urn" },
+        "approvedBy": { "$ref": "#/$defs/urn" },
+        "approvalDate": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "rationale": { "type": "string" },
+        "applicableTrades": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "preApproval": {
+      "type": "object",
+      "description": "Decision that authorizes future work variations",
+      "properties": {
+        "id": { "type": "string" },
+        "scope": { "type": "string" },
+        "conditions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "validFrom": { "type": "string", "format": "date-time" },
+        "validUntil": { "type": "string", "format": "date-time" },
+        "sourceDecisionRef": { "$ref": "#/$defs/urn" },
+        "authorityLevel": {
+          "type": "string",
+          "enum": [
+            "FIELD",
+            "FOREMAN",
+            "SUPERINTENDENT",
+            "PM",
+            "ARCHITECT",
+            "OWNER",
+            "REGULATORY"
+          ]
+        },
+        "applicableTrades": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "usageCount": { "type": "integer", "default": 0 }
+      }
+    },
+    "voxelAlert": {
+      "type": "object",
+      "description": "Alert shown to workers entering this voxel",
+      "required": ["id", "priority", "title", "message"],
+      "properties": {
+        "id": { "type": "string" },
+        "priority": {
+          "type": "string",
+          "enum": ["INFO", "WARNING", "CRITICAL"]
+        },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "sourceDecisionRef": { "$ref": "#/$defs/urn" },
+        "targetTrades": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "requiresAcknowledgment": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "acknowledgedBy": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" }
+        }
+      }
+    },
+    "acknowledgment": {
+      "type": "object",
+      "description": "Worker acknowledgment of a decision",
+      "required": ["id", "decisionRef", "workerRef", "timestamp"],
+      "properties": {
+        "id": { "type": "string" },
+        "decisionRef": { "$ref": "#/$defs/urn" },
+        "workerRef": { "$ref": "#/$defs/urn" },
+        "workerName": { "type": "string" },
+        "workerTrade": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "method": {
+          "type": "string",
+          "enum": ["APP_TAP", "SMS_REPLY", "VOICE", "AR_GESTURE"]
+        },
+        "location": {
+          "type": "object",
+          "properties": {
+            "gps": {
+              "type": "object",
+              "properties": {
+                "lat": { "type": "number" },
+                "lng": { "type": "number" },
+                "accuracy": { "type": "number" }
+              }
+            },
+            "uwb": {
+              "type": "object",
+              "properties": {
+                "x": { "type": "number" },
+                "y": { "type": "number" },
+                "z": { "type": "number" },
+                "accuracy": { "type": "number" }
+              }
+            }
+          }
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "workStatus": {
+      "type": "object",
+      "description": "Current work state of this voxel",
+      "properties": {
+        "currentPhase": {
+          "type": "string",
+          "enum": [
+            "NOT_STARTED",
+            "ROUGH",
+            "FINISH",
+            "COMPLETE",
+            "REWORK",
+            "PUNCH_LIST"
+          ]
+        },
+        "activeTrades": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "scheduledTrades": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "trade": { "type": "string" },
+              "taskId": { "type": "string" },
+              "startDate": { "type": "string", "format": "date" },
+              "endDate": { "type": "string", "format": "date" }
+            }
+          }
+        },
+        "percentComplete": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "inspectionStatus": {
+      "type": "object",
+      "description": "Inspection state for this voxel",
+      "properties": {
+        "inspections": {
+          "type": "array",
+          "description": "URNs of inspections for this voxel",
+          "items": { "$ref": "#/$defs/urn" }
+        },
+        "roughInspection": {
+          "$ref": "#/$defs/inspectionState"
+        },
+        "finalInspection": {
+          "$ref": "#/$defs/inspectionState"
+        },
+        "decisionsReviewed": {
+          "type": "array",
+          "description": "Decision URNs inspector has reviewed",
+          "items": { "$ref": "#/$defs/urn" }
+        },
+        "readyForInspection": {
+          "type": "boolean",
+          "description": "All required decisions are attached and acknowledged"
+        }
+      }
+    },
+    "inspectionState": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "NOT_SCHEDULED",
+            "SCHEDULED",
+            "PASSED",
+            "FAILED",
+            "CONDITIONAL"
+          ]
+        },
+        "date": { "type": "string", "format": "date" },
+        "inspectionRef": { "$ref": "#/$defs/urn" }
+      }
+    },
+    "material": {
+      "type": "object",
+      "description": "Material in this voxel",
+      "properties": {
+        "materialId": { "type": "string" },
+        "name": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "carbonCoefficient": {
+          "type": "number",
+          "description": "kg CO2e per unit"
+        }
+      }
+    },
+    "labor": {
+      "type": "object",
+      "description": "Labor allocation for this voxel",
+      "properties": {
+        "estimatedHours": { "type": "number" },
+        "actualHours": { "type": "number" },
+        "assignedTrade": { "type": "string" },
+        "assignedCrew": { "type": "string" }
+      }
+    },
+    "cost": {
+      "type": "object",
+      "description": "Cost tracking for this voxel",
+      "properties": {
+        "estimated": { "type": "number" },
+        "actual": { "type": "number" },
+        "currency": { "type": "string", "default": "USD" }
+      }
+    },
+    "carbon": {
+      "type": "object",
+      "description": "Carbon tracking for this voxel",
+      "properties": {
+        "embodiedCarbon": { "type": "number", "description": "kg CO2e" },
+        "transportCarbon": { "type": "number", "description": "kg CO2e" },
+        "constructionCarbon": { "type": "number", "description": "kg CO2e" },
+        "totalCarbon": { "type": "number", "description": "kg CO2e" }
+      }
+    },
+    "schedule": {
+      "type": "object",
+      "description": "Schedule data for this voxel",
+      "properties": {
+        "plannedStart": { "type": "string", "format": "date-time" },
+        "plannedEnd": { "type": "string", "format": "date-time" },
+        "actualStart": { "type": "string", "format": "date-time" },
+        "actualEnd": { "type": "string", "format": "date-time" },
+        "isCriticalPath": { "type": "boolean" }
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "description": "Work dependencies for this voxel",
+      "properties": {
+        "predecessors": {
+          "type": "array",
+          "description": "Voxels that must complete before this one",
+          "items": { "$ref": "#/$defs/urn" }
+        },
+        "successors": {
+          "type": "array",
+          "description": "Voxels that depend on this one",
+          "items": { "$ref": "#/$defs/urn" }
+        }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "description": "V3 graph metadata for bidirectional traversal",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "edges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/edge" }
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["from", "to", "type"],
+      "properties": {
+        "from": { "$ref": "#/$defs/urn" },
+        "to": { "$ref": "#/$defs/urn" },
+        "type": {
+          "type": "string",
+          "enum": ["contains", "adjacent-to", "depends-on", "affects"]
+        },
+        "weight": { "type": "number", "minimum": 0, "maximum": 1 },
+        "label": { "type": "string" },
+        "metadata": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

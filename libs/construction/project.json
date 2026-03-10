@@ -1,0 +1,33 @@
+{
+  "name": "construction",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/construction/src",
+  "projectType": "library",
+  "tags": ["scope:construction", "type:library"],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "libs/construction/dist",
+        "main": "libs/construction/src/index.ts",
+        "tsConfig": "libs/construction/tsconfig.lib.json",
+        "assets": ["libs/construction/*.md"]
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/construction/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --passWithNoTests libs/construction/src",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

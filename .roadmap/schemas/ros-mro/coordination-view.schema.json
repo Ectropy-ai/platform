@@ -1,0 +1,277 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:ros-mro:coordination-view",
+  "title": "ROS MRO Coordination View Schema",
+  "description": "Schema defining the data structures for the Remote Operations Site Maintenance, Repair, Operations coordination dashboard",
+  "type": "object",
+  "definitions": {
+    "VoxelData": {
+      "type": "object",
+      "required": ["id", "voxelId", "center", "resolution", "system", "status"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Internal database ID"
+        },
+        "voxelId": {
+          "type": "string",
+          "pattern": "^VOX-L[0-9]+-[A-Z]+-[0-9]{3,}$",
+          "description": "Human-readable voxel identifier (e.g., VOX-L1-MECH-023)"
+        },
+        "center": {
+          "$ref": "#/definitions/Point3D",
+          "description": "Center point of voxel in millimeters"
+        },
+        "resolution": {
+          "type": "number",
+          "description": "Voxel size in millimeters"
+        },
+        "system": {
+          "type": "string",
+          "enum": ["STRUCT", "MECH", "ELEC", "PLUMB", "HVAC", "FIRE"],
+          "description": "Building system type"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["PLANNED", "IN_PROGRESS", "COMPLETE", "BLOCKED", "ON_HOLD", "INSPECTION_REQUIRED"],
+          "description": "Current work status"
+        },
+        "healthStatus": {
+          "type": "string",
+          "enum": ["HEALTHY", "AT_RISK", "CRITICAL"],
+          "description": "Health assessment status"
+        },
+        "decisionCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of linked decisions (RFIs, COs, etc.)"
+        },
+        "percentComplete": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Work completion percentage"
+        },
+        "level": {
+          "type": "string",
+          "description": "Building level identifier"
+        },
+        "assignedCrew": {
+          "type": "string",
+          "description": "Crew/team assigned to this voxel"
+        },
+        "linkedDecisions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "IDs of linked PM decisions"
+        }
+      }
+    },
+    "Point3D": {
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number", "description": "X coordinate in mm" },
+        "y": { "type": "number", "description": "Y coordinate in mm" },
+        "z": { "type": "number", "description": "Z coordinate in mm" }
+      }
+    },
+    "VoxelAggregation": {
+      "type": "object",
+      "required": ["key", "voxelCount", "overallProgress", "healthScore"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Aggregation key (level name, system, etc.)"
+        },
+        "voxelCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total voxels in this aggregation"
+        },
+        "plannedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inProgressCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completeCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blockedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decisionCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total decisions in this aggregation"
+        },
+        "overallProgress": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Weighted progress percentage"
+        },
+        "healthScore": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Health score (100 - blocked ratio)"
+        }
+      }
+    },
+    "ActivityItem": {
+      "type": "object",
+      "required": ["id", "type", "title", "timestamp", "severity"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Activity item ID"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["status_change", "decision_attached", "inspection", "issue", "robot_task", "sensor_alert"],
+          "description": "Activity type"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short activity title"
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When activity occurred"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "warning", "error", "success"],
+          "description": "Activity severity level"
+        },
+        "voxelId": {
+          "type": "string",
+          "description": "Related voxel ID (optional)"
+        },
+        "userId": {
+          "type": "string",
+          "description": "User who triggered activity"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Additional context data"
+        }
+      }
+    },
+    "ViewState": {
+      "type": "object",
+      "description": "UI state for ROS MRO view",
+      "properties": {
+        "showVoxels": { "type": "boolean", "default": true },
+        "showMesh": { "type": "boolean", "default": true },
+        "showDecisions": { "type": "boolean", "default": true },
+        "showActivity": { "type": "boolean", "default": true },
+        "showRobots": { "type": "boolean", "default": false },
+        "showSensors": { "type": "boolean", "default": false },
+        "colorScheme": {
+          "type": "string",
+          "enum": ["BY_STATUS", "BY_SYSTEM", "BY_HEALTH", "BY_PROGRESS"],
+          "default": "BY_STATUS"
+        },
+        "visualizationMode": {
+          "type": "string",
+          "enum": ["SOLID", "WIREFRAME", "HEATMAP"],
+          "default": "SOLID"
+        },
+        "filterSystems": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "filterStatuses": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "selectedVoxelId": {
+          "type": "string",
+          "nullable": true
+        }
+      }
+    },
+    "CoordinationConfig": {
+      "type": "object",
+      "description": "Configuration for ROS MRO coordination view",
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "description": "Active project ID"
+        },
+        "stakeholderRole": {
+          "type": "string",
+          "enum": ["architect", "engineer", "contractor", "owner", "coordinator"],
+          "description": "User's stakeholder role"
+        },
+        "authorityLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6,
+          "description": "SEPPA authority level"
+        },
+        "refreshInterval": {
+          "type": "integer",
+          "default": 30000,
+          "description": "Data refresh interval in ms"
+        },
+        "enableRealTime": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable WebSocket real-time updates"
+        },
+        "enableSEPPA": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable SEPPA AI assistant"
+        }
+      }
+    }
+  },
+  "properties": {
+    "voxels": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/VoxelData" },
+      "description": "All voxels for the project"
+    },
+    "aggregations": {
+      "type": "object",
+      "properties": {
+        "byLevel": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/VoxelAggregation" }
+        },
+        "bySystem": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/VoxelAggregation" }
+        }
+      }
+    },
+    "activities": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/ActivityItem" },
+      "description": "Recent activity stream"
+    },
+    "viewState": {
+      "$ref": "#/definitions/ViewState"
+    },
+    "config": {
+      "$ref": "#/definitions/CoordinationConfig"
+    }
+  }
+}

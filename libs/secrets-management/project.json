@@ -1,0 +1,33 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "secrets-management",
+  "projectType": "library",
+  "sourceRoot": "libs/secrets-management/src",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "libs/secrets-management/dist",
+        "main": "libs/secrets-management/src/index.ts",
+        "tsConfig": "libs/secrets-management/tsconfig.lib.json",
+        "assets": ["libs/secrets-management/*.md"]
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --passWithNoTests=false libs/secrets-management/src",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/secrets-management/**/*.js"]
+      }
+    }
+  },
+  "tags": ["lib:secrets", "scope:shared"]
+}

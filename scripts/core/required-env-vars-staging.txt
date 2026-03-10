@@ -1,0 +1,64 @@
+# =============================================================================
+# Staging Environment Required Variables
+# =============================================================================
+# This file lists all environment variables required for staging deployment
+# Used by: scripts/core/validate-env.sh staging
+#
+# Format:
+# - One variable name per line
+# - Lines starting with # are comments
+# - Empty lines are ignored
+# - Section headers: # Section Name:
+# - Optional sections: # Optional Section Name:
+# =============================================================================
+
+# Core Environment Configuration:
+NODE_ENV
+PORT
+
+# Database Configuration:
+DATABASE_HOST
+DATABASE_PORT
+DATABASE_NAME
+DATABASE_USER
+DB_PASSWORD
+
+# Redis Configuration:
+REDIS_HOST
+REDIS_PORT
+REDIS_PASSWORD
+
+# JWT & Authentication:
+JWT_SECRET
+JWT_REFRESH_SECRET
+SESSION_SECRET
+ENCRYPTION_KEY
+
+# API Gateway Configuration:
+API_GATEWAY_HOST
+API_GATEWAY_PORT
+
+# CORS Configuration:
+CORS_ORIGINS
+
+# Speckle Integration:
+SPECKLE_SERVER_URL
+SPECKLE_FRONTEND_URL
+SPECKLE_SESSION_SECRET
+
+# Optional Configuration:
+POSTGRES_PASSWORD
+SPECKLE_POSTGRES_PASSWORD
+DB_MAX_CONNECTIONS
+REDIS_MAX_MEMORY
+REDIS_KEY_PREFIX
+JWT_EXPIRES_IN
+JWT_REFRESH_EXPIRES_IN
+JWT_ISSUER
+JWT_AUDIENCE
+RATE_LIMIT_MAX
+RATE_LIMIT_WINDOW
+LOG_LEVEL
+LOG_FORMAT
+SPECKLE_FILE_SIZE_LIMIT_MB
+SPECKLE_FILEIMPORT_TIMEOUT

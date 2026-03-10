@@ -1,0 +1,128 @@
+#!/bin/bash
+###############################################################################
+# Weekly Runner Maintenance Cron Job
+# Purpose: Automated weekly cleanup and health reporting for self-hosted runners
+# Installation: Copy to /etc/cron.weekly/ on runner server
+# Usage: Runs automatically weekly via cron
+###############################################################################
+
+set -euo pipefail
+
+SCRIPT_DIR="/root/scripts"
+LOG_DIR="/var/log"
+CLEANUP_SCRIPT="${SCRIPT_DIR}/cleanup-runner.sh"
+DISK_REPORT_LOG="${LOG_DIR}/runner-disk-usage.log"
+TREND_SCRIPT="${SCRIPT_DIR}/track-disk-trends.sh"
+
+echo "=========================================="
+echo "🧹 Weekly Runner Maintenance - $(date)"
+echo "=========================================="
+
+# Check if cleanup script exists
+if [[ ! -f "$CLEANUP_SCRIPT" ]]; then
+  echo "❌ ERROR: Cleanup script not found at $CLEANUP_SCRIPT"
+  echo "   Please copy scripts/cleanup-runner.sh to $SCRIPT_DIR/"
+  exit 1
+fi
+
+# Make sure script is executable
+chmod +x "$CLEANUP_SCRIPT"
+
+# Run normal cleanup with verbose mode
+echo ""
+echo "🧹 Running normal cleanup..."
+"$CLEANUP_SCRIPT" --verbose
+
+# Track disk trends if script exists
+if [[ -f "$TREND_SCRIPT" ]]; then
+  echo ""
+  echo "📈 Tracking disk usage trends..."
+  chmod +x "$TREND_SCRIPT"
+  "$TREND_SCRIPT" || echo "⚠️  Trend tracking failed"
+fi
+
+# Generate disk usage report
+echo ""
+echo "📊 Disk Usage Report:"
+echo "===================="
+df -h / | tee "$DISK_REPORT_LOG"
+
+echo ""
+echo "🐳 Docker System Usage:"
+echo "======================"
+docker system df 2>/dev/null | tee -a "$DISK_REPORT_LOG" || echo "Docker not available"
+
+# Check disk usage and alert if still high
+DISK_USAGE=$(df / | tail -n 1 | awk '{print $5}' | sed 's/%//')
+DISK_AVAIL=$(df -h / | tail -n 1 | awk '{print $4}')
+
+echo ""
+echo "📊 Current Status:"
+echo "================="
+echo "Disk Usage: ${DISK_USAGE}%"
+echo "Available: ${DISK_AVAIL}"
+
+if [[ $DISK_USAGE -ge 85 ]]; then
+  echo ""
+  echo "🚨 CRITICAL: Disk usage at ${DISK_USAGE}% after weekly cleanup!"
+  echo "⚠️  EMERGENCY ACTION REQUIRED"
+  echo ""
+  echo "Recommended actions:"
+  echo "1. Run emergency cleanup: $CLEANUP_SCRIPT --emergency"
+  echo "2. Investigate large files: find / -type f -size +1G 2>/dev/null | head -20"
+  echo "3. Check runner work directories: du -sh /opt/actions-runner-*"
+  echo "4. Review Docker volumes: docker system df -v"
+  echo "5. Consider capacity expansion"
+  
+  # Try emergency cleanup automatically
+  echo ""
+  echo "🚨 Attempting automatic emergency cleanup..."
+  "$CLEANUP_SCRIPT" --emergency || echo "❌ Emergency cleanup failed"
+  
+  # Re-check after emergency cleanup
+  DISK_USAGE_AFTER=$(df / | tail -n 1 | awk '{print $5}' | sed 's/%//')
+  if [[ $DISK_USAGE_AFTER -ge 85 ]]; then
+    echo "❌ CRITICAL: Manual intervention required - disk still at ${DISK_USAGE_AFTER}%"
+    exit 1
+  fi
+elif [[ $DISK_USAGE -ge 75 ]]; then
+  echo ""
+  echo "⚠️  WARNING: Disk usage at ${DISK_USAGE}% after weekly cleanup"
+  echo "💡 Running aggressive cleanup..."
+  "$CLEANUP_SCRIPT" --aggressive || echo "⚠️  Aggressive cleanup failed"
+  
+  # Re-check
+  DISK_USAGE_AFTER=$(df / | tail -n 1 | awk '{print $5}' | sed 's/%//')
+  if [[ $DISK_USAGE_AFTER -ge 75 ]]; then
+    echo "⚠️  WARNING: Disk still at ${DISK_USAGE_AFTER}% - manual investigation recommended"
+  else
+    echo "✅ Cleanup successful - disk now at ${DISK_USAGE_AFTER}%"
+  fi
+elif [[ $DISK_USAGE -ge 65 ]]; then
+  echo ""
+  echo "ℹ️  Disk usage at ${DISK_USAGE}% - monitoring recommended"
+else
+  echo ""
+  echo "✅ Disk usage healthy at ${DISK_USAGE}%"
+fi
+
+# Rotate old log files (keep last 12 weeks)
+if [[ -f "${DISK_REPORT_LOG}.12" ]]; then
+  rm -f "${DISK_REPORT_LOG}.12"
+fi
+
+# Rotate logs
+for i in {11..1}; do
+  if [[ -f "${DISK_REPORT_LOG}.$i" ]]; then
+    mv "${DISK_REPORT_LOG}.$i" "${DISK_REPORT_LOG}.$((i+1))"
+  fi
+done
+
+if [[ -f "$DISK_REPORT_LOG" ]]; then
+  cp "$DISK_REPORT_LOG" "${DISK_REPORT_LOG}.1"
+fi
+
+echo ""
+echo "=========================================="
+echo "✅ Weekly maintenance complete - $(date)"
+echo "=========================================="

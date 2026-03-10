@@ -1,0 +1,615 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:seed:orchestrator",
+  "title": "Seed Orchestrator Configuration Schema",
+  "description": "Enterprise seed orchestration for multi-tenant database initialization with validation gates and idempotent execution. Defines orchestrator configuration, execution order, validation criteria, and tenant isolation patterns.",
+  "type": "object",
+  "required": [
+    "$schema",
+    "$id",
+    "schemaVersion",
+    "meta",
+    "orchestration",
+    "validation"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "urn:luhtech:ectropy:schema:seed:orchestrator",
+      "description": "Schema identifier for seed orchestrator configuration"
+    },
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:ectropy:seed:orchestration:",
+      "description": "Unique identifier for this orchestration configuration (URN pattern)"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of orchestrator schema (e.g., 1.0.0)"
+    },
+    "meta": {
+      "type": "object",
+      "required": ["name", "description", "environment", "status"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable orchestrator name (e.g., 'Staging Environment Seed Orchestrator')"
+        },
+        "description": {
+          "type": "string",
+          "description": "Purpose and scope of this orchestration configuration"
+        },
+        "environment": {
+          "type": "string",
+          "enum": ["development", "staging", "production", "test"],
+          "description": "Target environment for this orchestration"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "deprecated", "experimental", "disabled"],
+          "description": "Current status of this orchestration configuration"
+        },
+        "owner": {
+          "type": "string",
+          "description": "Team or individual responsible for maintaining this orchestration"
+        },
+        "lastExecuted": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of last successful execution"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of orchestration creation"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of last configuration update"
+        }
+      }
+    },
+    "orchestration": {
+      "type": "object",
+      "required": ["executionMode", "phases"],
+      "properties": {
+        "executionMode": {
+          "type": "string",
+          "enum": ["sequential", "parallel", "phased"],
+          "description": "Execution strategy: sequential (one-by-one), parallel (concurrent), phased (dependencies)"
+        },
+        "continueOnError": {
+          "type": "boolean",
+          "default": false,
+          "description": "Continue executing subsequent seeds if a seed fails (anti-pattern for staging/production)"
+        },
+        "idempotent": {
+          "type": "boolean",
+          "default": true,
+          "description": "Safe to run multiple times without duplicating data (upsert pattern)"
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum execution time in seconds (0 = no timeout)"
+        },
+        "retryPolicy": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable automatic retries on transient failures"
+            },
+            "maxRetries": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5,
+              "default": 3,
+              "description": "Maximum number of retry attempts per seed"
+            },
+            "backoffStrategy": {
+              "type": "string",
+              "enum": ["none", "linear", "exponential"],
+              "default": "exponential",
+              "description": "Delay strategy between retries"
+            },
+            "initialDelay": {
+              "type": "integer",
+              "minimum": 100,
+              "default": 1000,
+              "description": "Initial delay in milliseconds before first retry"
+            }
+          }
+        },
+        "phases": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Ordered phases of seed execution (P0: Foundation, P1: Core Data, P2: Demo Data)",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "seeds"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^P\\d+$",
+                "description": "Phase identifier (P0, P1, P2, etc.)"
+              },
+              "name": {
+                "type": "string",
+                "description": "Human-readable phase name"
+              },
+              "description": {
+                "type": "string",
+                "description": "Purpose and scope of this phase"
+              },
+              "executionMode": {
+                "type": "string",
+                "enum": ["sequential", "parallel"],
+                "default": "sequential",
+                "description": "Execution mode for seeds within this phase (overrides global)"
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^P\\d+$"
+                },
+                "description": "Phase IDs that must complete before this phase starts"
+              },
+              "seeds": {
+                "type": "array",
+                "minItems": 1,
+                "description": "Seed configurations for this phase",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "name", "type", "source"],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^seed-[a-z0-9-]+$",
+                      "description": "Unique seed identifier (seed-decision-lifecycle, seed-model-catalog)"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Human-readable seed name"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": ["prisma", "service", "sql", "migration"],
+                      "description": "Seed implementation type"
+                    },
+                    "source": {
+                      "type": "string",
+                      "description": "File path or function reference for seed implementation"
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "default": true,
+                      "description": "Enable/disable this seed without removing from configuration"
+                    },
+                    "tenantScoped": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Seed creates tenant-specific data (true) vs platform-wide data (false)"
+                    },
+                    "targetTenant": {
+                      "type": "string",
+                      "description": "Specific tenant slug for tenant-scoped seeds (e.g., 'ectropy-demo')"
+                    },
+                    "priority": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 100,
+                      "description": "Execution priority within phase (lower = earlier, 0 = highest priority)"
+                    },
+                    "timeout": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Seed-specific timeout in seconds (overrides orchestrator timeout)"
+                    },
+                    "dependsOn": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^seed-[a-z0-9-]+$"
+                      },
+                      "description": "Seed IDs that must complete before this seed starts"
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "description": "Seed-specific parameters passed to implementation",
+                      "additionalProperties": true
+                    },
+                    "validation": {
+                      "type": "object",
+                      "description": "Validation criteria for this seed",
+                      "properties": {
+                        "expectedRecordCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "Expected number of records created"
+                        },
+                        "minRecordCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "Minimum acceptable record count"
+                        },
+                        "queries": {
+                          "type": "array",
+                          "description": "SQL validation queries to execute after seed",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "description",
+                              "query",
+                              "expectedResult"
+                            ],
+                            "properties": {
+                              "description": {
+                                "type": "string",
+                                "description": "What this query validates"
+                              },
+                              "query": {
+                                "type": "string",
+                                "description": "SQL query to execute"
+                              },
+                              "expectedResult": {
+                                "type": ["integer", "string", "boolean"],
+                                "description": "Expected query result value"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable validation gates after orchestration completes"
+        },
+        "failOnValidationError": {
+          "type": "boolean",
+          "default": true,
+          "description": "Fail orchestration if post-execution validation fails"
+        },
+        "gates": {
+          "type": "array",
+          "description": "Validation gates to execute after all seeds complete",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "type", "criteria"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^gate-[a-z0-9-]+$",
+                "description": "Unique gate identifier"
+              },
+              "name": {
+                "type": "string",
+                "description": "Human-readable gate name"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "record_count",
+                  "data_integrity",
+                  "referential_integrity",
+                  "custom_query"
+                ],
+                "description": "Type of validation gate"
+              },
+              "criteria": {
+                "type": "object",
+                "description": "Gate-specific validation criteria",
+                "additionalProperties": true
+              },
+              "required": {
+                "type": "boolean",
+                "default": true,
+                "description": "Gate must pass for orchestration to succeed"
+              }
+            }
+          }
+        },
+        "healthChecks": {
+          "type": "array",
+          "description": "Post-seeding health checks to execute",
+          "items": {
+            "type": "object",
+            "required": ["name", "endpoint"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Health check name"
+              },
+              "endpoint": {
+                "type": "string",
+                "description": "Health check endpoint URL or database query"
+              },
+              "expectedStatus": {
+                "type": "integer",
+                "default": 200,
+                "description": "Expected HTTP status code (for endpoint checks)"
+              },
+              "timeout": {
+                "type": "integer",
+                "default": 5000,
+                "description": "Health check timeout in milliseconds"
+              }
+            }
+          }
+        }
+      }
+    },
+    "tenantIsolation": {
+      "type": "object",
+      "description": "Multi-tenant isolation configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable tenant isolation enforcement during seeding"
+        },
+        "createDemoTenant": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically create 'ectropy-demo' tenant if it doesn't exist"
+        },
+        "demoTenantSlug": {
+          "type": "string",
+          "default": "ectropy-demo",
+          "description": "Slug for demo tenant"
+        },
+        "validateTenantScoping": {
+          "type": "boolean",
+          "default": true,
+          "description": "Validate all tenant-scoped seeds have valid tenant_id references"
+        }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "info",
+          "description": "Logging verbosity level"
+        },
+        "logToFile": {
+          "type": "boolean",
+          "default": true,
+          "description": "Write orchestration logs to file"
+        },
+        "logFilePath": {
+          "type": "string",
+          "description": "Path to log file (relative to project root)"
+        },
+        "includeTimestamps": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include ISO 8601 timestamps in log entries"
+        },
+        "progressIndicators": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show progress indicators (✅/❌/⏳) in console output"
+        }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "description": "Rollback configuration for failed orchestrations",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable automatic rollback on orchestration failure"
+        },
+        "strategy": {
+          "type": "string",
+          "enum": ["transaction", "compensating", "snapshot"],
+          "description": "Rollback strategy: transaction (DB rollback), compensating (reverse seeds), snapshot (restore point)"
+        },
+        "createSnapshot": {
+          "type": "boolean",
+          "default": false,
+          "description": "Create database snapshot before orchestration starts"
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Orchestration metrics and telemetry",
+      "properties": {
+        "trackExecutionTime": {
+          "type": "boolean",
+          "default": true,
+          "description": "Track total and per-seed execution time"
+        },
+        "trackRecordCounts": {
+          "type": "boolean",
+          "default": true,
+          "description": "Track number of records created per seed"
+        },
+        "exportMetrics": {
+          "type": "boolean",
+          "default": false,
+          "description": "Export metrics to external monitoring system"
+        },
+        "metricsEndpoint": {
+          "type": "string",
+          "description": "Endpoint URL for metrics export"
+        }
+      }
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "$schema": "urn:luhtech:ectropy:schema:seed:orchestrator",
+      "$id": "urn:luhtech:ectropy:seed:orchestration:staging-unified-v1",
+      "schemaVersion": "1.0.0",
+      "meta": {
+        "name": "Staging Environment Unified Seed Orchestrator",
+        "description": "Consolidates 6 fragmented seed files into single atomic orchestration with validation gates",
+        "environment": "staging",
+        "status": "active",
+        "owner": "Ectropy Engineering",
+        "createdAt": "2026-02-13T00:00:00Z"
+      },
+      "orchestration": {
+        "executionMode": "phased",
+        "continueOnError": false,
+        "idempotent": true,
+        "timeout": 300,
+        "retryPolicy": {
+          "enabled": true,
+          "maxRetries": 3,
+          "backoffStrategy": "exponential",
+          "initialDelay": 1000
+        },
+        "phases": [
+          {
+            "id": "P0",
+            "name": "Foundation Data",
+            "description": "Platform-wide foundational data (authority levels, model catalog)",
+            "executionMode": "sequential",
+            "seeds": [
+              {
+                "id": "seed-decision-lifecycle",
+                "name": "Decision Lifecycle Authority Levels",
+                "type": "prisma",
+                "source": "prisma/seed-decision-lifecycle.ts",
+                "enabled": true,
+                "tenantScoped": false,
+                "priority": 0,
+                "validation": {
+                  "expectedRecordCount": 7,
+                  "minRecordCount": 7
+                }
+              }
+            ]
+          },
+          {
+            "id": "P1",
+            "name": "Demo Tenant Data",
+            "description": "Ectropy-demo tenant with projects and BIM data",
+            "executionMode": "sequential",
+            "dependsOn": ["P0"],
+            "seeds": [
+              {
+                "id": "seed-demo-tenant",
+                "name": "Create Demo Tenant",
+                "type": "prisma",
+                "source": "scripts/database/seeds/create-demo-tenant.ts",
+                "enabled": true,
+                "tenantScoped": false,
+                "targetTenant": "ectropy-demo",
+                "priority": 0,
+                "validation": {
+                  "expectedRecordCount": 1,
+                  "minRecordCount": 1
+                }
+              },
+              {
+                "id": "seed-ros-mro-demo",
+                "name": "ROS MRO Coordination View Demo",
+                "type": "prisma",
+                "source": "prisma/seed-ros-mro-demo.ts",
+                "enabled": true,
+                "tenantScoped": true,
+                "targetTenant": "ectropy-demo",
+                "priority": 10,
+                "dependsOn": ["seed-demo-tenant"]
+              }
+            ]
+          },
+          {
+            "id": "P2",
+            "name": "Service Layer Seeds",
+            "description": "Contract templates and platform patterns (service-layer registration)",
+            "executionMode": "parallel",
+            "dependsOn": ["P1"],
+            "seeds": [
+              {
+                "id": "seed-contract-templates",
+                "name": "CCDC & AIA Contract Templates",
+                "type": "service",
+                "source": "apps/mcp-server/src/services/contract-template-seeds.ts::registerAllSeedTemplates",
+                "enabled": true,
+                "tenantScoped": false,
+                "priority": 0
+              },
+              {
+                "id": "seed-platform-patterns",
+                "name": "Platform Success Stack Patterns",
+                "type": "service",
+                "source": "apps/mcp-server/src/services/platform-pattern-seeder.ts::seedPlatformPatterns",
+                "enabled": true,
+                "tenantScoped": false,
+                "priority": 0
+              }
+            ]
+          }
+        ]
+      },
+      "validation": {
+        "enabled": true,
+        "failOnValidationError": true,
+        "gates": [
+          {
+            "id": "gate-tenant-count",
+            "name": "Demo Tenant Exists",
+            "type": "record_count",
+            "criteria": {
+              "table": "tenants",
+              "where": { "slug": "ectropy-demo" },
+              "expectedCount": 1
+            },
+            "required": true
+          },
+          {
+            "id": "gate-authority-levels",
+            "name": "Authority Levels Seeded",
+            "type": "record_count",
+            "criteria": {
+              "table": "authority_levels",
+              "expectedCount": 7,
+              "minCount": 7
+            },
+            "required": true
+          }
+        ]
+      },
+      "tenantIsolation": {
+        "enabled": true,
+        "createDemoTenant": true,
+        "demoTenantSlug": "ectropy-demo",
+        "validateTenantScoping": true
+      },
+      "logging": {
+        "level": "info",
+        "logToFile": true,
+        "logFilePath": "logs/seed-orchestration.log",
+        "includeTimestamps": true,
+        "progressIndicators": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,212 @@
+# ============================================================================
+# ⚠️ DEPRECATED - Archived 2025-12-16 (Session 5)
+# ============================================================================
+#
+# This workflow has been DEPRECATED and consolidated into terraform-utilities.yml
+#
+# CONSOLIDATION RATIONALE:
+# - Terraform utility workflows consolidated to reduce workflow sprawl (33→30)
+# - State recovery operations are emergency-only (infrequent use)
+# - Unified diagnostic/maintenance interface provides clearer UX for DevOps users
+# - Maintains all state recovery functionality with mode-based selection
+#
+# MIGRATION PATH:
+# Use terraform-utilities.yml with utility_mode: state-recovery
+#
+# Example:
+#   Utility Mode: state-recovery
+#   Recovery Action: verify-state, remove-wrong-droplet, import-correct-droplet, full-cleanup-and-import
+#
+# FUNCTIONALITY PRESERVED:
+# ✅ Show current Terraform state resources
+# ✅ Remove incorrect resources from state
+# ✅ Import correct sfo3 droplet (ID: 525145389)
+# ✅ Import database (ID: afac7c67-bd14-424c-a7e0-72ce480cfecb)
+# ✅ Import load balancer (ID: f8dfd1f2-4fd3-42ad-9ad2-33783bfc7e87)
+# ✅ Verify state after recovery operations
+# ✅ Plan output artifact upload
+#
+# WORKFLOW MATRIX REFERENCE:
+# apps/mcp-server/data/cicd-environment-workflow-matrix.json v1.6.0
+#
+# ARCHIVED: 2025-12-16T04:00:00Z
+# SESSION: 5 (Workflow Consolidation Phase 2 - Terraform Utilities)
+# REPLACEMENT: .github/workflows/terraform-utilities.yml (state-recovery mode)
+# ============================================================================
+
+name: Fix Terraform State - Import Correct Resources
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - remove-wrong-droplet
+          - import-correct-droplet
+          - verify-state
+          - full-cleanup-and-import
+        default: 'verify-state'
+
+env:
+  TF_VERSION: '1.9.0'
+  TF_WORKING_DIR: './infrastructure/terraform'
+  AWS_REGION: 'us-east-1' # Required for S3 backend, not used by Spaces
+
+# Enterprise Security: Explicit least-privilege permissions
+# READ + DEPLOY: State fix needs read state and deploy corrections
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  terraform-state-fix:
+    name: Fix Terraform State
+    runs-on: ubuntu-latest
+    environment:
+      name: production-infrastructure
+      url: https://ectropy.ai
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "🔧 Initializing Terraform..."
+          terraform init -input=false
+
+      - name: Show Current State
+        if: always()
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          TF_VAR_do_token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          TF_VAR_ssh_key_fingerprint: ${{ vars.TF_VAR_SSH_KEY_FINGERPRINT }}
+          TF_VAR_admin_ip: ${{ vars.TF_VAR_ADMIN_IP }}
+          TF_VAR_ssl_certificate_name: ${{ vars.TF_VAR_SSL_CERTIFICATE_NAME || 'ectropy-production-cert' }}
+          TF_VAR_alert_email: ${{ vars.TF_VAR_ALERT_EMAIL || 'alerts@ectropy.ai' }}
+        run: |
+          echo "📋 Current Terraform State Resources:"
+          terraform state list || echo "No resources in state"
+
+      - name: Remove Wrong Droplet from State
+        if: inputs.action == 'remove-wrong-droplet' || inputs.action == 'full-cleanup-and-import'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          TF_VAR_do_token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          TF_VAR_ssh_key_fingerprint: ${{ vars.TF_VAR_SSH_KEY_FINGERPRINT }}
+          TF_VAR_admin_ip: ${{ vars.TF_VAR_ADMIN_IP }}
+          TF_VAR_ssl_certificate_name: ${{ vars.TF_VAR_SSL_CERTIFICATE_NAME || 'ectropy-production-cert' }}
+          TF_VAR_alert_email: ${{ vars.TF_VAR_ALERT_EMAIL || 'alerts@ectropy.ai' }}
+        run: |
+          echo "🗑️ Removing incorrect droplet from state..."
+          terraform state rm digitalocean_droplet.production || echo "⚠️ Droplet not in state or already removed"
+
+      - name: Import Correct sfo3 Droplet
+        if: inputs.action == 'import-correct-droplet' || inputs.action == 'full-cleanup-and-import'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          TF_VAR_do_token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          TF_VAR_ssh_key_fingerprint: ${{ vars.TF_VAR_SSH_KEY_FINGERPRINT }}
+          TF_VAR_admin_ip: ${{ vars.TF_VAR_ADMIN_IP }}
+          TF_VAR_ssl_certificate_name: ${{ vars.TF_VAR_SSL_CERTIFICATE_NAME || 'ectropy-production-cert' }}
+          TF_VAR_alert_email: ${{ vars.TF_VAR_ALERT_EMAIL || 'alerts@ectropy.ai' }}
+        run: |
+          echo "📥 Importing correct sfo3 production droplet (ID: 525145389)..."
+          terraform import digitalocean_droplet.production 525145389
+
+      - name: Import Database (if needed)
+        if: inputs.action == 'full-cleanup-and-import'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          TF_VAR_do_token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          TF_VAR_ssh_key_fingerprint: ${{ vars.TF_VAR_SSH_KEY_FINGERPRINT }}
+          TF_VAR_admin_ip: ${{ vars.TF_VAR_ADMIN_IP }}
+          TF_VAR_ssl_certificate_name: ${{ vars.TF_VAR_SSL_CERTIFICATE_NAME || 'ectropy-production-cert' }}
+          TF_VAR_alert_email: ${{ vars.TF_VAR_ALERT_EMAIL || 'alerts@ectropy.ai' }}
+        run: |
+          echo "📥 Importing production database (ID: afac7c67-bd14-424c-a7e0-72ce480cfecb)..."
+          terraform import digitalocean_database_cluster.production afac7c67-bd14-424c-a7e0-72ce480cfecb || echo "⚠️ Database already imported"
+
+      - name: Import Load Balancer (if needed)
+        if: inputs.action == 'full-cleanup-and-import'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          TF_VAR_do_token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          TF_VAR_ssh_key_fingerprint: ${{ vars.TF_VAR_SSH_KEY_FINGERPRINT }}
+          TF_VAR_admin_ip: ${{ vars.TF_VAR_ADMIN_IP }}
+          TF_VAR_ssl_certificate_name: ${{ vars.TF_VAR_SSL_CERTIFICATE_NAME || 'ectropy-production-cert' }}
+          TF_VAR_alert_email: ${{ vars.TF_VAR_ALERT_EMAIL || 'alerts@ectropy.ai' }}
+        run: |
+          echo "📥 Importing production load balancer (ID: f8dfd1f2-4fd3-42ad-9ad2-33783bfc7e87)..."
+          terraform import digitalocean_loadbalancer.production f8dfd1f2-4fd3-42ad-9ad2-33783bfc7e87 || echo "⚠️ Load balancer already imported"
+
+      - name: Verify State After Import
+        if: always()
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          TF_VAR_do_token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          TF_VAR_ssh_key_fingerprint: ${{ vars.TF_VAR_SSH_KEY_FINGERPRINT }}
+          TF_VAR_admin_ip: ${{ vars.TF_VAR_ADMIN_IP }}
+          TF_VAR_ssl_certificate_name: ${{ vars.TF_VAR_SSL_CERTIFICATE_NAME || 'ectropy-production-cert' }}
+          TF_VAR_alert_email: ${{ vars.TF_VAR_ALERT_EMAIL || 'alerts@ectropy.ai' }}
+        run: |
+          echo "🔍 Verifying Terraform state..."
+          echo ""
+          echo "Resources in state:"
+          terraform state list
+          echo ""
+          echo "Running terraform plan to check for drift..."
+          terraform plan -no-color -input=false | tee plan_output.txt
+
+      - name: Upload Plan Output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: state-fix-plan-${{ github.sha }}
+          path: ${{ env.TF_WORKING_DIR }}/plan_output.txt
+          retention-days: 30
+
+      - name: State Fix Summary
+        if: always()
+        run: |
+          echo "## 🔧 Terraform State Fix Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Action**: ${{ inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Expected State:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | ID | Region | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|----|---------|---------" >> $GITHUB_STEP_SUMMARY
+          echo "| Droplet | 525145389 | sfo3 | Should be imported |" >> $GITHUB_STEP_SUMMARY
+          echo "| Database | afac7c67-bd14-424c-a7e0-72ce480cfecb | sfo3 | Should be imported |" >> $GITHUB_STEP_SUMMARY
+          echo "| Load Balancer | f8dfd1f2-4fd3-42ad-9ad2-33783bfc7e87 | sfo3 | Should be imported |" >> $GITHUB_STEP_SUMMARY
+          echo "| Firewall | N/A | N/A | Will be created |" >> $GITHUB_STEP_SUMMARY
+          echo "| Domain | N/A | N/A | Will be created |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Review the plan output artifact to verify the state is correct." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Completed at $(date -u +\"%Y-%m-%d %H:%M:%S UTC\")" >> $GITHUB_STEP_SUMMARY

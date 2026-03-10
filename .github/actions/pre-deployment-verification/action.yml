@@ -1,0 +1,454 @@
+name: 'Pre-Deployment Verification'
+description: 'Comprehensive pre-deployment validation and safety checks'
+author: 'Ectropy Engineering'
+
+inputs:
+  environment:
+    description: 'Target environment (development, staging, production)'
+    required: true
+  verify_docker_config:
+    description: 'Validate Docker Compose configuration'
+    required: false
+    default: 'true'
+  verify_env_vars:
+    description: 'Validate required environment variables'
+    required: false
+    default: 'true'
+  verify_typescript:
+    description: 'Run TypeScript compilation check'
+    required: false
+    default: 'true'
+  verify_dependencies:
+    description: 'Verify all dependencies are installed'
+    required: false
+    default: 'true'
+  verify_terraform:
+    description: 'Run Terraform validation and drift detection'
+    required: false
+    default: 'false'
+  check_git_status:
+    description: 'Verify clean git working tree'
+    required: false
+    default: 'true'
+  abort_on_failure:
+    description: 'Abort deployment if any verification fails'
+    required: false
+    default: 'true'
+
+outputs:
+  verification_passed:
+    description: 'Whether all verifications passed (true/false)'
+    value: ${{ steps.summary.outputs.passed }}
+  docker_config_valid:
+    description: 'Docker configuration validation result'
+    value: ${{ steps.docker.outputs.valid }}
+  env_vars_valid:
+    description: 'Environment variables validation result'
+    value: ${{ steps.env.outputs.valid }}
+  typescript_valid:
+    description: 'TypeScript compilation result'
+    value: ${{ steps.typescript.outputs.valid }}
+  dependencies_valid:
+    description: 'Dependencies validation result'
+    value: ${{ steps.deps.outputs.valid }}
+  terraform_valid:
+    description: 'Terraform validation result'
+    value: ${{ steps.terraform.outputs.valid }}
+  verification_report:
+    description: 'JSON report of all verification results'
+    value: ${{ steps.summary.outputs.report }}
+
+runs:
+  using: 'composite'
+  steps:
+    # =========================================================================
+    # INITIALIZATION
+    # =========================================================================
+    - name: 🔒 Initialize Pre-Deployment Verification
+      shell: bash
+      run: |
+        echo "========================================="
+        echo "🔒 PRE-DEPLOYMENT VERIFICATION"
+        echo "========================================="
+        echo "Environment:           ${{ inputs.environment }}"
+        echo "Docker Config:         ${{ inputs.verify_docker_config }}"
+        echo "Environment Variables: ${{ inputs.verify_env_vars }}"
+        echo "TypeScript:            ${{ inputs.verify_typescript }}"
+        echo "Dependencies:          ${{ inputs.verify_dependencies }}"
+        echo "Terraform:             ${{ inputs.verify_terraform }}"
+        echo "Git Status:            ${{ inputs.check_git_status }}"
+        echo "Abort on Failure:      ${{ inputs.abort_on_failure }}"
+        echo "========================================="
+        echo ""
+
+        # Create verification results directory
+        mkdir -p /tmp/verification-results
+        echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" > /tmp/verification-results/start_time
+
+    # =========================================================================
+    # GIT STATUS CHECK
+    # =========================================================================
+    - name: 📋 Check Git Working Tree
+      id: git
+      if: inputs.check_git_status == 'true'
+      shell: bash
+      run: |
+        echo "Checking Git working tree status..."
+
+        if [ -d .git ]; then
+          GIT_STATUS=$(git status --porcelain)
+
+          if [ -z "$GIT_STATUS" ]; then
+            echo "✅ Git working tree is CLEAN"
+            echo "valid=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  WARNING: Git working tree has uncommitted changes:"
+            echo "$GIT_STATUS"
+            echo ""
+            echo "This is acceptable for CI/CD deployments but indicates"
+            echo "that local changes may not be reflected in this deployment."
+            echo "valid=warning" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "ℹ️  Not a git repository, skipping check"
+          echo "valid=skipped" >> $GITHUB_OUTPUT
+        fi
+        echo ""
+
+    # =========================================================================
+    # DOCKER CONFIGURATION VALIDATION
+    # =========================================================================
+    - name: 🐳 Validate Docker Configuration
+      id: docker
+      if: inputs.verify_docker_config == 'true'
+      shell: bash
+      run: |
+        echo "Validating Docker Compose configuration..."
+
+        # Determine compose file based on environment
+        case "${{ inputs.environment }}" in
+          production)
+            COMPOSE_FILE="docker-compose.production.yml"
+            ;;
+          staging)
+            COMPOSE_FILE="docker-compose.staging.yml"
+            ;;
+          development)
+            COMPOSE_FILE="docker-compose.development.yml"
+            ;;
+          *)
+            COMPOSE_FILE="docker-compose.yml"
+            ;;
+        esac
+
+        if [ ! -f "$COMPOSE_FILE" ]; then
+          echo "❌ ERROR: Compose file not found: $COMPOSE_FILE"
+          echo "valid=false" >> $GITHUB_OUTPUT
+
+          if [ "${{ inputs.abort_on_failure }}" = "true" ]; then
+            exit 1
+          fi
+        else
+          echo "Found compose file: $COMPOSE_FILE"
+
+          # Validate compose file syntax
+          if docker compose -f "$COMPOSE_FILE" config > /tmp/verification-results/docker-config.yml 2>&1; then
+            echo "✅ Docker Compose configuration is VALID"
+
+            # Additional validation: Check for required services
+            REQUIRED_SERVICES="api-gateway web-dashboard mcp-server postgres redis"
+            ALL_SERVICES_FOUND=true
+
+            for service in $REQUIRED_SERVICES; do
+              if ! grep -q "^  $service:" "$COMPOSE_FILE"; then
+                echo "⚠️  WARNING: Service '$service' not found in compose file"
+                ALL_SERVICES_FOUND=false
+              fi
+            done
+
+            if [ "$ALL_SERVICES_FOUND" = "true" ]; then
+              echo "✅ All required services present"
+              echo "valid=true" >> $GITHUB_OUTPUT
+            else
+              echo "⚠️  Some services missing (may be expected for this environment)"
+              echo "valid=warning" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "❌ Docker Compose configuration is INVALID"
+            cat /tmp/verification-results/docker-config.yml
+            echo "valid=false" >> $GITHUB_OUTPUT
+
+            if [ "${{ inputs.abort_on_failure }}" = "true" ]; then
+              exit 1
+            fi
+          fi
+        fi
+        echo ""
+
+    # =========================================================================
+    # ENVIRONMENT VARIABLES VALIDATION
+    # =========================================================================
+    - name: 🔐 Validate Environment Variables
+      id: env
+      if: inputs.verify_env_vars == 'true'
+      shell: bash
+      run: |
+        echo "Validating environment variables..."
+
+        # Define required environment variables based on environment
+        case "${{ inputs.environment }}" in
+          production)
+            REQUIRED_VARS="DATABASE_URL REDIS_URL JWT_SECRET NODE_ENV"
+            ;;
+          staging)
+            REQUIRED_VARS="DATABASE_URL REDIS_URL JWT_SECRET NODE_ENV"
+            ;;
+          development)
+            REQUIRED_VARS="DATABASE_URL NODE_ENV"
+            ;;
+        esac
+
+        MISSING_VARS=""
+        ALL_VARS_PRESENT=true
+
+        for var in $REQUIRED_VARS; do
+          if [ -z "${!var}" ]; then
+            echo "⚠️  Variable not set: $var"
+            MISSING_VARS="$MISSING_VARS $var"
+            ALL_VARS_PRESENT=false
+          else
+            # Show variable is set without revealing value
+            echo "✅ Variable set: $var (${#!var} characters)"
+          fi
+        done
+
+        if [ "$ALL_VARS_PRESENT" = "true" ]; then
+          echo "✅ All required environment variables are set"
+          echo "valid=true" >> $GITHUB_OUTPUT
+        else
+          echo "⚠️  Missing environment variables:$MISSING_VARS"
+          echo "These may be provided by Docker Compose or CI/CD secrets"
+          echo "valid=warning" >> $GITHUB_OUTPUT
+        fi
+        echo ""
+
+    # =========================================================================
+    # TYPESCRIPT COMPILATION CHECK
+    # =========================================================================
+    - name: 📘 Validate TypeScript Compilation
+      id: typescript
+      if: inputs.verify_typescript == 'true'
+      shell: bash
+      run: |
+        echo "Validating TypeScript compilation..."
+
+        if [ ! -f "package.json" ]; then
+          echo "ℹ️  No package.json found, skipping TypeScript check"
+          echo "valid=skipped" >> $GITHUB_OUTPUT
+        else
+          # Check if TypeScript is in dependencies
+          if grep -q "\"typescript\"" package.json; then
+            echo "TypeScript detected, running compilation check..."
+
+            # Try to run TypeScript compiler in check mode
+            if pnpm exec tsc --noEmit --skipLibCheck > /tmp/verification-results/tsc-output.txt 2>&1; then
+              echo "✅ TypeScript compilation SUCCESSFUL"
+              echo "valid=true" >> $GITHUB_OUTPUT
+            else
+              echo "❌ TypeScript compilation FAILED"
+              echo "First 20 errors:"
+              head -n 20 /tmp/verification-results/tsc-output.txt
+              echo "valid=false" >> $GITHUB_OUTPUT
+
+              if [ "${{ inputs.abort_on_failure }}" = "true" ]; then
+                echo ""
+                echo "Full compilation output:"
+                cat /tmp/verification-results/tsc-output.txt
+                exit 1
+              fi
+            fi
+          else
+            echo "ℹ️  TypeScript not in dependencies, skipping check"
+            echo "valid=skipped" >> $GITHUB_OUTPUT
+          fi
+        fi
+        echo ""
+
+    # =========================================================================
+    # DEPENDENCIES VALIDATION
+    # =========================================================================
+    - name: 📦 Validate Dependencies
+      id: deps
+      if: inputs.verify_dependencies == 'true'
+      shell: bash
+      run: |
+        echo "Validating dependencies..."
+
+        if [ ! -f "package.json" ]; then
+          echo "ℹ️  No package.json found, skipping dependency check"
+          echo "valid=skipped" >> $GITHUB_OUTPUT
+        else
+          # Check if node_modules exists
+          if [ -d "node_modules" ]; then
+            echo "✅ node_modules directory exists"
+
+            # Check if pnpm-lock.yaml is in sync
+            if [ -f "pnpm-lock.yaml" ]; then
+              echo "Checking if dependencies are up to date..."
+
+              # This is a simplified check - ideally would run pnpm install --frozen-lockfile
+              LOCKFILE_AGE=$(find pnpm-lock.yaml -mtime +7 2>/dev/null | wc -l)
+
+              if [ "$LOCKFILE_AGE" -gt 0 ]; then
+                echo "⚠️  WARNING: pnpm-lock.yaml is older than 7 days"
+                echo "Consider updating dependencies"
+                echo "valid=warning" >> $GITHUB_OUTPUT
+              else
+                echo "✅ Dependencies appear up to date"
+                echo "valid=true" >> $GITHUB_OUTPUT
+              fi
+            else
+              echo "⚠️  No pnpm-lock.yaml found"
+              echo "valid=warning" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "❌ node_modules directory not found"
+            echo "Run 'pnpm install' before deployment"
+            echo "valid=false" >> $GITHUB_OUTPUT
+
+            if [ "${{ inputs.abort_on_failure }}" = "true" ]; then
+              exit 1
+            fi
+          fi
+        fi
+        echo ""
+
+    # =========================================================================
+    # TERRAFORM VALIDATION
+    # =========================================================================
+    - name: 🏗️ Validate Terraform Configuration
+      id: terraform
+      if: inputs.verify_terraform == 'true'
+      shell: bash
+      run: |
+        echo "Validating Terraform configuration..."
+
+        if [ ! -d "terraform" ]; then
+          echo "ℹ️  No terraform directory found, skipping check"
+          echo "valid=skipped" >> $GITHUB_OUTPUT
+        else
+          cd terraform
+
+          # Initialize Terraform (if needed)
+          if [ ! -d ".terraform" ]; then
+            echo "Initializing Terraform..."
+            terraform init -backend=false > /tmp/verification-results/terraform-init.txt 2>&1
+          fi
+
+          # Validate Terraform configuration
+          if terraform validate > /tmp/verification-results/terraform-validate.txt 2>&1; then
+            echo "✅ Terraform configuration is VALID"
+
+            # Run Terraform plan to check for drift (if credentials available)
+            if terraform plan -detailed-exitcode > /tmp/verification-results/terraform-plan.txt 2>&1; then
+              echo "✅ Infrastructure is in sync (no drift detected)"
+              echo "valid=true" >> $GITHUB_OUTPUT
+            else
+              EXIT_CODE=$?
+              if [ $EXIT_CODE -eq 2 ]; then
+                echo "⚠️  WARNING: Infrastructure drift detected"
+                echo "Terraform plan shows pending changes"
+                echo "valid=warning" >> $GITHUB_OUTPUT
+              else
+                echo "❌ Terraform plan failed (may need credentials)"
+                echo "valid=warning" >> $GITHUB_OUTPUT
+              fi
+            fi
+          else
+            echo "❌ Terraform validation FAILED"
+            cat /tmp/verification-results/terraform-validate.txt
+            echo "valid=false" >> $GITHUB_OUTPUT
+
+            if [ "${{ inputs.abort_on_failure }}" = "true" ]; then
+              exit 1
+            fi
+          fi
+
+          cd ..
+        fi
+        echo ""
+
+    # =========================================================================
+    # SUMMARY AND FINAL VALIDATION
+    # =========================================================================
+    - name: 📊 Verification Summary
+      id: summary
+      shell: bash
+      run: |
+        echo "========================================="
+        echo "📊 VERIFICATION SUMMARY"
+        echo "========================================="
+
+        ALL_PASSED=true
+        REPORT="{"
+        REPORT+="\"timestamp\":\"$(date -u '+%Y-%m-%d %H:%M:%S UTC')\","
+        REPORT+="\"environment\":\"${{ inputs.environment }}\","
+        REPORT+="\"checks\":{"
+
+        # Aggregate results
+        GIT_STATUS="${{ steps.git.outputs.valid || 'skipped' }}"
+        DOCKER_STATUS="${{ steps.docker.outputs.valid || 'skipped' }}"
+        ENV_STATUS="${{ steps.env.outputs.valid || 'skipped' }}"
+        TS_STATUS="${{ steps.typescript.outputs.valid || 'skipped' }}"
+        DEPS_STATUS="${{ steps.deps.outputs.valid || 'skipped' }}"
+        TF_STATUS="${{ steps.terraform.outputs.valid || 'skipped' }}"
+
+        echo "Git Status:        $GIT_STATUS"
+        echo "Docker Config:     $DOCKER_STATUS"
+        echo "Environment Vars:  $ENV_STATUS"
+        echo "TypeScript:        $TS_STATUS"
+        echo "Dependencies:      $DEPS_STATUS"
+        echo "Terraform:         $TF_STATUS"
+
+        REPORT+="\"git\":\"$GIT_STATUS\","
+        REPORT+="\"docker\":\"$DOCKER_STATUS\","
+        REPORT+="\"env\":\"$ENV_STATUS\","
+        REPORT+="\"typescript\":\"$TS_STATUS\","
+        REPORT+="\"dependencies\":\"$DEPS_STATUS\","
+        REPORT+="\"terraform\":\"$TF_STATUS\""
+        REPORT+="},"
+
+        # Check for failures
+        for status in "$DOCKER_STATUS" "$TS_STATUS" "$DEPS_STATUS" "$TF_STATUS"; do
+          if [ "$status" = "false" ]; then
+            ALL_PASSED=false
+            break
+          fi
+        done
+
+        REPORT+="\"all_passed\":$ALL_PASSED}"
+
+        echo "========================================="
+
+        if [ "$ALL_PASSED" = "true" ]; then
+          echo "✅ ALL VERIFICATIONS PASSED"
+          echo "✅ System ready for deployment"
+          echo "passed=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ SOME VERIFICATIONS FAILED"
+          echo "❌ Deployment may fail or have issues"
+          echo "passed=false" >> $GITHUB_OUTPUT
+
+          if [ "${{ inputs.abort_on_failure }}" = "true" ]; then
+            echo ""
+            echo "🛑 DEPLOYMENT BLOCKED"
+            exit 1
+          fi
+        fi
+
+        echo "report=$REPORT" >> $GITHUB_OUTPUT
+        echo ""
+
+branding:
+  icon: 'check-circle'
+  color: 'purple'

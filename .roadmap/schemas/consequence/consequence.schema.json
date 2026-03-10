@@ -1,0 +1,214 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ectropy://schemas/consequence/v1",
+  "title": "Consequence",
+  "description": "Documented outcome or downstream effect of a prior decision, enabling root cause tracing",
+  "type": "object",
+  "definitions": {
+    "Participant": {
+      "type": "object",
+      "required": ["id", "role", "organization"],
+      "properties": {
+        "id": { "type": "string", "description": "Unique participant ID" },
+        "name": { "type": "string", "description": "Display name" },
+        "role": { "type": "string", "description": "Job role/title" },
+        "organization": { "type": "string", "description": "Company/org name" },
+        "authorityLevel": {
+          "type": "string",
+          "enum": ["FIELD", "FOREMAN", "SUPERINTENDENT", "PM", "ARCHITECT", "OWNER", "REGULATORY"]
+        }
+      }
+    },
+    "Evidence": {
+      "type": "object",
+      "required": ["type", "timestamp"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["PHOTO", "DOCUMENT", "VOICE", "VIDEO", "SMS", "EMAIL", "MEETING_TRANSCRIPT"]
+        },
+        "uri": { "type": "string", "format": "uri" },
+        "hash": { "type": "string", "description": "SHA-256 of content for verification" },
+        "capturedBy": { "$ref": "#/definitions/Participant" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "SpatialReference": {
+      "type": "object",
+      "description": "Links consequence to BIM location (voxel)",
+      "properties": {
+        "voxelId": { "type": "string", "description": "Unique voxel identifier in BIM model" },
+        "level": { "type": "string" },
+        "zone": { "type": "string" },
+        "coordinates": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "z": { "type": "number" }
+          }
+        }
+      }
+    }
+  },
+  "required": ["id", "sourceDecisionId", "discoveredBy", "description", "category"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^CONSQ-[0-9]{4}-[0-9]{4,}$",
+      "description": "Unique consequence identifier"
+    },
+    "sourceDecisionId": {
+      "type": "string",
+      "pattern": "^DEC-[0-9]{4}-[0-9]{4,}$",
+      "description": "The decision that caused this consequence (may be updated after AI trace)"
+    },
+    "discoveredBy": {
+      "$ref": "#/definitions/Participant",
+      "description": "Person who discovered/reported the consequence"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the consequence was discovered"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "SCHEDULE_IMPACT",
+        "COST_IMPACT",
+        "QUALITY_IMPACT",
+        "SAFETY_IMPACT",
+        "COORDINATION_CONFLICT",
+        "TOLERANCE_VARIANCE",
+        "MATERIAL_MISMATCH",
+        "ACCESS_ISSUE",
+        "REGULATORY_CONCERN",
+        "DESIGN_CONFLICT"
+      ],
+      "description": "Type of consequence"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["MINOR", "MODERATE", "MAJOR", "CRITICAL"],
+      "description": "Impact severity"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of the consequence"
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/Evidence" },
+      "description": "Photos, documents supporting the report"
+    },
+    "spatialReference": {
+      "$ref": "#/definitions/SpatialReference",
+      "description": "Where in the building this consequence manifests"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["UNRESOLVED", "ESCALATED", "IN_REVIEW", "RESOLVED", "ACCEPTED"],
+      "default": "UNRESOLVED"
+    },
+    "resolutionPath": {
+      "type": "object",
+      "properties": {
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "description": { "type": "string" },
+              "estimatedCost": { "type": "number" },
+              "estimatedTime": { "type": "string" },
+              "requiredApprovalLevel": {
+                "type": "string",
+                "enum": ["FIELD", "FOREMAN", "SUPERINTENDENT", "PM", "ARCHITECT", "OWNER", "REGULATORY"]
+              },
+              "pros": { "type": "array", "items": { "type": "string" } },
+              "cons": { "type": "array", "items": { "type": "string" } }
+            },
+            "required": ["id", "description"]
+          },
+          "description": "Available resolution options"
+        },
+        "selectedOption": {
+          "type": "string",
+          "description": "ID of chosen resolution option"
+        },
+        "resolutionDecisionId": {
+          "type": "string",
+          "pattern": "^DEC-[0-9]{4}-[0-9]{4,}$",
+          "description": "Decision ID that resolved this consequence"
+        }
+      }
+    },
+    "aiTraceAnalysis": {
+      "type": "object",
+      "description": "AI analysis tracing back through decision graph",
+      "properties": {
+        "rootCauseChain": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Decision IDs in chronological causal chain"
+        },
+        "originalDecision": {
+          "type": "string",
+          "description": "The earliest decision in the chain (root cause)"
+        },
+        "chainLength": {
+          "type": "integer",
+          "description": "Number of decisions in causal chain"
+        },
+        "participantsInvolved": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Participant" },
+          "description": "All participants in the decision chain"
+        },
+        "patternMatch": {
+          "type": "object",
+          "properties": {
+            "templateId": { "type": "string" },
+            "templateName": { "type": "string" },
+            "similarity": { "type": "number", "minimum": 0, "maximum": 1 },
+            "suggestedResolution": { "type": "string" }
+          },
+          "description": "Matching pattern from template library"
+        },
+        "analysisNarrative": {
+          "type": "string",
+          "description": "Human-readable explanation of the causal chain"
+        }
+      }
+    },
+    "escalation": {
+      "type": "object",
+      "description": "Escalation tracking if consequence requires higher authority",
+      "properties": {
+        "currentLevel": {
+          "type": "string",
+          "enum": ["FIELD", "FOREMAN", "SUPERINTENDENT", "PM", "ARCHITECT", "OWNER", "REGULATORY"]
+        },
+        "requiredLevel": {
+          "type": "string",
+          "enum": ["FIELD", "FOREMAN", "SUPERINTENDENT", "PM", "ARCHITECT", "OWNER", "REGULATORY"]
+        },
+        "escalationPath": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "participant": { "$ref": "#/definitions/Participant" },
+              "action": { "type": "string", "enum": ["ESCALATED", "REVIEWING", "DECIDED"] },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "notes": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

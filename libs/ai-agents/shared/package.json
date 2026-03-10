@@ -1,0 +1,16 @@
+{
+  "name": "@ectropy/ai-agents-shared",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": "./index.js",
+    "./base-agent": "./base-agent.js",
+    "./types": "./types.js",
+    "./mcp-management/src/index": "./mcp-management/src/index.js"
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  }
+}

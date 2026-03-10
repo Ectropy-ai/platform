@@ -1,0 +1,330 @@
+name: 'Setup Playwright'
+description: 'Install Playwright browsers with APT lock handling (requires external caching)'
+author: 'Ectropy Platform Team'
+
+inputs:
+  browsers:
+    description: 'Browsers to install (space-separated: chromium firefox webkit)'
+    required: false
+    default: 'chromium'
+  with-deps:
+    description: 'Install system dependencies for browsers'
+    required: false
+    default: 'true'
+  skip-browser-download:
+    description: 'Set PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD environment variable'
+    required: false
+    default: '0'
+  cache-hit:
+    description: 'Whether the Playwright cache was hit (from external cache step)'
+    required: false
+    default: 'false'
+
+outputs:
+  browser-path:
+    description: 'Detected browser installation path'
+    value: ${{ steps.detect-browsers.outputs.browser-path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 🔍 Detect Pre-Installed Browsers (Self-Hosted)
+      id: detect-browsers
+      shell: bash
+      run: |
+        echo "🔍 Checking for pre-installed Playwright browsers..."
+
+        # ENTERPRISE: Browser cache path resolution for self-hosted runners
+        # Priority order:
+        # 1. PLAYWRIGHT_BROWSERS_PATH (shared cache: /opt/shared-playwright-cache)
+        # 2. Runner-specific path (legacy: /opt/actions-runner-X/.cache/ms-playwright)
+        # 3. HOME-based path (GitHub-hosted runners)
+        #
+        # Shared cache implementation:
+        # - Runner .env sets PLAYWRIGHT_BROWSERS_PATH=/opt/shared-playwright-cache
+        # - All runners on same host share browser binaries (1.8GB disk savings)
+        # - Workflow cache@v4 uses /opt/shared-playwright-cache as path
+        # - Eliminates path mismatches in matrix jobs (root cause of E2E failures)
+        # - Setup: scripts/ci/setup-shared-playwright-cache.sh
+
+        # Check if PLAYWRIGHT_BROWSERS_PATH env variable is explicitly set
+        if [ -n "$PLAYWRIGHT_BROWSERS_PATH" ]; then
+          echo "✅ Using explicit PLAYWRIGHT_BROWSERS_PATH: $PLAYWRIGHT_BROWSERS_PATH"
+          BROWSER_PATH="$PLAYWRIGHT_BROWSERS_PATH"
+        elif [ -n "$RUNNER_NAME" ]; then
+          # Self-hosted runner - construct path from runner name
+          echo "ℹ️  Self-hosted runner detected: $RUNNER_NAME"
+          # Extract runner number from name (e.g., ectropy-runner-3 → 3)
+          RUNNER_NUM="${RUNNER_NAME##*-}"
+          BROWSER_PATH="/opt/actions-runner-${RUNNER_NUM}/.cache/ms-playwright"
+          echo "ℹ️  Constructed runner-specific path: $BROWSER_PATH"
+        elif [ -n "$HOME" ] && [ "$HOME" != "/" ]; then
+          # HOME is set and not root - use it
+          BROWSER_PATH="$HOME/.cache/ms-playwright"
+          echo "ℹ️  Using HOME-based path: $BROWSER_PATH"
+        else
+          # Fallback to common locations
+          echo "⚠️  HOME not reliably set (HOME=${HOME:-'<not set>'}), trying fallback paths..."
+          for candidate in "/home/runner/.cache/ms-playwright" "/root/.cache/ms-playwright" "$(pwd)/.cache/ms-playwright"; do
+            if [ -d "$candidate" ] && [ -n "$(find "$candidate" -maxdepth 1 -name 'chromium-*' -type d 2>/dev/null)" ]; then
+              BROWSER_PATH="$candidate"
+              echo "✅ Found browsers at fallback path: $BROWSER_PATH"
+              break
+            fi
+          done
+
+          if [ -z "$BROWSER_PATH" ]; then
+            BROWSER_PATH="$HOME/.cache/ms-playwright"
+            echo "ℹ️  Using default HOME path as last resort: $BROWSER_PATH"
+          fi
+        fi
+
+        echo "📍 Final browser path: $BROWSER_PATH"
+
+        # ENTERPRISE BROWSER VERSION VALIDATION
+        # Root cause of E2E failures: Cache restores incompatible browser versions
+        # Solution: Validate browser revision matches Playwright's requirements
+
+        echo "🔍 Validating browser version compatibility..."
+
+        # Get current Playwright version
+        if ! PLAYWRIGHT_VERSION=$(pnpm exec playwright --version 2>/dev/null | awk '{print $2}'); then
+          echo "⚠️  Could not determine Playwright version, skipping version check"
+          SKIP_VERSION_CHECK=true
+        else
+          echo "📦 Playwright version: $PLAYWRIGHT_VERSION"
+          SKIP_VERSION_CHECK=false
+        fi
+
+        # Extract expected browser revision from Playwright
+        if [ "$SKIP_VERSION_CHECK" != "true" ]; then
+          # Use playwright install --dry-run to get expected revision without downloading
+          EXPECTED_REVISION=$(pnpm exec playwright install --dry-run chromium 2>&1 | grep -oP 'chromium.*?-\K[0-9]+' | head -1)
+
+          if [ -n "$EXPECTED_REVISION" ]; then
+            echo "✅ Expected Chromium revision: $EXPECTED_REVISION"
+
+            # Check if compatible browser exists
+            COMPATIBLE_BROWSER_FOUND=false
+
+            if [ -d "$BROWSER_PATH" ]; then
+              # Check for both chromium-* and chromium_headless_shell-* with expected revision
+              if [ -d "$BROWSER_PATH/chromium-$EXPECTED_REVISION" ] || [ -d "$BROWSER_PATH/chromium_headless_shell-$EXPECTED_REVISION" ]; then
+                echo "✅ Compatible browser found (revision $EXPECTED_REVISION)"
+                COMPATIBLE_BROWSER_FOUND=true
+              else
+                echo "⚠️  Browser version mismatch detected"
+                echo "   Expected revision: $EXPECTED_REVISION"
+                echo "   Found browsers:"
+                ls -1 "$BROWSER_PATH" 2>/dev/null | grep -E "chromium" | head -5 || echo "   (none)"
+
+                # ENTERPRISE FIX: Remove incompatible browsers to force reinstallation
+                echo "🔄 Removing incompatible browser versions..."
+                rm -rf "$BROWSER_PATH"/chromium-* "$BROWSER_PATH"/chromium_headless_shell-* 2>/dev/null || true
+                echo "✅ Incompatible browsers removed, fresh installation will be triggered"
+              fi
+            fi
+
+            # ENTERPRISE FIX: Always export browser path for verification step
+            # Verification step needs this path regardless of pre-installation status
+            echo "browser-path=$BROWSER_PATH" >> $GITHUB_OUTPUT
+
+            if [ "$COMPATIBLE_BROWSER_FOUND" = "true" ]; then
+              echo "✅ Pre-installed compatible browsers detected on self-hosted runner"
+              echo "📦 Location: $BROWSER_PATH"
+              echo "🎯 Revision: $EXPECTED_REVISION"
+              ls -1 "$BROWSER_PATH" | head -5
+              echo "pre-installed=true" >> $GITHUB_OUTPUT
+            else
+              echo "ℹ️  No compatible pre-installed browsers found"
+              echo "📍 Browser path will be used post-installation: $BROWSER_PATH"
+              echo "pre-installed=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "⚠️  Could not determine expected revision, falling back to basic check"
+            SKIP_VERSION_CHECK=true
+          fi
+        fi
+
+        # Fallback: Basic check without version validation (backward compatible)
+        if [ "$SKIP_VERSION_CHECK" = "true" ]; then
+          # ENTERPRISE FIX: Always export browser path first
+          echo "browser-path=$BROWSER_PATH" >> $GITHUB_OUTPUT
+
+          if [ -d "$BROWSER_PATH" ] && [ -n "$(find "$BROWSER_PATH" -maxdepth 1 -name 'chromium-*' -type d 2>/dev/null)" ]; then
+            echo "✅ Pre-installed browsers detected (version validation skipped)"
+            echo "📦 Location: $BROWSER_PATH"
+            ls -1 "$BROWSER_PATH" | head -5
+            echo "pre-installed=true" >> $GITHUB_OUTPUT
+          else
+            echo "ℹ️  No pre-installed browsers found at $BROWSER_PATH"
+            echo "📍 Browser path will be used post-installation: $BROWSER_PATH"
+            echo "pre-installed=false" >> $GITHUB_OUTPUT
+          fi
+        fi
+
+    - name: 🔧 Handle APT locks (self-hosted only)
+      # ENTERPRISE: Skip APT lock handler on GitHub-hosted runners (ubuntu-latest, ubuntu-22.04, etc.)
+      # Rationale: GitHub-hosted runners have clean APT state, no lock contention
+      # Only needed for self-hosted runners with parallel workflows causing APT lock races
+      # Detection: RUNNER_NAME env var is only set on self-hosted runners
+      if: |
+        env.RUNNER_NAME != '' &&
+        steps.detect-browsers.outputs.pre-installed != 'true' &&
+        inputs.with-deps == 'true'
+      uses: ./.github/actions/apt-lock-handler
+      with:
+        max-retries: 30
+        retry-delay: 10
+        skip-if-cached: 'false'
+
+    - name: 📥 Install Playwright browsers
+      # Only run if: no pre-installed browsers (browser detection sets this correctly even when cache-hit)
+      # Note: Removed cache-hit check - browser detection handles this by setting pre-installed=false when incompatible browsers are removed
+      if: steps.detect-browsers.outputs.pre-installed != 'true'
+      shell: bash
+      env:
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: ${{ inputs.skip-browser-download }}
+        # ENTERPRISE CORE FIX: Ensure Playwright installs to detected browser path
+        # Critical for self-hosted runners where validation expects browsers at runner-specific paths
+        PLAYWRIGHT_BROWSERS_PATH: ${{ steps.detect-browsers.outputs.browser-path }}
+      run: |
+        echo "📥 Installing Playwright browsers: ${{ inputs.browsers }}"
+        echo "📍 Target installation path: $PLAYWRIGHT_BROWSERS_PATH"
+
+        if [ "${{ inputs.with-deps }}" = "true" ]; then
+          echo "📦 Installing browsers with system dependencies..."
+          # Use || true to make this non-blocking if APT is unavailable
+          # If APT health check passed, this should work
+          # If APT health check failed, we'll get diagnostic output but won't block
+          pnpm exec playwright install ${{ inputs.browsers }} --with-deps || {
+            EXIT_CODE=$?
+            echo "⚠️  Browser installation with dependencies failed (exit code: $EXIT_CODE)"
+            echo "    This is expected if APT is unavailable on this runner"
+            echo "    Attempting installation without system dependencies as fallback..."
+            pnpm exec playwright install ${{ inputs.browsers }}
+          }
+        else
+          echo "📦 Installing browsers without system dependencies..."
+          pnpm exec playwright install ${{ inputs.browsers }}
+        fi
+
+        echo "✅ Playwright browser installation complete"
+
+    - name: ✅ Using Pre-Installed Browsers
+      if: steps.detect-browsers.outputs.pre-installed == 'true'
+      shell: bash
+      env:
+        # CRITICAL: Use detected browser path from previous step
+        PLAYWRIGHT_BROWSERS_PATH: ${{ steps.detect-browsers.outputs.browser-path }}
+      run: |
+        echo "✅ Using pre-installed Playwright browsers from self-hosted runner"
+        echo "📍 Location: $PLAYWRIGHT_BROWSERS_PATH"
+        echo "🚀 Skipping browser installation and APT operations"
+
+        # Verify browsers are executable with proper path handling
+        for chromium_dir in "$PLAYWRIGHT_BROWSERS_PATH"/chromium-*; do
+          if [ -d "$chromium_dir" ]; then
+            echo "✅ Found Chromium installation: $(basename "$chromium_dir")"
+
+            CHROME_BINARY="$chromium_dir/chrome-linux/chrome"
+            if [ -f "$CHROME_BINARY" ]; then
+              echo "✅ Chrome binary exists and is executable"
+            else
+              echo "⚠️  Chrome binary not found at: $CHROME_BINARY"
+            fi
+          fi
+        done
+
+    - name: ✅ Verify Playwright installation
+      shell: bash
+      env:
+        # CRITICAL: Use detected browser path from detection step
+        PLAYWRIGHT_BROWSERS_PATH: ${{ steps.detect-browsers.outputs.browser-path || format('{0}/.cache/ms-playwright', env.HOME) }}
+      run: |
+        echo "🔍 Verifying Playwright installation..."
+        echo "📍 PLAYWRIGHT_BROWSERS_PATH: ${PLAYWRIGHT_BROWSERS_PATH:-<not set>}"
+        echo "📍 Working directory: $(pwd)"
+        echo "📍 Node version: $(node --version)"
+        echo "📍 pnpm version: $(pnpm --version)"
+        echo ""
+
+        # ENTERPRISE FIX: Capture full error output for diagnosis
+        echo "Testing: pnpm exec playwright --version"
+        set +e
+        PLAYWRIGHT_OUTPUT=$(pnpm exec playwright --version 2>&1)
+        PLAYWRIGHT_EXIT_CODE=$?
+        set -e
+
+        if [ $PLAYWRIGHT_EXIT_CODE -eq 0 ]; then
+          echo "✅ Playwright CLI is functional"
+          echo "   Version: $PLAYWRIGHT_OUTPUT"
+        else
+          echo "❌ Playwright CLI verification FAILED"
+          echo "   Exit code: $PLAYWRIGHT_EXIT_CODE"
+          echo "   Error output:"
+          echo "$PLAYWRIGHT_OUTPUT" | sed 's/^/     /'
+          echo ""
+          echo "🔬 ENTERPRISE DIAGNOSTIC:"
+          echo "   This indicates pnpm exec or Playwright CLI is in an inconsistent state"
+          echo "   after browser installation. Attempting recovery..."
+          echo ""
+
+          # ENTERPRISE RECOVERY: Try alternative invocation methods
+          echo "Recovery attempt 1: Direct node_modules invocation"
+          if [ -x "./node_modules/.bin/playwright" ]; then
+            ./node_modules/.bin/playwright --version && echo "✅ Direct invocation works" || echo "❌ Direct invocation also fails"
+          else
+            echo "❌ playwright binary not found in node_modules/.bin/"
+          fi
+          echo ""
+
+          echo "Recovery attempt 2: npx invocation"
+          npx playwright --version 2>&1 && echo "✅ npx invocation works" || echo "❌ npx invocation also fails"
+          echo ""
+
+          # Exit with failure
+          exit 1
+        fi
+
+        # Verify browser binaries with proper path expansion
+        echo "🔍 Checking browser binaries..."
+        echo "📍 Browser cache path: $PLAYWRIGHT_BROWSERS_PATH"
+
+        BROWSER_PATH="$PLAYWRIGHT_BROWSERS_PATH"
+
+        if [ -d "$BROWSER_PATH" ]; then
+          BROWSER_COUNT=$(ls -1 "$BROWSER_PATH" 2>/dev/null | wc -l)
+          echo "✅ Browser cache directory exists with $BROWSER_COUNT entries"
+
+          # List installed browsers
+          echo "📦 Installed browsers:"
+          ls -1 "$BROWSER_PATH" 2>/dev/null || echo "  (none found)"
+
+          # Test browser binary execution with proper path
+          # Note: Using glob pattern correctly with quotes
+          for chromium_dir in "$BROWSER_PATH"/chromium-*; do
+            if [ -d "$chromium_dir" ]; then
+              CHROMIUM_BINARY="$chromium_dir/chrome-linux/chrome"
+              if [ -f "$CHROMIUM_BINARY" ]; then
+                CHROMIUM_VERSION=$("$CHROMIUM_BINARY" --version 2>/dev/null || echo "version check failed")
+                echo "✅ Chromium binary is executable: $CHROMIUM_VERSION"
+                echo "   Location: $CHROMIUM_BINARY"
+              else
+                echo "⚠️  Chromium binary not found at: $CHROMIUM_BINARY"
+              fi
+              break
+            fi
+          done
+        else
+          echo "❌ Browser cache directory not found: $BROWSER_PATH"
+          echo "   This will cause Playwright tests to fail"
+          echo ""
+          echo "Troubleshooting:"
+          echo "1. Ensure Playwright browsers are installed: pnpm exec playwright install chromium --with-deps"
+          echo "2. Check if PLAYWRIGHT_BROWSERS_PATH env variable is set correctly"
+          echo "3. Verify cache directory permissions"
+          exit 1
+        fi
+
+        echo "✅ Playwright verification complete"

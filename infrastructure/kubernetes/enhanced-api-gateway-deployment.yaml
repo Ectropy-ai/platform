@@ -1,0 +1,234 @@
+# 🚀 ENHANCED API GATEWAY - YOUR PHASE 1 SECURITY IMPLEMENTATION
+# Deploys your enhanced API Gateway with comprehensive security middleware
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ectropy-api-gateway
+  namespace: ectropy-production
+  labels:
+    app: ectropy-api-gateway
+    tier: api
+    component: federated-platform
+spec:
+  replicas: 3 # Scale based on enterprise needs
+  selector:
+    matchLabels:
+      app: ectropy-api-gateway
+  template:
+    metadata:
+      labels:
+        app: ectropy-api-gateway
+      annotations:
+        security.ectropy.io/security-level: 'enhanced'
+        security.ectropy.io/middleware: 'comprehensive'
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '4000'
+        prometheus.io/path: '/metrics'
+    spec:
+      serviceAccountName: ectropy-service-account
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      containers:
+        - name: api-gateway
+          image: ghcr.io/luhtech/ectropy-api-gateway:staging-latest
+          ports:
+            - containerPort: 4000
+              name: http
+          env:
+            # Load configuration from your enhanced config
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: NODE_ENV
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: API_GATEWAY_PORT
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: LOG_LEVEL
+
+            # Database configuration
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: DB_NAME
+            - name: DB_USER
+              value: 'ectropy'
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: DB_PASSWORD
+
+            # Security configuration (from your enhanced middleware)
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: JWT_SECRET
+            - name: JWT_REFRESH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: JWT_REFRESH_SECRET
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: SESSION_SECRET
+
+            # Redis configuration
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: REDIS_PORT
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: REDIS_PASSWORD
+
+            # DAO Governance configuration
+            - name: DAO_GOVERNANCE_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: DAO_GOVERNANCE_ENABLED
+            - name: BLOCKCHAIN_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: BLOCKCHAIN_PRIVATE_KEY
+
+            # AI Integration
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: OPENAI_API_KEY
+
+            # Performance configuration
+            - name: NODE_OPTIONS
+              value: '--max-old-space-size=4096'
+
+            # Rate limiting (from your security middleware)
+            - name: RATE_LIMIT_WINDOW_MS
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: RATE_LIMIT_WINDOW_MS
+            - name: RATE_LIMIT_MAX
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: RATE_LIMIT_MAX
+
+          # Enterprise resource allocation
+          resources:
+            requests:
+              memory: '2Gi'
+              cpu: '1'
+            limits:
+              memory: '4Gi'
+              cpu: '2'
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ectropy-api-gateway-service
+  namespace: ectropy-production
+  labels:
+    app: ectropy-api-gateway
+    tier: api
+spec:
+  selector:
+    app: ectropy-api-gateway
+  ports:
+    - port: 4000
+      targetPort: 4000
+      name: http
+  type: ClusterIP
+
+---
+# Horizontal Pod Autoscaler for API Gateway
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ectropy-api-gateway-hpa
+  namespace: ectropy-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ectropy-api-gateway
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60

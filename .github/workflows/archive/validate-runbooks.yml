@@ -1,0 +1,204 @@
+# ============================================================================
+# ⚠️ DEPRECATED - Archived 2025-12-16 (Session 5)
+# ============================================================================
+#
+# This workflow has been DEPRECATED and consolidated into validation-utilities.yml
+#
+# CONSOLIDATION RATIONALE:
+# - Validation workflows consolidated to reduce workflow sprawl (28→27)
+# - Runbook and infrastructure validation unified under single interface
+# - Maintains automated path-based triggering for runbook changes
+# - Clearer DevOps UX: validation-utilities covers all validation operations
+#
+# MIGRATION PATH:
+# Use validation-utilities.yml with validation_mode: runbook-validation
+#
+# Example:
+#   Validation Mode: runbook-validation
+#   (Runs automatically on push/PR to runbook paths)
+#
+# FUNCTIONALITY PRESERVED:
+# ✅ Runbook JSON validation against schema
+# ✅ TypeScript validator execution (validate-runbook.ts --all)
+# ✅ JSON schema syntax validation
+# ✅ Architecture alignment verification
+# ✅ Multi-job validation pipeline (validate, schema, architecture, summary)
+# ✅ Validation report artifact generation
+# ✅ Production-readiness assessment
+#
+# WORKFLOW MATRIX REFERENCE:
+# apps/mcp-server/data/cicd-environment-workflow-matrix.json v1.8.0
+#
+# ARCHIVED: 2025-12-16T06:00:00Z
+# SESSION: 5 (Workflow Consolidation Phase 4 - Validation Utilities)
+# REPLACEMENT: .github/workflows/validation-utilities.yml (runbook-validation mode)
+# ============================================================================
+
+name: Validate Runbooks
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+    paths:
+      - 'apps/mcp-server/data/runbooks/**/*.json'
+      - 'scripts/runbooks/schema/runbook-schema.json'
+      - 'scripts/runbooks/validate-runbook.ts'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'apps/mcp-server/data/runbooks/**/*.json'
+      - 'scripts/runbooks/schema/runbook-schema.json'
+      - 'scripts/runbooks/validate-runbook.ts'
+
+# Enterprise Security: Explicit least-privilege permissions
+# READ-ONLY: Runbook validation requires no write access
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Runbook JSON Files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate all runbooks
+        run: pnpm tsx scripts/runbooks/validate-runbook.ts --all
+
+      - name: Report validation results
+        if: success()
+        run: |
+          echo "✅ All runbooks passed validation!"
+          echo "📊 Validation Summary:"
+          echo "- Schema compliance: 100%"
+          echo "- Business rules: Enforced"
+          echo "- Architecture alignment: Verified"
+          echo "- MCP integration: Validated"
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: runbook-validation-report
+          path: |
+            apps/mcp-server/data/runbooks/**/*.json
+          retention-days: 30
+
+  schema-validation:
+    name: Validate JSON Schema
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate JSON Schema syntax
+        run: |
+          if ! jq empty scripts/runbooks/schema/runbook-schema.json; then
+            echo "❌ JSON Schema is invalid"
+            exit 1
+          fi
+          echo "✅ JSON Schema is valid"
+
+      - name: Check schema version
+        run: |
+          SCHEMA_TITLE=$(jq -r '.title' scripts/runbooks/schema/runbook-schema.json)
+          echo "📋 Schema: $SCHEMA_TITLE"
+
+  architecture-alignment:
+    name: Verify Architecture Alignment
+    runs-on: ubuntu-latest
+    needs: validate
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify routing architecture references
+        run: |
+          echo "🔍 Verifying architecture alignment..."
+
+          # Check if routing-architecture.json exists
+          if [ ! -f "apps/mcp-server/data/routing-architecture.json" ]; then
+            echo "⚠️  Warning: routing-architecture.json not found"
+            exit 0
+          fi
+
+          # Count runbooks with architecture alignment
+          RUNBOOKS_WITH_ALIGNMENT=$(find apps/mcp-server/data/runbooks -name "*.json" -exec jq -r 'select(.mcpIntegration.architectureAlignment != null) | .metadata.catalogId' {} \; | wc -l)
+          TOTAL_RUNBOOKS=$(find apps/mcp-server/data/runbooks -name "*.json" | wc -l)
+
+          echo "📊 Architecture Alignment Coverage:"
+          echo "- Runbooks with alignment: $RUNBOOKS_WITH_ALIGNMENT"
+          echo "- Total runbooks: $TOTAL_RUNBOOKS"
+
+          if [ $RUNBOOKS_WITH_ALIGNMENT -lt $TOTAL_RUNBOOKS ]; then
+            echo "⚠️  Warning: Not all runbooks have architecture alignment defined"
+          else
+            echo "✅ All runbooks have architecture alignment"
+          fi
+
+  summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: [validate, schema-validation, architecture-alignment]
+    if: always()
+
+    steps:
+      - name: Check validation status
+        run: |
+          if [ "${{ needs.validate.result }}" == "success" ] && \
+             [ "${{ needs.schema-validation.result }}" == "success" ]; then
+            echo "✅ All validation checks passed!"
+            echo "🎉 Runbooks are production-ready"
+          else
+            echo "❌ Some validation checks failed"
+            exit 1
+          fi

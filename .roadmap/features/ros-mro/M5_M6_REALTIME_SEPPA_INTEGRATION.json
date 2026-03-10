@@ -1,0 +1,273 @@
+{
+  "$schema": "../../schemas/feature.schema.json",
+  "$id": "urn:luhtech:ectropy:feature:ros-mro:m5-m6-integration",
+  "featureId": "ros-mro-m5-m6",
+  "name": "ROS MRO Real-Time WebSocket & SEPPA AI Integration",
+  "version": "1.0.0",
+  "status": "IMPLEMENTED",
+  "priority": "HIGH",
+  "owner": "claude-agent",
+  "repository": "luhtech/Ectropy",
+  "targetRelease": "2026-02-15",
+  "schemaVersion": "1.0.0",
+  "meta": {
+    "sourceOfTruth": ".roadmap/features/ros-mro/M5_M6_REALTIME_SEPPA_INTEGRATION.json",
+    "createdAt": "2026-01-29T14:00:00Z",
+    "lastUpdated": "2026-01-29T14:00:00Z",
+    "parentFeature": ".roadmap/features/ros-mro/FEATURE.json",
+    "relatedDocuments": [
+      ".roadmap/features/ros-mro/DECISION_SURFACE_INTEGRATION_STRATEGY.json",
+      ".roadmap/features/ros-mro/VOXEL_EXECUTION_STRATEGY.json"
+    ]
+  },
+  "description": "Complete the ROS MRO real-time coordination system by integrating WebSocket for sub-second updates (M5) and SEPPA AI assistant for context-aware construction intelligence (M6). This enables field workers to receive instant voxel status changes and interact with an AI assistant that understands their current spatial context.",
+  "businessValue": {
+    "currentState": {
+      "updateLatency": "30 seconds (polling)",
+      "aiAssistance": "Not integrated in coordination view",
+      "userExperience": "Manual refresh required for updates"
+    },
+    "targetState": {
+      "updateLatency": "<1 second (WebSocket)",
+      "aiAssistance": "Context-aware SEPPA in coordination view",
+      "userExperience": "Real-time updates with AI guidance"
+    },
+    "estimatedImpact": {
+      "coordinationResponseTime": "30s → <1s (97% improvement)",
+      "decisionSupportAccuracy": "AI provides voxel-specific guidance",
+      "userProductivity": "No manual refresh, instant awareness"
+    }
+  },
+  "architecturePrinciples": {
+    "scalability": {
+      "principle": "Horizontal scaling via Redis Pub/Sub",
+      "implementation": "WebSocket broadcasts fan out through Redis adapter",
+      "rationale": "Multiple API gateway instances can serve WebSocket connections"
+    },
+    "resilience": {
+      "principle": "Graceful degradation",
+      "implementation": "Fallback to polling if WebSocket disconnects",
+      "rationale": "System remains functional even with network issues"
+    },
+    "separation": {
+      "principle": "Clean architectural boundaries",
+      "implementation": "WebSocket handler separate from REST routes, context injection pattern for SEPPA",
+      "rationale": "Maintainable, testable, replaceable components"
+    },
+    "observability": {
+      "principle": "Full visibility into system state",
+      "implementation": "Connection metrics, message throughput, SEPPA tool execution logs",
+      "rationale": "Debugging and performance optimization"
+    }
+  },
+  "milestones": [
+    {
+      "id": "M5.1",
+      "name": "WebSocket Broadcast Integration",
+      "status": "COMPLETE",
+      "description": "Add WebSocket broadcast calls to voxels.routes.ts for real-time updates",
+      "deliverables": [
+        "apps/api-gateway/src/routes/voxels.routes.ts (broadcast integration)",
+        "apps/api-gateway/src/websocket/voxel-stream.ts (broadcast helper export)"
+      ],
+      "completionCriteria": [
+        "PATCH /voxels/:voxelId/status broadcasts to WebSocket subscribers",
+        "POST /voxels/batch broadcasts batch updates",
+        "Activity events broadcast to project subscribers"
+      ],
+      "technicalDetails": {
+        "changes": [
+          {
+            "file": "apps/api-gateway/src/routes/voxels.routes.ts",
+            "action": "Import getVoxelStreamHandler and call broadcastVoxelUpdate after status changes"
+          }
+        ],
+        "testing": "Integration test verifying WebSocket receives update after REST call"
+      }
+    },
+    {
+      "id": "M5.2",
+      "name": "Redis Pub/Sub Adapter",
+      "status": "COMPLETE",
+      "description": "Add Redis adapter for horizontal WebSocket scaling",
+      "deliverables": [
+        "apps/api-gateway/src/websocket/voxel-stream.ts (Redis adapter)",
+        "apps/api-gateway/src/websocket/redis-pubsub.ts (new file)"
+      ],
+      "completionCriteria": [
+        "WebSocket broadcasts propagate across multiple API gateway instances",
+        "Redis connection failure gracefully degrades to local-only broadcasts",
+        "Metrics track cross-instance message propagation"
+      ],
+      "technicalDetails": {
+        "pattern": "Redis Pub/Sub with channel per project",
+        "channels": [
+          "voxel:project:{projectId}:updates",
+          "voxel:project:{projectId}:activity"
+        ],
+        "failover": "Local Map-based fallback if Redis unavailable"
+      }
+    },
+    {
+      "id": "M5.3",
+      "name": "ROSMROView WebSocket Integration",
+      "status": "COMPLETE",
+      "description": "Wire useVoxelStream hook into ROSMROView component",
+      "deliverables": [
+        "apps/web-dashboard/src/components/BIMViewer/ROSMROView.tsx"
+      ],
+      "completionCriteria": [
+        "useVoxelStream hook connected with projectId",
+        "Connection status indicator visible in UI",
+        "Automatic cache invalidation on WebSocket updates",
+        "Graceful fallback to polling on disconnect"
+      ],
+      "technicalDetails": {
+        "hook": "useVoxelStream from hooks/queries/useVoxelStream",
+        "cacheIntegration": "React Query cache automatically updated by hook",
+        "statusIndicator": "Green/amber/red connection indicator in header"
+      }
+    },
+    {
+      "id": "M6.1",
+      "name": "SEPPA Panel Integration",
+      "status": "COMPLETE",
+      "description": "Add SEPPAChatPanel to ROSMROView with FAB trigger",
+      "deliverables": [
+        "apps/web-dashboard/src/components/BIMViewer/ROSMROView.tsx"
+      ],
+      "completionCriteria": [
+        "FAB button in bottom-right opens SEPPA panel",
+        "Panel receives projectId and selectedVoxelId props",
+        "User authority level passed from auth context",
+        "Panel closes gracefully and preserves conversation"
+      ],
+      "technicalDetails": {
+        "component": "SEPPAChatPanel from components/seppa-chat",
+        "trigger": "Floating Action Button with SmartToy icon",
+        "state": "Local useState for panel open/close"
+      }
+    },
+    {
+      "id": "M6.2",
+      "name": "Voxel-Aware SEPPA Context",
+      "status": "COMPLETE",
+      "description": "Enhance SEPPA system prompt with voxel selection context",
+      "deliverables": [
+        "apps/mcp-server/src/services/assistant/system-prompt.ts",
+        "apps/mcp-server/src/services/assistant/context-builder.ts (new file)"
+      ],
+      "completionCriteria": [
+        "System prompt includes selected voxel details",
+        "Voxel status, health, and decision count in context",
+        "Active alerts surfaced to AI",
+        "Adjacent voxels mentioned for spatial awareness"
+      ],
+      "technicalDetails": {
+        "contextFields": [
+          "voxelId",
+          "voxelStatus",
+          "voxelHealth",
+          "decisionCount",
+          "activeAlerts",
+          "toleranceOverrides",
+          "adjacentVoxels"
+        ],
+        "injection": "ChatContext.metadata.voxelContext object"
+      }
+    },
+    {
+      "id": "M6.3",
+      "name": "Decision Surface Tools Registration",
+      "status": "COMPLETE",
+      "description": "Register 6 decision surface MCP tools with SEPPA assistant",
+      "deliverables": [
+        "apps/mcp-server/src/services/assistant/tool-registry.ts"
+      ],
+      "completionCriteria": [
+        "get_voxel_decisions tool available to assistant",
+        "acknowledge_decision tool available",
+        "apply_tolerance_override tool available",
+        "query_tolerance_overrides tool available",
+        "request_inspection tool available",
+        "complete_inspection tool available"
+      ],
+      "technicalDetails": {
+        "tools": [
+          "get_voxel_decisions",
+          "acknowledge_decision",
+          "apply_tolerance_override",
+          "query_tolerance_overrides",
+          "request_inspection",
+          "complete_inspection"
+        ],
+        "integration": "Add to MCP tool list in assistant service initialization"
+      }
+    }
+  ],
+  "implementationOrder": [
+    {
+      "phase": 1,
+      "name": "WebSocket Foundation",
+      "milestones": ["M5.1", "M5.2"],
+      "rationale": "Backend must broadcast before frontend can receive"
+    },
+    {
+      "phase": 2,
+      "name": "WebSocket Frontend",
+      "milestones": ["M5.3"],
+      "rationale": "Frontend integration depends on backend broadcasts"
+    },
+    {
+      "phase": 3,
+      "name": "SEPPA Integration",
+      "milestones": ["M6.1", "M6.2", "M6.3"],
+      "rationale": "Can proceed in parallel with WebSocket once M5.1 started"
+    }
+  ],
+  "riskMitigation": {
+    "websocketFailure": {
+      "risk": "WebSocket connection drops",
+      "mitigation": "useVoxelStream has exponential backoff reconnection (1s → 30s)",
+      "fallback": "React Query polling continues at 30s staleTime"
+    },
+    "redisFailure": {
+      "risk": "Redis Pub/Sub unavailable",
+      "mitigation": "Graceful degradation to local-only broadcasts",
+      "impact": "Multi-instance environments won't see cross-instance updates"
+    },
+    "seppaOverload": {
+      "risk": "Too many concurrent AI requests",
+      "mitigation": "Rate limiting per user, conversation queuing",
+      "fallback": "Error message with retry guidance"
+    }
+  },
+  "testingStrategy": {
+    "unit": [
+      "VoxelStreamHandler broadcast methods",
+      "Redis Pub/Sub adapter",
+      "Context builder for SEPPA"
+    ],
+    "integration": [
+      "REST → WebSocket broadcast pipeline",
+      "useVoxelStream cache invalidation",
+      "SEPPA tool execution with voxel context"
+    ],
+    "e2e": [
+      "Update voxel status, verify real-time UI update",
+      "Open SEPPA, ask about selected voxel, verify context-aware response"
+    ]
+  },
+  "successCriteria": {
+    "m5Complete": {
+      "metric": "WebSocket update latency",
+      "target": "<500ms from status change to UI update",
+      "measurement": "Timestamp diff between REST response and WebSocket message"
+    },
+    "m6Complete": {
+      "metric": "SEPPA voxel awareness",
+      "target": "AI correctly references selected voxel in 95% of relevant queries",
+      "measurement": "Manual QA of 20 voxel-related queries"
+    }
+  }
+}

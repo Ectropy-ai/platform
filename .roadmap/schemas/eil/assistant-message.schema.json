@@ -1,0 +1,150 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://luhtech.dev/schemas/eil/assistant-message.schema.json",
+  "title": "Assistant Message Schema",
+  "description": "Chat message format for Seppä assistant conversations",
+  "type": "object",
+  "required": ["messageId", "role", "content", "timestamp"],
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for the message"
+    },
+    "conversationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Parent conversation identifier"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["user", "assistant", "system", "tool"],
+      "description": "Message sender role"
+    },
+    "content": {
+      "type": "string",
+      "description": "Message text content"
+    },
+    "toolCalls": {
+      "type": "array",
+      "description": "Tools invoked during message processing",
+      "items": {
+        "$ref": "#/$defs/toolCall"
+      }
+    },
+    "toolResults": {
+      "type": "array",
+      "description": "Results from tool executions",
+      "items": {
+        "$ref": "#/$defs/toolResult"
+      }
+    },
+    "citations": {
+      "type": "array",
+      "description": "Source citations from RAG retrieval",
+      "items": {
+        "$ref": "#/$defs/citation"
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string",
+          "description": "Claude model used"
+        },
+        "inputTokens": {
+          "type": "integer",
+          "description": "Input token count"
+        },
+        "outputTokens": {
+          "type": "integer",
+          "description": "Output token count"
+        },
+        "latencyMs": {
+          "type": "integer",
+          "description": "Response latency in milliseconds"
+        },
+        "stopReason": {
+          "type": "string",
+          "enum": ["end_turn", "max_tokens", "tool_use", "stop_sequence"]
+        }
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Message creation timestamp"
+    }
+  },
+  "$defs": {
+    "toolCall": {
+      "type": "object",
+      "required": ["toolId", "name", "input"],
+      "properties": {
+        "toolId": {
+          "type": "string",
+          "description": "Unique tool call identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Tool name (e.g., capture_decision)"
+        },
+        "input": {
+          "type": "object",
+          "description": "Tool input parameters"
+        }
+      }
+    },
+    "toolResult": {
+      "type": "object",
+      "required": ["toolId", "status"],
+      "properties": {
+        "toolId": {
+          "type": "string",
+          "description": "Matching tool call identifier"
+        },
+        "output": {
+          "description": "Tool execution result"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "error", "timeout"]
+        },
+        "durationMs": {
+          "type": "integer",
+          "description": "Tool execution duration"
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message if status is error"
+        }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "required": ["sourceUrn", "content"],
+      "properties": {
+        "sourceUrn": {
+          "type": "string",
+          "pattern": "^urn:luhtech:[a-z0-9-]+:[a-z-]+:.+$",
+          "description": "URN of the source document"
+        },
+        "content": {
+          "type": "string",
+          "description": "Cited text excerpt"
+        },
+        "relevanceScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Relevance score from RAG"
+        },
+        "chunkIndex": {
+          "type": "integer",
+          "description": "Index of the chunk in the source document"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,133 @@
+name: Speckle Upload Demo Content
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (staging/production)'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  upload-demo-content:
+    name: Upload IFC Model to Speckle
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate IFC file exists
+        run: |
+          if [ ! -f "test-data/Ifc4_SampleHouse.ifc" ]; then
+            echo "❌ ERROR: IFC file not found: test-data/Ifc4_SampleHouse.ifc"
+            exit 1
+          fi
+          FILE_SIZE=$(stat -c%s "test-data/Ifc4_SampleHouse.ifc")
+          echo "✅ IFC file found: $(numfmt --to=iec-i --suffix=B $FILE_SIZE)"
+
+      - name: Configure Speckle URL
+        id: config
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "production" ]; then
+            echo "SPECKLE_URL=https://ectropy.ai/speckle" >> $GITHUB_OUTPUT
+          else
+            echo "SPECKLE_URL=https://staging.ectropy.ai/speckle" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Speckle stream
+        id: create_stream
+        env:
+          SPECKLE_URL: ${{ steps.config.outputs.SPECKLE_URL }}
+          SPECKLE_TOKEN: ${{ secrets.SPECKLE_SERVER_TOKEN }}
+        run: |
+          echo "=== Creating Speckle Stream ==="
+          GRAPHQL_ENDPOINT="${SPECKLE_URL}/graphql"
+
+          # Create stream mutation
+          CREATE_STREAM_RESULT=$(curl -s -X POST "${GRAPHQL_ENDPOINT}" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${SPECKLE_TOKEN}" \
+            -d '{"query":"mutation { streamCreate(stream: { name: \"Ectropy Demo Building\", description: \"Sample IFC4 building model for BIM viewer demonstration\", isPublic: true }) { id name } }"}')
+
+          echo "Response: $CREATE_STREAM_RESULT"
+
+          # Extract stream ID
+          STREAM_ID=$(echo "$CREATE_STREAM_RESULT" | jq -r '.data.streamCreate.id // empty')
+
+          if [ -z "$STREAM_ID" ]; then
+            echo "❌ ERROR: Failed to create stream"
+            echo "$CREATE_STREAM_RESULT" | jq .
+            exit 1
+          fi
+
+          echo "✅ Stream created: $STREAM_ID"
+          echo "STREAM_ID=$STREAM_ID" >> $GITHUB_OUTPUT
+
+      - name: Upload IFC file to Speckle
+        id: upload
+        env:
+          SPECKLE_URL: ${{ steps.config.outputs.SPECKLE_URL }}
+          SPECKLE_TOKEN: ${{ secrets.SPECKLE_SERVER_TOKEN }}
+          STREAM_ID: ${{ steps.create_stream.outputs.STREAM_ID }}
+        run: |
+          echo "=== Uploading IFC File ==="
+          UPLOAD_URL="${SPECKLE_URL}/api/file/${STREAM_ID}"
+
+          UPLOAD_RESULT=$(curl -s -X POST "${UPLOAD_URL}" \
+            -H "Authorization: Bearer ${SPECKLE_TOKEN}" \
+            -F "file=@test-data/Ifc4_SampleHouse.ifc")
+
+          echo "Response: $UPLOAD_RESULT"
+
+          # Extract object ID (try multiple possible fields)
+          OBJECT_ID=$(echo "$UPLOAD_RESULT" | jq -r '.objectId // .commitId // .versionId // empty')
+
+          if [ -z "$OBJECT_ID" ]; then
+            echo "❌ ERROR: Failed to upload IFC file"
+            echo "$UPLOAD_RESULT" | jq .
+            exit 1
+          fi
+
+          echo "✅ IFC uploaded successfully"
+          echo "OBJECT_ID=$OBJECT_ID" >> $GITHUB_OUTPUT
+
+      - name: Output configuration
+        env:
+          STREAM_ID: ${{ steps.create_stream.outputs.STREAM_ID }}
+          OBJECT_ID: ${{ steps.upload.outputs.OBJECT_ID }}
+          SPECKLE_TOKEN: ${{ secrets.SPECKLE_SERVER_TOKEN }}
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+        run: |
+          echo ""
+          echo "=== ✅ PHASE 4 COMPLETE: Demo Content Uploaded ==="
+          echo ""
+          echo "📋 CONFIGURATION VALUES:"
+          echo "  Environment: ${ENVIRONMENT}"
+          echo "  Stream ID:   ${STREAM_ID}"
+          echo "  Object ID:   ${OBJECT_ID}"
+          echo "  Token:       ${SPECKLE_TOKEN:0:20}..."
+          echo ""
+          echo "📝 NEXT STEPS:"
+          echo ""
+          echo "1. Add these values to docker-compose.${ENVIRONMENT}.yml:"
+          echo "   ---"
+          echo "   REACT_APP_DEMO_STREAM_ID: '${STREAM_ID}'"
+          echo "   REACT_APP_DEMO_OBJECT_ID: '${OBJECT_ID}'"
+          echo "   REACT_APP_SPECKLE_TOKEN: '\${SPECKLE_SERVER_TOKEN}'"
+          echo "   ---"
+          echo ""
+          echo "2. Commit and deploy:"
+          echo "   git add docker-compose.${ENVIRONMENT}.yml"
+          echo "   git commit -m 'feat(bim-viewer): P0 ROOT CAUSE #62 PHASE 4 - Configure Demo Model'"
+          echo "   git push origin develop"
+          echo ""
+          echo "3. After deployment, validate:"
+          echo "   https://${ENVIRONMENT}.ectropy.ai/dashboard/architect"
+          echo "   Expected: 3D building model visible and interactive"
+          echo ""

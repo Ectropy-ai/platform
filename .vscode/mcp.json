@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "ectropy-validation": {
+      "type": "stdio",
+      "command": "bash",
+      "args": [
+        "-c",
+        "cd /workspace && node /workspace/mcp/dist/apps/mcp-server/main.js"
+      ],
+      "env": {
+        "MCP_MODE": "validation-only",
+        "NODE_ENV": "production",
+        "PORT": "3001"
+      },
+      "tools": [
+        "get_guidance",
+        "validate_work_plan",
+        "check_strategy",
+        "get_current_phase",
+        "check_roadmap_alignment"
+      ]
+    }
+  }
+}

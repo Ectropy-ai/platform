@@ -1,0 +1,259 @@
+name: 'Enterprise Service Management'
+description: 'Comprehensive service discovery, cleanup, and port verification for deployments'
+author: 'Ectropy Engineering'
+
+inputs:
+  environment:
+    description: 'Target environment (development, staging, production)'
+    required: true
+  operation:
+    description: 'Operation to perform: discover, cleanup, verify, or full'
+    required: false
+    default: 'full'
+  force_cleanup:
+    description: 'Skip confirmation prompts during cleanup'
+    required: false
+    default: 'true'
+  backup_database:
+    description: 'Create PostgreSQL backup before cleanup'
+    required: false
+    default: 'true'
+  required_ports:
+    description: 'Comma-separated list of required ports (e.g., "3000,4000,3001")'
+    required: false
+    default: '3000,3001,3002,4000'
+  database_ports:
+    description: 'Comma-separated list of database ports (e.g., "5432,6379")'
+    required: false
+    default: '5432,6379'
+  abort_on_port_conflict:
+    description: 'Abort deployment if ports are in use'
+    required: false
+    default: 'true'
+
+outputs:
+  discovery_report:
+    description: 'JSON report of discovered services'
+    value: ${{ steps.discovery.outputs.report }}
+  cleanup_status:
+    description: 'Status of cleanup operation (success, partial, failed)'
+    value: ${{ steps.cleanup.outputs.status }}
+  ports_verified:
+    description: 'Whether all required ports are free (true/false)'
+    value: ${{ steps.verify.outputs.ports_free }}
+  backup_path:
+    description: 'Path to database backup if created'
+    value: ${{ steps.backup.outputs.backup_path }}
+
+runs:
+  using: 'composite'
+  steps:
+    # =========================================================================
+    # STEP 1: SERVICE DISCOVERY
+    # =========================================================================
+    - name: 🔍 Discover Running Services
+      id: discovery
+      if: inputs.operation == 'discover' || inputs.operation == 'full'
+      shell: bash
+      run: |
+        echo "========================================="
+        echo "🔍 SERVICE DISCOVERY - ${{ inputs.environment }}"
+        echo "========================================="
+
+        if [ -f scripts/deployment/discover-services.sh ]; then
+          echo "Running comprehensive service discovery..."
+          bash scripts/deployment/discover-services.sh
+
+          # Capture discovery report (simplified JSON output)
+          DISCOVERY_JSON=$(bash scripts/deployment/discover-services.sh --json 2>/dev/null || echo '{"status":"completed"}')
+          echo "report=$DISCOVERY_JSON" >> $GITHUB_OUTPUT
+        else
+          echo "⚠️  WARNING: discover-services.sh not found"
+          echo "Skipping service discovery"
+          echo "report={\"status\":\"skipped\",\"reason\":\"script_not_found\"}" >> $GITHUB_OUTPUT
+        fi
+        echo ""
+
+    # =========================================================================
+    # STEP 2: DATABASE BACKUP (if enabled)
+    # =========================================================================
+    - name: 💾 Backup Database
+      id: backup
+      if: |
+        inputs.backup_database == 'true' &&
+        (inputs.operation == 'cleanup' || inputs.operation == 'full')
+      shell: bash
+      run: |
+        echo "========================================="
+        echo "💾 DATABASE BACKUP - ${{ inputs.environment }}"
+        echo "========================================="
+
+        BACKUP_DIR="/tmp/ectropy-backups"
+        mkdir -p "$BACKUP_DIR"
+
+        TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+        BACKUP_FILE="$BACKUP_DIR/backup_${{ inputs.environment }}_${TIMESTAMP}.sql"
+
+        # Check if PostgreSQL is running
+        if systemctl is-active --quiet postgresql 2>/dev/null; then
+          echo "PostgreSQL is running, creating backup..."
+
+          # Determine database name based on environment
+          case "${{ inputs.environment }}" in
+            production)
+              DB_NAME="ectropy_production"
+              ;;
+            staging)
+              DB_NAME="ectropy_staging"
+              ;;
+            development)
+              DB_NAME="ectropy_dev"
+              ;;
+            *)
+              DB_NAME="ectropy"
+              ;;
+          esac
+
+          # Create backup
+          if sudo -u postgres pg_dump "$DB_NAME" > "$BACKUP_FILE" 2>/dev/null; then
+            BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
+            echo "✅ Backup created: $BACKUP_FILE (${BACKUP_SIZE})"
+            echo "backup_path=$BACKUP_FILE" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  WARNING: Failed to create backup (database may not exist)"
+            echo "backup_path=" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "ℹ️  PostgreSQL not running, skipping backup"
+          echo "backup_path=" >> $GITHUB_OUTPUT
+        fi
+        echo ""
+
+    # =========================================================================
+    # STEP 3: SERVICE CLEANUP
+    # =========================================================================
+    - name: 🛑 Cleanup All Services
+      id: cleanup
+      if: inputs.operation == 'cleanup' || inputs.operation == 'full'
+      shell: bash
+      run: |
+        echo "========================================="
+        echo "🛑 SERVICE CLEANUP - ${{ inputs.environment }}"
+        echo "========================================="
+
+        if [ -f scripts/deployment/cleanup-all-services.sh ]; then
+          echo "Running comprehensive service cleanup..."
+
+          # Build cleanup command
+          CLEANUP_CMD="bash scripts/deployment/cleanup-all-services.sh"
+
+          if [ "${{ inputs.force_cleanup }}" = "true" ]; then
+            CLEANUP_CMD="$CLEANUP_CMD --force"
+          fi
+
+          # Execute cleanup
+          if $CLEANUP_CMD; then
+            echo "✅ Cleanup completed successfully"
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            EXIT_CODE=$?
+            if [ $EXIT_CODE -eq 1 ]; then
+              echo "⚠️  Cleanup completed with some failures"
+              echo "status=partial" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Cleanup failed"
+              echo "status=failed" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+          # Wait for processes to fully terminate
+          echo ""
+          echo "Waiting 5 seconds for processes to terminate..."
+          sleep 5
+        else
+          echo "⚠️  WARNING: cleanup-all-services.sh not found"
+          echo "Skipping service cleanup"
+          echo "status=skipped" >> $GITHUB_OUTPUT
+        fi
+        echo ""
+
+    # =========================================================================
+    # STEP 4: PORT VERIFICATION (DEFENSIVE GATE)
+    # =========================================================================
+    - name: ✅ Verify Ports Are Free
+      id: verify
+      if: inputs.operation == 'verify' || inputs.operation == 'full'
+      shell: bash
+      run: |
+        echo "========================================="
+        echo "✅ PORT VERIFICATION - ${{ inputs.environment }}"
+        echo "========================================="
+
+        if [ -f scripts/deployment/verify-ports.sh ]; then
+          echo "Running port verification..."
+
+          # Override ports in environment if specified
+          if [ -n "${{ inputs.required_ports }}" ]; then
+            export REQUIRED_PORTS="${{ inputs.required_ports }}"
+          fi
+
+          if [ -n "${{ inputs.database_ports }}" ]; then
+            export DATABASE_PORTS="${{ inputs.database_ports }}"
+          fi
+
+          # Run verification
+          if bash scripts/deployment/verify-ports.sh; then
+            echo "✅ All required ports are FREE"
+            echo "ports_free=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Port verification FAILED - some ports are in use"
+            echo "ports_free=false" >> $GITHUB_OUTPUT
+
+            if [ "${{ inputs.abort_on_port_conflict }}" = "true" ]; then
+              echo ""
+              echo "🛑 DEPLOYMENT BLOCKED - Port conflict detected"
+              echo "Action required:"
+              echo "  1. Check which services are using the ports"
+              echo "  2. Run cleanup-all-services.sh manually"
+              echo "  3. Verify ports again before deployment"
+              exit 1
+            else
+              echo "⚠️  WARNING: Proceeding despite port conflicts"
+            fi
+          fi
+        else
+          echo "⚠️  WARNING: verify-ports.sh not found"
+          echo "Skipping port verification"
+          echo "ports_free=unknown" >> $GITHUB_OUTPUT
+        fi
+        echo ""
+
+    # =========================================================================
+    # STEP 5: FINAL SUMMARY
+    # =========================================================================
+    - name: 📊 Service Management Summary
+      shell: bash
+      run: |
+        echo "========================================="
+        echo "📊 SERVICE MANAGEMENT SUMMARY"
+        echo "========================================="
+        echo "Environment:       ${{ inputs.environment }}"
+        echo "Operation:         ${{ inputs.operation }}"
+        echo "Cleanup Status:    ${{ steps.cleanup.outputs.status || 'N/A' }}"
+        echo "Ports Verified:    ${{ steps.verify.outputs.ports_free || 'N/A' }}"
+        echo "Backup Created:    ${{ steps.backup.outputs.backup_path != '' && 'Yes' || 'No' }}"
+        echo "========================================="
+        echo ""
+
+        if [ "${{ steps.verify.outputs.ports_free }}" = "true" ] || [ "${{ inputs.operation }}" != "full" ]; then
+          echo "✅ Service management completed successfully"
+          echo "✅ System ready for deployment"
+        else
+          echo "⚠️  Service management completed with warnings"
+          echo "⚠️  Review above output before proceeding"
+        fi
+        echo ""
+
+branding:
+  icon: 'shield'
+  color: 'blue'

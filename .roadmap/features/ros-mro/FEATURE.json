@@ -1,0 +1,287 @@
+{
+  "$schema": "../../schemas/feature.schema.json",
+  "$id": "urn:luhtech:ectropy:feature:ros-mro",
+  "featureId": "ros-mro",
+  "name": "ROS MRO Coordination View",
+  "version": "1.0.0",
+  "status": "PILOT",
+  "priority": "HIGH",
+  "owner": "erik",
+  "repository": "luhtech/Ectropy",
+  "targetRelease": "2026-03-01",
+  "schemaVersion": "1.0.0",
+  "meta": {
+    "sourceOfTruth": ".roadmap/features/ros-mro/FEATURE.json",
+    "lastUpdated": "2026-01-29T12:00:00Z",
+    "migratedFrom": [
+      ".roadmap/features/ros-mro/ROS_MRO_ANALYSIS.md",
+      ".roadmap/features/ros-mro/ROS_MRO_ENTERPRISE_INTEGRATION_PLAN.md"
+    ],
+    "strategicDocuments": [
+      ".roadmap/features/ros-mro/VOXEL_EXECUTION_STRATEGY.json"
+    ]
+  },
+  "pilot": {
+    "name": "Canadian Plant Facility",
+    "location": "Canada",
+    "startDate": "2026-03-01",
+    "duration": "3 months",
+    "participants": ["Architect", "Engineer", "Contractor", "Owner"]
+  },
+  "description": "ROS MRO (Remote Operations Site - Maintenance, Repair, Operations) is a unified coordination dashboard for construction-to-operations lifecycle, providing real-time 3D BIM visualization with voxel decision surfaces, multi-stakeholder role-based views, and seamless transition from construction to 50-year building operations.",
+  "coreInnovation": {
+    "before": {
+      "dataSource": "Mock generators (lines 175-306)",
+      "apiIntegration": "None",
+      "realTime": "Not implemented",
+      "demoCapability": "Static mock data only"
+    },
+    "after": {
+      "dataSource": "PostgreSQL via Prisma ORM",
+      "apiIntegration": "Full REST API with React Query hooks",
+      "realTime": "Polling (30s), WebSocket planned Q2 2026",
+      "demoCapability": "Synthetic data generation with DemoPersistenceService"
+    }
+  },
+  "value": {
+    "estimatedSavings": "$200,000 per project",
+    "roi": "500%",
+    "incidentsAvoided": 50,
+    "timeReduction": "Coordination response: 28 hours to 10 seconds",
+    "systemCost": "$40,000"
+  },
+  "milestones": [
+    {
+      "id": "M1",
+      "name": "API Routes & Data Layer",
+      "targetDate": "2026-01-24",
+      "status": "COMPLETE",
+      "description": "Create REST API endpoints for voxel CRUD, aggregation, export, history, and batch updates",
+      "deliverables": [
+        "apps/api-gateway/src/routes/voxel.routes.ts",
+        "apps/api-gateway/src/services/voxel-data.service.ts"
+      ],
+      "completionCriteria": [
+        "GET /api/v1/projects/:projectId/voxels",
+        "GET /api/v1/projects/:projectId/voxels/aggregation",
+        "GET /api/v1/projects/:projectId/voxels/:voxelId",
+        "PATCH /api/v1/voxels/:voxelId/status",
+        "GET /api/v1/voxels/:voxelId/history",
+        "POST /api/v1/voxels/batch",
+        "GET /api/v1/projects/:projectId/voxels/export"
+      ],
+      "completedAt": "2026-01-24T18:00:00Z",
+      "evidence": {
+        "commits": ["09bf49ef", "21d13ca2", "40a8ec12"],
+        "testResults": {
+          "typescript": "pass",
+          "api-gateway": "pass"
+        }
+      }
+    },
+    {
+      "id": "M2",
+      "name": "React Query Hooks",
+      "targetDate": "2026-01-24",
+      "status": "COMPLETE",
+      "description": "Create React Query hooks for data fetching with mock fallback",
+      "deliverables": [
+        "apps/web-dashboard/src/hooks/queries/useVoxels.ts",
+        "apps/web-dashboard/src/hooks/queries/useActivityStream.ts",
+        "apps/web-dashboard/src/hooks/queries/index.ts"
+      ],
+      "completionCriteria": [
+        "useVoxels hook with staleTime 30s",
+        "useVoxelAggregations hook",
+        "useVoxelMutation for status updates",
+        "Mock fallback for offline/demo mode"
+      ],
+      "completedAt": "2026-01-24T18:00:00Z",
+      "evidence": {
+        "commits": ["fb153c3c"]
+      }
+    },
+    {
+      "id": "M3",
+      "name": "Demo Persistence Service",
+      "targetDate": "2026-01-24",
+      "status": "COMPLETE",
+      "description": "Service to persist synthetic demo data to PostgreSQL for live dashboard testing",
+      "deliverables": [
+        "apps/api-gateway/src/services/demo-persistence.service.ts",
+        "prisma/seed-ros-mro-demo.ts"
+      ],
+      "completionCriteria": [
+        "Persist GeneratedRecords to database",
+        "Support 4 building types (office, house, duplex, commercial)",
+        "Integration with admin.routes.ts instantiateScenario"
+      ],
+      "completedAt": "2026-01-24T19:00:00Z",
+      "evidence": {
+        "commits": ["fb153c3c", "6c89fd21"]
+      }
+    },
+    {
+      "id": "M4",
+      "name": "Dashboard Integration",
+      "targetDate": "2026-01-24",
+      "status": "COMPLETE",
+      "description": "Integrate ROSMROView into ViewerPage with Coordination tab",
+      "deliverables": [
+        "apps/web-dashboard/src/pages/ViewerPage.tsx"
+      ],
+      "completionCriteria": [
+        "Coordination tab in ViewerPage",
+        "Role-based stakeholder view mapping",
+        "ROSMROView receiving projectId prop"
+      ],
+      "completedAt": "2026-01-24T19:30:00Z",
+      "evidence": {
+        "commits": ["fb153c3c"]
+      }
+    },
+    {
+      "id": "M4a",
+      "name": "Adjacent Voxel Computation",
+      "targetDate": "2026-01-29",
+      "status": "COMPLETE",
+      "description": "Compute 6-connected adjacent voxels during voxelization for spatial graph traversal",
+      "deliverables": [
+        "apps/mcp-server/src/services/voxel-decomposition.service.ts",
+        "apps/mcp-server/src/types/voxel-decomposition.types.ts"
+      ],
+      "completionCriteria": [
+        "adjacentVoxels array populated with neighbor URNs",
+        "graphMetadata.outEdges contains 'adjacent-to' edges",
+        "6-connected neighbor detection (face-sharing voxels)",
+        "Integration tests for graph traversal"
+      ],
+      "completedAt": "2026-01-29T12:30:00Z",
+      "evidence": {
+        "implementation": {
+          "location": "voxelizeElements() second pass (lines 612-679)",
+          "neighborOffsets": "[(-1,0,0), (+1,0,0), (0,-1,0), (0,+1,0), (0,0,-1), (0,0,+1)]",
+          "dataStructure": "coordToVoxel Map for O(1) neighbor lookup"
+        },
+        "typesUpdated": [
+          "VoxelData.adjacentVoxels?: string[]",
+          "VoxelData.graphMetadata.edges?: GraphEdge[]",
+          "GraphEdge moved before VoxelData for reference"
+        ]
+      },
+      "rationale": "Required for navigate_decision_surface MCP tool and spatial decision propagation"
+    },
+    {
+      "id": "M4b",
+      "name": "Production IFC Element Loading",
+      "targetDate": "2026-01-29",
+      "status": "COMPLETE",
+      "description": "Replace mock IFC element generation with production database/Speckle loading",
+      "deliverables": [
+        "apps/mcp-server/src/services/voxel-decomposition.service.ts",
+        "apps/mcp-server/src/services/speckle-voxel-integration.service.ts"
+      ],
+      "completionCriteria": [
+        "Load IFC elements from PostgreSQL via Prisma",
+        "Support Speckle stream integration",
+        "Fallback to synthetic data for demo mode",
+        "Project-specific element retrieval"
+      ],
+      "completedAt": "2026-01-29T13:00:00Z",
+      "evidence": {
+        "implementation": {
+          "productionPath": "SpeckleVoxelIntegrationService.voxelizeProjectElements()",
+          "databaseQuery": "SELECT from construction_elements WHERE project_id = ?",
+          "specklePath": "SpeckleVoxelIntegrationService.voxelizeFromSpeckleStream()",
+          "demoFallback": "VoxelDecompositionService.generateDemoElements()"
+        }
+      },
+      "rationale": "Mock data cannot demonstrate real BIM coordination capabilities in pilot"
+    },
+    {
+      "id": "M5",
+      "name": "WebSocket Real-Time",
+      "targetDate": "2026-04-30",
+      "status": "NOT_STARTED",
+      "description": "Enable real-time voxel updates via WebSocket",
+      "deliverables": [
+        "apps/api-gateway/src/websocket/voxel-stream.ts",
+        "apps/web-dashboard/src/hooks/useVoxelStream.ts"
+      ],
+      "completionCriteria": [
+        "Socket.IO server with Redis adapter",
+        "React Query cache invalidation on WS message",
+        "Auto-reconnection with exponential backoff"
+      ]
+    },
+    {
+      "id": "M6",
+      "name": "SEPPA Integration",
+      "targetDate": "2026-05-31",
+      "status": "NOT_STARTED",
+      "description": "Add AI-powered coordination assistance via SEPPA",
+      "deliverables": [
+        "apps/web-dashboard/src/components/BIMViewer/ROSMROView.tsx"
+      ],
+      "completionCriteria": [
+        "SEPPAChatPanel integration",
+        "Voxel-aware context for AI",
+        "voxel.updateStatus MCP tool"
+      ]
+    }
+  ],
+  "dependencies": {
+    "schemas": [
+      ".roadmap/schemas/ros-mro/coordination-view.schema.json",
+      ".roadmap/schemas/ros-mro/voxel-stream.schema.json",
+      ".roadmap/schemas/ros-mro/voxel-filter.schema.json",
+      ".roadmap/schemas/voxel/voxel-v3.schema.json",
+      ".roadmap/schemas/decision/pm-decision.schema.json"
+    ],
+    "services": [
+      "api-gateway:4000",
+      "web-dashboard:3000",
+      "mcp-server:3001"
+    ],
+    "features": [
+      "decision-lifecycle",
+      "seppa-agent"
+    ],
+    "external": [
+      "@tanstack/react-query",
+      "socket.io-client",
+      "three.js"
+    ]
+  },
+  "scenarios": [
+    {
+      "name": "Multi-Stakeholder Coordination",
+      "description": "Architects, engineers, contractors, and owners view the same voxel grid with role-specific filters",
+      "frequency": "Daily",
+      "traditionalCost": "$2,500 per coordination meeting",
+      "withFeatureCost": "$250 dashboard review",
+      "savingsPerIncident": "$2,250",
+      "annualSavings": "$112,500"
+    },
+    {
+      "name": "Decision Attachment to Space",
+      "description": "Attach PM decisions directly to voxel locations for spatial context",
+      "frequency": "Weekly",
+      "traditionalCost": "$5,000 per decision rework",
+      "withFeatureCost": "$500 spatial decision",
+      "savingsPerIncident": "$4,500",
+      "annualSavings": "$87,500"
+    }
+  ],
+  "graphMetadata": {
+    "nodeType": "Feature",
+    "inEdges": [
+      {"type": "DEPENDS_ON", "target": "urn:luhtech:ectropy:feature:decision-lifecycle"},
+      {"type": "DEPENDS_ON", "target": "urn:luhtech:ectropy:schema:voxel-v3"}
+    ],
+    "outEdges": [
+      {"type": "PROVIDES", "target": "urn:luhtech:ectropy:interfaces:ros-mro"},
+      {"type": "USES", "target": "urn:luhtech:ectropy:schema:ros-mro:coordination-view"}
+    ]
+  }
+}

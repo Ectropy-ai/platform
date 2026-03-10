@@ -1,0 +1,70 @@
+name: Security Audit
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6 AM UTC
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install pnpm
+        run: npm install -g pnpm@8.15.9
+        
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        
+      - name: Dependency audit
+        run: pnpm audit --audit-level=moderate
+        continue-on-error: true
+        
+      - name: License check
+        run: npx license-checker --production --summary
+        continue-on-error: true
+        
+      - name: Security scan with existing tools
+        run: |
+          if [ -f "./security/scan-all.sh" ]; then
+            chmod +x ./security/scan-all.sh
+            ./security/scan-all.sh
+          else
+            echo "Security scan script not found, creating basic scan"
+            mkdir -p reports/security
+            pnpm audit --json > reports/security/npm-audit.json || true
+            echo "Basic security scan completed"
+          fi
+        continue-on-error: true
+        
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports
+          path: reports/security/
+          retention-days: 30
+          
+      - name: Security summary
+        run: |
+          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "### Scan Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f "reports/security/npm-audit.json" ]; then
+            echo "- ✅ Dependency scan completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ Dependency scan failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review detailed reports in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "2. Address any critical or high-severity findings" >> $GITHUB_STEP_SUMMARY
+          echo "3. Update security documentation as needed" >> $GITHUB_STEP_SUMMARY

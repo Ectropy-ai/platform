@@ -1,0 +1,148 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://luhtech.dev/schemas/eil/rag-context.schema.json",
+  "title": "RAG Context Schema",
+  "description": "Retrieved context assembly from vector search for Seppä assistant",
+  "type": "object",
+  "required": ["contextId", "query", "createdAt"],
+  "properties": {
+    "contextId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique context identifier"
+    },
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:rag-context:.+$",
+      "description": "URN identifier for graph integration"
+    },
+    "conversationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Associated conversation"
+    },
+    "query": {
+      "type": "string",
+      "description": "User query that triggered retrieval"
+    },
+    "projectId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "retrievalStrategy": {
+      "type": "string",
+      "enum": ["vector", "keyword", "hybrid"],
+      "default": "hybrid"
+    },
+    "chunks": {
+      "type": "array",
+      "description": "Retrieved document chunks",
+      "items": {
+        "type": "object",
+        "required": ["chunkId", "content", "sourceUrn"],
+        "properties": {
+          "chunkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "content": {
+            "type": "string",
+            "description": "Chunk text content"
+          },
+          "sourceUrn": {
+            "type": "string",
+            "pattern": "^urn:luhtech:.+$",
+            "description": "Source document URN"
+          },
+          "collection": {
+            "type": "string",
+            "enum": [
+              "project_documents",
+              "decision_history",
+              "voxel_metadata",
+              "conversation_logs",
+              "safety_protocols"
+            ]
+          },
+          "vectorScore": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Vector similarity score"
+          },
+          "keywordScore": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Keyword/BM25 score"
+          },
+          "fusedScore": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Final RRF fused score"
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "documentTitle": { "type": "string" },
+              "documentType": { "type": "string" },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "author": { "type": "string" },
+              "zone": { "type": "string" },
+              "voxelId": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "assembledContext": {
+      "type": "string",
+      "description": "Final assembled context string for Claude"
+    },
+    "tokenCount": {
+      "type": "integer",
+      "description": "Token count of assembled context"
+    },
+    "tokenBudget": {
+      "type": "integer",
+      "description": "Token budget based on user authority"
+    },
+    "reranked": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether cross-encoder reranking was applied"
+    },
+    "citations": {
+      "type": "array",
+      "description": "Citations to include in response",
+      "items": {
+        "type": "object",
+        "properties": {
+          "index": { "type": "integer" },
+          "sourceUrn": { "type": "string" },
+          "title": { "type": "string" },
+          "excerpt": { "type": "string" }
+        }
+      }
+    },
+    "searchMetrics": {
+      "type": "object",
+      "properties": {
+        "vectorSearchMs": { "type": "integer" },
+        "keywordSearchMs": { "type": "integer" },
+        "rerankMs": { "type": "integer" },
+        "totalMs": { "type": "integer" },
+        "chunksRetrieved": { "type": "integer" },
+        "chunksAfterRerank": { "type": "integer" }
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

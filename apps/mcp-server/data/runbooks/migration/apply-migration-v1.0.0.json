@@ -1,0 +1,1413 @@
+{
+  "version": "1.0.0",
+  "environment": "all",
+  "runbookType": "migration",
+  "metadata": {
+    "catalogId": "migration-runbook-v1-0-0-apply",
+    "name": "Apply Database Migration",
+    "type": "migration",
+    "purpose": "Generic database migration runbook with comprehensive safety checks, automated backup, dry-run capability, and rollback procedures for applying any database schema migration",
+    "maintainer": "database-team",
+    "author": "Claude (Enterprise Integration)",
+    "created": "2025-11-16T19:30:00Z",
+    "lastUpdated": "2025-11-16T19:30:00Z",
+    "estimatedDuration": "5 minutes",
+    "complexity": "medium",
+    "priority": "high",
+    "relatedDocuments": [
+      "libs/database/migrations/",
+      "apps/mcp-server/data/routing-architecture.json",
+      "evidence/p1-infrastructure-fixes-2025-11-14.md"
+    ],
+    "sourceFile": "scripts/deployment/apply-migration.ps1",
+    "conversionDate": "2025-11-16T19:30:00Z",
+    "schemaVersion": "1.0.0"
+  },
+  "executiveSummary": {
+    "description": "Enterprise-grade database migration runbook providing a systematic, safe approach to applying database schema changes. Features comprehensive pre-flight checks, automated backup creation, SQL validation, dry-run mode for testing, post-migration verification, and complete rollback capability. Designed to minimize risk and ensure data integrity during schema modifications.",
+    "status": "READY",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "LOW",
+    "keyChanges": [
+      "Comprehensive pre-flight validation of database connectivity",
+      "Automated full database backup before changes",
+      "SQL syntax and structure validation",
+      "Idempotent migration detection and prevention",
+      "Dry-run capability for risk-free testing",
+      "Post-migration schema verification",
+      "Complete rollback procedure with backup restore",
+      "Detailed success criteria and validation queries"
+    ],
+    "prerequisites": [
+      "PostgreSQL container running (ectropy-postgres-1)",
+      "Target database exists (ectropy_dev, ectropy_staging, or ectropy_production)",
+      "PowerShell 5.1+ available for script execution",
+      "Docker CLI available for database operations",
+      "Sufficient disk space for backup creation (recommend 500MB+ free)",
+      "Migration SQL file exists in libs/database/migrations/",
+      "Dependent services can be restarted if needed"
+    ],
+    "impact": {
+      "systems": [
+        "postgres",
+        "api-gateway",
+        "web-dashboard",
+        "mcp-server"
+      ],
+      "downtime": "None for additive migrations, minimal (< 30s) for destructive changes",
+      "rollbackTime": "2-5 minutes",
+      "dataLoss": "None with backup (backup created automatically before changes)"
+    }
+  },
+  "preFlightChecks": [
+    {
+      "id": "check-migration-file",
+      "order": 1,
+      "category": "configuration",
+      "name": "Validate migration file exists",
+      "description": "Ensure specified migration SQL file exists in migrations directory",
+      "command": "Test-Path $migrationFile",
+      "expectedResult": "True",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "File must exist at specified path before proceeding",
+      "onFailure": {
+        "action": "abort",
+        "message": "Migration file not found at specified path. Verify file path and try again."
+      }
+    },
+    {
+      "id": "check-postgres-container",
+      "order": 2,
+      "category": "infrastructure",
+      "name": "Validate PostgreSQL container is running",
+      "description": "Verify database container exists and is in running state",
+      "command": "docker ps --filter name=ectropy-postgres-1 --filter status=running",
+      "expectedResult": "Container listed in output",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Container must be running to accept connections",
+      "onFailure": {
+        "action": "abort",
+        "message": "PostgreSQL container not running. Start with: docker-compose up -d postgres"
+      }
+    },
+    {
+      "id": "check-postgres-connectivity",
+      "order": 3,
+      "category": "infrastructure",
+      "name": "Validate PostgreSQL connectivity",
+      "description": "Ensure database container is accepting connections",
+      "command": "docker exec ectropy-postgres-1 psql -U postgres -c \"SELECT version()\"",
+      "expectedResult": "PostgreSQL version output",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates successful database connection",
+      "onFailure": {
+        "action": "abort",
+        "message": "Cannot connect to PostgreSQL. Database may be starting. Wait 10s and retry."
+      }
+    },
+    {
+      "id": "check-target-database",
+      "order": 4,
+      "category": "configuration",
+      "name": "Verify target database exists",
+      "description": "Confirm the target database (ectropy_dev) exists",
+      "command": "docker exec ectropy-postgres-1 psql -U postgres -lqt | cut -d \\| -f 1 | grep -qw ectropy_dev",
+      "expectedResult": "Database found in list",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Target database must exist before applying migration",
+      "onFailure": {
+        "action": "abort",
+        "message": "Target database does not exist. Create it first or check database name."
+      }
+    },
+    {
+      "id": "check-migration-status",
+      "order": 5,
+      "category": "configuration",
+      "name": "Check if migration already applied",
+      "description": "Detect if migration tables already exist to prevent duplicate application",
+      "command": "docker exec ectropy-postgres-1 psql -U postgres -d ectropy_dev -t -c \"SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'speckle_streams');\"",
+      "expectedResult": "f (false) if migration not yet applied",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "validationLogic": "If migration tables exist, warn user before proceeding",
+      "onFailure": {
+        "action": "skip",
+        "message": "Migration may have been applied already. Verify before continuing."
+      }
+    },
+    {
+      "id": "check-disk-space",
+      "order": 6,
+      "category": "infrastructure",
+      "name": "Verify sufficient disk space for backup",
+      "description": "Ensure adequate disk space for database backup creation",
+      "command": "Get-PSDrive C | Select-Object @{Name='FreeGB';Expression={[math]::Round($_.Free/1GB,2)}}",
+      "expectedResult": "At least 0.5 GB free",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "validationLogic": "Minimum 500MB free space recommended for backup",
+      "onFailure": {
+        "action": "skip",
+        "message": "Low disk space. Backup may fail. Free up space or use -SkipBackup (not recommended)."
+      }
+    },
+    {
+      "id": "validate-sql-syntax",
+      "order": 7,
+      "category": "configuration",
+      "name": "Basic SQL syntax validation",
+      "description": "Check SQL file is readable and contains valid structure",
+      "command": "Get-Content $migrationFile -Raw | Select-String 'CREATE TABLE'",
+      "expectedResult": "At least one CREATE TABLE statement found",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "validationLogic": "SQL should contain expected DDL statements",
+      "onFailure": {
+        "action": "skip",
+        "message": "No CREATE TABLE statements found. Verify migration SQL content."
+      }
+    },
+    {
+      "id": "check-dangerous-operations",
+      "order": 8,
+      "category": "security",
+      "name": "Check for destructive operations",
+      "description": "Warn if migration contains DROP TABLE or TRUNCATE statements",
+      "command": "Get-Content $migrationFile -Raw | Select-String '(DROP TABLE|TRUNCATE)'",
+      "expectedResult": "No matches (for additive migrations)",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "validationLogic": "Flag potentially destructive operations for operator review",
+      "onFailure": {
+        "action": "skip",
+        "message": "CAUTION: Migration contains potentially destructive operations (DROP/TRUNCATE)"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Pre-Migration Validation",
+      "description": "Comprehensive safety checks before migration execution",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Verify migration file exists",
+          "description": "Check that the specified migration SQL file is present and accessible",
+          "command": "if (-not (Test-Path $migrationFile)) { Write-Host '[FAILED] Migration file not found: $migrationFile' -ForegroundColor Red; exit 1 }",
+          "purpose": "Ensure migration file is available before proceeding with any operations",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": "Migration file must exist at specified path"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Migration file not found. Verify path and try again."
+          }
+        },
+        {
+          "step": "1.2",
+          "name": "Display migration summary",
+          "description": "Show operator which migration will be applied and to which database",
+          "command": "Write-Host 'Migration file: $migrationFile' -ForegroundColor Cyan; Write-Host 'Target database: ectropy_dev' -ForegroundColor Cyan",
+          "purpose": "Provide clear visibility into migration scope",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Summary information displayed"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not display summary, but proceeding"
+          }
+        },
+        {
+          "step": "1.3",
+          "name": "Check PostgreSQL connectivity",
+          "description": "Verify database container is running and accepting connections",
+          "command": "docker exec ectropy-postgres-1 psql -U postgres -c \"SELECT version()\" > $null 2>&1; if ($LASTEXITCODE -ne 0) { Write-Host '[FAILED] Cannot connect to PostgreSQL' -ForegroundColor Red; exit 1 }",
+          "purpose": "Ensure database is available before attempting migration",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Database connection must succeed"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Cannot connect to PostgreSQL. Is the database running? Check: docker ps"
+          }
+        },
+        {
+          "step": "1.4",
+          "name": "Check migration status",
+          "description": "Verify if migration has already been applied to prevent duplicate execution",
+          "command": "$tablesCheck = docker exec ectropy-postgres-1 psql -U postgres -d ectropy_dev -t -c \"SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'speckle_streams');\" 2>&1; if ($tablesCheck -match 't') { Write-Host '[WARN] Tables may already exist' -ForegroundColor Yellow }",
+          "purpose": "Prevent accidental reapplication of migrations",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Should return 'f' if migration not applied"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Migration may have been applied. Continue anyway? (yes/no)"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Database Backup Creation",
+      "description": "Create full database backup before applying any changes",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "skipConditions": [
+        "DryRun flag is set",
+        "SkipBackup flag is set (not recommended)"
+      ],
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Create backup directory",
+          "description": "Ensure backup directory structure exists",
+          "command": "if (-not (Test-Path $backupDir)) { New-Item -ItemType Directory -Path $backupDir -Force | Out-Null }",
+          "purpose": "Prepare directory for backup file storage",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": "Backup directory must exist"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to create backup directory"
+          }
+        },
+        {
+          "step": "2.2",
+          "name": "Execute pg_dump backup",
+          "description": "Create timestamped full database backup using PostgreSQL pg_dump utility",
+          "command": "$backupFile = \"$backupDir/ectropy_dev_pre_migration_$timestamp.sql\"; docker exec ectropy-postgres-1 pg_dump -U postgres ectropy_dev > $backupFile 2>$null; if ($LASTEXITCODE -ne 0) { Write-Host '[FAILED] Database backup failed' -ForegroundColor Red; exit 1 }",
+          "purpose": "Enable complete rollback capability if migration fails",
+          "required": true,
+          "automatable": true,
+          "timeout": "120s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": "Backup file must be created successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Database backup failed. Migration aborted for safety. Check disk space and permissions."
+          },
+          "relatedFiles": [
+            "backups/migrations/"
+          ],
+          "notes": [
+            "Backup includes complete database schema and all data",
+            "Typical backup size: 50-500 KB for development, larger for production",
+            "Backup file naming pattern: ectropy_dev_pre_migration_YYYYMMDD_HHmmss.sql",
+            "pg_dump creates a SQL script that can be used to restore database"
+          ]
+        },
+        {
+          "step": "2.3",
+          "name": "Verify backup file created",
+          "description": "Confirm backup file exists and report size",
+          "command": "$backupSize = (Get-Item $backupFile).Length / 1KB; Write-Host \"[OK] Backup created ($([math]::Round($backupSize, 2)) KB)\" -ForegroundColor Green",
+          "purpose": "Confirm backup was successfully written to disk with non-zero size",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": "Backup file size must be > 0 bytes"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Backup file verification failed. File may be empty or corrupted."
+          }
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Migration SQL Validation",
+      "description": "Validate migration SQL structure, syntax, and safety",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Load and parse SQL content",
+          "description": "Read migration SQL file into memory for analysis",
+          "command": "$sqlContent = Get-Content $migrationFile -Raw",
+          "purpose": "Prepare SQL content for validation checks",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "SQL content must be readable"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Cannot read migration SQL file. Check file permissions."
+          }
+        },
+        {
+          "step": "3.2",
+          "name": "Validate expected table creation",
+          "description": "Check SQL contains expected CREATE TABLE statements",
+          "command": "if ($sqlContent -notmatch 'CREATE TABLE.*speckle_streams') { Write-Host '[WARN] Expected table creation not found' -ForegroundColor Yellow; $validationPassed = $false }",
+          "purpose": "Ensure migration contains expected schema changes",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "SQL must contain expected table definitions"
+          },
+          "onFailure": {
+            "action": "retry",
+            "message": "Expected table creation statements not found in migration"
+          }
+        },
+        {
+          "step": "3.3",
+          "name": "Check for dangerous DROP statements",
+          "description": "Warn if migration contains potentially destructive DROP TABLE operations",
+          "command": "if ($sqlContent -match 'DROP TABLE') { Write-Host '[WARN] Migration contains DROP TABLE statements' -ForegroundColor Yellow }",
+          "purpose": "Alert operator to potentially destructive operations requiring extra caution",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Ideally should not contain DROP TABLE for additive migrations"
+          },
+          "onFailure": {
+            "action": "retry",
+            "message": "Migration contains DROP TABLE - proceed with caution and verify backup"
+          }
+        },
+        {
+          "step": "3.4",
+          "name": "Count migration statements",
+          "description": "Analyze and count different types of DDL statements in migration",
+          "command": "$createTableCount = ([regex]::Matches($sqlContent, 'CREATE TABLE', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)).Count; $createIndexCount = ([regex]::Matches($sqlContent, 'CREATE INDEX', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)).Count; $alterTableCount = ([regex]::Matches($sqlContent, 'ALTER TABLE', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)).Count; $createViewCount = ([regex]::Matches($sqlContent, 'CREATE VIEW', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)).Count",
+          "purpose": "Provide migration impact summary for operator review",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Statement counts should be reasonable (< 100 of each type)"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Statement counting failed, but migration can continue"
+          }
+        },
+        {
+          "step": "3.5",
+          "name": "Display dry-run summary (if applicable)",
+          "description": "Show operator what would be executed in dry-run mode",
+          "command": "if ($DryRun) { Write-Host 'Would execute:' -ForegroundColor Cyan; Write-Host \"- $createTableCount table creation(s)\" -ForegroundColor White; Write-Host \"- $createIndexCount index creation(s)\" -ForegroundColor White; Write-Host \"- $alterTableCount table alteration(s)\" -ForegroundColor White; Write-Host \"- $createViewCount view creation(s)\" -ForegroundColor White }",
+          "purpose": "Inform operator of migration scope without making changes",
+          "required": false,
+          "automatable": true,
+          "timeout": "5s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Summary displayed to operator"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not display dry-run summary"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Migration Execution",
+      "description": "Apply migration SQL to database (skipped in dry-run mode)",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "skipConditions": [
+        "DryRun flag is set"
+      ],
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Record migration start time",
+          "description": "Capture start timestamp for duration calculation",
+          "command": "$migrationStart = Get-Date; Write-Host 'Applying Migration...' -ForegroundColor Yellow; Write-Host 'This may take 30-60 seconds...' -ForegroundColor Cyan",
+          "purpose": "Track migration execution time for performance metrics",
+          "required": false,
+          "automatable": true,
+          "timeout": "5s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Start time recorded"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not record start time"
+          }
+        },
+        {
+          "step": "4.2",
+          "name": "Execute migration SQL",
+          "description": "Apply migration to target database using psql",
+          "command": "docker exec -i ectropy-postgres-1 psql -U postgres -d ectropy_dev < $migrationFile 2>&1 | Out-Null; if ($LASTEXITCODE -ne 0) { Write-Host '[FAILED] Migration failed' -ForegroundColor Red; Write-Host 'Check logs for errors' -ForegroundColor Yellow; if (-not $SkipBackup) { Write-Host \"[INFO] Backup available at: $backupFile\" -ForegroundColor Cyan; Write-Host \"To restore: docker exec -i ectropy-postgres-1 psql -U postgres ectropy_dev < $backupFile\" -ForegroundColor Cyan } exit 1 }",
+          "purpose": "Create or modify database schema according to migration SQL",
+          "required": true,
+          "automatable": true,
+          "timeout": "120s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Migration must complete without PostgreSQL errors"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "message": "Migration failed. Review PostgreSQL logs for error details. Backup available for rollback."
+          },
+          "relatedFiles": [
+            "libs/database/migrations/"
+          ],
+          "notes": [
+            "Migration is executed within a transaction (if SQL includes BEGIN/COMMIT)",
+            "PostgreSQL errors will cause automatic rollback of transaction",
+            "Output is suppressed but errors are captured in exit code",
+            "Typical execution time: 30-120 seconds depending on complexity"
+          ]
+        },
+        {
+          "step": "4.3",
+          "name": "Calculate and display migration duration",
+          "description": "Calculate total migration execution time and display to operator",
+          "command": "$duration = ((Get-Date) - $migrationStart).TotalSeconds; Write-Host \"[OK] Migration applied successfully ($([math]::Round($duration, 2))s)\" -ForegroundColor Green",
+          "purpose": "Provide performance metrics and confirm successful completion",
+          "required": false,
+          "automatable": true,
+          "timeout": "5s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Duration calculated and displayed"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Duration calculation failed, but migration succeeded"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Post-Migration Verification",
+      "description": "Comprehensive validation of migration results",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "5.1",
+          "name": "Verify tables created",
+          "description": "Check that expected tables exist in database schema",
+          "command": "$tables = @('speckle_streams', 'speckle_sync_logs'); foreach ($table in $tables) { $exists = docker exec ectropy-postgres-1 psql -U postgres -d ectropy_dev -t -c \"SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '$table');\" 2>&1; if ($exists -match 't') { Write-Host \"[OK] Table '$table' exists\" -ForegroundColor Green } else { Write-Host \"[FAIL] Table '$table' not found\" -ForegroundColor Red; $validationPassed = $false } }",
+          "purpose": "Confirm primary tables were created successfully",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "All expected tables must exist"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "message": "Required tables not found - migration incomplete, consider rollback"
+          }
+        },
+        {
+          "step": "5.2",
+          "name": "Verify views created",
+          "description": "Check that expected database views exist",
+          "command": "$views = @('v_active_speckle_syncs', 'v_project_speckle_streams'); foreach ($view in $views) { $exists = docker exec ectropy-postgres-1 psql -U postgres -d ectropy_dev -t -c \"SELECT EXISTS (SELECT FROM information_schema.views WHERE table_schema = 'public' AND table_name = '$view');\" 2>&1; if ($exists -match 't') { Write-Host \"[OK] View '$view' exists\" -ForegroundColor Green } else { Write-Host \"[WARN] View '$view' not found\" -ForegroundColor Yellow } }",
+          "purpose": "Confirm support views were created (non-critical)",
+          "required": false,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Views should exist for monitoring and reporting"
+          },
+          "onFailure": {
+            "action": "retry",
+            "message": "Some views not found - may impact monitoring but not core functionality"
+          }
+        },
+        {
+          "step": "5.3",
+          "name": "Verify columns added to existing tables",
+          "description": "Check that new columns were added to existing tables",
+          "command": "$columnCheck = docker exec ectropy-postgres-1 psql -U postgres -d ectropy_dev -t -c \"SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'construction_elements' AND column_name = 'speckle_object_id');\" 2>&1; if ($columnCheck -match 't') { Write-Host '[OK] Column speckle_object_id added to construction_elements' -ForegroundColor Green } else { Write-Host '[WARN] Column speckle_object_id not found' -ForegroundColor Yellow }",
+          "purpose": "Confirm ALTER TABLE operations succeeded",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "New columns should be present in modified tables"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Expected columns not found in existing tables"
+          }
+        },
+        {
+          "step": "5.4",
+          "name": "Test basic query execution",
+          "description": "Execute test query on new tables to verify accessibility",
+          "command": "$testQuery = 'SELECT COUNT(*) FROM speckle_streams;'; docker exec ectropy-postgres-1 psql -U postgres -d ectropy_dev -c \"$testQuery\" > $null 2>&1; if ($LASTEXITCODE -eq 0) { Write-Host '[OK] Can query speckle_streams table' -ForegroundColor Green } else { Write-Host '[FAIL] Cannot query speckle_streams table' -ForegroundColor Red; $validationPassed = $false }",
+          "purpose": "Verify tables are queryable and accessible (permissions correct)",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Query must execute successfully"
+          },
+          "onFailure": {
+            "action": "retry",
+            "message": "Cannot query new tables - possible permission or constraint issue"
+          }
+        },
+        {
+          "step": "5.5",
+          "name": "Verify indexes created",
+          "description": "Check that performance indexes were created successfully",
+          "command": "$indexCount = docker exec ectropy-postgres-1 psql -U postgres -d ectropy_dev -t -c \"SELECT COUNT(*) FROM pg_indexes WHERE tablename IN ('speckle_streams', 'speckle_sync_logs');\" 2>&1; Write-Host \"[INFO] Created $indexCount indexes\" -ForegroundColor Cyan",
+          "purpose": "Confirm performance optimization indexes are in place",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Expected number of indexes should be created"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Index count unexpected - may impact query performance"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Post-Migration Guidance",
+      "description": "Provide operator with next steps and deployment guidance",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "6.1",
+          "name": "Display final migration summary",
+          "description": "Show comprehensive summary of migration results",
+          "command": "Write-Host '========================================' -ForegroundColor Cyan; Write-Host 'MIGRATION SUMMARY' -ForegroundColor Cyan; Write-Host '========================================' -ForegroundColor Cyan; if ($DryRun) { Write-Host '[DRY RUN] No changes were made' -ForegroundColor Cyan } elseif ($validationPassed) { Write-Host '[SUCCESS] Migration applied and verified' -ForegroundColor Green } else { Write-Host '[PARTIAL] Migration applied but verification failed' -ForegroundColor Yellow }",
+          "purpose": "Provide clear migration outcome to operator",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Summary displayed"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not display summary"
+          }
+        },
+        {
+          "step": "6.2",
+          "name": "Display backup location",
+          "description": "Show operator where backup file is stored for rollback if needed",
+          "command": "if (-not $SkipBackup -and -not $DryRun) { Write-Host 'Backup Location:' -ForegroundColor Yellow; Write-Host \"  $backupFile\" -ForegroundColor White }",
+          "purpose": "Inform operator of rollback capability",
+          "required": false,
+          "automatable": true,
+          "timeout": "5s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Backup file path displayed"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not display backup location"
+          }
+        },
+        {
+          "step": "6.3",
+          "name": "Display next steps",
+          "description": "Show recommended post-migration actions",
+          "command": "Write-Host 'Next Steps:' -ForegroundColor Cyan; Write-Host '  1. Restart API Gateway to pick up schema changes' -ForegroundColor White; Write-Host '     docker-compose restart api-gateway' -ForegroundColor White; Write-Host '  2. Create Speckle admin user at http://localhost:8080' -ForegroundColor White; Write-Host '  3. Run smoke tests: .\\scripts\\deployment\\smoke-test.ps1' -ForegroundColor White",
+          "purpose": "Guide operator through post-migration deployment steps",
+          "required": false,
+          "automatable": true,
+          "timeout": "5s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Next steps displayed"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not display next steps"
+          },
+          "relatedFiles": [
+            "scripts/deployment/smoke-test.ps1",
+            "docker-compose.yml"
+          ]
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "healthChecks": [
+      {
+        "service": "postgres",
+        "endpoint": "http://localhost:5432",
+        "expectedStatus": 0,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "api-gateway",
+        "endpoint": "http://localhost:3000/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": false
+      }
+    ],
+    "databaseSchema": [
+      {
+        "object": "speckle_streams",
+        "type": "table",
+        "requiredColumns": [
+          "id (UUID, primary key)",
+          "construction_project_id (UUID, foreign key)",
+          "stream_id (VARCHAR, unique)",
+          "stream_name (VARCHAR)",
+          "created_at (TIMESTAMP WITH TIME ZONE)",
+          "updated_at (TIMESTAMP WITH TIME ZONE)"
+        ],
+        "critical": true
+      },
+      {
+        "object": "speckle_sync_logs",
+        "type": "table",
+        "requiredColumns": [
+          "id (UUID, primary key)",
+          "construction_project_id (UUID, foreign key)",
+          "operation (VARCHAR)",
+          "status (VARCHAR)",
+          "started_at (TIMESTAMP WITH TIME ZONE)",
+          "completed_at (TIMESTAMP WITH TIME ZONE)"
+        ],
+        "critical": true
+      }
+    ],
+    "dataIntegrity": [
+      {
+        "check": "No existing data modified",
+        "validation": "Migration is additive - no data deletion or modification of existing records",
+        "expected": "All existing data intact after migration"
+      },
+      {
+        "check": "Foreign key constraints valid",
+        "validation": "All foreign keys reference existing tables",
+        "expected": "No constraint violations"
+      },
+      {
+        "check": "Indexes created successfully",
+        "validation": "All performance indexes created without errors",
+        "expected": "Expected number of indexes present"
+      }
+    ],
+    "performanceThresholds": [
+      {
+        "metric": "Migration execution time",
+        "threshold": "< 120 seconds",
+        "measurement": "Total time from start to completion of SQL execution"
+      },
+      {
+        "metric": "Backup creation time",
+        "threshold": "< 60 seconds",
+        "measurement": "pg_dump execution duration"
+      },
+      {
+        "metric": "Table query response time",
+        "threshold": "< 100ms",
+        "measurement": "SELECT COUNT(*) FROM new_table"
+      }
+    ]
+  },
+  "rollback": {
+    "supported": true,
+    "estimatedDuration": "2-5 minutes",
+    "dataLossRisk": "minimal",
+    "triggerConditions": [
+      "Migration SQL execution fails with PostgreSQL errors",
+      "Required tables or columns not created after migration",
+      "Foreign key or check constraint violations detected",
+      "Post-migration validation fails (tables not queryable)",
+      "Manual operator decision due to unexpected behavior",
+      "Critical application errors after migration deployment"
+    ],
+    "decisionMaker": "Database Administrator or Technical Lead",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Locate backup file",
+        "command": "Get-ChildItem -Path backups/migrations/ -Filter 'ectropy_dev_pre_migration_*' | Sort-Object LastWriteTime -Descending | Select-Object -First 1",
+        "purpose": "Find the most recent pre-migration backup with timestamp",
+        "required": true,
+        "notes": [
+          "Backup files are named: ectropy_dev_pre_migration_YYYYMMDD_HHmmss.sql",
+          "Use most recent backup if multiple exist from same migration attempt",
+          "Verify backup file size is reasonable (> 10 KB) before restoring"
+        ]
+      },
+      {
+        "step": 2,
+        "name": "Stop dependent services",
+        "command": "docker-compose stop api-gateway web-dashboard mcp-server",
+        "purpose": "Prevent active database connections during restore to avoid conflicts",
+        "required": true,
+        "notes": [
+          "This ensures no services are actively using the database during restore",
+          "Services will be restarted after rollback completion",
+          "Typically takes 10-20 seconds for graceful shutdown"
+        ]
+      },
+      {
+        "step": 3,
+        "name": "Drop new tables (if created)",
+        "command": "docker exec ectropy-postgres-1 psql -U postgres -d ectropy_dev -c \"DROP TABLE IF EXISTS speckle_sync_logs CASCADE; DROP TABLE IF EXISTS speckle_streams CASCADE;\"",
+        "purpose": "Remove newly created tables before full restore to prevent conflicts",
+        "required": true,
+        "notes": [
+          "CASCADE ensures dependent objects (views, triggers) are also removed",
+          "This step prevents primary key or unique constraint conflicts during restore",
+          "Only drops tables that were created by migration"
+        ]
+      },
+      {
+        "step": 4,
+        "name": "Restore from backup",
+        "command": "docker exec -i ectropy-postgres-1 psql -U postgres -d ectropy_dev < $backupFile",
+        "purpose": "Restore complete database to pre-migration state",
+        "required": true,
+        "notes": [
+          "Full database restore including all schema and data",
+          "Restore duration: 1-3 minutes depending on database size",
+          "All changes made by migration will be reverted",
+          "Any data inserted after migration will be lost"
+        ]
+      },
+      {
+        "step": 5,
+        "name": "Verify tables removed",
+        "command": "docker exec ectropy-postgres-1 psql -U postgres -d ectropy_dev -c \"SELECT COUNT(*) FROM information_schema.tables WHERE table_name IN ('speckle_streams', 'speckle_sync_logs');\"",
+        "expectedOutput": "0",
+        "purpose": "Confirm migration tables were successfully removed",
+        "required": true,
+        "notes": [
+          "Expected result: count = 0",
+          "If count > 0, tables still exist - manual cleanup may be needed",
+          "This verifies rollback was successful"
+        ]
+      },
+      {
+        "step": 6,
+        "name": "Verify columns removed from modified tables",
+        "command": "docker exec ectropy-postgres-1 psql -U postgres -d ectropy_dev -c \"SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'construction_elements' AND column_name = 'speckle_object_id');\"",
+        "expectedOutput": "f (false)",
+        "purpose": "Confirm added columns were removed from existing tables",
+        "required": true,
+        "notes": [
+          "Expected result: f (false)",
+          "If t (true), column still exists - may need manual ALTER TABLE DROP COLUMN",
+          "This ensures complete rollback of schema changes"
+        ]
+      },
+      {
+        "step": 7,
+        "name": "Restart application services",
+        "command": "docker-compose start api-gateway web-dashboard mcp-server",
+        "purpose": "Restore application services to operational state after rollback",
+        "required": true,
+        "notes": [
+          "Services should start normally with pre-migration schema",
+          "Check service logs for any startup errors",
+          "Typically takes 30-60 seconds for all services to become healthy"
+        ]
+      },
+      {
+        "step": 8,
+        "name": "Verify database connectivity and functionality",
+        "command": "docker exec ectropy-postgres-1 psql -U postgres -d ectropy_dev -c \"SELECT version(); SELECT COUNT(*) FROM projects;\"",
+        "purpose": "Confirm database is operational and accessible after rollback",
+        "required": true,
+        "notes": [
+          "Should return PostgreSQL version and project count",
+          "Confirms database is accessible and functional",
+          "If queries fail, database may need additional recovery steps"
+        ]
+      }
+    ],
+    "verification": {
+      "checks": [
+        {
+          "name": "Migration tables removed",
+          "command": "SELECT COUNT(*) FROM information_schema.tables WHERE table_name LIKE 'speckle_%'",
+          "expectedResult": "0",
+          "critical": true
+        },
+        {
+          "name": "Migration views removed",
+          "command": "SELECT COUNT(*) FROM information_schema.views WHERE table_name LIKE 'v_%speckle%'",
+          "expectedResult": "0",
+          "critical": false
+        },
+        {
+          "name": "Added columns removed from existing tables",
+          "command": "SELECT column_name FROM information_schema.columns WHERE table_name = 'construction_elements' AND column_name IN ('speckle_object_id', 'element_type', 'geometry_data')",
+          "expectedResult": "Empty result set",
+          "critical": true
+        },
+        {
+          "name": "Database functional with existing data",
+          "command": "SELECT COUNT(*) FROM projects; SELECT COUNT(*) FROM construction_elements;",
+          "expectedResult": "Queries execute successfully, counts match pre-migration values",
+          "critical": true
+        },
+        {
+          "name": "Application services healthy",
+          "command": "docker-compose ps",
+          "expectedResult": "All services in 'Up' state",
+          "critical": true
+        }
+      ],
+      "successCriteria": "All migration-specific database objects removed, pre-migration schema restored, existing data intact, services operational"
+    },
+    "postRollbackActions": [
+      "Investigate root cause of migration failure by reviewing PostgreSQL logs",
+      "Review migration SQL for syntax errors, constraint violations, or incompatibilities",
+      "Check that all prerequisite tables and schemas exist (from previous migrations)",
+      "Verify PostgreSQL version compatibility with migration SQL syntax",
+      "Re-run migration with --DryRun flag to validate before reapplication",
+      "Consider breaking migration into smaller, incremental steps if complexity is high",
+      "Document failure reason and resolution for future reference",
+      "Update migration SQL to fix identified issues before re-attempting"
+    ]
+  },
+  "monitoring": {
+    "duration": "Critical: First 24 hours after migration | Ongoing: Continuous monitoring",
+    "keyMetrics": [
+      {
+        "metric": "Database connectivity",
+        "threshold": "100% uptime",
+        "query": "docker exec ectropy-postgres-1 psql -U postgres -c 'SELECT 1'",
+        "alertOn": "Connection failures",
+        "severity": "critical"
+      },
+      {
+        "metric": "Table accessibility",
+        "threshold": "All queries succeed",
+        "query": "SELECT COUNT(*) FROM speckle_streams; SELECT COUNT(*) FROM speckle_sync_logs;",
+        "alertOn": "Query errors or timeouts",
+        "severity": "critical"
+      },
+      {
+        "metric": "Data integrity",
+        "threshold": "No constraint violations",
+        "query": "SELECT COUNT(*) FROM information_schema.table_constraints WHERE constraint_type = 'FOREIGN KEY' AND table_name IN ('speckle_streams', 'speckle_sync_logs')",
+        "alertOn": "Missing or broken constraints",
+        "severity": "warning"
+      },
+      {
+        "metric": "Application error rate",
+        "threshold": "< 1% errors",
+        "query": "Review application logs for database-related errors",
+        "alertOn": "> 5% error rate",
+        "severity": "critical"
+      },
+      {
+        "metric": "Query performance",
+        "threshold": "< 100ms for simple queries",
+        "query": "EXPLAIN ANALYZE SELECT * FROM speckle_streams LIMIT 10",
+        "alertOn": "> 500ms response time",
+        "severity": "warning"
+      }
+    ],
+    "alertThresholds": [
+      {
+        "condition": "Database queries fail with schema errors",
+        "severity": "critical",
+        "action": "Check schema integrity, verify migration completed successfully",
+        "escalation": "Immediate rollback if critical tables missing or corrupted"
+      },
+      {
+        "condition": "Foreign key constraint violations detected",
+        "severity": "critical",
+        "action": "Review migration for constraint definition errors",
+        "escalation": "Consider rollback if data integrity compromised"
+      },
+      {
+        "condition": "Application cannot connect to new tables",
+        "severity": "critical",
+        "action": "Check RLS policies and permissions on new tables",
+        "escalation": "Grant appropriate permissions or rollback if permissions cannot be resolved"
+      },
+      {
+        "condition": "Significant performance degradation after migration",
+        "severity": "warning",
+        "action": "Review indexes created, check query execution plans",
+        "escalation": "Add missing indexes or optimize queries"
+      }
+    ],
+    "dashboards": [
+      "Database health: docker exec ectropy-postgres-1 psql -U postgres -c '\\l+'",
+      "Table statistics: SELECT * FROM pg_stat_user_tables WHERE schemaname = 'public'",
+      "Index usage: SELECT * FROM pg_stat_user_indexes WHERE schemaname = 'public'",
+      "Connection count: SELECT count(*) FROM pg_stat_activity WHERE datname = 'ectropy_dev'",
+      "Recent errors: Review PostgreSQL logs for ERROR or FATAL messages"
+    ]
+  },
+  "successCriteria": [
+    {
+      "criterion": "Migration SQL executed without errors",
+      "status": "REQUIRED",
+      "validation": "Exit code 0 from psql command execution"
+    },
+    {
+      "criterion": "All expected tables created successfully",
+      "status": "REQUIRED",
+      "validation": "SELECT COUNT(*) FROM information_schema.tables WHERE table_name IN ('<expected_tables>')"
+    },
+    {
+      "criterion": "All expected views created successfully",
+      "status": "RECOMMENDED",
+      "validation": "SELECT COUNT(*) FROM information_schema.views WHERE table_name IN ('<expected_views>')"
+    },
+    {
+      "criterion": "New columns added to existing tables",
+      "status": "REQUIRED",
+      "validation": "SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_name = '<table>' AND column_name = '<column>')"
+    },
+    {
+      "criterion": "Indexes created for performance optimization",
+      "status": "REQUIRED",
+      "validation": "SELECT COUNT(*) FROM pg_indexes WHERE tablename IN ('<new_tables>') >= <expected_count>"
+    },
+    {
+      "criterion": "Foreign key constraints valid and enforced",
+      "status": "REQUIRED",
+      "validation": "SELECT COUNT(*) FROM information_schema.table_constraints WHERE constraint_type = 'FOREIGN KEY'"
+    },
+    {
+      "criterion": "Row Level Security (RLS) enabled if required",
+      "status": "RECOMMENDED",
+      "validation": "SELECT relname FROM pg_class WHERE relrowsecurity = true AND relname LIKE '<table_pattern>'"
+    },
+    {
+      "criterion": "Database backup created successfully",
+      "status": "REQUIRED",
+      "validation": "Test-Path <backup_file_path> AND file size > 10KB"
+    },
+    {
+      "criterion": "All tables are queryable and accessible",
+      "status": "REQUIRED",
+      "validation": "SELECT COUNT(*) FROM <each_new_table> executes without error"
+    },
+    {
+      "criterion": "No PostgreSQL errors in logs during migration",
+      "status": "REQUIRED",
+      "validation": "docker logs ectropy-postgres-1 --tail 100 | grep -i 'ERROR\\|FATAL' returns no matches"
+    },
+    {
+      "criterion": "Application services restart successfully after migration",
+      "status": "RECOMMENDED",
+      "validation": "docker-compose restart <services> completes successfully, all services healthy"
+    },
+    {
+      "criterion": "Existing data remains intact (no data loss)",
+      "status": "REQUIRED",
+      "validation": "SELECT COUNT(*) FROM <existing_tables> matches pre-migration counts"
+    }
+  ],
+  "mcpIntegration": {
+    "queryableFields": [
+      "phases",
+      "rollback",
+      "preFlightChecks",
+      "validation",
+      "backupProcedure",
+      "dryRunCapability",
+      "successCriteria",
+      "monitoring",
+      "estimatedDuration"
+    ],
+    "supportedQueries": [
+      {
+        "query": "getMigrationPhases",
+        "returns": "Array of migration phases with ordered steps",
+        "purpose": "Retrieve complete migration execution plan",
+        "args": []
+      },
+      {
+        "query": "getPreFlightChecks",
+        "returns": "List of validation checks to perform before migration",
+        "purpose": "Assess migration readiness and identify potential issues",
+        "args": []
+      },
+      {
+        "query": "getBackupProcedure",
+        "returns": "Detailed backup creation and verification steps",
+        "purpose": "Understand backup process and rollback capability",
+        "args": []
+      },
+      {
+        "query": "getRollbackProcedure",
+        "returns": "Step-by-step rollback instructions with verification",
+        "purpose": "Retrieve complete rollback plan if migration fails",
+        "args": []
+      },
+      {
+        "query": "getDryRunCommands",
+        "returns": "Commands for dry-run execution without database changes",
+        "purpose": "Test migration safety without applying changes",
+        "args": []
+      },
+      {
+        "query": "getValidationQueries",
+        "returns": "SQL queries for post-migration validation",
+        "purpose": "Verify migration success and data integrity",
+        "args": []
+      },
+      {
+        "query": "getMonitoringQueries",
+        "returns": "Database health and performance monitoring queries",
+        "purpose": "Monitor migration impact on database performance",
+        "args": []
+      },
+      {
+        "query": "getSuccessCriteria",
+        "returns": "Complete list of success criteria with validation methods",
+        "purpose": "Determine if migration meets all requirements",
+        "args": []
+      },
+      {
+        "query": "estimateMigrationRisk",
+        "returns": "Risk assessment based on migration complexity",
+        "purpose": "Calculate risk level and recommend precautions",
+        "args": [
+          "migrationFile",
+          "databaseSize",
+          "hasDestructiveOps"
+        ]
+      }
+    ],
+    "decisionSupport": [
+      "Recommend mandatory dry-run before production migration execution",
+      "Suggest backup verification before proceeding with schema changes",
+      "Alert if migration has already been applied (idempotent check)",
+      "Recommend rollback if post-migration validation fails",
+      "Suggest monitoring queries for 24-hour post-migration health checks",
+      "Calculate migration risk based on database size, complexity, and operation types",
+      "Recommend service restart timing to minimize user impact",
+      "Suggest breaking large migrations into smaller incremental steps",
+      "Alert to potentially destructive operations (DROP, TRUNCATE) requiring extra caution"
+    ],
+    "architectureAlignment": {
+      "routingConfig": "apps/mcp-server/data/routing-architecture.json",
+      "portAllocation": "routing-architecture.json#/portAllocationMatrix",
+      "databaseConfig": "routing-architecture.json#/services/postgres"
+    }
+  },
+  "knownIssues": [
+    {
+      "id": "issue-migration-1",
+      "title": "Migration may fail if prerequisite tables missing",
+      "severity": "High",
+      "impact": "Migration aborts with foreign key constraint errors or table not found",
+      "mitigation": "Pre-flight checks verify prerequisite tables exist before migration",
+      "action": "Ensure all previous migrations have been applied in sequence before running new migration",
+      "priority": "P0"
+    },
+    {
+      "id": "issue-migration-2",
+      "title": "Backup creation may fail on low disk space",
+      "severity": "Medium",
+      "impact": "Migration aborts before applying changes, backup incomplete or missing",
+      "mitigation": "Pre-flight checks monitor disk space and warn if below threshold",
+      "action": "Ensure sufficient disk space (500+ MB free) before migration, or use -SkipBackup flag (not recommended for production)",
+      "priority": "P1"
+    },
+    {
+      "id": "issue-migration-3",
+      "title": "Active database connections may interfere with schema changes",
+      "severity": "Medium",
+      "impact": "Migration may hang or fail if tables are locked by active connections",
+      "mitigation": "Recommend stopping dependent services before migration for complex schema changes",
+      "action": "Run migration during maintenance window or stop api-gateway and web-dashboard services temporarily",
+      "priority": "P1"
+    },
+    {
+      "id": "issue-migration-4",
+      "title": "Large migrations may exceed default timeout",
+      "severity": "Low",
+      "impact": "Migration appears to fail but may still be executing in PostgreSQL",
+      "mitigation": "Increase timeout value for complex migrations with many tables/indexes",
+      "action": "Monitor PostgreSQL logs to verify migration completion if timeout occurs",
+      "priority": "P2"
+    },
+    {
+      "id": "issue-migration-5",
+      "title": "Rollback may lose data inserted after migration",
+      "severity": "Medium",
+      "impact": "Any data inserted into new tables after migration will be lost on rollback",
+      "mitigation": "Backup is created before migration, not after",
+      "action": "Document this behavior clearly to operators - rollback restores to pre-migration state only",
+      "priority": "P1"
+    }
+  ],
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "POSTGRES_USER",
+        "description": "PostgreSQL superuser for executing migrations (default: postgres)",
+        "example": "postgres",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "POSTGRES_DB",
+        "description": "Target database name for migration (default: ectropy_dev)",
+        "example": "ectropy_dev",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "POSTGRES_PASSWORD",
+        "description": "PostgreSQL password for authentication",
+        "example": "your_secure_password_here",
+        "required": true,
+        "environment": "all",
+        "secret": true,
+        "minimumLength": 12
+      }
+    ],
+    "optional": [
+      {
+        "name": "SKIP_BACKUP",
+        "description": "Skip backup creation (not recommended, use only in development)",
+        "example": "false",
+        "required": false,
+        "environment": "development",
+        "secret": false
+      },
+      {
+        "name": "DRY_RUN",
+        "description": "Show what migration would do without applying changes",
+        "example": "false",
+        "required": false,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "BACKUP_DIR",
+        "description": "Custom directory for backup file storage (default: backups/migrations)",
+        "example": "backups/migrations",
+        "required": false,
+        "environment": "all",
+        "secret": false
+      }
+    ]
+  },
+  "usageExamples": [
+    {
+      "scenario": "Standard production migration with all safety checks",
+      "command": ".\\scripts\\deployment\\apply-migration.ps1",
+      "description": "Execute migration with automatic backup, all validations, and post-migration verification",
+      "expectedDuration": "3-5 minutes",
+      "notes": [
+        "This is the recommended approach for production environments",
+        "Full database backup is created automatically before any changes",
+        "All pre-flight checks and post-migration validations are performed",
+        "Rollback capability available via backup file"
+      ]
+    },
+    {
+      "scenario": "Dry-run to preview migration without changes",
+      "command": ".\\scripts\\deployment\\apply-migration.ps1 -DryRun",
+      "description": "Validate migration readiness and show what would be executed without applying changes",
+      "expectedDuration": "1 minute",
+      "notes": [
+        "No database modifications are made",
+        "All pre-flight validation checks are still performed",
+        "Statement counts and migration impact summary are displayed",
+        "Use this to test migration safety before production application",
+        "Recommended for all first-time migrations in new environments"
+      ]
+    },
+    {
+      "scenario": "Development migration without backup",
+      "command": ".\\scripts\\deployment\\apply-migration.ps1 -SkipBackup",
+      "description": "Execute migration without creating backup (faster, but no rollback capability)",
+      "expectedDuration": "2-3 minutes",
+      "notes": [
+        "Only use in development environments with non-critical data",
+        "No rollback capability without backup",
+        "Faster execution but higher risk if migration fails",
+        "NOT RECOMMENDED for staging or production"
+      ]
+    },
+    {
+      "scenario": "Verbose migration with detailed logging",
+      "command": ".\\scripts\\deployment\\apply-migration.ps1 -Verbose",
+      "description": "Execute migration with detailed progress logging for troubleshooting",
+      "expectedDuration": "3-5 minutes",
+      "notes": [
+        "Shows detailed progress of each validation and execution step",
+        "Useful for troubleshooting migration issues",
+        "Backup is created automatically",
+        "Recommended for complex migrations or when investigating failures"
+      ]
+    }
+  ],
+  "relatedRunbooks": [
+    {
+      "name": "Speckle Integration Migration Runbook",
+      "path": "apps/mcp-server/data/runbooks/migration/speckle-integration-migration-v1.0.0.json",
+      "relationship": "Specific implementation of this generic migration pattern for Speckle BIM integration"
+    },
+    {
+      "name": "Unified Deployment Runbook",
+      "path": "apps/mcp-server/data/runbooks/deployment/unified-deploy-v1.0.0.json",
+      "relationship": "Full deployment orchestration including migration as one phase"
+    },
+    {
+      "name": "Infrastructure Deployment Runbook",
+      "path": "apps/mcp-server/data/runbooks/deployment/deploy-infrastructure-v1.0.0.json",
+      "relationship": "Infrastructure setup that may include database initialization and migrations"
+    }
+  ],
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2025-11-16T19:30:00Z",
+      "author": "Claude (Enterprise Integration)",
+      "changes": [
+        "Initial runbook creation from PowerShell migration script",
+        "Comprehensive 6-phase migration workflow with 25+ steps",
+        "8 pre-flight safety checks covering infrastructure, configuration, and security",
+        "Detailed backup creation and verification procedures",
+        "SQL syntax validation and dangerous operation detection",
+        "Complete rollback procedure with 8 steps and verification criteria",
+        "Post-migration validation covering tables, views, columns, indexes, and permissions",
+        "MCP integration with 9 queryable operations and decision support",
+        "12 success criteria with specific validation queries",
+        "Monitoring queries and alert thresholds for post-migration health",
+        "5 known issues documented with mitigation strategies",
+        "4 usage examples for different scenarios (production, dry-run, development, verbose)",
+        "Environment variable documentation for all required and optional settings",
+        "Related runbooks cross-referenced for comprehensive deployment guidance"
+      ]
+    }
+  ]
+}

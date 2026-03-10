@@ -1,0 +1,88 @@
+# Use Node.js 20 bullseye for consistency with CI/CD and production builds
+# This standardizes the platform across all environments
+FROM node:20-bullseye
+
+# Install system dependencies with security updates
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y \
+        git \
+        curl \
+        bash \
+        jq \
+        python3 \
+        python3-pip \
+        build-essential \
+        ca-certificates \
+        gnupg \
+        lsb-release \
+        vim \
+        less \
+        procps \
+        net-tools \
+        postgresql-client \
+        redis-tools \
+        openjdk-17-jdk && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
+
+# Install latest pnpm and TypeScript globally with correct version and global access
+RUN npm install -g pnpm@10.14.0 typescript@5.6.3 ts-node@10.9.2 && \
+    # Create symbolic links for reliability and global access
+    ln -sf /usr/local/bin/pnpm /usr/bin/pnpm && \
+    ln -sf /usr/local/bin/tsc /usr/bin/tsc && \
+    ln -sf /usr/local/bin/ts-node /usr/bin/ts-node && \
+    ln -sf /usr/local/bin/npx /usr/bin/npx && \
+    # Make pnpm available in PATH for all users
+    echo 'export PATH="/usr/local/bin:$PATH"' >> /etc/profile && \
+    echo 'export PNPM_HOME="/usr/local/share/pnpm"' >> /etc/profile && \
+    echo 'export PATH="$PNPM_HOME:$PATH"' >> /etc/profile && \
+    # Verify installations
+    node --version && \
+    npm --version && \
+    pnpm --version && \
+    tsc --version && \
+    ts-node --version && \
+    npx --version
+
+# Set environment variables for reproducibility and security
+ENV NODE_ENV=development \
+    PNPM_HOME=/usr/local/share/pnpm \
+    PNPM_STORE_DIR=/usr/local/share/pnpm-store \
+    PATH=/usr/local/share/pnpm:/usr/local/bin:$PATH \
+    # Security hardening
+    NODE_OPTIONS="--max-old-space-size=4096" \
+    # Development optimizations
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    CYPRESS_CACHE_FOLDER=/usr/local/share/cypress-cache
+
+# Configure pnpm for optimal performance and security
+RUN pnpm config set store-dir /usr/local/share/pnpm-store && \
+    pnpm config set cache-dir /usr/local/share/pnpm-cache && \
+    pnpm config set state-dir /usr/local/share/pnpm-state && \
+    pnpm config set global-bin-dir /usr/local/bin && \
+    pnpm config set registry https://registry.npmjs.org/ && \
+    pnpm config set strict-ssl true && \
+    # Create cache directories with proper permissions
+    mkdir -p /usr/local/share/pnpm-store /usr/local/share/pnpm-cache /usr/local/share/pnpm-state && \
+    chmod -R 755 /usr/local/share/pnpm*
+
+# Create non-root user with secure defaults (simplified enterprise approach)
+RUN if ! id -u vscode >/dev/null 2>&1; then \
+        # Create vscode user with safe defaults
+        groupadd --gid 1000 vscode 2>/dev/null || true && \
+        useradd --uid 1000 --gid 1000 --shell /bin/bash --create-home vscode 2>/dev/null || \
+        useradd --shell /bin/bash --create-home vscode; \
+    fi && \
+    # Ensure vscode user has access to pnpm directories
+    chown -R vscode:vscode /usr/local/share/pnpm* 2>/dev/null || true && \
+    # Ensure workspace directory exists with proper permissions
+    mkdir -p /workspace && \
+    chown -R vscode:vscode /workspace 2>/dev/null || true
+
+# Set bash options for scripts
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+WORKDIR /workspace
+USER vscode
+CMD ["sleep", "infinity"]

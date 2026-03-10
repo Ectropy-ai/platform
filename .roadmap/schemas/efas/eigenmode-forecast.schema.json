@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:efas:eigenmode-forecast",
+  "title": "Eigenmode Forecast",
+  "description": "Physics-informed forecast using eigenmode decomposition (EFAS)",
+  "type": "object",
+  "required": ["id", "metric", "forecastHorizon", "eigenmodes"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^FORECAST-[0-9]{4}-[0-9]{4,}$",
+      "description": "Unique forecast identifier"
+    },
+    "metric": {
+      "type": "string",
+      "description": "Metric being forecasted (cash flow, progress, etc.)"
+    },
+    "forecastHorizon": {
+      "type": "number",
+      "description": "Days ahead being forecasted"
+    },
+    "eigenmodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "modeNumber": { "type": "number" },
+          "eigenvalue": { "type": "number" },
+          "contribution": {
+            "type": "number",
+            "description": "Percent contribution to forecast"
+          },
+          "frequency": {
+            "type": "number",
+            "description": "Oscillation frequency (if periodic)"
+          },
+          "dampingFactor": { "type": "number" }
+        }
+      },
+      "description": "Dominant eigenmodes in decomposition"
+    },
+    "forecast": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string", "format": "date" },
+          "predictedValue": { "type": "number" },
+          "lowerBound": { "type": "number" },
+          "upperBound": { "type": "number" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "historicalData": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string", "format": "date" },
+          "actualValue": { "type": "number" }
+        }
+      }
+    },
+    "accuracy": {
+      "type": "object",
+      "properties": {
+        "mape": {
+          "type": "number",
+          "description": "Mean Absolute Percentage Error"
+        },
+        "rmse": { "type": "number", "description": "Root Mean Squared Error" },
+        "r2": { "type": "number", "description": "R-squared correlation" }
+      }
+    },
+    "generatedAt": { "type": "string", "format": "date-time" }
+  }
+}

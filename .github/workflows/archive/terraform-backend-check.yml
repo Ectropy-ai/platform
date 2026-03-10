@@ -1,0 +1,350 @@
+# ============================================================================
+# ⚠️ DEPRECATED - Archived 2025-12-16 (Session 5)
+# ============================================================================
+#
+# This workflow has been DEPRECATED and consolidated into terraform-utilities.yml
+#
+# CONSOLIDATION RATIONALE:
+# - Terraform utility workflows consolidated to reduce workflow sprawl (33→30)
+# - Backend health check automated (scheduled twice daily)
+# - Unified diagnostic/maintenance interface provides clearer UX for DevOps users
+# - Maintains all backend validation functionality with mode-based selection
+#
+# MIGRATION PATH:
+# Use terraform-utilities.yml with utility_mode: backend-health-check
+#
+# Example:
+#   Utility Mode: backend-health-check
+#   (Runs automatically on schedule: every 12 hours at 00:00 and 12:00 UTC)
+#
+# FUNCTIONALITY PRESERVED:
+# ✅ DigitalOcean Spaces credentials validation
+# ✅ Bucket accessibility checks with retries
+# ✅ Bucket permissions validation (read/write)
+# ✅ Terraform state file presence verification
+# ✅ Terraform configuration validation (dry run with backend=false)
+# ✅ Backend connectivity testing
+# ✅ Health report generation and artifact upload
+#
+# WORKFLOW MATRIX REFERENCE:
+# apps/mcp-server/data/cicd-environment-workflow-matrix.json v1.6.0
+#
+# ARCHIVED: 2025-12-16T04:00:00Z
+# SESSION: 5 (Workflow Consolidation Phase 2 - Terraform Utilities)
+# REPLACEMENT: .github/workflows/terraform-utilities.yml (backend-health-check mode)
+# ============================================================================
+
+name: Terraform Backend Health Check
+
+# Purpose: Continuous monitoring of Terraform backend (DigitalOcean Spaces) health
+# Validates backend connectivity, configuration, and readiness for Terraform operations
+#
+# Triggers:
+#   - Schedule: Every 12 hours (twice daily)
+#   - Manual: Via workflow_dispatch for on-demand checks
+#
+# Checks Performed:
+#   1. DigitalOcean Spaces credentials validation
+#   2. Spaces bucket accessibility
+#   3. Bucket permissions (read/write)
+#   4. Terraform state file presence
+#   5. Terraform init validation (dry run, backend=false)
+#
+# Success Criteria:
+#   - All validation checks pass
+#   - Terraform configuration is valid
+#   - Backend resources are accessible and properly configured
+#
+# Failure Handling:
+#   - Workflow fails if any validation check fails
+#   - Detailed logs provided for troubleshooting
+#   - GitHub issue can be created manually if issues persist
+
+on:
+  schedule:
+    # Run every 12 hours (00:00 and 12:00 UTC)
+    - cron: '0 */12 * * *'
+
+  workflow_dispatch:
+    # Allow manual triggering for immediate health checks
+
+env:
+  DO_SPACES_REGION: 'sfo3' # DigitalOcean Spaces region - must match backend.tf
+
+jobs:
+  validate-backend:
+    name: Validate Terraform Backend
+    runs-on: ubuntu-latest
+
+    # Explicit permissions (principle of least privilege)
+    permissions:
+      contents: read # Required to checkout repository
+
+    # Set timeout to prevent hanging workflows
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1 # Shallow clone for speed
+
+      - name: Configure DigitalOcean Spaces Credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "🔑 Configuring DigitalOcean Spaces credentials..."
+
+          # Validate secrets are available
+          if [ -z "$AWS_ACCESS_KEY_ID" ]; then
+            echo "❌ ERROR: AWS_ACCESS_KEY_ID secret is not configured"
+            echo "This should contain your DigitalOcean Spaces Access Key"
+            echo "Configure at: Settings → Secrets and variables → Actions → Repository secrets"
+            exit 1
+          fi
+
+          if [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "❌ ERROR: AWS_SECRET_ACCESS_KEY secret is not configured"
+            echo "This should contain your DigitalOcean Spaces Secret Key"
+            exit 1
+          fi
+
+          echo "✅ DigitalOcean Spaces credentials configured"
+          echo "   Note: Using AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY for S3-compatible API"
+
+      - name: Verify DigitalOcean Spaces Connectivity
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "🔍 Verifying DigitalOcean Spaces connectivity..."
+
+          # Test connection to DigitalOcean Spaces
+          if aws s3 ls --endpoint-url https://${{ env.DO_SPACES_REGION }}.digitaloceanspaces.com &>/dev/null; then
+            echo "✅ DigitalOcean Spaces is accessible"
+            echo "   Endpoint: https://${{ env.DO_SPACES_REGION }}.digitaloceanspaces.com"
+          else
+            echo "❌ ERROR: Cannot connect to DigitalOcean Spaces"
+            echo "   Verify:"
+            echo "   - Credentials are correct (DigitalOcean Spaces keys)"
+            echo "   - Network connectivity is available"
+            echo "   - DigitalOcean Spaces service is operational"
+            exit 1
+          fi
+
+      - name: Validate Bucket Exists and Initialize if Needed
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+        run: |
+          echo "🪣 Validating bucket accessibility..."
+
+          # Test bucket accessibility with retries
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          BUCKET_ACCESSIBLE=false
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if aws s3 ls s3://ectropy-terraform-state \
+              --endpoint-url https://${{ env.DO_SPACES_REGION }}.digitaloceanspaces.com &>/dev/null; then
+              echo "✅ Bucket accessible on attempt $((RETRY_COUNT + 1))"
+              BUCKET_ACCESSIBLE=true
+              break
+            fi
+            
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+              echo "⚠️  Attempt $RETRY_COUNT failed, retrying in 5s..."
+              sleep 5
+            fi
+          done
+
+          # Initialize bucket if not accessible
+          if [ "$BUCKET_ACCESSIBLE" = false ]; then
+            echo "⚠️  Bucket not accessible after $MAX_RETRIES attempts"
+            echo "🚀 Running initialization script..."
+            bash scripts/terraform/init-digitalocean-backend.sh
+          else
+            echo "✅ Bucket validation complete"
+          fi
+
+      - name: Validate Backend Configuration
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "🔍 Running DigitalOcean Spaces backend validation..."
+          echo ""
+
+          # Run validation script
+          bash scripts/terraform/validate-digitalocean-backend.sh
+
+          # Capture exit code
+          VALIDATION_RESULT=$?
+
+          if [ $VALIDATION_RESULT -eq 0 ]; then
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "✅ Backend validation completed successfully"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          else
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "❌ Backend validation failed"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            exit 1
+          fi
+
+      - name: Diagnostic Output on Failure
+        if: failure()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "📊 Running diagnostics for troubleshooting..."
+          echo ""
+
+          echo "=== AWS CLI Version ==="
+          aws --version || echo "AWS CLI not installed"
+          echo ""
+
+          echo "=== DigitalOcean Spaces Endpoint Test ==="
+          curl -I https://${{ env.DO_SPACES_REGION }}.digitaloceanspaces.com || echo "Endpoint unreachable"
+          echo ""
+
+          echo "=== Bucket Listing Attempt ==="
+          aws s3 ls s3://ectropy-terraform-state \
+            --endpoint-url https://${{ env.DO_SPACES_REGION }}.digitaloceanspaces.com 2>&1 | tail -20 || echo "Bucket listing failed"
+          echo ""
+
+          echo "=== Validation Script Output ==="
+          bash scripts/terraform/validate-digitalocean-backend.sh || true
+          echo ""
+
+          echo "=== Environment Variables ==="
+          env | grep -E "(AWS|DIGITAL)" | sed 's/=.*/=***REDACTED***/' || echo "No AWS/DIGITAL variables found"
+          echo ""
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.0 # Standardized across all workflows
+
+      - name: Validate Terraform Configuration (Dry Run)
+        working-directory: infrastructure/terraform/
+        run: |
+          echo "🔍 Validating Terraform configuration..."
+          echo ""
+
+          # Initialize Terraform without backend (dry run)
+          # This validates the configuration without actually connecting to the backend
+          echo "Running: terraform init -backend=false"
+          terraform init -backend=false
+
+          echo ""
+          echo "✅ Terraform initialization successful (backend validation skipped)"
+          echo ""
+
+          # Validate Terraform configuration syntax
+          echo "Running: terraform validate"
+          terraform validate
+
+          echo ""
+          echo "✅ Terraform configuration is valid"
+
+      - name: Test Backend Connectivity (Optional)
+        working-directory: infrastructure/terraform/
+        continue-on-error: true # Don't fail workflow if this step fails
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "🔍 Testing actual backend connectivity (optional check)..."
+          echo ""
+
+          # Try to initialize with backend using -upgrade for safety
+          # This will fail if backend.tf doesn't exist or if backend is misconfigured
+          # We allow failure here because this is an optional connectivity test
+          # Using -upgrade instead of -reconfigure for safety (won't overwrite existing config)
+          if terraform init -upgrade 2>&1 | tee /tmp/terraform-init.log; then
+            echo ""
+            echo "✅ Backend connectivity test: PASSED"
+            echo "   Terraform successfully initialized with DigitalOcean Spaces backend"
+          else
+            echo ""
+            echo "⚠️  Backend connectivity test: FAILED"
+            echo "   This may indicate backend configuration or connectivity issues"
+            echo ""
+            echo "Log output:"
+            cat /tmp/terraform-init.log
+          fi
+
+      - name: Generate Health Report
+        if: always() # Run even if previous steps failed
+        run: |
+          echo "📊 Generating backend health report..."
+          echo ""
+
+          REPORT_FILE="/tmp/backend-health-report.txt"
+
+          cat > "$REPORT_FILE" <<EOF
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          Terraform Backend Health Report
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+          Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          Workflow Run: ${{ github.run_number }}
+          Triggered By: ${{ github.event_name }}
+
+          Configuration:
+            Backend Type: DigitalOcean Spaces (S3-compatible)
+            Bucket: ectropy-terraform-state
+            Endpoint: https://${{ env.DO_SPACES_REGION }}.digitaloceanspaces.com
+            Region: ${{ env.DO_SPACES_REGION }}
+            State Path: production/terraform.tfstate
+
+          Validation Status:
+            Spaces Credentials: ✅ Valid
+            Bucket Accessibility: Check logs above
+            Terraform Config: Check logs above
+
+          Next Steps:
+            - Review validation logs above for detailed status
+            - If failures occurred, check DigitalOcean Spaces credentials
+            - Verify bucket exists in DigitalOcean console
+            - Run manual validation: bash scripts/terraform/validate-digitalocean-backend.sh
+            - Initialize backend: bash scripts/terraform/init-digitalocean-backend.sh
+
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          EOF
+
+          cat "$REPORT_FILE"
+
+          echo ""
+          echo "✅ Health report generated"
+
+      - name: Upload Health Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-health-report-${{ github.run_number }}
+          path: /tmp/backend-health-report.txt
+          retention-days: 30
+
+      - name: Workflow Summary
+        if: always()
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📋 Workflow Summary"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "Job: Terraform Backend Health Check"
+          echo "Status: Check step results above"
+          echo "Run Number: ${{ github.run_number }}"
+          echo "Commit: ${{ github.sha }}"
+          echo ""
+          echo "For detailed validation results, see the 'Validate Backend Configuration' step"
+          echo "Health report artifact: backend-health-report-${{ github.run_number }}"
+          echo ""

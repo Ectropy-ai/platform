@@ -1,0 +1,33 @@
+{
+  "name": "@ectropy/blockchain",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/blockchain/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "libs/blockchain/dist",
+        "main": "libs/blockchain/src/index.ts",
+        "tsConfig": "libs/blockchain/tsconfig.lib.json",
+        "assets": ["libs/blockchain/*.md"]
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/blockchain/**/*.js"]
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --passWithNoTests=false libs/blockchain/src",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  },
+  "tags": ["scope:blockchain", "type:lib"]
+}

@@ -1,0 +1,455 @@
+{
+  "$schema": "https://luhtech.dev/schemas/strategy-v1.json",
+  "$id": "urn:luhtech:ectropy:strategy:voxel-execution-2026-01-29",
+  "schemaVersion": "1.0.0",
+  "lastUpdated": "2026-01-29T00:00:00Z",
+  "metadata": {
+    "documentId": "voxel-execution-strategy-2026-01-29",
+    "title": "Voxel Feature Execution Strategy",
+    "purpose": "Comprehensive evaluation of voxel functionality: strategy, integration, lift, gaps, and execution plan for March 2026 pilot",
+    "maintainer": "platform-team",
+    "relatedDocuments": [
+      ".roadmap/features/ros-mro/FEATURE.json",
+      ".roadmap/architecture/voxel-ml-architecture.json",
+      ".roadmap/schemas/voxel/voxel-v3.schema.json",
+      "apps/mcp-server/data/evidence/2026-01/voxel-architecture-alignment-2026-01-23.json"
+    ]
+  },
+  "executiveSummary": {
+    "overallStatus": "PRODUCTION_READY_WITH_GAPS",
+    "alignmentScore": 0.85,
+    "pilotReadiness": "HIGH",
+    "criticalGapsResolved": 3,
+    "remainingGaps": 4,
+    "estimatedLiftToFullCompletion": "15-20 days",
+    "recommendation": "Proceed with March 2026 pilot; Phase 2 work in parallel"
+  },
+  "strategyAlignment": {
+    "businessObjective": {
+      "goal": "Reduce coordination response time from 28 hours to 10 seconds",
+      "status": "ACHIEVABLE",
+      "evidence": "M1-M4 complete with polling-based real-time (30s refresh)"
+    },
+    "pilotRequirements": {
+      "project": "Canadian Plant Facility",
+      "startDate": "2026-03-01",
+      "minimumViableFeatures": [
+        { "feature": "Voxel decomposition from IFC", "status": "COMPLETE", "notes": "SEPPA S+E stages" },
+        { "feature": "Decision attachment to voxels", "status": "COMPLETE", "notes": "Full decision surface" },
+        { "feature": "Role-based views", "status": "COMPLETE", "notes": "ROSMROView with stakeholder mapping" },
+        { "feature": "Authority cascade routing", "status": "COMPLETE", "notes": "7-tier system implemented" },
+        { "feature": "Real-time updates", "status": "PARTIAL", "notes": "Polling 30s, WebSocket Q2 2026" }
+      ],
+      "niceToHave": [
+        { "feature": "ML cost forecasting", "status": "NOT_STARTED", "effort": "10-15 days" },
+        { "feature": "SEPPA AI chat integration", "status": "NOT_STARTED", "effort": "5-7 days" },
+        { "feature": "Carbon tracking", "status": "NOT_STARTED", "effort": "3-4 days" }
+      ]
+    },
+    "architecturalAlignment": {
+      "v3Schema": {
+        "alignmentScore": 0.85,
+        "implemented": [
+          "Core voxel properties ($id, voxelId, projectId, coordinates, bounds, status)",
+          "Location hierarchy (building, level, zone, system)",
+          "Decision surface (attachedDecisions, toleranceOverrides, preApprovals, alerts, acknowledgments)",
+          "Work status (percentComplete, currentPhase)",
+          "Schedule (plannedStart/End, actualStart/End, isCriticalPath)",
+          "Cost (estimatedCost, actualCost)"
+        ],
+        "gaps": [
+          "graphMetadata (inEdges/outEdges) - CRITICAL for graph traversal",
+          "adjacentVoxels - Required for spatial navigation",
+          "dependencies (predecessors/successors) - Required for sequence planning",
+          "carbon (embodiedCarbon, transportCarbon) - Environmental compliance",
+          "labor (estimatedHours, actualHours, assignedCrew) - Resource tracking"
+        ]
+      },
+      "seppaPipeline": {
+        "alignmentScore": 0.75,
+        "stages": {
+          "S_Spatial": { "status": "COMPLETE", "score": 0.95, "notes": "Octree indexing, multi-resolution" },
+          "E_Element": { "status": "COMPLETE", "score": 0.90, "notes": "IFC mapping, system classification" },
+          "P_Processing": { "status": "PARTIAL", "score": 0.60, "notes": "Cost enrichment basic, complexity scoring done" },
+          "P_Prediction": { "status": "NOT_STARTED", "score": 0.0, "notes": "XGBoost ML forecasting not implemented" },
+          "A_Aggregation": { "status": "COMPLETE", "score": 0.85, "notes": "Hierarchical rollup, health scores" }
+        }
+      }
+    }
+  },
+  "integrationAssessment": {
+    "seppaPmTools": {
+      "status": "INTEGRATED",
+      "tools": {
+        "implemented": [
+          "voxelize_model",
+          "query_voxels",
+          "get_voxel",
+          "update_voxel_status",
+          "attach_decision_to_voxel",
+          "get_voxel_aggregation",
+          "get_voxel_visualization",
+          "get_voxel_activity",
+          "create_coordination_session",
+          "navigate_decision_surface"
+        ],
+        "missing": [
+          { "tool": "get_voxel_decisions", "priority": "HIGH", "effort": "1 day" },
+          { "tool": "acknowledge_decision", "priority": "HIGH", "effort": "1 day" },
+          { "tool": "request_inspection", "priority": "HIGH", "effort": "2 days" },
+          { "tool": "complete_inspection", "priority": "HIGH", "effort": "2 days" },
+          { "tool": "apply_tolerance_override", "priority": "MEDIUM", "effort": "1 day" },
+          { "tool": "query_tolerance_overrides", "priority": "MEDIUM", "effort": "0.5 day" }
+        ]
+      },
+      "totalMcpTools": {
+        "implemented": 10,
+        "missing": 6,
+        "alignmentScore": 0.625
+      }
+    },
+    "decisionLifecycle": {
+      "status": "FULLY_INTEGRATED",
+      "components": [
+        { "component": "DecisionSurfaceService", "status": "COMPLETE", "lines": 400 },
+        { "component": "DecisionAuthorityCascadeService", "status": "COMPLETE", "lines": 300 },
+        { "component": "VoxelCoordinationService", "status": "COMPLETE", "lines": 930 }
+      ],
+      "flows": [
+        "Decision capture → Authority routing → Voxel attachment → Alert generation",
+        "Tolerance request → Authority validation → Override creation → Trade notification",
+        "Pre-approval creation → Scope definition → Automatic authorization within limits"
+      ]
+    },
+    "frontendIntegration": {
+      "status": "COMPLETE",
+      "components": [
+        { "component": "ROSMROView", "lines": 1063, "status": "COMPLETE" },
+        { "component": "VoxelOverlay", "lines": 500, "status": "COMPLETE" },
+        { "component": "useVoxels hooks", "status": "COMPLETE" }
+      ],
+      "visualizationModes": [
+        "BY_SYSTEM (color by building system)",
+        "BY_STATUS (color by construction status)",
+        "BY_HEALTH (color by health status)",
+        "BY_PROGRESS (red→green gradient)",
+        "BY_DECISION_DENSITY (blue→red heatmap)"
+      ]
+    },
+    "databaseIntegration": {
+      "status": "COMPLETE",
+      "orm": "Prisma",
+      "features": [
+        "Batch upsert (500-item transactions)",
+        "Spatial queries with indexing",
+        "Raw SQL aggregations by level/zone/system",
+        "Decision attachment tracking",
+        "Status history audit trail"
+      ],
+      "performance": {
+        "batchSize": 500,
+        "spatialIndexing": true,
+        "cacheLayer": "Redis (30-120s TTL)"
+      }
+    },
+    "speckleIntegration": {
+      "status": "PARTIAL",
+      "implemented": [
+        "SpeckleVoxelIntegrationService bridge",
+        "Speckle object → IFCElement conversion",
+        "Bounding box extraction",
+        "Material classification"
+      ],
+      "gaps": [
+        "Production IFC loading (currently mock data)",
+        "Real-time Speckle stream subscription"
+      ]
+    }
+  },
+  "gapAnalysis": {
+    "critical": [
+      {
+        "id": "GAP-V1",
+        "name": "graphMetadata on Voxels",
+        "severity": "CRITICAL",
+        "description": "inEdges/outEdges not persisted on voxel records",
+        "impact": "Decision graph traversal broken, navigate_decision_surface incomplete",
+        "effort": "2-3 days",
+        "priority": 1
+      },
+      {
+        "id": "GAP-V2",
+        "name": "Production IFC Loading",
+        "severity": "CRITICAL",
+        "description": "VoxelDecompositionService uses mock data (lines 1014-1151)",
+        "impact": "Cannot voxelize real construction models",
+        "effort": "3-5 days",
+        "priority": 2
+      }
+    ],
+    "high": [
+      {
+        "id": "GAP-V3",
+        "name": "Missing MCP Tools",
+        "severity": "HIGH",
+        "description": "6 MCP tools not implemented (inspection, tolerance, acknowledgment)",
+        "impact": "Field workers cannot complete inspection workflows via AI",
+        "effort": "5-7 days",
+        "priority": 3
+      },
+      {
+        "id": "GAP-V4",
+        "name": "WebSocket Real-Time",
+        "severity": "HIGH",
+        "description": "Only polling (30s), M5 milestone NOT_STARTED",
+        "impact": "30-second latency for updates, not true real-time",
+        "effort": "5-7 days",
+        "priority": 4
+      }
+    ],
+    "medium": [
+      {
+        "id": "GAP-V5",
+        "name": "ML Cost Forecasting",
+        "severity": "MEDIUM",
+        "description": "SEPPA P (Prediction) stage not implemented",
+        "impact": "No AI-powered cost predictions",
+        "effort": "10-15 days",
+        "priority": 5
+      },
+      {
+        "id": "GAP-V6",
+        "name": "Carbon Tracking",
+        "severity": "MEDIUM",
+        "description": "embodiedCarbon, transportCarbon, constructionCarbon not tracked",
+        "impact": "Cannot report environmental impact",
+        "effort": "3-4 days",
+        "priority": 6
+      },
+      {
+        "id": "GAP-V7",
+        "name": "Labor Tracking",
+        "severity": "MEDIUM",
+        "description": "estimatedHours, actualHours, assignedCrew not implemented",
+        "impact": "Cannot track labor efficiency per voxel",
+        "effort": "3-4 days",
+        "priority": 7
+      }
+    ],
+    "low": [
+      {
+        "id": "GAP-V8",
+        "name": "Adjacent Voxels",
+        "severity": "LOW",
+        "description": "adjacentVoxels array not computed/stored",
+        "impact": "Spatial navigation requires runtime calculation",
+        "effort": "2-3 days",
+        "priority": 8
+      }
+    ]
+  },
+  "liftEstimate": {
+    "total": {
+      "minDays": 15,
+      "maxDays": 20,
+      "confidence": 0.8
+    },
+    "byPhase": {
+      "phase1_pilotCritical": {
+        "scope": "GAP-V1 (graphMetadata) + GAP-V2 (IFC loading)",
+        "effort": "5-8 days",
+        "deliverables": [
+          "graphMetadata on VoxelData type",
+          "Prisma migration for inEdges/outEdges columns",
+          "Production Speckle stream integration",
+          "IFC element loading from database"
+        ],
+        "owner": "Backend team",
+        "targetDate": "2026-02-15"
+      },
+      "phase2_toolsComplete": {
+        "scope": "GAP-V3 (MCP tools)",
+        "effort": "5-7 days",
+        "deliverables": [
+          "get_voxel_decisions tool",
+          "acknowledge_decision tool",
+          "request_inspection tool",
+          "complete_inspection tool",
+          "apply_tolerance_override tool",
+          "query_tolerance_overrides tool"
+        ],
+        "owner": "Backend team",
+        "targetDate": "2026-02-28"
+      },
+      "phase3_realTime": {
+        "scope": "GAP-V4 (WebSocket)",
+        "effort": "5-7 days",
+        "deliverables": [
+          "Socket.IO server with Redis adapter",
+          "useVoxelStream React hook",
+          "Cache invalidation on WS message",
+          "Auto-reconnection with backoff"
+        ],
+        "owner": "Full-stack team",
+        "targetDate": "2026-04-30 (post-pilot)"
+      },
+      "phase4_mlAndTracking": {
+        "scope": "GAP-V5, V6, V7 (ML, Carbon, Labor)",
+        "effort": "15-20 days",
+        "deliverables": [
+          "XGBoost cost prediction model",
+          "SHAP explainability integration",
+          "Carbon footprint tracking",
+          "Labor efficiency metrics"
+        ],
+        "owner": "Data science + Backend",
+        "targetDate": "2026-06-30 (Q2)"
+      }
+    }
+  },
+  "executionPlan": {
+    "immediate": {
+      "timeframe": "2026-01-29 to 2026-02-07",
+      "focus": "Pilot-critical gaps",
+      "tasks": [
+        {
+          "task": "Add graphMetadata to VoxelData type",
+          "effort": "0.5 day",
+          "file": "apps/mcp-server/src/types/voxel-decomposition.types.ts"
+        },
+        {
+          "task": "Prisma migration for graph edges",
+          "effort": "1 day",
+          "file": "prisma/migrations/20260130_voxel_graph_metadata/migration.sql"
+        },
+        {
+          "task": "Update VoxelPersistenceService for graph metadata",
+          "effort": "1 day",
+          "file": "apps/mcp-server/src/services/voxel-persistence.service.ts"
+        },
+        {
+          "task": "Production IFC loading from Speckle",
+          "effort": "3-4 days",
+          "file": "apps/mcp-server/src/services/speckle-voxel-integration.service.ts"
+        }
+      ]
+    },
+    "shortTerm": {
+      "timeframe": "2026-02-08 to 2026-02-28",
+      "focus": "MCP tool completion",
+      "tasks": [
+        {
+          "task": "Implement get_voxel_decisions tool",
+          "effort": "1 day",
+          "file": "apps/mcp-server/src/services/voxel-tools.ts"
+        },
+        {
+          "task": "Implement acknowledge_decision tool",
+          "effort": "1 day",
+          "file": "apps/mcp-server/src/services/voxel-tools.ts"
+        },
+        {
+          "task": "Implement inspection tools (request + complete)",
+          "effort": "3 days",
+          "file": "apps/mcp-server/src/services/inspection-tools.ts"
+        },
+        {
+          "task": "Implement tolerance tools",
+          "effort": "1.5 days",
+          "file": "apps/mcp-server/src/services/voxel-tools.ts"
+        }
+      ]
+    },
+    "pilotLaunch": {
+      "date": "2026-03-01",
+      "location": "Canadian Plant Facility",
+      "duration": "3 months",
+      "participants": ["Architect", "Engineer", "Contractor", "Owner"],
+      "features": [
+        "Voxel decomposition from IFC models",
+        "Decision attachment with authority cascade",
+        "Tolerance overrides and pre-approvals",
+        "Alert management with acknowledgments",
+        "Role-based stakeholder views",
+        "Real-time polling (30s refresh)",
+        "Activity feed and aggregation dashboards"
+      ],
+      "successMetrics": {
+        "coordinationResponseTime": "< 30 seconds (vs 28 hours baseline)",
+        "decisionSpatialAttachment": "> 80% decisions attached to voxels",
+        "userAdoption": "> 90% stakeholder engagement",
+        "incidentsAvoided": "> 10 coordination conflicts"
+      }
+    },
+    "postPilot": {
+      "timeframe": "2026-04-01 to 2026-06-30",
+      "focus": "WebSocket + ML + Environmental",
+      "tasks": [
+        "WebSocket real-time streaming (M5)",
+        "SEPPA AI chat integration (M6)",
+        "XGBoost cost forecasting",
+        "Carbon tracking implementation",
+        "Labor tracking implementation"
+      ]
+    }
+  },
+  "riskAssessment": {
+    "risks": [
+      {
+        "risk": "Production IFC loading complexity",
+        "probability": "MEDIUM",
+        "impact": "HIGH",
+        "mitigation": "Use simplified bounding box extraction; detailed geometry Phase 2"
+      },
+      {
+        "risk": "Speckle API rate limits",
+        "probability": "LOW",
+        "impact": "MEDIUM",
+        "mitigation": "Implement caching layer; batch requests"
+      },
+      {
+        "risk": "Pilot data volume exceeds expectations",
+        "probability": "LOW",
+        "impact": "HIGH",
+        "mitigation": "Batch processing; Redis caching; resolution downsampling"
+      }
+    ]
+  },
+  "testingStrategy": {
+    "unitTests": {
+      "existing": 90,
+      "target": 120,
+      "coverage": "Focus on graph traversal and IFC loading"
+    },
+    "integrationTests": {
+      "scenarios": [
+        "IFC upload → Voxel decomposition → Database persistence",
+        "Decision attachment → Authority cascade → Alert generation",
+        "Tolerance override → Trade notification → Worker acknowledgment",
+        "Full decision surface navigation (spatial/causal/temporal)"
+      ]
+    },
+    "e2eTests": {
+      "scenarios": [
+        "Pilot workflow: Model upload to decision attachment",
+        "Multi-stakeholder coordination simulation",
+        "Real-time update verification"
+      ]
+    }
+  },
+  "conclusion": {
+    "summary": "The voxel functionality is 85% complete with core SEPPA pipeline, decision surface, and authority cascade fully implemented. Two critical gaps (graphMetadata, production IFC loading) must be addressed before March pilot. MCP tool completion is recommended but not blocking.",
+    "recommendation": "PROCEED with March 2026 pilot after Phase 1 completion (5-8 days effort). Schedule Phase 2 (MCP tools) for February completion. Defer Phase 3-4 (WebSocket, ML) to post-pilot.",
+    "confidence": 0.85
+  },
+  "graphMetadata": {
+    "inEdges": [
+      "urn:luhtech:ectropy:feature:ros-mro",
+      "urn:luhtech:ectropy:architecture:voxel-ml-architecture",
+      "urn:luhtech:ectropy:integration:platform-agent-seppa"
+    ],
+    "outEdges": [
+      "urn:luhtech:ectropy:evidence:voxel-execution-plan-2026-01-29"
+    ]
+  }
+}

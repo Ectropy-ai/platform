@@ -1,0 +1,118 @@
+# 🐳 PRODUCTION DOCKERFILE - ECTROPY FEDERATED PLATFORM
+# Optimized for production deployment with enhanced security and performance
+
+# Build stage
+FROM node:20-bullseye AS builder
+
+# Build arguments for production environment
+ARG NODE_ENV=production
+ARG PORT=4000
+ARG BUILD_DATE
+ARG GIT_COMMIT
+
+WORKDIR /app
+
+# Set environment variables for build
+ENV DEBIAN_FRONTEND=noninteractive
+ENV NODE_ENV=${NODE_ENV}
+ENV PORT=${PORT}
+
+# Add build metadata
+LABEL build_date="${BUILD_DATE}"
+LABEL git_commit="${GIT_COMMIT}"
+LABEL environment="production"
+
+# Install build dependencies with security updates
+RUN set -eux; \
+    apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y \
+        build-essential \
+        python3 \
+        curl \
+        bash \
+        ca-certificates \
+        git \
+        && rm -rf /var/lib/apt/lists/*
+
+# Install pnpm using npm global install (more reliable in containers)
+RUN npm install -g pnpm@10.14.0
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/ ./apps/
+COPY libs/ ./libs/
+COPY tools/ ./tools/
+COPY nx.json tsconfig.base.json ./
+COPY scripts ./scripts
+
+# CRITICAL: Prisma schema must exist before pnpm install
+# because package.json postinstall hook runs "prisma generate"
+COPY prisma ./prisma
+
+# Install dependencies with production optimizations
+RUN pnpm install --frozen-lockfile --prod
+
+# Build applications for production
+RUN pnpm nx build web-dashboard --configuration=production
+RUN pnpm nx build api-gateway --configuration=production
+RUN pnpm nx build mcp-server --configuration=production
+
+# Production stage
+FROM node:20-bullseye-slim AS production
+
+# Production environment variables
+ENV NODE_ENV=production
+ENV PORT=4000
+
+WORKDIR /app
+
+# Install only runtime dependencies
+RUN set -eux; \
+    apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y \
+        ca-certificates \
+        curl \
+        && rm -rf /var/lib/apt/lists/* \
+        && groupadd -r ectropy \
+        && useradd -r -g ectropy ectropy
+
+# Install pnpm for dependency management
+RUN npm install -g pnpm@10.14.0
+
+# Copy package files and Prisma schema
+COPY --from=builder --chown=ectropy:ectropy /app/package.json ./package.json
+COPY --from=builder --chown=ectropy:ectropy /app/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=builder --chown=ectropy:ectropy /app/prisma ./prisma
+
+# Install dependencies from generated package.json
+# Cannot use --frozen-lockfile because package.json was modified by prepare script
+# and no longer matches the builder stage lockfile
+# Cannot use --prod because Prisma CLI is devDependency
+# Prisma client generation requires the CLI at runtime in containerized environments
+RUN pnpm install --no-frozen-lockfile
+
+# Generate Prisma client for production runtime
+# This ensures @prisma/client is available at runtime
+RUN npx prisma generate
+
+# Copy built applications
+COPY --from=builder --chown=ectropy:ectropy /app/dist ./dist
+
+# Copy runtime configuration files
+COPY --chown=ectropy:ectropy docker-compose.production.yml ./
+COPY --chown=ectropy:ectropy .env.production.template ./
+
+# Switch to non-root user
+USER ectropy
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
+
+# Expose port
+EXPOSE ${PORT}
+
+# Start the application
+CMD ["node", "dist/apps/api-gateway/main.js"]

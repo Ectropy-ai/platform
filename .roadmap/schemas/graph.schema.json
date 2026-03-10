@@ -1,0 +1,209 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:graph",
+  "title": "Ectropy Roadmap Knowledge Graph",
+  "description": "Graph schema defining all node and edge types for the Ectropy roadmap architecture, enabling AI agent navigation and dependency resolution",
+  "type": "object",
+  "required": ["nodes", "edges", "metadata"],
+  "properties": {
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/Node" },
+      "description": "All nodes in the roadmap knowledge graph"
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/Edge" },
+      "description": "All relationships between nodes"
+    },
+    "metadata": {
+      "$ref": "#/definitions/GraphMetadata",
+      "description": "Graph-level metadata"
+    }
+  },
+  "definitions": {
+    "Node": {
+      "type": "object",
+      "required": ["id", "type", "urn"],
+      "properties": {
+        "id": { "type": "string", "description": "Unique node identifier" },
+        "type": { "$ref": "#/definitions/NodeType" },
+        "urn": {
+          "type": "string",
+          "pattern": "^urn:luhtech:[a-z-]+:[a-z-]+:[a-z0-9-]+$",
+          "description": "Globally unique URN (e.g., urn:luhtech:ectropy:feature:carbon-marketplace)"
+        },
+        "data": {
+          "type": "object",
+          "description": "Node-specific data payload"
+        },
+        "relationships": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Edge IDs connected to this node"
+        }
+      }
+    },
+    "NodeType": {
+      "type": "string",
+      "enum": [
+        "Feature",
+        "Deliverable",
+        "Release",
+        "Service",
+        "Schema",
+        "MCPTool",
+        "Dependency",
+        "ExternalAPI",
+        "Database",
+        "Contract",
+        "Decision",
+        "Voxel",
+        "ComplianceCharter",
+        "AuthorityTier",
+        "TaktZone",
+        "TaktWagon",
+        "PayApplication",
+        "CarbonOffset",
+        "EPDCache",
+        "MaterialSupplier",
+        "Robot",
+        "SensorPlan",
+        "EigenmodeForecast",
+        "ConsequenceChain",
+        "ScheduleProposal",
+        "FunctionalTest",
+        "CommissioningSystem",
+        "CxIssue",
+        "PunchItem",
+        "Closeout",
+        "G704Certificate",
+        "Warranty",
+        "WarrantyClaim",
+        "BuildingHistory",
+        "Inspection",
+        "SavingsDistribution",
+        "TargetCost",
+        "IPDVotingSession",
+        "AssistantConversation",
+        "AssistantMessage",
+        "PhoneAgentConfig",
+        "RAGContext",
+        "SMSConversation",
+        "SMSMessage",
+        "LienWaiver",
+        "RetainageLedger",
+        "ChangeOrder",
+        "RFI",
+        "Submittal",
+        "TaktTrain",
+        "CrewAllocation",
+        "TradeSequence",
+        "ConflictAnalysis",
+        "FlowOptimization",
+        "EmergencyIncident",
+        "SpaceAllocation",
+        "EnergyMetrics",
+        "ResourceAssignment",
+        "UWBAnchor",
+        "PositioningGrid",
+        "SensorReading",
+        "IoTDevice",
+        "CommissioningTest",
+        "TurnoverPackage",
+        "ForecastAnalysis",
+        "EigenSpectrum",
+        "ConfidenceInterval",
+        "CarbonCalculation",
+        "CarbonHotspot"
+      ],
+      "description": "Type of node in the knowledge graph (70 total node types)"
+    },
+    "Edge": {
+      "type": "object",
+      "required": ["id", "type", "source", "target"],
+      "properties": {
+        "id": { "type": "string", "description": "Unique edge identifier" },
+        "type": { "$ref": "#/definitions/EdgeType" },
+        "source": {
+          "type": "string",
+          "description": "Source node URN"
+        },
+        "target": {
+          "type": "string",
+          "description": "Target node URN"
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Edge-specific metadata (weight, timestamp, etc.)"
+        }
+      }
+    },
+    "EdgeType": {
+      "type": "string",
+      "enum": [
+        "DEPENDS_ON",
+        "IMPLEMENTS",
+        "EXTENDS",
+        "USES",
+        "INTEGRATES",
+        "BELONGS_TO",
+        "PRODUCES",
+        "CONSUMES",
+        "TRIGGERS",
+        "RESOLVES",
+        "BLOCKS",
+        "REFERENCES",
+        "SUPERSEDES",
+        "CAUSES",
+        "MITIGATES",
+        "VALIDATES",
+        "DEPLOYS_TO",
+        "RUNS_ON",
+        "STORES_IN",
+        "QUERIES",
+        "PUBLISHES",
+        "SUBSCRIBES",
+        "ESCALATES_TO",
+        "DELEGATES_TO",
+        "ASSIGNS",
+        "APPROVES",
+        "REJECTS",
+        "PRECEDES",
+        "FOLLOWS",
+        "CONTAINS"
+      ],
+      "description": "Type of relationship between nodes (30 total edge types)"
+    },
+    "GraphMetadata": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Graph schema version"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "nodeCount": {
+          "type": "number",
+          "description": "Total nodes in graph"
+        },
+        "edgeCount": {
+          "type": "number",
+          "description": "Total edges in graph"
+        },
+        "namespaces": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "URN namespaces used (ectropy, raizal, external, etc.)"
+        }
+      }
+    }
+  }
+}

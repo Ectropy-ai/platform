@@ -1,0 +1,14 @@
+{
+  "_instructions": "These should match your GitHub staging secrets",
+  "JWT_SECRET": "copy-from-github-staging-secrets",
+  "JWT_REFRESH_SECRET": "copy-from-github-staging-secrets",
+  "SESSION_SECRET": "copy-from-github-staging-secrets",
+  "DB_PASSWORD": "copy-from-github-staging-secrets",
+  "REDIS_PASSWORD": "copy-from-github-staging-secrets",
+  "ENCRYPTION_KEY": "add-this-to-github-then-copy-here",
+  "DATABASE_URL": "copy-from-github-staging-secrets",
+  "POSTGRES_PASSWORD": "copy-from-github-staging-secrets",
+  "SPECKLE_POSTGRES_PASSWORD": "copy-from-github-staging-secrets",
+  "SPECKLE_REDIS_PASSWORD": "copy-from-github-staging-secrets",
+  "SPECKLE_SESSION_SECRET": "copy-from-github-staging-secrets"
+}

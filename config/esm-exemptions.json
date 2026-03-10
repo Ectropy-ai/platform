@@ -1,0 +1,10 @@
+{
+  "exemptions": [
+    {
+      "path": "scripts/enable-mcp-agents.cjs",
+      "reason": "Requires CommonJS for backwards compatibility"
+    }
+  ],
+  "validated": "2025-01-10",
+  "nextReview": "2025-02-01"
+}

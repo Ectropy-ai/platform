@@ -1,0 +1,201 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:decision:sdi-snapshot",
+  "title": "SDI Snapshot",
+  "description": "Solution Density Index calculation snapshot. Captures the state of decision space density at a point in time for a project or zone.",
+  "type": "object",
+  "required": ["$id", "timestamp", "projectId", "sdiValue", "classification", "components"],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[^:]+:sdi-snapshot:SDI-[0-9]{4}-[0-9]{4,}$",
+      "description": "URN identifier for the SDI snapshot"
+    },
+    "$schema": {
+      "type": "string",
+      "const": "https://luhtech.dev/schemas/decision/sdi-snapshot.schema.json"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "const": "3.0.0"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this snapshot was calculated"
+    },
+    "projectId": {
+      "type": "string",
+      "description": "Project identifier"
+    },
+    "zoneId": {
+      "type": "string",
+      "description": "Takt zone (for localized SDI)"
+    },
+    "sdiValue": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Raw Solution Density Index (typically 10^3 to 10^6)"
+    },
+    "sdiLog": {
+      "type": "number",
+      "description": "log10(SDI) for normalized comparison (3-6 typical range)"
+    },
+    "shannonEntropy": {
+      "type": "number",
+      "description": "H = log2(SDI) - information entropy of decision space"
+    },
+    "classification": {
+      "type": "string",
+      "enum": ["critical", "warning", "healthy", "abundant"],
+      "description": "SDI classification based on thresholds"
+    },
+    "explorationBudget": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Computed exploration budget (0 = exploit only, 1 = full exploration)"
+    },
+    "components": {
+      "type": "object",
+      "description": "Breakdown of SDI calculation components",
+      "required": ["viablePathCount", "constraintCount", "resourceSlackRatio", "eigenmodeStability"],
+      "properties": {
+        "viablePathCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of viable decision paths"
+        },
+        "constraintCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of active constraints"
+        },
+        "resourceSlackRatio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Available resource slack (0 = fully committed, 1 = abundant)"
+        },
+        "eigenmodeStability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Stability of eigenmode vector over recent window"
+        },
+        "dependencyDepth": {
+          "type": "integer",
+          "description": "Maximum depth of dependency chain"
+        },
+        "criticalPathSlack": {
+          "type": "number",
+          "description": "Slack on critical path (hours)"
+        }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "description": "SDI threshold values (may be project-specific)",
+      "properties": {
+        "critical": {
+          "type": "number",
+          "description": "Below this: crisis mode, exploit only"
+        },
+        "warning": {
+          "type": "number",
+          "description": "Below this: constrain exploration"
+        },
+        "healthy": {
+          "type": "number",
+          "description": "Above this: normal operations"
+        },
+        "abundant": {
+          "type": "number",
+          "description": "Above this: full exploration enabled"
+        }
+      }
+    },
+    "trend": {
+      "type": "object",
+      "description": "SDI trend analysis",
+      "properties": {
+        "direction": {
+          "type": "string",
+          "enum": ["increasing", "stable", "decreasing", "volatile"]
+        },
+        "velocity": {
+          "type": "number",
+          "description": "Rate of change (SDI units per day)"
+        },
+        "projectedClassificationChange": {
+          "type": "string",
+          "enum": ["upgrade", "stable", "downgrade"],
+          "description": "Expected classification change in next 7 days"
+        },
+        "historicalWindow": {
+          "type": "integer",
+          "description": "Days of history used for trend calculation"
+        }
+      }
+    },
+    "budgetBreakdown": {
+      "type": "object",
+      "description": "Exploration budget component breakdown",
+      "properties": {
+        "sdiFactor": {
+          "type": "number",
+          "description": "Contribution from SDI (40% weight)"
+        },
+        "stabilityFactor": {
+          "type": "number",
+          "description": "Contribution from eigenmode stability (35% weight)"
+        },
+        "resourceFactor": {
+          "type": "number",
+          "description": "Contribution from resource slack (25% weight)"
+        }
+      }
+    },
+    "eigenmodeVector": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 12,
+      "maxItems": 12,
+      "description": "Current 12-element eigenmode state"
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string" },
+          "severity": { "type": "number", "minimum": 0, "maximum": 1 },
+          "description": { "type": "string" }
+        }
+      },
+      "description": "Active constraints affecting SDI"
+    },
+    "triggeredBy": {
+      "type": "string",
+      "description": "What triggered this snapshot (scheduled, decision-event, manual)"
+    },
+    "linkedDecisionEvent": {
+      "type": "string",
+      "description": "Decision event URN if snapshot was taken for a decision"
+    },
+    "graphMetadata": {
+      "type": "object",
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "$schema": "../../schemas/feature.schema.json",
+  "$id": "urn:luhtech:ectropy:feature:gaas-caas-paas",
+  "featureId": "gaas-caas-paas",
+  "name": "GaaS/CaaS/PaaS - Governance, Coordination & Payment Architecture",
+  "version": "1.0.0",
+  "status": "IN_DEVELOPMENT",
+  "priority": "CRITICAL",
+  "owner": "Team",
+  "repository": "luhtech/Ectropy-Business",
+  "targetRelease": "2026-03-01",
+  "schemaVersion": "3.0.0",
+  "meta": {
+    "sourceOfTruth": ".roadmap/features/gaas-caas-paas/FEATURE.json",
+    "lastUpdated": "2026-01-30T00:00:00Z"
+  },
+  "description": "Three tightly integrated services forming the enterprise backbone: GaaS (Governance as a Service) for contract compliance and 7-tier authority cascade, CaaS (Coordination as a Service) for takt planning and trade sequencing, and PaaS (Payment as a Service) for AIA G702/G703 payment applications with retainage management.",
+  "coreInnovation": {
+    "before": {
+      "governance": "Manual compliance tracking, scattered decision authority",
+      "coordination": "Excel-based takt planning, no real-time visibility",
+      "payment": "Paper-based AIA forms, manual retainage calculation"
+    },
+    "after": {
+      "governance": "Automated 7-tier authority cascade with spatial decision attachment",
+      "coordination": "3D takt zones with real-time wagon tracking and flow optimization",
+      "payment": "Automated G702/G703 generation with lien waiver validation"
+    }
+  },
+  "value": {
+    "complianceTracking": "Automated charter validation against AIA, OSHA, carbon budgets",
+    "taktPlanning": "Real-time conflict detection and route optimization",
+    "paymentProcessing": "Automated retainage calculation and lien waiver tracking"
+  },
+  "services": [
+    {
+      "name": "GaaS (Governance as a Service)",
+      "port": 4008,
+      "purpose": "Contract compliance, decision authority, regulatory enforcement",
+      "mcpTools": 35
+    },
+    {
+      "name": "CaaS (Coordination as a Service)",
+      "port": 4009,
+      "purpose": "Takt planning, trade sequencing, flow optimization",
+      "mcpTools": 42
+    },
+    {
+      "name": "PaaS (Payment as a Service)",
+      "port": 4010,
+      "purpose": "AIA G702/G703 payment applications, retainage, lien waivers",
+      "mcpTools": 38
+    }
+  ],
+  "milestones": [
+    {
+      "id": "M1",
+      "name": "Foundation",
+      "targetDate": "2026-03-01",
+      "status": "IN_PROGRESS",
+      "description": "Compliance Charter schema, 7-tier authority cascade, takt zone creation, G702/G703 generation",
+      "deliverables": [
+        ".roadmap/schemas/gaas/compliance-charter.schema.json",
+        ".roadmap/schemas/gaas/authority-tier.schema.json",
+        ".roadmap/schemas/caas/takt-zone.schema.json",
+        ".roadmap/schemas/caas/takt-wagon.schema.json",
+        ".roadmap/schemas/paas/pay-application.schema.json"
+      ]
+    },
+    {
+      "id": "M2",
+      "name": "Carbon Integration",
+      "targetDate": "2026-06-01",
+      "status": "NOT_STARTED",
+      "description": "Carbon budget enforcement, Buy Clean CA validation, carbon offset voxel attribution"
+    },
+    {
+      "id": "M3",
+      "name": "Advanced Coordination",
+      "targetDate": "2026-06-01",
+      "status": "NOT_STARTED",
+      "description": "Takt wagon route optimization, PostGIS conflict detection, crew allocation optimization, EFAS integration"
+    },
+    {
+      "id": "M4",
+      "name": "IPD & Risk Sharing",
+      "targetDate": "2026-09-01",
+      "status": "NOT_STARTED",
+      "description": "Target cost tracking, IPD voting sessions, risk pool allocation, incentive compensation"
+    }
+  ],
+  "dependencies": {
+    "schemas": [
+      ".roadmap/schemas/gaas/compliance-charter.schema.json",
+      ".roadmap/schemas/gaas/authority-tier.schema.json",
+      ".roadmap/schemas/caas/takt-zone.schema.json",
+      ".roadmap/schemas/caas/takt-wagon.schema.json",
+      ".roadmap/schemas/paas/pay-application.schema.json"
+    ],
+    "services": [
+      "PostgreSQL + PostGIS",
+      "API Gateway"
+    ],
+    "features": [
+      "decision-lifecycle",
+      "vaas"
+    ]
+  },
+  "mcpTools": {
+    "total": 115,
+    "categories": {
+      "gaasCompliance": 35,
+      "caasCoordination": 42,
+      "paasPayment": 38
+    }
+  },
+  "graphMetadata": {
+    "nodeType": "Feature",
+    "inEdges": [
+      {"type": "PART_OF", "target": "urn:luhtech:ectropy:file:roadmap"}
+    ],
+    "outEdges": [
+      {"type": "INTEGRATES_WITH", "target": "urn:luhtech:ectropy:feature:decision-lifecycle"},
+      {"type": "INTEGRATES_WITH", "target": "urn:luhtech:ectropy:feature:carbon-intelligence"}
+    ]
+  }
+}

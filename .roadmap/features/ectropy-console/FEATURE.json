@@ -1,0 +1,125 @@
+{
+  "$schema": "../../schemas/feature.schema.json",
+  "$id": "urn:luhtech:ectropy:feature:ectropy-console",
+  "featureId": "ectropy-console",
+  "name": "Ectropy Employee Console",
+  "version": "1.0.0",
+  "status": "PILOT",
+  "priority": "CRITICAL",
+  "owner": "Platform Team",
+  "repository": "luhtech/Ectropy",
+  "targetRelease": "2026-03-01",
+  "schemaVersion": "3.0.0",
+  "meta": {
+    "sourceOfTruth": ".roadmap/features/ectropy-console/FEATURE.json",
+    "lastUpdated": "2026-01-30T00:00:00Z"
+  },
+  "description": "A dedicated internal console application for Ectropy staff to manage the entire platform: tenants, users, infrastructure, and monitoring. Architecturally distinct from customer-facing dashboards, consolidating multi-tenant management, cross-tenant user authorization, real-time system health monitoring, and centralized alerting.",
+  "coreInnovation": {
+    "before": {
+      "administration": "Scattered across Grafana, direct database access, customer dashboards",
+      "visibility": "No unified view for tenant/user management",
+      "provisioning": "Manual process for each new customer"
+    },
+    "after": {
+      "administration": "Single consolidated console at console.ectropy.ai",
+      "visibility": "Real-time system health and tenant metrics at a glance",
+      "provisioning": "Zero-SSH user provisioning via web dashboard"
+    }
+  },
+  "value": {
+    "adminTimeReduction": "80% reduction in platform administration time",
+    "customerOnboarding": "Enables scalable March 2026 demo onboarding",
+    "operationalVisibility": "Single source of truth for platform operations"
+  },
+  "milestones": [
+    {
+      "id": "M1",
+      "name": "Console App Structure",
+      "targetDate": "2026-01-29",
+      "status": "COMPLETE",
+      "completedAt": "2026-01-29T00:00:00Z",
+      "description": "React 18 + MUI 6 + React Query 5 app with platform admin authentication gate",
+      "deliverables": [
+        "apps/ectropy-console/",
+        "Platform admin authentication gate",
+        "Dark theme for monitoring context"
+      ]
+    },
+    {
+      "id": "M2",
+      "name": "Backend Console APIs",
+      "targetDate": "2026-01-29",
+      "status": "COMPLETE",
+      "completedAt": "2026-01-29T00:00:00Z",
+      "description": "11 RESTful endpoints for tenant CRUD, user authorization, system health",
+      "deliverables": [
+        "GET/POST/PUT /api/console/tenants",
+        "POST /api/console/tenants/:id/suspend",
+        "POST /api/console/tenants/:id/activate",
+        "GET /api/console/users",
+        "POST /api/console/users/:id/authorize",
+        "POST /api/console/users/:id/revoke",
+        "POST /api/console/users/invite",
+        "GET /api/console/health"
+      ]
+    },
+    {
+      "id": "M3",
+      "name": "Prometheus/Grafana Hybrid",
+      "targetDate": "2026-02-15",
+      "status": "NOT_STARTED",
+      "description": "Embedded Grafana dashboards, native metrics display, real-time WebSocket updates"
+    },
+    {
+      "id": "M4",
+      "name": "Alert Management",
+      "targetDate": "2026-02-28",
+      "status": "NOT_STARTED",
+      "description": "AlertManager API integration, alert history and acknowledgment, incident tracking"
+    },
+    {
+      "id": "M5",
+      "name": "Deployment Management",
+      "targetDate": "2026-03-15",
+      "status": "NOT_STARTED",
+      "description": "Watchtower integration, container health monitoring, rollback controls"
+    },
+    {
+      "id": "M6",
+      "name": "Analytics & Reporting",
+      "targetDate": "2026-04-01",
+      "status": "NOT_STARTED",
+      "description": "Tenant usage analytics, conversion funnel metrics, revenue tracking"
+    }
+  ],
+  "urls": {
+    "console": "console.ectropy.ai",
+    "customerDashboard": "app.ectropy.ai",
+    "grafana": "grafana.ectropy.ai"
+  },
+  "accessBoundaries": {
+    "ectropyStaff": "is_platform_admin = true",
+    "tenantAdmin": "TenantMember.is_owner = true",
+    "tenantUser": "TenantMember.role"
+  },
+  "dependencies": {
+    "features": [
+      "user-management",
+      "multi-tenant-foundation"
+    ],
+    "services": [
+      "Prometheus",
+      "Grafana",
+      "AlertManager"
+    ]
+  },
+  "graphMetadata": {
+    "nodeType": "Feature",
+    "inEdges": [
+      {"type": "PART_OF", "target": "urn:luhtech:ectropy:file:roadmap"},
+      {"type": "DEPENDS_ON", "target": "urn:luhtech:ectropy:feature:user-management"}
+    ],
+    "outEdges": []
+  }
+}

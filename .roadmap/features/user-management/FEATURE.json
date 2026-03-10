@@ -1,0 +1,495 @@
+{
+  "$schema": "../../schemas/feature.schema.json",
+  "$id": "urn:luhtech:ectropy:feature:user-management",
+  "featureId": "user-management",
+  "name": "User Management & Self-Service Onboarding",
+  "version": "1.0.0",
+  "status": "PLANNED",
+  "priority": "CRITICAL",
+  "owner": "Erik Luhman",
+  "repository": "luhtech/Ectropy",
+  "targetRelease": "2026-03-01",
+  "schemaVersion": "3.0.0",
+  "meta": {
+    "sourceOfTruth": ".roadmap/features/user-management/FEATURE.json",
+    "lastUpdated": "2026-01-28T00:00:00Z",
+    "dependsOn": ["multi-tenant-foundation (COMPLETE)"],
+    "relatedDocs": [
+      "apps/mcp-server/data/roadmap/USER_MANAGEMENT_ARCHITECTURE_2026-01-28.json",
+      "apps/mcp-server/data/evidence/2026-01/MULTI_TENANT_AUDIT_RESOLUTION_2026-01-28.json",
+      ".roadmap/database-strategy.json",
+      "apps/api-gateway/src/routes/oauth.routes.ts",
+      "apps/api-gateway/src/routes/waitlist.routes.ts"
+    ]
+  },
+  "description": "Comprehensive user management architecture that eliminates manual AUTHORIZED_USERS environment variable pattern, enables self-service tenant registration and user onboarding, integrates with existing CRM pipeline (Twenty CRM via n8n), and provides admin interfaces for user/tenant management. Critical foundation for March 2026 pilot customer onboarding and revenue generation.",
+  "businessJustification": {
+    "problem": "Current AUTHORIZED_USERS env var pattern requires manual SSH access for every new user, blocks self-service signup, causes E2E test failures, and prevents automated customer journey from waitlist → trial → paying customer",
+    "impact": "Blocks March 2026 Canadian pilot customer onboarding, prevents revenue generation, creates operational bottleneck for user provisioning",
+    "opportunity": "Enable $5K-$10K MRR by Sept 2026 through automated customer acquisition and tenant provisioning",
+    "roi": "Eliminates 100% of manual user provisioning overhead, reduces onboarding time from days to minutes, enables pre-seed raise milestone (June 2026)"
+  },
+  "coreInnovation": {
+    "before": {
+      "authorization": "AUTHORIZED_USERS environment variable (comma-separated email list)",
+      "userProvisioning": "Manual SSH access to production servers to update env vars and restart services",
+      "tenantCreation": "Manual database operations via Prisma Studio or SQL scripts",
+      "teamInvitations": "Email-based manual account creation by platform admin",
+      "customerJourney": "Waitlist → manual outreach → manual provisioning → manual access grant",
+      "crmIntegration": "One-way: Waitlist → n8n → Twenty CRM (no reverse sync)",
+      "scalability": "Limited by manual operations, high operational cost per tenant",
+      "compliance": "No audit trail for user provisioning, manual PIPEDA data handling"
+    },
+    "after": {
+      "authorization": "Database-driven UserAuthorizationService with Redis caching, automatic session validation",
+      "userProvisioning": "Self-service registration with email verification, automated tenant provisioning",
+      "tenantCreation": "TenantProvisioningService automatically creates tenant + schema + admin user + demo data",
+      "teamInvitations": "Secure token-based invitation system with 7-day expiration, role assignment",
+      "customerJourney": "Waitlist → email verified → self-service signup → automated trial → upgrade to paid",
+      "crmIntegration": "Bidirectional: Registration updates CRM, CRM webhooks trigger provisioning",
+      "scalability": "Zero manual intervention, automated tenant lifecycle, unlimited growth capacity",
+      "compliance": "Full audit trail, automated PIPEDA compliance, tenant-isolated data retention"
+    }
+  },
+  "architectureDecisions": {
+    "approach": "Database-Driven User Management with Multi-Tenant Integration",
+    "keyPrinciples": [
+      "Build on completed multi-tenant foundation (MT-M1 through MT-M5)",
+      "Leverage existing OAuth authentication (Google OAuth via Passport.js)",
+      "Replace environment variable authorization with database + Redis cache",
+      "Automate tenant provisioning during registration workflow",
+      "Maintain existing CRM integration (Twenty CRM via n8n) and extend bidirectionally",
+      "Admin UI for zero-SSH user/tenant management",
+      "Invitation-based team member onboarding with secure tokens",
+      "Progressive disclosure: Basic registration → Trial features → Paid subscription"
+    ],
+    "alternatives": [
+      {
+        "name": "Third-party auth service (Auth0, Clerk)",
+        "rejected": "High recurring cost ($200-500/month), vendor lock-in, existing OAuth investment"
+      },
+      {
+        "name": "Keep AUTHORIZED_USERS pattern with automation",
+        "rejected": "Still requires env var management, no audit trail, doesn't solve E2E testing issues"
+      },
+      {
+        "name": "Manual onboarding with CRM-only tracking",
+        "rejected": "Doesn't scale, blocks self-service model, high operational cost"
+      }
+    ],
+    "rationale": [
+      "Extends existing multi-tenant foundation without architectural rework",
+      "Eliminates operational bottleneck (manual user provisioning)",
+      "Enables automated customer acquisition funnel",
+      "Provides strong audit trail for PIPEDA/SOX compliance",
+      "Zero additional licensing costs beyond existing infrastructure"
+    ]
+  },
+  "securityModel": {
+    "authentication": "Google OAuth 2.0 via Passport.js (existing implementation)",
+    "authorization": "Database-driven UserAuthorizationService with role-based access control (RBAC)",
+    "sessionManagement": "Redis-backed sessions with automatic regeneration after privilege escalation",
+    "invitationSecurity": "Cryptographically secure tokens (32+ random bytes), 7-day expiration, single-use",
+    "tenantIsolation": "Row-Level Security (RLS) with app.current_tenant_id session variable (from MT-M3)",
+    "auditTrail": "All user/tenant operations logged in audit_logs table with tenant_id isolation",
+    "passwordPolicy": "bcrypt hashing (cost factor 12) for optional password auth, minimum 10 characters",
+    "apiSecurity": "JWT tokens with tenant claims, rate limiting (100 req/15min per user)"
+  },
+  "integrationPoints": {
+    "multiTenantFoundation": {
+      "dependency": "multi-tenant-foundation (MT-M1 through MT-M5)",
+      "integration": [
+        "Uses existing Tenant model (tenant_id, subscription_tier, status)",
+        "Leverages TenantContextService for request-scoped isolation",
+        "Relies on RLS policies (app.current_tenant_id) for data security",
+        "Extends User model with registration fields (email_verified_at, last_login_at)",
+        "Integrates with existing StakeholderRole enum (admin, owner, contractor)"
+      ]
+    },
+    "databaseStrategy": {
+      "alignment": ".roadmap/database-strategy.json lines 360-372 (tenant provisioning workflow)",
+      "implementation": [
+        "TenantProvisioningService executes workflow: Create tenant → Generate schema → Migrate → Seed → Create admin",
+        "UserRegistrationService handles waitlist → email verification → tenant creation lifecycle",
+        "Atomic transactions with full rollback on provisioning failure",
+        "Automated data retention policies per tenant (GDPR/PIPEDA compliance)"
+      ]
+    },
+    "existingCRM": {
+      "integration": "apps/api-gateway/src/routes/waitlist.routes.ts",
+      "enhancement": [
+        "Bidirectional sync: Registration → Twenty CRM (update lead status to 'trial_user')",
+        "CRM webhook handler: Twenty CRM trial_to_paid trigger → Subscription upgrade",
+        "Lifecycle stages: waitlist → email_verified → tenant_created → trial → paid_customer → churned"
+      ]
+    },
+    "adminUI": {
+      "currentState": "apps/api-gateway/src/routes/admin.routes.ts (basic metrics)",
+      "additions": [
+        "User CRUD: List, create, edit, deactivate users (with tenant filtering)",
+        "Tenant CRUD: List, create, edit, suspend, delete tenants",
+        "Role assignment: Grant/revoke roles per user per tenant",
+        "Invitation management: Create, resend, revoke team invitations",
+        "User impersonation: Platform admins can impersonate tenant users for support"
+      ]
+    }
+  },
+  "milestones": [
+    {
+      "id": "M1",
+      "name": "Database Models & Migrations",
+      "targetDate": "2026-02-05",
+      "status": "NOT_STARTED",
+      "description": "Create Prisma schema extensions for user registration, invitations, tenant members, and subscription history",
+      "deliverables": [
+        "prisma/schema.prisma - 4 new models (UserInvitation, UserRegistration, TenantMember, SubscriptionHistory)",
+        "prisma/migrations/YYYYMMDD_m1_user_management_models/migration.sql",
+        "Updated User model with registration fields (email_verified, email_verified_at, last_login_at, registration_completed)",
+        "Updated Tenant model with trial tracking (trial_started_at, trial_ends_at, converted_at)"
+      ],
+      "completionCriteria": [
+        "UserInvitation model with token, email, tenant_id, role, status, expires_at, invited_by",
+        "UserRegistration model tracking lifecycle: waitlist → verified → tenant_created → trial → paid",
+        "TenantMember junction table for many-to-many user-tenant-role assignments",
+        "SubscriptionHistory for audit trail of tier changes (trial → basic → professional → enterprise)",
+        "All foreign keys with proper constraints and cascading rules",
+        "Indexes for performance: tenant_id, email, token, status, expires_at",
+        "Migration tested against staging database with rollback plan"
+      ],
+      "evidence": {
+        "schemas": [
+          "UserInvitation: 10 fields, unique token index, expires_at index",
+          "UserRegistration: 12 fields tracking CRM integration lifecycle",
+          "TenantMember: 6 fields with composite unique constraint (user_id, tenant_id)",
+          "SubscriptionHistory: 8 fields for SOX compliance audit trail"
+        ],
+        "migrations": [
+          "Forward migration: CREATE TABLE statements with constraints",
+          "Rollback migration: DROP TABLE statements for clean reversal"
+        ]
+      }
+    },
+    {
+      "id": "M2",
+      "name": "Backend Services Layer",
+      "targetDate": "2026-02-10",
+      "status": "NOT_STARTED",
+      "description": "Implement core service classes for registration, invitations, tenant provisioning, authorization, and CRM integration",
+      "deliverables": [
+        "apps/api-gateway/src/services/user-registration.service.ts",
+        "apps/api-gateway/src/services/user-invitation.service.ts",
+        "apps/api-gateway/src/services/tenant-provisioning.service.ts",
+        "apps/api-gateway/src/services/user-authorization.service.ts (replaces AUTHORIZED_USERS)",
+        "apps/api-gateway/src/services/crm-integration.service.ts (extends waitlist integration)",
+        "Unit tests for all 5 services (>80% coverage)"
+      ],
+      "completionCriteria": [
+        "UserRegistrationService: register(), verifyEmail(), completeProfile() methods",
+        "UserInvitationService: createInvitation(), acceptInvitation(), revokeInvitation() with token generation",
+        "TenantProvisioningService: provisionTenant() executes atomic workflow (tenant + admin + schema + seed)",
+        "UserAuthorizationService: isAuthorized() with Redis caching (5-minute TTL), replacing env var checks",
+        "CRMIntegrationService: syncToTwentyCRM() bidirectional with lifecycle stage updates",
+        "All services use TenantContextService for RLS isolation",
+        "Error handling with specific error types (RegistrationError, InvitationExpiredError, ProvisioningError)",
+        "Transaction-safe operations with automatic rollback on failure"
+      ],
+      "evidence": {
+        "serviceClasses": "5 services, average 300+ lines each, full TypeScript types",
+        "unitTests": "25+ test cases covering happy paths, error cases, edge cases",
+        "redisIntegration": "Authorization cache with automatic invalidation on user/role changes",
+        "transactionHandling": "Prisma $transaction() usage with rollback validation"
+      }
+    },
+    {
+      "id": "M3",
+      "name": "Registration & Invitation API Endpoints",
+      "targetDate": "2026-02-15",
+      "status": "NOT_STARTED",
+      "description": "Create RESTful API endpoints for user registration, email verification, and team invitation workflows",
+      "deliverables": [
+        "apps/api-gateway/src/routes/registration.routes.ts - 6 endpoints",
+        "apps/api-gateway/src/routes/invitation.routes.ts - 5 endpoints",
+        "Integration tests for all 11 endpoints",
+        "OpenAPI/Swagger documentation for API"
+      ],
+      "completionCriteria": [
+        "POST /api/registration/signup - Create registration from waitlist email",
+        "POST /api/registration/verify-email - Verify email with token",
+        "POST /api/registration/complete-profile - Complete registration with company/role info",
+        "GET /api/registration/status/:email - Check registration status",
+        "POST /api/invitations - Create team invitation (authenticated, admin role required)",
+        "POST /api/invitations/:token/accept - Accept invitation and create user account",
+        "GET /api/invitations/pending - List pending invitations for current user",
+        "DELETE /api/invitations/:id - Revoke invitation (admin only)",
+        "All endpoints validated with Zod schemas for request/response",
+        "Rate limiting: 5 req/hour for signup, 100 req/15min for authenticated endpoints",
+        "Email notifications: Welcome email, invitation email, verification email"
+      ],
+      "evidence": {
+        "endpoints": "11 RESTful endpoints with full CRUD operations",
+        "validation": "Zod schemas for all inputs, type-safe responses",
+        "rateLimiting": "express-rate-limit middleware per endpoint",
+        "emailTemplates": "3 email templates (welcome, invitation, verification)"
+      }
+    },
+    {
+      "id": "M4",
+      "name": "Admin UI for User & Tenant Management",
+      "targetDate": "2026-02-20",
+      "status": "NOT_STARTED",
+      "description": "Build admin dashboard pages for managing users, tenants, invitations, and roles without SSH access",
+      "deliverables": [
+        "apps/web/src/app/admin/users/page.tsx - User management table with filters",
+        "apps/web/src/app/admin/tenants/page.tsx - Tenant management with status controls",
+        "apps/web/src/app/admin/invitations/page.tsx - Invitation creation and tracking",
+        "apps/web/src/components/admin/UserEditDialog.tsx - User profile editor",
+        "apps/web/src/components/admin/TenantProvisioningDialog.tsx - Manual tenant creation",
+        "E2E tests for admin workflows (Playwright)"
+      ],
+      "completionCriteria": [
+        "User table: Search, filter by tenant/role/status, edit, deactivate, impersonate",
+        "Tenant table: Search, filter by tier/status, edit, suspend, view metrics (user count, project count)",
+        "Invitation page: Create invitation with email/role/tenant, resend, revoke, view status",
+        "Role assignment: Multi-select roles per user per tenant (admin, owner, contractor)",
+        "Impersonation: Platform admin can impersonate tenant user (logged in audit_logs)",
+        "Responsive design: Works on desktop and tablet (admin on mobile not required)",
+        "Permissions: Only is_platform_admin=true users can access admin UI",
+        "Real-time updates: Auto-refresh tables when changes occur (WebSocket or polling)"
+      ],
+      "evidence": {
+        "pages": "3 admin pages with full CRUD operations",
+        "components": "10+ reusable admin components (dialogs, tables, filters)",
+        "e2eTests": "15+ Playwright tests covering admin workflows",
+        "permissions": "Middleware blocking non-admin access, tested with E2E"
+      }
+    },
+    {
+      "id": "M5",
+      "name": "CRM Integration & Customer Lifecycle",
+      "targetDate": "2026-02-25",
+      "status": "NOT_STARTED",
+      "description": "Extend CRM integration to bidirectionally sync user lifecycle stages and enable automated customer journey",
+      "deliverables": [
+        "apps/api-gateway/src/routes/crm-webhooks.routes.ts - Webhook handlers for Twenty CRM",
+        "apps/api-gateway/src/services/customer-lifecycle.service.ts - Lifecycle stage management",
+        "n8n workflow updates for bidirectional sync",
+        "Analytics integration for conversion funnel tracking"
+      ],
+      "completionCriteria": [
+        "Lifecycle stages: waitlist → email_verified → tenant_created → trial → paid_customer → churned",
+        "Webhook: POST /api/webhooks/crm/trial-to-paid - Upgrade user from trial to paid subscription",
+        "Webhook: POST /api/webhooks/crm/lead-qualified - Trigger automated registration email",
+        "n8n workflow: Sync registration → Twenty CRM with lifecycle stage update",
+        "n8n workflow: Twenty CRM opportunity_won → Subscription tier upgrade",
+        "Analytics events: registration_started, email_verified, tenant_created, trial_activated, subscription_paid",
+        "Conversion funnel metrics: Waitlist → Trial conversion rate, Trial → Paid conversion rate",
+        "Email automation: Trial expiring (7 days before), trial expired, upgrade prompts"
+      ],
+      "evidence": {
+        "webhooks": "3 webhook endpoints with HMAC signature validation",
+        "n8nWorkflows": "2 updated workflows with error handling and retry logic",
+        "analyticsEvents": "6 lifecycle events tracked in conversion-funnel.ts",
+        "emailAutomation": "3 automated email sequences based on lifecycle stage"
+      }
+    },
+    {
+      "id": "M6",
+      "name": "AUTHORIZED_USERS Migration & Cleanup",
+      "targetDate": "2026-03-01",
+      "status": "NOT_STARTED",
+      "description": "Migrate existing AUTHORIZED_USERS environment variable to database, update OAuth routes, deploy to production",
+      "deliverables": [
+        "scripts/migration/migrate-authorized-users-to-db.ts - One-time migration script",
+        "apps/api-gateway/src/routes/oauth.routes.ts - Updated to use UserAuthorizationService",
+        "apps/api-gateway/src/config/index.ts - Remove AUTHORIZED_USERS config (deprecated)",
+        "Deployment runbook for zero-downtime migration",
+        "E2E tests validating new authorization flow"
+      ],
+      "completionCriteria": [
+        "Migration script: Parse AUTHORIZED_USERS, create User records with email_verified=true",
+        "OAuth routes: Replace authorizedUsers.includes(email) with UserAuthorizationService.isAuthorized()",
+        "Redis cache: Warm cache with existing users before cutover",
+        "Blue-green deployment: New code deployed, old env var still works during overlap",
+        "Validation: All existing users can still authenticate post-migration",
+        "Cleanup: AUTHORIZED_USERS env var removed from all environments (dev, staging, production)",
+        "Documentation: Update deployment docs, remove references to AUTHORIZED_USERS pattern",
+        "Monitoring: Track authorization failures, cache hit rate, latency (p95 < 50ms)"
+      ],
+      "evidence": {
+        "migration": "Dry-run and production execution logs with user counts",
+        "deployment": "Zero downtime during cutover, no authentication failures",
+        "cleanup": "AUTHORIZED_USERS removed from .env, docker-compose, GitHub secrets",
+        "monitoring": "Grafana dashboard showing authorization metrics (cache hit rate >95%)"
+      }
+    }
+  ],
+  "dependencies": {
+    "features": [
+      "multi-tenant-foundation (COMPLETE - MT-M1 through MT-M5 required)"
+    ],
+    "services": [
+      "DigitalOcean Managed PostgreSQL (existing)",
+      "Redis 7.x (existing)",
+      "n8n automation platform (existing)",
+      "Twenty CRM (existing)",
+      "Google OAuth 2.0 (existing)"
+    ],
+    "external": [
+      "Email service (SendGrid, AWS SES, or similar) - to be provisioned",
+      "Domain verification for email sending (DKIM, SPF, DMARC) - to be configured"
+    ]
+  },
+  "value": {
+    "estimatedSavings": "$50K-$100K annual operational cost reduction (eliminates manual provisioning overhead)",
+    "roi": "500%+ ROI within 6 months (implementation cost ~$20K vs. $100K+ revenue enabled)",
+    "timeReduction": "Onboarding time: Days → Minutes (>95% reduction)",
+    "revenueEnabled": "$5K-$10K MRR by Sept 2026 through automated customer acquisition",
+    "systemCost": "$15K-$20K implementation (200-250 development hours @ $75-100/hour)",
+    "operationalImpact": "Zero manual intervention required for user/tenant provisioning post-implementation"
+  },
+  "complianceImpact": {
+    "pipeda": "Automated data retention policies per tenant, full audit trail for user provisioning",
+    "gdpr": "Self-service data export, right to erasure, consent management during registration",
+    "sox": "7-year audit log retention for user/tenant changes, immutable subscription history",
+    "cmmc": "Enhanced access control with RBAC, MFA support (future), all authentication logged"
+  },
+  "riskMitigation": {
+    "pilotBlocking": {
+      "risk": "March 2026 Canadian pilot delayed due to manual onboarding bottleneck",
+      "mitigation": "M1-M3 completion by Feb 15 enables basic registration, sufficient for pilot"
+    },
+    "dataMigration": {
+      "risk": "Existing AUTHORIZED_USERS migration breaks authentication",
+      "mitigation": "Blue-green deployment with overlap period, dry-run migration, comprehensive E2E testing"
+    },
+    "emailDeliverability": {
+      "risk": "Verification emails marked as spam, blocking registration flow",
+      "mitigation": "Proper DKIM/SPF/DMARC setup, use reputable email service (SendGrid/AWS SES), test deliverability"
+    },
+    "crmIntegration": {
+      "risk": "Twenty CRM webhook failures cause registration failures",
+      "mitigation": "CRM sync is async/non-blocking, retry logic with exponential backoff, fallback to manual sync"
+    }
+  },
+  "successCriteria": {
+    "technical": [
+      "Zero manual SSH access required for user/tenant provisioning",
+      "100% of new users onboard via self-service registration",
+      "Authorization cache hit rate >95%",
+      "Registration flow completion <5 minutes (p95)",
+      "Email verification delivery rate >98%",
+      "E2E test success rate 100% on staging with OAuth + database auth"
+    ],
+    "business": [
+      "March 2026 pilot customer onboarded via self-service (no manual provisioning)",
+      "Waitlist → Trial conversion rate >25%",
+      "Trial → Paid conversion rate >10%",
+      "5-10 paying customers by Sept 2026",
+      "$5K-$10K MRR by Sept 2026",
+      "Pre-seed raise milestone achieved (June 2026) enabled by revenue traction"
+    ],
+    "operational": [
+      "Zero support tickets for 'cannot login' issues (replaced with self-service password reset)",
+      "Platform admin time on user provisioning reduced from 2 hours/week to 0",
+      "Tenant creation time: Days → Seconds (automated provisioning)",
+      "CRM data quality: 100% registration → CRM sync (currently ~80% manual entry)"
+    ]
+  },
+  "rolloutStrategy": {
+    "phase1": {
+      "name": "Internal Testing (Dev + Staging)",
+      "timeline": "Feb 5 - Feb 20, 2026",
+      "scope": "M1-M4 completed, tested on staging environment",
+      "validation": "E2E tests passing, admin UI functional, registration flow works for test users"
+    },
+    "phase2": {
+      "name": "Pilot Customer Onboarding",
+      "timeline": "Feb 25 - Mar 1, 2026",
+      "scope": "M5-M6 completed, deployed to production, AUTHORIZED_USERS migrated",
+      "validation": "March pilot customer self-service registration successful, CRM integration working"
+    },
+    "phase3": {
+      "name": "Public Waitlist Conversion",
+      "timeline": "Mar 1 - Sept 1, 2026",
+      "scope": "All existing waitlist users (~50-100) invited to register via automated campaign",
+      "validation": "Waitlist → Trial conversion rate >25%, no manual provisioning needed"
+    },
+    "phase4": {
+      "name": "Revenue Generation & Optimization",
+      "timeline": "Sept 1, 2026 onwards",
+      "scope": "Trial → Paid conversion optimization, subscription tier upgrades, feature gating",
+      "validation": "$5K-$10K MRR achieved, 5-10 paying customers, pre-seed raise completed"
+    }
+  },
+  "monitoringAndObservability": {
+    "metrics": [
+      "Registration funnel: Started → Email verified → Profile completed → Tenant created",
+      "Authorization performance: Cache hit rate, p50/p95/p99 latency, failure rate",
+      "Invitation metrics: Created, accepted, expired, revoked per tenant",
+      "Tenant provisioning: Success rate, failure reasons, rollback frequency, duration (p95)",
+      "CRM sync: Success rate, latency, retry count, manual intervention needed"
+    ],
+    "dashboards": {
+      "grafana": "User management dashboard with real-time registration metrics",
+      "mixpanel": "Conversion funnel visualization (waitlist → trial → paid)",
+      "twentyCRM": "Lead lifecycle dashboard with stage progression"
+    },
+    "alerting": {
+      "registrationFailures": {
+        "threshold": ">5 failures in 1 hour",
+        "action": "Alert ops team, investigate email service or database issues"
+      },
+      "authorizationCacheMiss": {
+        "threshold": "Cache hit rate <90%",
+        "action": "Investigate Redis performance or cache invalidation logic"
+      },
+      "crmSyncFailures": {
+        "threshold": ">10% sync failure rate",
+        "action": "Alert integration team, check n8n workflow and Twenty CRM API health"
+      }
+    }
+  },
+  "futureEnhancements": {
+    "mfaSupport": {
+      "description": "Multi-factor authentication via TOTP (Google Authenticator) for enhanced security",
+      "targetDate": "2026-Q3",
+      "priority": "HIGH"
+    },
+    "ssoIntegration": {
+      "description": "Enterprise SSO via SAML 2.0 / OpenID Connect for large customers",
+      "targetDate": "2026-Q4",
+      "priority": "MEDIUM"
+    },
+    "advancedRbac": {
+      "description": "Custom role definitions, permission granularity at feature level",
+      "targetDate": "2026-Q4",
+      "priority": "MEDIUM"
+    },
+    "userImpersonation": {
+      "description": "Enhanced impersonation with session recording for support/debugging",
+      "targetDate": "2026-Q3",
+      "priority": "LOW"
+    },
+    "selfServiceBilling": {
+      "description": "Stripe integration for subscription management, invoicing, payment methods",
+      "targetDate": "2026-Q2",
+      "priority": "CRITICAL"
+    }
+  },
+  "relatedDocuments": {
+    "architectureDesign": "apps/mcp-server/data/roadmap/USER_MANAGEMENT_ARCHITECTURE_2026-01-28.json",
+    "multiTenantFoundation": ".roadmap/features/multi-tenant-foundation/FEATURE.json",
+    "databaseStrategy": ".roadmap/database-strategy.json",
+    "businessRoadmap": ".roadmap/roadmap-business.json",
+    "currentAuthImplementation": [
+      "apps/api-gateway/src/routes/oauth.routes.ts",
+      "apps/api-gateway/src/config/index.ts (AUTHORIZED_USERS)",
+      "apps/api-gateway/src/routes/waitlist.routes.ts",
+      "apps/api-gateway/src/routes/admin.routes.ts"
+    ],
+    "evidenceDocuments": [
+      "apps/mcp-server/data/evidence/2026-01/MULTI_TENANT_AUDIT_RESOLUTION_2026-01-28.json",
+      "apps/mcp-server/data/evidence/2026-01/E2E_TEST_AUTH_FAILURE_ANALYSIS_2026-01-28.json"
+    ]
+  }
+}

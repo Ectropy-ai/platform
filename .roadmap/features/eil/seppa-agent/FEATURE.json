@@ -1,0 +1,488 @@
+{
+  "$schema": "https://luhtech.dev/schemas/feature.schema.json",
+  "$id": "urn:luhtech:ectropy:feature:seppa-agent",
+  "schemaVersion": "1.0.0",
+  "meta": {
+    "ventureId": "ectropy",
+    "createdAt": "2026-01-07T20:00:00Z",
+    "lastUpdated": "2026-01-23T03:30:00Z",
+    "author": "erik",
+    "sourceDoc": ".roadmap/features/eil/seppa-agent/FEATURE.json"
+  },
+  "feature": {
+    "id": "seppa-agent",
+    "name": "Seppä Construction Intelligence Agent",
+    "description": "AI-powered construction assistant using Claude for natural language interaction with PM decision lifecycle, RAG retrieval, and multi-channel access",
+    "etymology": {
+      "finnish": "Seppä (master builder, journeyman)",
+      "acronym": "Spatial Element Processing Prediction Aggregation"
+    },
+    "status": "IN_DEVELOPMENT",
+    "priority": "critical",
+    "targetRelease": "2026-03-01",
+    "pilot": "Canadian Plant Facility"
+  },
+  "businessValue": {
+    "problem": "Construction teams spend 28+ hours per decision escalation, field workers have <30% app adoption",
+    "solution": "AI agent that understands construction context, respects authority cascade, and meets workers via SMS/voice",
+    "differentiator": "Only AI assistant with voxel-attached decision context and 7-tier authority awareness",
+    "metrics": {
+      "targetAdoptionRate": ">95% (via SMS vs <30% mobile apps)",
+      "targetResponseTime": "<5s P95 simple queries, <15s P95 complex",
+      "targetAccuracy": ">90% tool selection accuracy",
+      "targetROI": "1,485% per project"
+    }
+  },
+  "architecture": {
+    "services": [
+      {
+        "serviceId": "assistant-service",
+        "name": "Assistant Service",
+        "port": 4005,
+        "technology": "Node.js + Express + Anthropic SDK",
+        "description": "Claude API orchestration, tool execution, conversation management"
+      },
+      {
+        "serviceId": "rag-service",
+        "name": "RAG Service",
+        "port": 4006,
+        "technology": "Node.js + Qdrant + Jina Embeddings v3",
+        "description": "Vector search, embedding generation, context assembly"
+      },
+      {
+        "serviceId": "phone-agent-service",
+        "name": "Phone Agent Service",
+        "port": 4007,
+        "technology": "Node.js + Express + Twilio SDK",
+        "description": "SMS/Voice channel handling, multi-turn conversations"
+      }
+    ],
+    "integrations": [
+      {
+        "system": "MCP Server",
+        "port": 3002,
+        "method": "REST API",
+        "purpose": "PM Decision tools, deliverable CRUD, roadmap queries"
+      },
+      {
+        "system": "Qdrant",
+        "port": 6333,
+        "method": "gRPC/HTTP",
+        "purpose": "Vector storage and similarity search"
+      },
+      {
+        "system": "Twilio",
+        "method": "Webhooks",
+        "purpose": "SMS/Voice inbound and outbound messaging"
+      }
+    ],
+    "claudeModels": {
+      "production": {
+        "model": "claude-sonnet-4-20250514",
+        "maxTokens": 4096,
+        "useCase": "Primary assistant, tool orchestration"
+      },
+      "costOptimized": {
+        "model": "claude-haiku-4-5-20251001",
+        "maxTokens": 2048,
+        "useCase": "Simple queries, high-volume SMS"
+      },
+      "complex": {
+        "model": "claude-opus-4-5-20251101",
+        "maxTokens": 8192,
+        "useCase": "Multi-step reasoning, report generation"
+      }
+    }
+  },
+  "tools": {
+    "pmDecisionTools": {
+      "count": 17,
+      "categories": [
+        {
+          "name": "Decision Management",
+          "count": 6,
+          "tools": [
+            "capture_decision",
+            "route_decision",
+            "approve_decision",
+            "reject_decision",
+            "escalate_decision",
+            "batch_decisions"
+          ]
+        },
+        {
+          "name": "Authority Graph",
+          "count": 2,
+          "tools": ["get_authority_graph", "calculate_required_authority"]
+        },
+        {
+          "name": "Voxel Operations",
+          "count": 2,
+          "tools": ["get_voxel_decisions", "get_spatial_context"]
+        },
+        {
+          "name": "Consequence Tracking",
+          "count": 3,
+          "tools": [
+            "query_consequences",
+            "project_consequence_impact",
+            "record_consequence_occurrence"
+          ]
+        },
+        {
+          "name": "Inspection & Schedule",
+          "count": 3,
+          "tools": [
+            "schedule_inspection",
+            "record_inspection_result",
+            "get_inspection_requirements"
+          ]
+        },
+        {
+          "name": "Graph Query",
+          "count": 1,
+          "tools": ["traverse_decision_graph"]
+        }
+      ]
+    }
+  },
+  "multiTenant": {
+    "isolationLayers": [
+      {
+        "layer": "Database",
+        "strategy": "Schema per tenant with PostgreSQL RLS"
+      },
+      {
+        "layer": "Vector DB",
+        "strategy": "Qdrant namespaced collections per tenant"
+      },
+      {
+        "layer": "Cache",
+        "strategy": "Redis key prefix pattern: {tenantId}:*"
+      },
+      {
+        "layer": "LLM Context",
+        "strategy": "System prompt includes tenant scope"
+      },
+      {
+        "layer": "File Storage",
+        "strategy": "S3-compatible with tenant prefix"
+      },
+      { "layer": "Audit Logs", "strategy": "All logs include tenantId field" }
+    ],
+    "resourceQuotas": {
+      "standard": {
+        "claudeApiCalls": 1000,
+        "smsMessages": 500,
+        "vectorStorage": 100000,
+        "documentStorage": "10GB",
+        "concurrentUsers": 50
+      },
+      "enterprise": {
+        "claudeApiCalls": 10000,
+        "smsMessages": 5000,
+        "vectorStorage": 1000000,
+        "documentStorage": "100GB",
+        "concurrentUsers": 500
+      }
+    }
+  },
+  "schemas": [
+    {
+      "name": "assistant-message.schema.json",
+      "path": ".roadmap/schemas/eil/assistant-message.schema.json",
+      "purpose": "Chat message format with tool calls and citations"
+    },
+    {
+      "name": "assistant-conversation.schema.json",
+      "path": ".roadmap/schemas/eil/assistant-conversation.schema.json",
+      "purpose": "Conversation container with tenant and user context"
+    },
+    {
+      "name": "tool-call.schema.json",
+      "path": ".roadmap/schemas/eil/tool-call.schema.json",
+      "purpose": "Tool invocation record with timing and status"
+    },
+    {
+      "name": "rag-context.schema.json",
+      "path": ".roadmap/schemas/eil/rag-context.schema.json",
+      "purpose": "Retrieved context assembly with citations"
+    }
+  ],
+  "deliverables": [
+    {
+      "id": "p5b-d20",
+      "$id": "urn:luhtech:ectropy:deliverable:p5b-d20",
+      "name": "SEPPA Foundation Schemas",
+      "targetDate": "2026-01-31",
+      "estimatedHours": 40,
+      "status": "planned",
+      "successCriteria": [
+        "All EIL schemas created and validated against JSON Schema Draft 2020-12",
+        "URN identifiers follow urn:luhtech:{tenantId}:{nodeType}:{identifier} pattern",
+        "Schema documentation complete with examples"
+      ]
+    },
+    {
+      "id": "p5b-d21",
+      "$id": "urn:luhtech:ectropy:deliverable:p5b-d21",
+      "name": "Assistant Service MVP",
+      "targetDate": "2026-02-14",
+      "estimatedHours": 60,
+      "status": "planned",
+      "dependencies": ["p5b-d20"],
+      "successCriteria": [
+        "ClaudeClient wrapper operational with tool registration",
+        "17 PM Decision tools accessible via assistant",
+        "Authority validation on all state-modifying operations",
+        "<5s P95 response time for simple queries",
+        ">80% unit test coverage"
+      ],
+      "interfaces": {
+        "api": "POST /api/assistant/chat",
+        "streaming": "SSE for incremental responses",
+        "contract": "OpenAPI 3.1 specification"
+      }
+    },
+    {
+      "id": "p5b-d22",
+      "$id": "urn:luhtech:ectropy:deliverable:p5b-d22",
+      "name": "RAG Layer Foundation",
+      "targetDate": "2026-03-01",
+      "estimatedHours": 80,
+      "status": "planned",
+      "dependencies": ["p5b-d20", "p5b-d21"],
+      "successCriteria": [
+        "Qdrant collections provisioned per tenant (5 standard collections)",
+        "Jina Embeddings v3 integration operational (768 dimensions)",
+        "Hybrid search: vector + keyword operational",
+        ">85% retrieval precision on test queries",
+        "Citation tracking with source URN attribution"
+      ],
+      "interfaces": {
+        "api": "POST /api/rag/search",
+        "embedding": "POST /api/rag/embed",
+        "contract": "OpenAPI 3.1 specification"
+      }
+    },
+    {
+      "id": "p5b-d23",
+      "$id": "urn:luhtech:ectropy:deliverable:p5b-d23",
+      "name": "EIL Integration Testing",
+      "targetDate": "2026-03-22",
+      "estimatedHours": 40,
+      "status": "planned",
+      "dependencies": ["p5b-d21", "p5b-d22", "p5b-d24"],
+      "successCriteria": [
+        "End-to-end conversation flow validated",
+        ">90% tool selection accuracy on evaluation set",
+        "Multi-turn conversation state preserved",
+        "Authority cascade enforced across all channels",
+        "Contract tests for all API endpoints"
+      ]
+    },
+    {
+      "id": "p5b-d24",
+      "$id": "urn:luhtech:ectropy:deliverable:p5b-d24",
+      "name": "Phone Agent Service MVP",
+      "targetDate": "2026-03-15",
+      "estimatedHours": 120,
+      "status": "planned",
+      "dependencies": ["p5b-d21", "p5b-d22"],
+      "successCriteria": [
+        "Twilio webhook integration operational",
+        "User identity resolution from phone number",
+        "Multi-turn SMS conversation state machine",
+        "Intent classification >85% accuracy",
+        "<3s P95 SMS round-trip latency",
+        "Photo attachment handling"
+      ],
+      "interfaces": {
+        "webhook": "POST /api/phone/v1/webhooks/twilio/sms",
+        "outbound": "POST /api/phone/v1/send",
+        "contract": "Twilio webhook signature validation"
+      }
+    }
+  ],
+  "implementation": {
+    "phases": [
+      {
+        "phase": 1,
+        "name": "Foundation",
+        "weeks": "1-2",
+        "status": "COMPLETE",
+        "completedDate": "2026-01-14",
+        "tasks": [
+          "Define SEPPA schemas",
+          "Set up assistant-service scaffold",
+          "Implement ClaudeClient wrapper",
+          "Create ToolExecutor framework",
+          "Write system prompt templates"
+        ]
+      },
+      {
+        "phase": 2,
+        "name": "Tool Integration",
+        "weeks": "3-4",
+        "status": "COMPLETE",
+        "completedDate": "2026-01-08",
+        "tasks": [
+          "Register 17 PM tools with Claude",
+          "Implement authority validation",
+          "Add deliverable tools",
+          "Integration testing >80% coverage",
+          "Update MCPChatPanel frontend"
+        ]
+      },
+      {
+        "phase": 3,
+        "name": "RAG Layer",
+        "weeks": "5-6",
+        "status": "NOT_STARTED",
+        "tasks": [
+          "Set up Qdrant collections",
+          "Implement embedding pipeline",
+          "Build context assembler",
+          "Add citation tracking",
+          "Document indexing workflow"
+        ]
+      },
+      {
+        "phase": 4,
+        "name": "Phone Agent",
+        "weeks": "7-8",
+        "status": "NOT_STARTED",
+        "tasks": [
+          "Twilio webhook setup",
+          "User identity resolution",
+          "Intent classification",
+          "State machine implementation",
+          "SMS response formatting"
+        ]
+      }
+    ],
+    "totalHours": 340
+  },
+  "evidence": {
+    "phase1Complete": {
+      "date": "2026-01-14",
+      "description": "Redis persistence + SSE streaming + health checks",
+      "files": {
+        "conversationStoreRedis": "apps/mcp-server/src/services/assistant/conversation-store-redis.ts (508 LOC)",
+        "streaming": "apps/mcp-server/src/services/assistant/streaming.ts (438 LOC)",
+        "claudeClient": "apps/mcp-server/src/services/assistant/claude-client.ts (270 LOC)",
+        "toolRegistry": "apps/mcp-server/src/services/assistant/tool-registry.ts (177 LOC)",
+        "toolExecutor": "apps/mcp-server/src/services/assistant/tool-executor.ts (347 LOC)",
+        "systemPrompt": "apps/mcp-server/src/services/assistant/system-prompt.ts (226 LOC)",
+        "contextBuilder": "apps/mcp-server/src/services/assistant/context-builder.ts (253 LOC)",
+        "assistantService": "apps/mcp-server/src/services/assistant/assistant.service.ts (363 LOC)",
+        "types": "apps/mcp-server/src/services/assistant/types.ts (383 LOC)"
+      },
+      "features": {
+        "redisPersistence": "30-day TTL with graceful in-memory fallback",
+        "sseStreaming": "6 event types: start, content, tool_start, tool_end, done, error",
+        "healthMonitoring": "Claude API + Redis availability + storage mode reporting"
+      }
+    },
+    "phase2Complete": {
+      "date": "2026-01-08",
+      "description": "21 PM Decision tools integrated with Claude",
+      "evidenceFile": "apps/mcp-server/data/evidence/M2_MCP_TOOLS_IMPLEMENTATION_COMPLETE_2026-01-07.json",
+      "toolCategories": {
+        "decisionManagement": 6,
+        "authorityGraph": 3,
+        "voxelOperations": 3,
+        "toleranceManagement": 2,
+        "consequenceTracking": 3,
+        "legacyTools": 4
+      }
+    },
+    "frontendIntegration": {
+      "date": "2026-01-23",
+      "description": "Web dashboard components for SEPPA chat with streaming and optimizations",
+      "files": {
+        "chatPanel": "apps/web-dashboard/src/components/seppa-chat/SEPPAChatPanel.tsx",
+        "message": "apps/web-dashboard/src/components/seppa-chat/SEPPAMessage.tsx",
+        "chatInput": "apps/web-dashboard/src/components/seppa-chat/SEPPAChatInput.tsx",
+        "clientService": "apps/web-dashboard/src/services/seppa/seppa-client.service.ts"
+      },
+      "features": {
+        "streaming": "Real-time SSE token streaming with streamChatResponse()",
+        "conversationHistory": "Load and resume previous conversations",
+        "memoization": "React.memo on SEPPAMessage and ToolCallDisplay components",
+        "abortControl": "AbortController for cancelling in-flight requests",
+        "projectIntegration": "Integrated in ProjectWorkspace with FAB and drawer"
+      }
+    },
+    "testSuites": {
+      "date": "2026-01-23",
+      "description": "Comprehensive test suites for assistant services",
+      "files": {
+        "conversationStoreTests": "apps/mcp-server/src/services/__tests__/conversation-store-redis.spec.ts",
+        "streamingTests": "apps/mcp-server/src/services/__tests__/streaming.spec.ts"
+      },
+      "coverage": {
+        "conversationStore": "45+ test cases covering CRUD, Redis fallback, message handling, context management",
+        "streaming": "40+ test cases covering SSE events, error handling, performance metrics"
+      }
+    },
+    "usfIntegration": {
+      "date": "2026-01-22",
+      "description": "USF-enhanced decision lifecycle",
+      "evidenceFile": "apps/mcp-server/data/evidence/USF_INTEGRATION_PHASE4_COMPLETE.json",
+      "features": [
+        "calculateProjectedUSFImpact",
+        "classifyImpactSeverity",
+        "getUSFProviderRecommendations",
+        "getUSFEscalationRecommendation",
+        "calculateUSFAuthorityAdjustment"
+      ],
+      "testCount": 33
+    },
+    "frontendFinalization": {
+      "date": "2026-01-23",
+      "description": "Production-ready frontend with streaming, history, and performance optimizations",
+      "optimizations": {
+        "streaming": {
+          "description": "SSE streaming support for real-time token display",
+          "implementation": "streamChatResponse() with EventSource-style parsing",
+          "benefits": "Immediate user feedback, reduced perceived latency"
+        },
+        "conversationHistory": {
+          "description": "Load and resume previous conversations from Redis/memory store",
+          "implementation": "handleLoadConversation() with conversation list menu",
+          "benefits": "Continuity of context, user productivity"
+        },
+        "memoization": {
+          "description": "React.memo with custom comparison on message components",
+          "implementation": "SEPPAMessage and ToolCallDisplay wrapped with React.memo",
+          "benefits": "Reduced re-renders during streaming, smoother UX"
+        },
+        "abortControl": {
+          "description": "Request cancellation for abandoned queries",
+          "implementation": "AbortController ref with cleanup on unmount",
+          "benefits": "Clean resource management, no orphaned requests"
+        }
+      },
+      "status": "PRODUCTION_READY"
+    }
+  },
+  "graphMetadata": {
+    "inEdges": [
+      "urn:luhtech:ectropy:feature:decision-lifecycle",
+      "urn:luhtech:ectropy:file:roadmap"
+    ],
+    "outEdges": [
+      "urn:luhtech:ectropy:deliverable:p5b-d20",
+      "urn:luhtech:ectropy:deliverable:p5b-d21",
+      "urn:luhtech:ectropy:deliverable:p5b-d22",
+      "urn:luhtech:ectropy:deliverable:p5b-d23",
+      "urn:luhtech:ectropy:deliverable:p5b-d24"
+    ]
+  },
+  "documentation": {
+    "technicalSpec": "SEPPA_Technical_Specification_v1.docx",
+    "smsArchitecture": "SMS_PHONE_AGENT_SERVICE_ARCHITECTURE.md",
+    "claudeIntegration": "ectropy-claude-assistant-plan.md"
+  }
+}

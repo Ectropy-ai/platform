@@ -1,0 +1,268 @@
+[
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:participant:tom-bradley",
+    "$schema": "https://luhtech.dev/schemas/pm/participant.schema.json",
+    "schemaVersion": "3.0.0",
+    "participantId": "tom-bradley",
+    "name": "Tom Bradley",
+    "role": "Ironworker Journeyman",
+    "company": "BC Steel Erectors",
+    "authorityLevel": 0,
+    "authorityLevelName": "FIELD",
+    "zones": ["ZONE-A"],
+    "contact": {
+      "email": "tom.bradley@bcsteelerectors.ca",
+      "phone": "+1-604-555-1000"
+    },
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:participant:maria-santos",
+    "$schema": "https://luhtech.dev/schemas/pm/participant.schema.json",
+    "schemaVersion": "3.0.0",
+    "participantId": "maria-santos",
+    "name": "Maria Santos",
+    "role": "Electrician",
+    "company": "Maple Electric Ltd",
+    "authorityLevel": 0,
+    "authorityLevelName": "FIELD",
+    "zones": ["ZONE-D", "ZONE-A"],
+    "contact": {
+      "email": "maria.santos@mapleelectricltd.ca",
+      "phone": "+1-604-555-1001"
+    },
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:participant:kevin-nguyen",
+    "$schema": "https://luhtech.dev/schemas/pm/participant.schema.json",
+    "schemaVersion": "3.0.0",
+    "participantId": "kevin-nguyen",
+    "name": "Kevin Nguyen",
+    "role": "Structural Foreman",
+    "company": "BC Steel Erectors",
+    "authorityLevel": 1,
+    "authorityLevelName": "FOREMAN",
+    "zones": ["ZONE-A", "ZONE-C"],
+    "budgetLimit": 2500,
+    "contact": {
+      "email": "kevin.nguyen@bcsteelerectors.ca",
+      "phone": "+1-604-555-1002"
+    },
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen",
+    "$schema": "https://luhtech.dev/schemas/pm/participant.schema.json",
+    "schemaVersion": "3.0.0",
+    "participantId": "lisa-chen",
+    "name": "Lisa Chen",
+    "role": "Electrical Foreman",
+    "company": "Maple Electric Ltd",
+    "authorityLevel": 1,
+    "authorityLevelName": "FOREMAN",
+    "zones": ["ZONE-D", "ZONE-B"],
+    "budgetLimit": 2500,
+    "contact": {
+      "email": "lisa.chen@mapleelectricltd.ca",
+      "phone": "+1-604-555-1003"
+    },
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+    "$schema": "https://luhtech.dev/schemas/pm/participant.schema.json",
+    "schemaVersion": "3.0.0",
+    "participantId": "mike-wilson",
+    "name": "Mike Wilson",
+    "role": "General Superintendent",
+    "company": "Maple Builders GC",
+    "authorityLevel": 2,
+    "authorityLevelName": "SUPERINTENDENT",
+    "zones": ["ALL"],
+    "budgetLimit": 7500,
+    "contact": {
+      "email": "mike.wilson@maplebuildersgc.ca",
+      "phone": "+1-604-555-1004"
+    },
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:participant:jennifer-park",
+    "$schema": "https://luhtech.dev/schemas/pm/participant.schema.json",
+    "schemaVersion": "3.0.0",
+    "participantId": "jennifer-park",
+    "name": "Jennifer Park",
+    "role": "MEP Superintendent",
+    "company": "Maple Builders GC",
+    "authorityLevel": 2,
+    "authorityLevelName": "SUPERINTENDENT",
+    "zones": ["ZONE-D", "ZONE-E"],
+    "budgetLimit": 7500,
+    "contact": {
+      "email": "jennifer.park@maplebuildersgc.ca",
+      "phone": "+1-604-555-1005"
+    },
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:participant:sarah-thompson",
+    "$schema": "https://luhtech.dev/schemas/pm/participant.schema.json",
+    "schemaVersion": "3.0.0",
+    "participantId": "sarah-thompson",
+    "name": "Sarah Thompson",
+    "role": "Project Manager",
+    "company": "Maple Builders GC",
+    "authorityLevel": 3,
+    "authorityLevelName": "PM",
+    "zones": ["ALL"],
+    "budgetLimit": 37500,
+    "contact": {
+      "email": "sarah.thompson@maplebuildersgc.ca",
+      "phone": "+1-604-555-1006"
+    },
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:participant:james-wright",
+    "$schema": "https://luhtech.dev/schemas/pm/participant.schema.json",
+    "schemaVersion": "3.0.0",
+    "participantId": "james-wright",
+    "name": "James Wright",
+    "role": "Structural Engineer",
+    "company": "Wright Engineering",
+    "authorityLevel": 4,
+    "authorityLevelName": "ARCHITECT_ENGINEER",
+    "zones": ["ALL"],
+    "contact": {
+      "email": "james.wright@wrightengineering.ca",
+      "phone": "+1-604-555-1007"
+    },
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:participant:amanda-foster",
+    "$schema": "https://luhtech.dev/schemas/pm/participant.schema.json",
+    "schemaVersion": "3.0.0",
+    "participantId": "amanda-foster",
+    "name": "Amanda Foster",
+    "role": "Project Architect",
+    "company": "Foster Design Group",
+    "authorityLevel": 4,
+    "authorityLevelName": "ARCHITECT_ENGINEER",
+    "zones": ["ALL"],
+    "contact": {
+      "email": "amanda.foster@fosterdesigngroup.ca",
+      "phone": "+1-604-555-1008"
+    },
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:participant:robert-chen",
+    "$schema": "https://luhtech.dev/schemas/pm/participant.schema.json",
+    "schemaVersion": "3.0.0",
+    "participantId": "robert-chen",
+    "name": "Robert Chen",
+    "role": "Owner Representative",
+    "company": "Maple Ridge Industries",
+    "authorityLevel": 5,
+    "authorityLevelName": "OWNER",
+    "zones": ["ALL"],
+    "budgetLimit": 150000,
+    "contact": {
+      "email": "robert.chen@mapleridgeindustries.ca",
+      "phone": "+1-604-555-1009"
+    },
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:participant:inspector-williams",
+    "$schema": "https://luhtech.dev/schemas/pm/participant.schema.json",
+    "schemaVersion": "3.0.0",
+    "participantId": "inspector-williams",
+    "name": "David Williams",
+    "role": "Building Inspector",
+    "company": "City of Maple Ridge",
+    "authorityLevel": 6,
+    "authorityLevelName": "REGULATORY",
+    "zones": ["ALL"],
+    "contact": {
+      "email": "inspector.williams@cityofmapleridge.ca",
+      "phone": "+1-604-555-1010"
+    },
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:participant:inspector-garcia",
+    "$schema": "https://luhtech.dev/schemas/pm/participant.schema.json",
+    "schemaVersion": "3.0.0",
+    "participantId": "inspector-garcia",
+    "name": "Elena Garcia",
+    "role": "Electrical Inspector",
+    "company": "BC Safety Authority",
+    "authorityLevel": 6,
+    "authorityLevelName": "REGULATORY",
+    "zones": ["ALL"],
+    "contact": {
+      "email": "inspector.garcia@bcsafetyauthority.ca",
+      "phone": "+1-604-555-1011"
+    },
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:participant:inspector-patel",
+    "$schema": "https://luhtech.dev/schemas/pm/participant.schema.json",
+    "schemaVersion": "3.0.0",
+    "participantId": "inspector-patel",
+    "name": "Raj Patel",
+    "role": "Fire Inspector",
+    "company": "Maple Ridge Fire Dept",
+    "authorityLevel": 6,
+    "authorityLevelName": "REGULATORY",
+    "zones": ["ALL"],
+    "contact": {
+      "email": "inspector.patel@mapleridgefiredept.ca",
+      "phone": "+1-604-555-1012"
+    },
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  }
+]

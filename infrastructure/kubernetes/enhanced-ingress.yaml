@@ -1,0 +1,243 @@
+# 🌐 ENTERPRISE INGRESS - PRODUCTION READY
+# Enterprise ingress for your federated platform with enhanced security
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ectropy-platform-ingress
+  namespace: ectropy-production
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: '2000m' # Large BIM files
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+    nginx.ingress.kubernetes.io/rate-limit: '1000' # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit-window: '1m'
+    nginx.ingress.kubernetes.io/enable-cors: 'true'
+    nginx.ingress.kubernetes.io/cors-allow-origin: 'https://app.ectropy.io'
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: https:;" always;
+spec:
+  tls:
+    - hosts:
+        - app.ectropy.io
+        - api.ectropy.io
+        - speckle.ectropy.io
+        - dao.ectropy.io
+      secretName: ectropy-platform-tls
+  rules:
+    # Main application frontend
+    - host: app.ectropy.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: speckle-frontend-service
+                port:
+                  number: 8080
+
+    # API Gateway (your enhanced server)
+    - host: api.ectropy.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ectropy-api-gateway-service
+                port:
+                  number: 4000
+          # DAO governance endpoints
+          - path: /dao
+            pathType: Prefix
+            backend:
+              service:
+                name: dao-governance-service
+                port:
+                  number: 3001
+          # Manufacturer API endpoints
+          - path: /manufacturer
+            pathType: Prefix
+            backend:
+              service:
+                name: manufacturer-api-service
+                port:
+                  number: 3002
+          # AI agents endpoints
+          - path: /ai
+            pathType: Prefix
+            backend:
+              service:
+                name: ai-agents-service
+                port:
+                  number: 3003
+
+    # Speckle BIM collaboration
+    - host: speckle.ectropy.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: speckle-server-service
+                port:
+                  number: 3000
+
+    # DAO governance dashboard
+    - host: dao.ectropy.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dao-governance-service
+                port:
+                  number: 3001
+
+---
+# 🔒 NETWORK SECURITY POLICY - ZERO TRUST ARCHITECTURE
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ectropy-security-policy
+  namespace: ectropy-production
+  annotations:
+    security.ectropy.io/policy-version: '1.0'
+    security.ectropy.io/zero-trust: 'enabled'
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: nginx-ingress
+    # Allow inter-service communication within namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ectropy-production
+    # Allow monitoring traffic
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 4000 # API Gateway metrics
+        - protocol: TCP
+          port: 3000 # Speckle metrics
+  egress:
+    # Allow communication within namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: ectropy-production
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    # Allow HTTPS to external APIs
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow blockchain network access
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 8545 # Ethereum RPC
+        - protocol: TCP
+          port: 30303 # Ethereum P2P
+
+---
+# 👤 RBAC CONFIGURATION - ENHANCED SECURITY
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: ectropy-production
+  name: ectropy-federated-platform-role
+  annotations:
+    security.ectropy.io/dao-governed: 'true'
+rules:
+  - apiGroups: ['']
+    resources: ['pods', 'services', 'configmaps', 'secrets']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['apps']
+    resources: ['deployments', 'replicasets']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['networking.k8s.io']
+    resources: ['ingresses']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['autoscaling']
+    resources: ['horizontalpodautoscalers']
+    verbs: ['get', 'list', 'watch']
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ectropy-platform-binding
+  namespace: ectropy-production
+subjects:
+  - kind: ServiceAccount
+    name: ectropy-service-account
+    namespace: ectropy-production
+roleRef:
+  kind: Role
+  name: ectropy-federated-platform-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# 🛡️ POD SECURITY POLICY - ENTERPRISE GRADE
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: ectropy-security-policy
+  namespace: ectropy-production
+  annotations:
+    security.ectropy.io/policy-version: '1.0'
+    security.ectropy.io/validated-by: 'enhanced-security-middleware'
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  allowedCapabilities: []
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  runAsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'

@@ -1,0 +1,332 @@
+name: Build Production Docker Images
+
+# Enterprise-grade Docker image build workflow
+# Builds and pushes production images to DigitalOcean Container Registry (DOCR)
+#
+# Architecture:
+# - Builds: api-gateway, mcp-server, web-dashboard, ectropy-console
+# - Tags: {commit-sha}, latest
+# - Registry: registry.digitalocean.com/ectropy-registry/*
+# - Trigger: Manual dispatch or on main branch releases
+# - Pattern: Industry-standard DOCR for enterprise consistency
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag (default: commit SHA)'
+        required: false
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/**'
+      - 'libs/**'
+      - 'docker-compose.*.yml'
+      - 'Dockerfile.*'
+      - '.github/workflows/build-production-images.yml'
+
+env:
+  # ENTERPRISE PATTERN: DOCR for industry-standard container registry
+  REGISTRY: registry.digitalocean.com/ectropy-registry
+
+permissions:
+  contents: read
+
+jobs:
+  build-matrix:
+    name: Build ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - mcp-server
+          - web-dashboard
+          - ectropy-console
+
+    steps:
+      # ENTERPRISE P0 FIX (2025-12-18): FREE UP DISK SPACE BEFORE DOCKER BUILDS
+      # Docker multi-stage builds for 3 services can consume 8-12GB
+      # Remove unnecessary pre-installed software to gain space
+      - name: 🧹 Free up disk space (Enterprise)
+        run: |
+          echo "=== DISK SPACE BEFORE CLEANUP ==="
+          df -h /
+          echo ""
+
+          echo "🧹 Removing unnecessary software to free up 8-12GB..."
+
+          # Remove Android SDK (frees ~8GB)
+          sudo rm -rf /usr/local/lib/android || true
+
+          # Remove .NET runtime (frees ~2GB)
+          sudo rm -rf /usr/share/dotnet || true
+
+          # Remove large tool caches (frees ~2GB)
+          sudo rm -rf /opt/hostedtoolcache || true
+
+          echo ""
+          echo "=== DISK SPACE AFTER CLEANUP ==="
+          df -h /
+          echo "✅ Disk cleanup complete - ready for Docker builds"
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.sha }}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "short_sha=${TAG:0:7}" >> $GITHUB_OUTPUT
+          echo "📦 Image tag: ${TAG}"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack and Install pnpm
+        run: |
+          corepack enable
+          PNPM_VERSION=$(node -p "require('./package.json').packageManager.split('@')[1].split('+')[0]")
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Setup Nx cache
+        uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: ${{ runner.os }}-nx-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/project.json', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nx-${{ hashFiles('**/pnpm-lock.yaml') }}-
+            ${{ runner.os }}-nx-
+
+      - name: Install dependencies
+        timeout-minutes: 10
+        run: |
+          echo "📦 Installing dependencies with pnpm..."
+          pnpm install --frozen-lockfile --prefer-offline
+          echo "✅ Dependencies installed"
+
+      - name: Generate Prisma Client
+        run: |
+          echo "🔄 Generating Prisma Client..."
+          pnpm prisma:generate
+
+      - name: Build ${{ matrix.service }}
+        if: matrix.service != 'ectropy-console'
+        timeout-minutes: 20
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          NX_DAEMON: false
+        run: |
+          echo "🏗️ Building ${{ matrix.service }} for production..."
+          pnpm nx build ${{ matrix.service }} --configuration=production
+          echo "✅ Build complete"
+
+      - name: Verify build artifacts
+        run: |
+          echo "🔍 Verifying build artifacts for ${{ matrix.service }}..."
+
+          case "${{ matrix.service }}" in
+            api-gateway)
+              if [ ! -f "dist/apps/api-gateway/main.js" ]; then
+                echo "❌ api-gateway build failed - main.js not found"
+                exit 1
+              fi
+              echo "✅ api-gateway artifacts verified"
+              ;;
+            mcp-server)
+              if [ ! -f "dist/apps/mcp-server/main.js" ]; then
+                echo "❌ mcp-server build failed - main.js not found"
+                exit 1
+              fi
+              echo "✅ mcp-server artifacts verified"
+              ;;
+            web-dashboard)
+              if [ ! -f "dist/apps/web-dashboard/index.html" ]; then
+                echo "❌ web-dashboard build failed - index.html not found"
+                exit 1
+              fi
+              echo "✅ web-dashboard artifacts verified"
+              ;;
+            ectropy-console)
+              # ectropy-console uses Vite (no Nx build step) — artifacts verified by Docker build
+              echo "✅ ectropy-console skips pre-build verification (Vite builds inside Docker)"
+              ;;
+          esac
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Log in to DigitalOcean Container Registry
+        run: doctl registry login --expiry-seconds 3600
+
+      - name: Build Docker Image
+        run: |
+          echo "🐳 Building production Docker image for ${{ matrix.service }}..."
+          echo "  Registry: ${{ env.REGISTRY }}"
+          echo "  Service: ${{ matrix.service }}"
+          echo "  Tags: latest, ${{ steps.tag.outputs.tag }}, ${{ steps.tag.outputs.short_sha }}"
+          echo ""
+
+          # Build image directly from Dockerfile
+          EXTRA_ARGS=""
+          if [ "${{ matrix.service }}" = "ectropy-console" ]; then
+            EXTRA_ARGS="--build-arg VITE_BASE_PATH=/ --build-arg VITE_API_BASE_URL=https://api.ectropy.ai"
+          fi
+
+          docker build \
+            -f apps/${{ matrix.service }}/Dockerfile \
+            -t ${{ matrix.service }}:latest \
+            --build-arg NODE_ENV=production \
+            --build-arg BUILD_SHA=${{ github.sha }} \
+            $EXTRA_ARGS \
+            .
+
+          echo "✅ Docker image built successfully"
+          docker images | grep "${{ matrix.service }}"
+
+      - name: Tag and Push Docker Images to DOCR
+        run: |
+          echo "📤 Pushing ${{ matrix.service }} images to DOCR..."
+
+          # Tag with multiple versions for production flexibility
+          docker tag ${{ matrix.service }}:latest ${{ env.REGISTRY }}/${{ matrix.service }}:latest
+          docker tag ${{ matrix.service }}:latest ${{ env.REGISTRY }}/${{ matrix.service }}:${{ steps.tag.outputs.tag }}
+          docker tag ${{ matrix.service }}:latest ${{ env.REGISTRY }}/${{ matrix.service }}:${{ steps.tag.outputs.short_sha }}
+
+          # Push all tags
+          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:latest
+          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ steps.tag.outputs.tag }}
+          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ steps.tag.outputs.short_sha }}
+
+          echo "✅ Images pushed to DOCR"
+          echo "  - ${{ env.REGISTRY }}/${{ matrix.service }}:latest"
+          echo "  - ${{ env.REGISTRY }}/${{ matrix.service }}:${{ steps.tag.outputs.tag }}"
+          echo "  - ${{ env.REGISTRY }}/${{ matrix.service }}:${{ steps.tag.outputs.short_sha }}"
+
+      - name: Image scan for vulnerabilities
+        continue-on-error: true
+        run: |
+          echo "🔍 Scanning image for vulnerabilities..."
+
+          # Install trivy if not available
+          if ! command -v trivy &> /dev/null; then
+            echo "📦 Installing trivy..."
+            wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+            echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+            sudo apt-get update
+            sudo apt-get install -y trivy
+          fi
+
+          trivy image \
+            --severity HIGH,CRITICAL \
+            --no-progress \
+            ${{ env.REGISTRY }}/${{ matrix.service }}:latest || echo "⚠️ Vulnerabilities found (non-blocking)"
+
+      - name: Defensive pnpm cleanup
+        if: always()
+        continue-on-error: true
+        run: |
+          RUNNER_NAME="${{ runner.name }}"
+          if [ -z "$RUNNER_NAME" ] || [ "$RUNNER_NAME" = "null" ]; then
+            RUNNER_NAME="${RUNNER_NAME:-${HOSTNAME:-runner-$RANDOM}}"
+          fi
+          export RUNNER_NAME
+          bash scripts/ci/cleanup-pnpm-runner.sh
+
+  summary:
+    name: Build Summary
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "# Production Docker Images Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Status:** ${{ needs.build-matrix.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.build-matrix.result }}" == "success" ]; then
+            echo "## ✅ All images built and pushed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Images available at:**" >> $GITHUB_STEP_SUMMARY
+            echo "- \`registry.digitalocean.com/ectropy-registry/api-gateway:latest\`" >> $GITHUB_STEP_SUMMARY
+            echo "- \`registry.digitalocean.com/ectropy-registry/mcp-server:latest\`" >> $GITHUB_STEP_SUMMARY
+            echo "- \`registry.digitalocean.com/ectropy-registry/web-dashboard:latest\`" >> $GITHUB_STEP_SUMMARY
+            echo "- \`registry.digitalocean.com/ectropy-registry/ectropy-console:latest\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Next steps:**" >> $GITHUB_STEP_SUMMARY
+            echo "1. Deploy to Green production server: \`bash scripts/deployment/deploy-to-production-server.sh green\`" >> $GITHUB_STEP_SUMMARY
+            echo "2. Verify health checks" >> $GITHUB_STEP_SUMMARY
+            echo "3. Switch load balancer traffic: \`bash scripts/deployment/switch-production-traffic.sh green\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Image build failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please check the workflow logs for details." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Checkout (for Slack action)
+        uses: actions/checkout@v4
+
+      - name: Notify Slack on Success
+        if: success()
+        uses: ./.github/actions/slack-notify
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: success
+          workflow-name: 'Build Production Docker Images'
+          custom-message: |
+            📦 *Production Docker images built and pushed successfully*
+
+            **Images available:**
+            • \`registry.digitalocean.com/ectropy-registry/api-gateway:latest\`
+            • \`registry.digitalocean.com/ectropy-registry/mcp-server:latest\`
+            • \`registry.digitalocean.com/ectropy-registry/web-dashboard:latest\`
+            • \`registry.digitalocean.com/ectropy-registry/ectropy-console:latest\`
+
+            **Next Steps:**
+            1. Deploy to production server
+            2. Verify health checks
+            3. Switch load balancer traffic
+
+      - name: Notify Slack on Failure
+        if: failure()
+        uses: ./.github/actions/slack-notify
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: failure
+          workflow-name: 'Build Production Docker Images'
+          custom-message: '🚨 *CRITICAL: Production image build failed* - Immediate attention required. Check workflow logs for details.'
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Production image build failed - manual intervention required"

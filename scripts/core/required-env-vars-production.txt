@@ -1,0 +1,102 @@
+# =============================================================================
+# Production Environment Required Variables
+# =============================================================================
+# This file lists all environment variables required for production deployment
+# Used by: scripts/core/validate-env.sh production
+#
+# Format:
+# - One variable name per line
+# - Lines starting with # are comments
+# - Empty lines are ignored
+# - Section headers: # Section Name:
+# - Optional sections: # Optional Section Name:
+# =============================================================================
+
+# Core Environment Configuration:
+NODE_ENV
+LOG_LEVEL
+
+# Database Infrastructure:
+DATABASE_HOST
+DATABASE_PORT
+DATABASE_NAME
+DATABASE_USER
+DB_PASSWORD
+POSTGRES_ROOT_ROLE
+POSTGRES_ROOT_PASSWORD
+
+# Redis Infrastructure:
+REDIS_HOST
+REDIS_PORT
+REDIS_PASSWORD
+
+# Security Configuration (Critical):
+JWT_SECRET
+JWT_REFRESH_SECRET
+SESSION_SECRET
+
+# API & Service Configuration:
+API_PORT
+MCP_PORT
+WEB_PORT
+MCP_HOST
+CORS_ORIGIN
+
+# API Gateway Configuration:
+API_GATEWAY_HOST
+API_GATEWAY_PORT
+API_BASE_URL
+FRONTEND_URL
+MCP_URL
+
+# OAuth & Authentication:
+OAUTH_CLIENT_ID
+OAUTH_CLIENT_SECRET
+OAUTH_CALLBACK_URL
+
+# Monitoring & Observability:
+ENABLE_METRICS
+PROMETHEUS_PORT
+SENTRY_DSN
+SENTRY_ENVIRONMENT
+
+# BIM Integration:
+SPECKLE_SERVER_URL
+SPECKLE_CLIENT_ID
+SPECKLE_CLIENT_SECRET
+
+# DAO Blockchain Configuration:
+DAO_CONTRACT_ADDRESS
+BLOCKCHAIN_PROVIDER_URL
+VOTING_CONTRACT_ADDRESS
+
+# Optional Configuration:
+METRICS_PORT
+MCP_LOG_LEVEL
+MCP_HEALTH_CHECK_PATH
+MCP_METRICS_ENABLED
+CORS_ORIGINS
+JWT_EXPIRES_IN
+REFRESH_TOKEN_EXPIRES_IN
+BCRYPT_ROUNDS
+RATE_LIMIT_MAX
+RATE_LIMIT_WINDOW_MS
+LOG_FORMAT
+ENABLE_PROFILING
+PERFORMANCE_MONITORING
+EMBEDDINGS_MODEL
+EMBEDDINGS_CACHE_SIZE
+SEMANTIC_SEARCH_ENABLED
+ENABLE_SEMANTIC_SEARCH
+ENABLE_DOCUMENT_ANALYSIS
+ENABLE_CODE_GENERATION
+ENABLE_RATE_LIMITING
+ENABLE_HEALTH_CHECKS
+ENABLE_WEBSOCKETS
+ENABLE_MCP_AGENTS
+ENABLE_TELEMETRY
+ENTERPRISE_MODE
+COMPLIANCE_MODE
+NODE_OPTIONS
+WORKER_THREADS
+CACHE_TTL

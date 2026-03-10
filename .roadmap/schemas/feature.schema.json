@@ -1,0 +1,351 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:feature",
+  "title": "Feature Specification Schema",
+  "description": "Schema for FEATURE.json files that define feature specifications, milestones, deliverables, and business value tracking. Used across all Ectropy features for consistent documentation and validation.",
+  "type": "object",
+  "required": [
+    "$schema",
+    "$id",
+    "featureId",
+    "name",
+    "version",
+    "status",
+    "priority",
+    "owner",
+    "description",
+    "milestones"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Reference to this schema",
+      "const": "../../schemas/feature.schema.json"
+    },
+    "$id": {
+      "type": "string",
+      "description": "Unique URN identifier for this feature",
+      "pattern": "^urn:luhtech:[a-z]+:feature:[a-z0-9-]+$"
+    },
+    "featureId": {
+      "type": "string",
+      "description": "Short identifier for the feature (kebab-case)",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable feature name",
+      "minLength": 3,
+      "maxLength": 100
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version of the feature specification",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "status": {
+      "type": "string",
+      "description": "Current development status",
+      "enum": [
+        "PLANNED",
+        "IN_DEVELOPMENT",
+        "BETA",
+        "PILOT",
+        "PRODUCTION",
+        "DEPRECATED"
+      ]
+    },
+    "priority": {
+      "type": "string",
+      "description": "Feature priority level",
+      "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+    },
+    "owner": {
+      "type": "string",
+      "description": "Feature owner name"
+    },
+    "repository": {
+      "type": "string",
+      "description": "GitHub repository (org/repo format)",
+      "pattern": "^[a-zA-Z0-9-]+/[a-zA-Z0-9-]+$"
+    },
+    "branch": {
+      "type": "string",
+      "description": "Development branch name"
+    },
+    "targetRelease": {
+      "type": "string",
+      "description": "Target release date (ISO 8601)",
+      "format": "date"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "description": "Version of this FEATURE.json schema format",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "meta": {
+      "type": "object",
+      "description": "Metadata about this document",
+      "properties": {
+        "sourceOfTruth": {
+          "type": "string",
+          "description": "Path to this file (canonical location)"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "description": "Last update timestamp (ISO 8601)",
+          "format": "date-time"
+        },
+        "migratedFrom": {
+          "type": "array",
+          "description": "Previous locations of this data",
+          "items": {"type": "string"}
+        }
+      },
+      "required": ["sourceOfTruth", "lastUpdated"]
+    },
+    "pilot": {
+      "type": "object",
+      "description": "Pilot deployment information",
+      "properties": {
+        "name": {"type": "string"},
+        "location": {"type": "string"},
+        "startDate": {"type": "string", "format": "date"},
+        "duration": {"type": "string"},
+        "participants": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "required": ["name", "startDate"]
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed feature description",
+      "minLength": 50
+    },
+    "coreInnovation": {
+      "type": "object",
+      "description": "Before/after comparison showing the innovation",
+      "properties": {
+        "before": {
+          "type": "object",
+          "description": "State before this feature",
+          "additionalProperties": true
+        },
+        "after": {
+          "type": "object",
+          "description": "State after this feature",
+          "additionalProperties": true
+        }
+      },
+      "required": ["before", "after"]
+    },
+    "value": {
+      "type": "object",
+      "description": "Business value metrics",
+      "properties": {
+        "estimatedSavings": {
+          "type": "string",
+          "description": "Estimated cost savings (with currency symbol)"
+        },
+        "roi": {
+          "type": "string",
+          "description": "Return on investment percentage"
+        },
+        "incidentsAvoided": {
+          "type": "integer",
+          "description": "Number of incidents/issues avoided"
+        },
+        "timeReduction": {
+          "type": "string",
+          "description": "Time reduction description"
+        },
+        "systemCost": {
+          "type": "string",
+          "description": "Cost to implement (with currency symbol)"
+        }
+      }
+    },
+    "milestones": {
+      "type": "array",
+      "description": "Feature milestones with deliverables",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/milestone"
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "description": "Feature dependencies",
+      "properties": {
+        "schemas": {
+          "type": "array",
+          "description": "Required schema files",
+          "items": {"type": "string"}
+        },
+        "services": {
+          "type": "array",
+          "description": "Required services",
+          "items": {"type": "string"}
+        },
+        "features": {
+          "type": "array",
+          "description": "Dependent features",
+          "items": {"type": "string"}
+        },
+        "external": {
+          "type": "array",
+          "description": "External dependencies",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "description": "Key usage scenarios with ROI estimates",
+      "items": {
+        "$ref": "#/$defs/scenario"
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "description": "Graph traversal metadata for AI navigation",
+      "properties": {
+        "nodeType": {
+          "type": "string",
+          "const": "Feature"
+        },
+        "inEdges": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/graphEdge"}
+        },
+        "outEdges": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/graphEdge"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "milestone": {
+      "type": "object",
+      "required": ["id", "name", "status", "description"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Milestone identifier (M1, M2, etc.)",
+          "pattern": "^M[0-9]+(\\.[0-9]+)?$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Milestone name"
+        },
+        "targetDate": {
+          "type": "string",
+          "description": "Target completion date",
+          "format": "date"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["NOT_STARTED", "IN_PROGRESS", "COMPLETE", "BLOCKED", "DEFERRED"]
+        },
+        "description": {
+          "type": "string",
+          "description": "What this milestone delivers"
+        },
+        "deliverables": {
+          "type": "array",
+          "description": "List of deliverable file paths or descriptions",
+          "items": {"type": "string"}
+        },
+        "completionCriteria": {
+          "type": "array",
+          "description": "Criteria that must be met for completion",
+          "items": {"type": "string"}
+        },
+        "completedAt": {
+          "type": "string",
+          "description": "Actual completion timestamp",
+          "format": "date-time"
+        },
+        "evidence": {
+          "type": "object",
+          "description": "Evidence of milestone completion",
+          "properties": {
+            "testResults": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "commits": {
+              "type": "array",
+              "items": {"type": "string"}
+            },
+            "preExistingIssues": {
+              "type": "array",
+              "items": {"type": "string"}
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {"type": "string"}
+            }
+          }
+        },
+        "blockedBy": {
+          "type": "array",
+          "description": "What is blocking this milestone",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "required": ["name", "description"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "frequency": {
+          "type": "string",
+          "description": "How often this scenario occurs"
+        },
+        "traditionalCost": {
+          "type": "string",
+          "description": "Cost without this feature"
+        },
+        "withFeatureCost": {
+          "type": "string",
+          "description": "Cost with this feature"
+        },
+        "savingsPerIncident": {
+          "type": "string"
+        },
+        "annualSavings": {
+          "type": "string"
+        }
+      }
+    },
+    "graphEdge": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Edge type (e.g., DEPENDS_ON, IMPLEMENTS)"
+        },
+        "target": {
+          "type": "string",
+          "description": "Target node URN"
+        },
+        "cardinality": {
+          "type": "string",
+          "enum": ["ONE_TO_ONE", "ONE_TO_MANY", "MANY_TO_ONE", "MANY_TO_MANY"]
+        }
+      },
+      "required": ["type", "target"]
+    }
+  },
+  "additionalProperties": true
+}

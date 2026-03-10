@@ -1,0 +1,203 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://luhtech.dev/schemas/pm/authority-level.schema.json",
+  "title": "Authority Level Schema",
+  "description": "Definition of authority tiers in the 7-level construction decision cascade",
+  "type": "object",
+  "required": ["$id", "$schema", "schemaVersion", "levels", "graphMetadata"],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:authority-level:[a-z0-9-]+$",
+      "description": "URN identifier for this authority level definition"
+    },
+    "$schema": {
+      "const": "https://luhtech.dev/schemas/pm/authority-level.schema.json"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "ventureId": { "type": "string" },
+        "sourceOfTruth": { "type": "string" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      }
+    },
+    "levels": {
+      "type": "array",
+      "description": "The 7 authority levels from FIELD (0) to REGULATORY (6)",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/authorityLevel" }
+    },
+    "escalationRules": {
+      "type": "array",
+      "description": "Rules that determine when escalation is required",
+      "items": { "$ref": "#/$defs/escalationRule" }
+    },
+    "graphMetadata": {
+      "$ref": "#/$defs/graphMetadata"
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    },
+    "authorityLevel": {
+      "type": "object",
+      "required": ["level", "name", "title"],
+      "properties": {
+        "level": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6,
+          "description": "Numeric level (0-6)"
+        },
+        "name": {
+          "type": "string",
+          "enum": ["FIELD", "FOREMAN", "SUPERINTENDENT", "PM", "ARCHITECT", "OWNER", "REGULATORY"],
+          "description": "Authority level name"
+        },
+        "title": {
+          "type": "string",
+          "description": "Display title (e.g., 'Project Manager')"
+        },
+        "budgetLimit": {
+          "oneOf": [
+            { "type": "number", "minimum": 0 },
+            { "type": "string", "enum": ["design", "project", "code"] }
+          ],
+          "description": "Maximum budget authority (number in USD or special scope)"
+        },
+        "varianceTolerance": {
+          "oneOf": [
+            { "type": "string", "pattern": "^[0-9/]+\"?$" },
+            { "type": "string", "enum": ["visible", "major", "safety"] }
+          ],
+          "description": "Maximum dimensional variance authority"
+        },
+        "scheduleAuthority": {
+          "type": "string",
+          "description": "Maximum schedule delay authority (e.g., '4 hours', '1 week')"
+        },
+        "scheduleAuthorityHours": {
+          "type": "number",
+          "description": "Schedule authority converted to hours"
+        },
+        "autoApprove": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether decisions at this level can auto-approve"
+        },
+        "permissions": {
+          "type": "array",
+          "description": "Specific permissions granted at this level",
+          "items": {
+            "type": "string",
+            "enum": [
+              "CAPTURE_DECISION",
+              "APPROVE_DECISION",
+              "REJECT_DECISION",
+              "ESCALATE_DECISION",
+              "CREATE_TOLERANCE_OVERRIDE",
+              "CREATE_PRE_APPROVAL",
+              "MODIFY_SCHEDULE",
+              "REQUEST_INSPECTION",
+              "COMPLETE_INSPECTION",
+              "APPROVE_DESIGN_CHANGE",
+              "APPROVE_CODE_VARIANCE"
+            ]
+          }
+        },
+        "escalatesTo": {
+          "$ref": "#/$defs/urn",
+          "description": "URN of the next authority level"
+        },
+        "graphMetadata": {
+          "type": "object",
+          "properties": {
+            "inEdges": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/urn" }
+            },
+            "outEdges": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/urn" }
+            }
+          }
+        }
+      }
+    },
+    "escalationRule": {
+      "type": "object",
+      "description": "Rule that triggers escalation",
+      "required": ["id", "trigger", "requiredLevel"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "trigger": {
+          "type": "string",
+          "enum": [
+            "BUDGET_EXCEEDED",
+            "VARIANCE_EXCEEDED",
+            "SCHEDULE_EXCEEDED",
+            "SAFETY_CONCERN",
+            "DESIGN_CHANGE",
+            "CODE_VARIANCE",
+            "MULTI_TRADE_IMPACT",
+            "CRITICAL_PATH_IMPACT",
+            "REGULATORY_REQUIRED"
+          ]
+        },
+        "requiredLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "threshold": {
+          "type": "object",
+          "description": "Threshold that triggers this rule",
+          "properties": {
+            "budgetMin": { "type": "number" },
+            "budgetMax": { "type": "number" },
+            "varianceMin": { "type": "string" },
+            "scheduleHoursMin": { "type": "number" }
+          }
+        },
+        "description": { "type": "string" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to", "type"],
+            "properties": {
+              "from": { "$ref": "#/$defs/urn" },
+              "to": { "$ref": "#/$defs/urn" },
+              "type": { "type": "string", "enum": ["escalates-to", "delegates-from"] },
+              "label": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

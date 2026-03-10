@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:milestone:v3.1",
+  "title": "Milestone Schema V3.1",
+  "description": "Extended milestone schema with cognitive fields for Dual-Process Decision Engine integration. Adds healthScore, eigenmodeSnapshot, patternConfidence, explorationBudget, and monitoringTriggers to enable decision-driven milestone management.",
+  "type": "object",
+  "required": ["id", "name", "status", "description"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Milestone identifier (e.g., M1, PA-M1, DP-M3)",
+      "pattern": "^[A-Z]{1,4}-?M[0-9]+(\\.[0-9]+)?$"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable milestone name",
+      "minLength": 3,
+      "maxLength": 100
+    },
+    "targetDate": {
+      "type": "string",
+      "description": "Target completion date (ISO 8601)",
+      "format": "date"
+    },
+    "completedDate": {
+      "type": "string",
+      "description": "Actual completion date (ISO 8601)",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["NOT_STARTED", "PLANNED", "IN_PROGRESS", "COMPLETE", "BLOCKED", "DEFERRED"],
+      "description": "Current milestone status"
+    },
+    "description": {
+      "type": "string",
+      "description": "What this milestone delivers",
+      "minLength": 10
+    },
+    "deliverables": {
+      "type": "array",
+      "description": "List of deliverable file paths or descriptions",
+      "items": {"type": "string"}
+    },
+    "completionCriteria": {
+      "type": "array",
+      "description": "Criteria that must be met for completion",
+      "items": {"type": "string"}
+    },
+    "tools": {
+      "type": "array",
+      "description": "MCP tools delivered by this milestone",
+      "items": {"type": "string"}
+    },
+    "evidence": {
+      "type": "object",
+      "description": "Evidence of milestone completion",
+      "additionalProperties": true
+    },
+    "blockedBy": {
+      "type": "array",
+      "description": "What is blocking this milestone",
+      "items": {"type": "string"}
+    },
+
+    "classification": {
+      "$ref": "definitions/classification.schema.json#/definitions/Classification",
+      "description": "Atomic Reference Strategy classification",
+      "default": "LEAD"
+    },
+    "healthScore": {
+      "$ref": "definitions/classification.schema.json#/definitions/HealthScore",
+      "description": "SDI-derived milestone health (0=crisis, 1=abundant)"
+    },
+    "eigenmodeSnapshot": {
+      "$ref": "definitions/classification.schema.json#/definitions/EigenmodeVector",
+      "description": "12-element eigenmode vector at milestone assessment time"
+    },
+    "patternConfidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Success Stack match confidence for milestone approach"
+    },
+    "explorationBudget": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Permitted exploration budget for novel approaches (0=patterns only, 1=full exploration)"
+    },
+    "linkedDecisions": {
+      "type": "array",
+      "description": "URNs of decisions that drove this milestone",
+      "items": {
+        "type": "string",
+        "pattern": "^urn:luhtech:[^:]+:decision-event:DEV-.+$"
+      }
+    },
+    "appliedPatterns": {
+      "type": "array",
+      "description": "Success Stack patterns applied to this milestone",
+      "items": {
+        "$ref": "definitions/classification.schema.json#/definitions/PatternMatch"
+      }
+    },
+    "monitoringTriggers": {
+      "type": "array",
+      "description": "Early warning conditions for proactive intervention",
+      "items": {
+        "$ref": "definitions/classification.schema.json#/definitions/MonitoringTrigger"
+      }
+    },
+    "graphMetadata": {
+      "$ref": "definitions/classification.schema.json#/definitions/GraphMetadata",
+      "description": "Bidirectional links to predecessor/successor milestones"
+    }
+  },
+  "additionalProperties": true
+}

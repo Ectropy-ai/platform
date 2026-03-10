@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:contract-party",
+  "title": "Contract Party Schema",
+  "description": "Party to a construction contract with role and authority configuration",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "partyId",
+    "name",
+    "role",
+    "contractRef",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:contract-party:PTY-[0-9]{4}-[0-9]{4}$",
+      "description": "URN identifier for this contract party"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:contract-party"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "partyId": {
+      "type": "string",
+      "pattern": "^PTY-[0-9]{4}-[0-9]{4}$"
+    },
+    "name": {
+      "type": "string",
+      "description": "Legal name of the party"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "Owner",
+        "Architect",
+        "Contractor",
+        "KeyParticipant",
+        "Consultant",
+        "DesignBuilder",
+        "CMAtRisk",
+        "Subcontractor"
+      ],
+      "description": "Party role in the contract"
+    },
+    "contractRef": {
+      "$ref": "#/$defs/urn",
+      "description": "URN of the contract this party belongs to"
+    },
+    "contact": {
+      "type": "object",
+      "properties": {
+        "primaryName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "address": {
+          "type": "object",
+          "properties": {
+            "street": { "type": "string" },
+            "city": { "type": "string" },
+            "state": { "type": "string" },
+            "postalCode": { "type": "string" },
+            "country": { "type": "string" }
+          }
+        }
+      }
+    },
+    "ipdConfiguration": {
+      "type": "object",
+      "description": "IPD-specific party configuration",
+      "properties": {
+        "pmtMember": {
+          "type": "object",
+          "properties": {
+            "isMember": { "type": "boolean" },
+            "representativeName": { "type": "string" },
+            "representativeEmail": { "type": "string", "format": "email" },
+            "votingWeight": { "type": "number", "default": 1 }
+          }
+        },
+        "petMember": {
+          "type": "object",
+          "properties": {
+            "isMember": { "type": "boolean" },
+            "executiveName": { "type": "string" },
+            "executiveEmail": { "type": "string", "format": "email" }
+          }
+        },
+        "savingsShare": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of shared savings"
+        },
+        "atRiskAmount": {
+          "type": "number",
+          "description": "Amount at risk for cost overruns"
+        },
+        "goalAchievementBonus": {
+          "type": "number",
+          "description": "Potential bonus for achieving project goals"
+        }
+      }
+    },
+    "authorityLevel": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 6,
+      "description": "Default authority level for this party's decisions"
+    },
+    "scopeOfWork": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Areas of work responsibility"
+    },
+    "linkedParticipants": {
+      "type": "array",
+      "description": "Ectropy participants linked to this contract party",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    }
+  }
+}

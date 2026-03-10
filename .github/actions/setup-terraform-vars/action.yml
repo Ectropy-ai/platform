@@ -1,0 +1,368 @@
+name: 'Setup Terraform Variables'
+description: 'Centralized TF_VAR environment setup for all Terraform workflows'
+author: 'Ectropy Platform Engineering'
+
+# ENTERPRISE TERRAFORM PATTERN (2026-02-24):
+# Single source of truth for all TF_VAR mappings across workflows
+# Eliminates ~340 lines of duplicated TF_VAR declarations
+# Adding new variables requires 1 change instead of 6
+
+inputs:
+  # Target environment
+  environment:
+    description: 'Target environment (development, staging, production)'
+    required: true
+
+  # DigitalOcean Provider
+  digitalocean-token:
+    description: 'DIGITALOCEAN_ACCESS_TOKEN for provider authentication'
+    required: true
+
+  # Infrastructure SSH keys
+  ssh-private-key:
+    description: 'TERRAFORM_DEPLOY_PRIVATE_KEY for SSH provisioner'
+    required: false
+    default: ''
+
+  # SSL/TLS - Cloudflare Origin Certificate
+  ssl-certificate-name:
+    description: 'Existing DO certificate name (skips PEM upload when set)'
+    required: false
+    default: ''
+  ssl-cert-private-key:
+    description: 'CF_ORIGIN_KEY - Cloudflare origin certificate private key'
+    required: false
+    default: ''
+  ssl-cert-leaf:
+    description: 'CF_ORIGIN_CERT - Cloudflare origin certificate (leaf)'
+    required: false
+    default: ''
+
+  # Application Configuration
+  app-version:
+    description: 'Application version (resolved per environment)'
+    required: false
+    default: ''
+  api-url:
+    description: 'API URL (resolved per environment)'
+    required: false
+    default: ''
+  frontend-url:
+    description: 'Frontend URL (resolved per environment)'
+    required: false
+    default: ''
+
+  # Database Configuration
+  database-url:
+    description: 'DATABASE_URL full connection string'
+    required: false
+    default: ''
+  database-host:
+    description: 'DATABASE_HOST for PostgreSQL'
+    required: false
+    default: ''
+  database-password:
+    description: 'DB_PASSWORD for PostgreSQL'
+    required: false
+    default: ''
+
+  # Authentication & Security
+  jwt-secret:
+    description: 'JWT_SECRET for token signing'
+    required: false
+    default: ''
+  jwt-refresh-secret:
+    description: 'JWT_REFRESH_SECRET for refresh tokens'
+    required: false
+    default: ''
+  session-secret:
+    description: 'SESSION_SECRET for session management'
+    required: false
+    default: ''
+  encryption-key:
+    description: 'ENCRYPTION_KEY for data encryption'
+    required: false
+    default: ''
+  google-client-id:
+    description: 'GOOGLE_CLIENT_ID for OAuth (environment-specific)'
+    required: false
+    default: ''
+  google-client-secret:
+    description: 'GOOGLE_CLIENT_SECRET for OAuth (environment-specific)'
+    required: false
+    default: ''
+
+  # Data Layer
+  redis-password:
+    description: 'REDIS_PASSWORD for Redis authentication'
+    required: false
+    default: ''
+
+  # External APIs
+  mcp-api-key:
+    description: 'MCP_API_KEY for AI orchestration'
+    required: false
+    default: ''
+  openai-api-key:
+    description: 'OPENAI_API_KEY for OpenAI integration'
+    required: false
+    default: ''
+
+  # Speckle BIM
+  speckle-server-token:
+    description: 'SPECKLE_SERVER_TOKEN for Speckle authentication'
+    required: false
+    default: ''
+  speckle-admin-password:
+    description: 'SPECKLE_ADMIN_PASSWORD for Speckle admin'
+    required: false
+    default: ''
+  speckle-session-secret:
+    description: 'SPECKLE_SESSION_SECRET for Speckle sessions'
+    required: false
+    default: ''
+  minio-access-key:
+    description: 'MINIO_ACCESS_KEY for S3-compatible storage'
+    required: false
+    default: ''
+  minio-secret-key:
+    description: 'MINIO_SECRET_KEY for S3-compatible storage'
+    required: false
+    default: ''
+
+  # Infrastructure Services
+  resend-api-key:
+    description: 'RESEND_API_KEY for email service'
+    required: false
+    default: ''
+  watchtower-http-api-token:
+    description: 'WATCHTOWER_HTTP_API_TOKEN for container updates'
+    required: false
+    default: ''
+
+  # Phase P3 Zero-SSH
+  spaces-access-key-id:
+    description: 'SPACES_ACCESS_KEY_ID for DigitalOcean Spaces'
+    required: false
+    default: ''
+  spaces-secret-access-key:
+    description: 'SPACES_SECRET_ACCESS_KEY for DigitalOcean Spaces'
+    required: false
+    default: ''
+  docr-config-json:
+    description: 'DOCR_CONFIG_JSON for container registry auth'
+    required: false
+    default: ''
+
+  # Cloudflare DNS Management
+  cloudflare-api-token:
+    description: 'CLOUDFLARE_API_TOKEN for DNS management'
+    required: false
+    default: ''
+  cloudflare-zone-id:
+    description: 'CLOUDFLARE_ZONE_ID for DNS zone'
+    required: false
+    default: ''
+
+  # Multi-Database Architecture
+  platform-database-url:
+    description: 'PLATFORM_DATABASE_URL for platform schema'
+    required: false
+    default: ''
+  shared-database-url:
+    description: 'SHARED_DATABASE_URL for shared schema'
+    required: false
+    default: ''
+
+outputs:
+  variables-set:
+    description: 'Number of TF_VAR variables configured'
+    value: ${{ steps.set-vars.outputs.count }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set TF_VAR Environment Variables
+      id: set-vars
+      shell: bash
+      env:
+        # Pass ALL inputs through env vars to safely handle special characters
+        INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        INPUT_DIGITALOCEAN_TOKEN: ${{ inputs.digitalocean-token }}
+        INPUT_SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
+        INPUT_SSL_CERTIFICATE_NAME: ${{ inputs.ssl-certificate-name }}
+        INPUT_SSL_CERT_PRIVATE_KEY: ${{ inputs.ssl-cert-private-key }}
+        INPUT_SSL_CERT_LEAF: ${{ inputs.ssl-cert-leaf }}
+        INPUT_APP_VERSION: ${{ inputs.app-version }}
+        INPUT_API_URL: ${{ inputs.api-url }}
+        INPUT_FRONTEND_URL: ${{ inputs.frontend-url }}
+        INPUT_DATABASE_URL: ${{ inputs.database-url }}
+        INPUT_DATABASE_HOST: ${{ inputs.database-host }}
+        INPUT_DATABASE_PASSWORD: ${{ inputs.database-password }}
+        INPUT_JWT_SECRET: ${{ inputs.jwt-secret }}
+        INPUT_JWT_REFRESH_SECRET: ${{ inputs.jwt-refresh-secret }}
+        INPUT_SESSION_SECRET: ${{ inputs.session-secret }}
+        INPUT_ENCRYPTION_KEY: ${{ inputs.encryption-key }}
+        INPUT_GOOGLE_CLIENT_ID: ${{ inputs.google-client-id }}
+        INPUT_GOOGLE_CLIENT_SECRET: ${{ inputs.google-client-secret }}
+        INPUT_REDIS_PASSWORD: ${{ inputs.redis-password }}
+        INPUT_MCP_API_KEY: ${{ inputs.mcp-api-key }}
+        INPUT_OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        INPUT_SPECKLE_SERVER_TOKEN: ${{ inputs.speckle-server-token }}
+        INPUT_SPECKLE_ADMIN_PASSWORD: ${{ inputs.speckle-admin-password }}
+        INPUT_SPECKLE_SESSION_SECRET: ${{ inputs.speckle-session-secret }}
+        INPUT_MINIO_ACCESS_KEY: ${{ inputs.minio-access-key }}
+        INPUT_MINIO_SECRET_KEY: ${{ inputs.minio-secret-key }}
+        INPUT_RESEND_API_KEY: ${{ inputs.resend-api-key }}
+        INPUT_WATCHTOWER_HTTP_API_TOKEN: ${{ inputs.watchtower-http-api-token }}
+        INPUT_SPACES_ACCESS_KEY_ID: ${{ inputs.spaces-access-key-id }}
+        INPUT_SPACES_SECRET_ACCESS_KEY: ${{ inputs.spaces-secret-access-key }}
+        INPUT_DOCR_CONFIG_JSON: ${{ inputs.docr-config-json }}
+        INPUT_CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
+        INPUT_CLOUDFLARE_ZONE_ID: ${{ inputs.cloudflare-zone-id }}
+        INPUT_PLATFORM_DATABASE_URL: ${{ inputs.platform-database-url }}
+        INPUT_SHARED_DATABASE_URL: ${{ inputs.shared-database-url }}
+      run: |
+        echo "Setting TF_VAR environment variables for $INPUT_ENVIRONMENT..."
+
+        VAR_COUNT=0
+
+        # Helper function to safely set env var with heredoc (handles special chars)
+        set_env_var() {
+          local var_name="$1"
+          local var_value="$2"
+          {
+            echo "${var_name}<<TFVAR_EOF"
+            echo "$var_value"
+            echo "TFVAR_EOF"
+          } >> $GITHUB_ENV
+        }
+
+        # DigitalOcean Provider (always set)
+        set_env_var "DIGITALOCEAN_TOKEN" "$INPUT_DIGITALOCEAN_TOKEN"
+        : $((VAR_COUNT+=1))
+
+        # Infrastructure SSH keys - environment-aware
+        case "$INPUT_ENVIRONMENT" in
+          staging)
+            set_env_var "TF_VAR_staging_ssh_private_key" "$INPUT_SSH_PRIVATE_KEY"
+            echo "TF_VAR_production_ssh_private_key=" >> $GITHUB_ENV
+            echo "TF_VAR_development_ssh_private_key=" >> $GITHUB_ENV
+            ;;
+          production)
+            echo "TF_VAR_staging_ssh_private_key=" >> $GITHUB_ENV
+            set_env_var "TF_VAR_production_ssh_private_key" "$INPUT_SSH_PRIVATE_KEY"
+            echo "TF_VAR_development_ssh_private_key=" >> $GITHUB_ENV
+            ;;
+          development)
+            echo "TF_VAR_staging_ssh_private_key=" >> $GITHUB_ENV
+            echo "TF_VAR_production_ssh_private_key=" >> $GITHUB_ENV
+            set_env_var "TF_VAR_development_ssh_private_key" "$INPUT_SSH_PRIVATE_KEY"
+            ;;
+        esac
+        : $((VAR_COUNT+=3))
+
+        # SSL/TLS - Cloudflare Origin Certificate
+        echo "TF_VAR_ssl_certificate_name=$INPUT_SSL_CERTIFICATE_NAME" >> $GITHUB_ENV
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_ssl_cert_private_key" "$INPUT_SSL_CERT_PRIVATE_KEY"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_ssl_cert_leaf" "$INPUT_SSL_CERT_LEAF"
+        : $((VAR_COUNT+=1))
+
+        # Application Configuration (non-sensitive, direct assignment OK)
+        echo "TF_VAR_app_version=$INPUT_APP_VERSION" >> $GITHUB_ENV
+        : $((VAR_COUNT+=1))
+        echo "TF_VAR_api_url=$INPUT_API_URL" >> $GITHUB_ENV
+        : $((VAR_COUNT+=1))
+        echo "TF_VAR_frontend_url=$INPUT_FRONTEND_URL" >> $GITHUB_ENV
+        : $((VAR_COUNT+=1))
+
+        # Database Configuration
+        set_env_var "TF_VAR_database_url" "$INPUT_DATABASE_URL"
+        : $((VAR_COUNT+=1))
+        echo "TF_VAR_database_host=$INPUT_DATABASE_HOST" >> $GITHUB_ENV
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_database_password" "$INPUT_DATABASE_PASSWORD"
+        : $((VAR_COUNT+=1))
+
+        # Authentication & Security
+        set_env_var "TF_VAR_jwt_secret" "$INPUT_JWT_SECRET"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_jwt_refresh_secret" "$INPUT_JWT_REFRESH_SECRET"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_session_secret" "$INPUT_SESSION_SECRET"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_encryption_key" "$INPUT_ENCRYPTION_KEY"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_google_client_id" "$INPUT_GOOGLE_CLIENT_ID"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_google_client_secret" "$INPUT_GOOGLE_CLIENT_SECRET"
+        : $((VAR_COUNT+=1))
+
+        # Data Layer
+        set_env_var "TF_VAR_redis_password" "$INPUT_REDIS_PASSWORD"
+        : $((VAR_COUNT+=1))
+
+        # External APIs
+        set_env_var "TF_VAR_mcp_api_key" "$INPUT_MCP_API_KEY"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_openai_api_key" "$INPUT_OPENAI_API_KEY"
+        : $((VAR_COUNT+=1))
+
+        # Speckle BIM
+        set_env_var "TF_VAR_speckle_server_token" "$INPUT_SPECKLE_SERVER_TOKEN"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_speckle_admin_password" "$INPUT_SPECKLE_ADMIN_PASSWORD"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_speckle_session_secret" "$INPUT_SPECKLE_SESSION_SECRET"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_minio_access_key" "$INPUT_MINIO_ACCESS_KEY"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_minio_secret_key" "$INPUT_MINIO_SECRET_KEY"
+        : $((VAR_COUNT+=1))
+
+        # Infrastructure Services
+        set_env_var "TF_VAR_resend_api_key" "$INPUT_RESEND_API_KEY"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_watchtower_http_api_token" "$INPUT_WATCHTOWER_HTTP_API_TOKEN"
+        : $((VAR_COUNT+=1))
+
+        # Phase P3 Zero-SSH
+        set_env_var "TF_VAR_spaces_access_key_id" "$INPUT_SPACES_ACCESS_KEY_ID"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_spaces_secret_access_key" "$INPUT_SPACES_SECRET_ACCESS_KEY"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_docr_config_json" "$INPUT_DOCR_CONFIG_JSON"
+        : $((VAR_COUNT+=1))
+
+        # Cloudflare DNS Management
+        set_env_var "TF_VAR_cloudflare_api_token" "$INPUT_CLOUDFLARE_API_TOKEN"
+        : $((VAR_COUNT+=1))
+        echo "TF_VAR_cloudflare_zone_id=$INPUT_CLOUDFLARE_ZONE_ID" >> $GITHUB_ENV
+        : $((VAR_COUNT+=1))
+
+        # Multi-Database Architecture
+        set_env_var "TF_VAR_platform_database_url" "$INPUT_PLATFORM_DATABASE_URL"
+        : $((VAR_COUNT+=1))
+        set_env_var "TF_VAR_shared_database_url" "$INPUT_SHARED_DATABASE_URL"
+        : $((VAR_COUNT+=1))
+
+        echo "count=$VAR_COUNT" >> $GITHUB_OUTPUT
+        echo "Configured $VAR_COUNT TF_VAR environment variables for $INPUT_ENVIRONMENT"
+
+    - name: Validate Configuration
+      shell: bash
+      run: |
+        echo "=== TF_VAR Configuration Summary ==="
+        echo "Environment: ${{ inputs.environment }}"
+        echo "Variables configured: ${{ steps.set-vars.outputs.count }}"
+        echo ""
+        echo "Configured variables (values masked):"
+        env | grep -E "^TF_VAR_|^DIGITALOCEAN_TOKEN" | cut -d= -f1 | sort
+        echo ""
+        echo "Setup complete"
+
+branding:
+  icon: 'settings'
+  color: 'purple'

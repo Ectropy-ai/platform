@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:ros-mro:voxel-stream",
+  "title": "Voxel Stream Message Schema",
+  "description": "WebSocket message format for real-time voxel updates",
+  "type": "object",
+  "definitions": {
+    "VoxelUpdateMessage": {
+      "type": "object",
+      "required": ["type", "voxelId", "timestamp"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["status_change", "progress_update", "decision_attached", "alert_created", "alert_resolved"],
+          "description": "Type of voxel update"
+        },
+        "voxelId": {
+          "type": "string",
+          "description": "Voxel ID being updated"
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Project context"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["PLANNED", "IN_PROGRESS", "COMPLETE", "BLOCKED", "ON_HOLD", "INSPECTION_REQUIRED"],
+          "description": "New voxel status"
+        },
+        "percentComplete": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "New completion percentage"
+        },
+        "healthStatus": {
+          "type": "string",
+          "enum": ["HEALTHY", "AT_RISK", "CRITICAL"],
+          "description": "New health status"
+        },
+        "decisionId": {
+          "type": "string",
+          "description": "Decision ID if type is decision_attached"
+        },
+        "alertId": {
+          "type": "string",
+          "description": "Alert ID if type is alert_created or alert_resolved"
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional note about the update"
+        },
+        "updatedBy": {
+          "type": "object",
+          "properties": {
+            "userId": { "type": "string" },
+            "name": { "type": "string" },
+            "role": { "type": "string" }
+          }
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When update occurred"
+        }
+      }
+    },
+    "VoxelBatchUpdateMessage": {
+      "type": "object",
+      "required": ["type", "updates", "timestamp"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "batch_update",
+          "description": "Batch update message type"
+        },
+        "updates": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/VoxelUpdateMessage" },
+          "description": "Array of voxel updates"
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Project context"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "VoxelSubscriptionRequest": {
+      "type": "object",
+      "required": ["action", "target"],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["subscribe", "unsubscribe"],
+          "description": "Subscription action"
+        },
+        "target": {
+          "type": "object",
+          "properties": {
+            "projectId": { "type": "string" },
+            "voxelId": { "type": "string" },
+            "level": { "type": "string" },
+            "system": { "type": "string" }
+          },
+          "description": "Target to subscribe/unsubscribe"
+        }
+      }
+    },
+    "ConnectionState": {
+      "type": "object",
+      "properties": {
+        "connected": { "type": "boolean" },
+        "lastConnected": { "type": "string", "format": "date-time" },
+        "subscriptions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Active subscription keys"
+        },
+        "missedMessages": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "properties": {
+    "message": {
+      "oneOf": [
+        { "$ref": "#/definitions/VoxelUpdateMessage" },
+        { "$ref": "#/definitions/VoxelBatchUpdateMessage" }
+      ]
+    }
+  }
+}

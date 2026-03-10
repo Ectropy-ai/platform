@@ -1,0 +1,107 @@
+# ============================================================================
+# Ectropy Staging Environment Variables - Terraform GitOps Pattern
+# ============================================================================
+# ROOT CAUSE #149/#151: Enterprise GitOps secrets management
+# Pattern: Single source of truth for environment configuration
+# Security: This file contains TEMPLATE values - actual values stored as GitHub secret
+# ============================================================================
+
+# ============================================================================
+# Application Configuration
+# ============================================================================
+
+app_version = "staging"
+
+# ============================================================================
+# Database Configuration (DigitalOcean Managed PostgreSQL)
+# ============================================================================
+# Cluster ID: d1d6854a-3ecf-45d3-b699-14b8e72aa898 (from terraform.tfvars)
+# Connection via private network for security
+
+database_url      = "postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
+database_host     = "REPLACE_WITH_STAGING_DB_HOST"
+database_port     = "25060"  # DigitalOcean managed PostgreSQL default port
+database_name     = "ectropy_staging"
+database_user     = "REPLACE_WITH_DB_USER"
+database_password = "REPLACE_WITH_DB_PASSWORD"
+
+# ============================================================================
+# Authentication & Security
+# ============================================================================
+
+jwt_secret         = "REPLACE_WITH_JWT_SECRET_STAGING"
+jwt_refresh_secret = "REPLACE_WITH_JWT_REFRESH_SECRET_STAGING"
+session_secret     = "REPLACE_WITH_SESSION_SECRET_STAGING"
+
+# Google OAuth (Staging)
+google_client_id     = "REPLACE_WITH_GOOGLE_CLIENT_ID_STAGING"
+google_client_secret = "REPLACE_WITH_GOOGLE_CLIENT_SECRET_STAGING"
+
+# ============================================================================
+# Data Layer
+# ============================================================================
+
+redis_password  = "REPLACE_WITH_REDIS_PASSWORD"
+encryption_key  = "REPLACE_WITH_ENCRYPTION_KEY"
+
+# ============================================================================
+# External APIs
+# ============================================================================
+
+mcp_api_key    = "REPLACE_WITH_MCP_API_KEY"
+openai_api_key = "REPLACE_WITH_OPENAI_API_KEY"
+
+# ============================================================================
+# Service URLs
+# ============================================================================
+
+api_url      = "https://staging.ectropy.ai"
+frontend_url = "https://staging.ectropy.ai"
+
+# ============================================================================
+# Speckle BIM Integration (ROOT CAUSE #147)
+# ============================================================================
+
+speckle_server_token   = "REPLACE_WITH_SPECKLE_SERVER_TOKEN"
+speckle_admin_password = "REPLACE_WITH_SPECKLE_ADMIN_PASSWORD"
+speckle_session_secret = "REPLACE_WITH_SPECKLE_SESSION_SECRET"
+
+# MinIO (S3-compatible object storage for Speckle)
+minio_access_key = "REPLACE_WITH_MINIO_ACCESS_KEY"
+minio_secret_key = "REPLACE_WITH_MINIO_SECRET_KEY"
+
+# ============================================================================
+# Infrastructure Services
+# ============================================================================
+
+resend_api_key             = "REPLACE_WITH_RESEND_API_KEY"
+watchtower_http_api_token  = "REPLACE_WITH_WATCHTOWER_API_TOKEN"
+
+# ============================================================================
+# USAGE INSTRUCTIONS
+# ============================================================================
+# 1. Copy this template to staging_env.tfvars (gitignored):
+#    cp staging_env.tfvars.template staging_env.tfvars
+#
+# 2. Replace all REPLACE_WITH_* values with actual secrets from GitHub Secrets:
+#    - Use `gh secret list` to view available secrets
+#    - Use `gh secret set STAGING_ENV_TFVARS < staging_env.tfvars` to store entire file
+#
+# 3. Deploy via Terraform:
+#    cd infrastructure/terraform
+#    terraform apply -var-file=terraform_deploy_key.tfvars -var-file=staging_env.tfvars
+#
+# 4. Security: staging_env.tfvars is in .gitignore - NEVER commit actual secrets
+#
+# ============================================================================
+# ENTERPRISE PATTERN: GitOps Secrets Management
+# ============================================================================
+# This template documents ALL environment variables needed for staging.
+# Actual values flow: GitHub Secrets → staging_env.tfvars → Terraform → Server
+# Benefits:
+#   - Single source of truth (Terraform state)
+#   - Automated deployment on variable changes (hash-based triggers)
+#   - Audit trail (Terraform state history)
+#   - Rollback capability (Terraform state rollback)
+#   - Zero SSH from GitHub Actions (pure GitOps)
+# ============================================================================

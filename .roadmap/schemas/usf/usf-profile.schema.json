@@ -1,0 +1,298 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://luhtech.dev/schemas/usf/usf-profile.schema.json",
+  "title": "USF Profile Schema",
+  "description": "Universal Service Factors profile for service providers - normalized Quality/Cost/Speed metrics enabling equivalent comparison of heterogeneous resources (humans, agents, robots, teams, subcontractors)",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "profileId",
+    "providerId",
+    "providerType",
+    "factors",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:usf-profile:[A-Z0-9-]+$",
+      "description": "URN identifier for this USF profile"
+    },
+    "$schema": {
+      "const": "https://luhtech.dev/schemas/usf/usf-profile.schema.json"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "meta": {
+      "$ref": "#/$defs/meta"
+    },
+    "profileId": {
+      "type": "string",
+      "pattern": "^USF-[A-Z0-9-]+$",
+      "description": "Human-readable USF profile identifier (e.g., USF-CREW-ELEC-001)"
+    },
+    "providerId": {
+      "type": "string",
+      "description": "Reference to the provider entity (crew, robot, agent, etc.)"
+    },
+    "providerType": {
+      "type": "string",
+      "enum": ["human", "robot", "agent", "team", "subcontractor", "aggregate"],
+      "description": "Type of service provider"
+    },
+    "providerInfo": {
+      "type": "object",
+      "description": "Provider identification details",
+      "properties": {
+        "name": { "type": "string" },
+        "company": { "type": "string" },
+        "trade": { "type": "string" },
+        "certifications": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "location": { "type": "string" },
+        "contactRef": { "$ref": "#/$defs/urn" }
+      }
+    },
+    "factors": {
+      "type": "object",
+      "description": "The three Universal Service Factors (0.0-1.0 scale)",
+      "required": ["quality", "cost", "speed"],
+      "properties": {
+        "quality": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Quality score (Better) - derived from defect rate, first-pass yield, rework hours"
+        },
+        "cost": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Cost efficiency score (Cheaper) - actual cost vs market benchmark"
+        },
+        "speed": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Speed score (Faster) - actual duration vs takt target"
+        }
+      }
+    },
+    "composite": {
+      "type": "object",
+      "description": "Weighted composite score calculation",
+      "properties": {
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Weighted average: (quality * w_q) + (cost * w_c) + (speed * w_s)"
+        },
+        "weights": {
+          "type": "object",
+          "properties": {
+            "quality": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.4 },
+            "cost": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.3 },
+            "speed": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.3 }
+          }
+        }
+      }
+    },
+    "confidence": {
+      "type": "object",
+      "description": "Statistical confidence in the profile data",
+      "properties": {
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Overall confidence score based on sample size and variance"
+        },
+        "sampleSize": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of completed work packets contributing to this profile"
+        },
+        "variance": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Statistical variance in performance metrics"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the profile was last updated"
+        }
+      }
+    },
+    "pricingTier": {
+      "type": "string",
+      "enum": ["economy", "standard", "premium", "expedited"],
+      "description": "Provider's pricing tier based on USF profile"
+    },
+    "tierRequirements": {
+      "type": "object",
+      "description": "Minimum requirements for each tier",
+      "properties": {
+        "qualityMin": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum quality score for current tier"
+        },
+        "costMultiplier": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Cost multiplier for current tier"
+        }
+      }
+    },
+    "workTypes": {
+      "type": "array",
+      "description": "Types of work this provider is qualified for",
+      "items": {
+        "type": "object",
+        "properties": {
+          "workType": { "type": "string" },
+          "proficiencyLevel": {
+            "type": "string",
+            "enum": ["apprentice", "journeyman", "master", "specialist"]
+          },
+          "usfOverride": {
+            "type": "object",
+            "description": "Work-type specific USF if different from overall",
+            "properties": {
+              "quality": { "type": "number", "minimum": 0, "maximum": 1 },
+              "cost": { "type": "number", "minimum": 0, "maximum": 1 },
+              "speed": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "history": {
+      "type": "array",
+      "description": "Historical USF snapshots for trend analysis",
+      "items": { "$ref": "#/$defs/usfSnapshot" }
+    },
+    "activeContracts": {
+      "type": "array",
+      "description": "Current contract assignments",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "availability": {
+      "type": "object",
+      "description": "Provider availability information",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["available", "assigned", "unavailable", "limited"]
+        },
+        "nextAvailable": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "capacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Current capacity percentage available"
+        }
+      }
+    },
+    "timestamps": {
+      "$ref": "#/$defs/timestamps"
+    },
+    "graphMetadata": {
+      "$ref": "#/$defs/graphMetadata"
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$",
+      "description": "LuhTech URN identifier"
+    },
+    "meta": {
+      "type": "object",
+      "description": "V3 file metadata for sync tracking",
+      "properties": {
+        "projectId": { "type": "string" },
+        "sourceOfTruth": { "type": "string" },
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "syncStatus": {
+          "type": "object",
+          "properties": {
+            "syncDirection": {
+              "type": "string",
+              "enum": ["v3-is-source-of-truth", "bidirectional"]
+            }
+          }
+        }
+      }
+    },
+    "usfSnapshot": {
+      "type": "object",
+      "description": "Point-in-time USF factors snapshot",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "factors": {
+          "type": "object",
+          "properties": {
+            "quality": { "type": "number", "minimum": 0, "maximum": 1 },
+            "cost": { "type": "number", "minimum": 0, "maximum": 1 },
+            "speed": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "composite": { "type": "number", "minimum": 0, "maximum": 1 },
+        "sampleSize": { "type": "integer" },
+        "triggeringWorkPacket": { "$ref": "#/$defs/urn" }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to", "type"],
+            "properties": {
+              "from": { "$ref": "#/$defs/urn" },
+              "to": { "$ref": "#/$defs/urn" },
+              "type": {
+                "type": "string",
+                "enum": ["performs", "attributed-to", "rates", "derived-from"]
+              },
+              "weight": { "type": "number", "minimum": 0, "maximum": 1 },
+              "label": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

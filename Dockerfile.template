@@ -1,0 +1,83 @@
+# Enterprise Dockerfile Template - Use for all services
+# syntax=docker/dockerfile:1.4
+
+# ============================================
+# Stage 1: Dependencies
+# ============================================
+FROM node:20-bullseye AS deps
+
+# Install pnpm globally
+RUN npm install -g pnpm@10.14.0
+
+WORKDIR /app
+
+# Copy dependency files
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
+COPY nx.json tsconfig.base.json ./
+COPY scripts ./scripts
+
+# Copy workspace packages
+COPY apps/*/package.json ./apps/
+COPY libs/*/package.json ./libs/
+
+# Install production dependencies only
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --prod
+
+# ============================================
+# Stage 2: Builder
+# ============================================
+FROM node:20-bullseye AS builder
+
+# Install build dependencies
+RUN apt-get update && \
+    apt-get install -y python3 make g++ && \
+    npm install -g pnpm@10.14.0
+
+WORKDIR /app
+
+# Copy everything needed for build
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Install all dependencies including dev
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+
+# Build the application
+ARG SERVICE_NAME
+RUN pnpm nx build ${SERVICE_NAME} --configuration=production
+
+# ============================================
+# Stage 3: Production
+# ============================================
+FROM node:20-bullseye-slim AS production
+
+# Security: Create non-root user
+RUN groupadd -r nodejs && \
+    useradd -r -g nodejs nodejs
+
+# Install production runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy production dependencies and built application
+ARG SERVICE_NAME
+COPY --from=deps --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/dist/apps/${SERVICE_NAME} ./dist
+
+# Security: Use non-root user
+USER nodejs
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD node dist/main.js --health || exit 1
+
+# Start application
+CMD ["node", "dist/main.js"]

@@ -1,0 +1,191 @@
+{
+  "$schema": "../../schemas/feature.schema.json",
+  "$id": "urn:luhtech:ectropy:feature:commissioning-integration",
+  "featureId": "commissioning-integration",
+  "name": "Commissioning Integration Module",
+  "version": "1.0.0",
+  "status": "PLANNED",
+  "priority": "MEDIUM",
+  "owner": "Team",
+  "repository": "luhtech/Ectropy",
+  "targetRelease": "2026-09-01",
+  "schemaVersion": "3.0.0",
+  "meta": {
+    "sourceOfTruth": ".roadmap/features/commissioning/FEATURE.json",
+    "lastUpdated": "2026-01-15T23:50:00Z"
+  },
+  "description": "Track building system commissioning with functional performance testing (FPT) results linked to PM decisions. Connect commissioning issues to root cause decisions for complete audit trail from design through operations.",
+  "coreInnovation": {
+    "before": {
+      "fptTracking": "Paper checklists, manual spreadsheets",
+      "issueResolution": "No traceability to original decisions",
+      "documentation": "Scattered across multiple systems",
+      "rootCauseAnalysis": "Manual investigation, often incomplete"
+    },
+    "after": {
+      "fptTracking": "Digital records linked to voxels",
+      "issueResolution": "Direct links to PM decisions that caused issues",
+      "documentation": "Unified system with spatial context",
+      "rootCauseAnalysis": "Automated traversal of decision graph"
+    }
+  },
+  "value": {
+    "fptTimeReduction": "40% faster test documentation",
+    "issueResolutionTime": "60% faster with decision linkage",
+    "documentationCompleteness": "100% vs industry average 70%",
+    "differentiator": "Only platform linking Cx issues to construction decisions"
+  },
+  "milestones": [
+    {
+      "id": "M1",
+      "name": "Commissioning System Database",
+      "targetDate": "2026-07-01",
+      "status": "NOT_STARTED",
+      "description": "Prisma models and database for commissioning systems",
+      "deliverables": [
+        "Prisma models for CommissioningSystem, FunctionalTest, CxIssue",
+        "Database migrations",
+        "Seed data for system types"
+      ]
+    },
+    {
+      "id": "M2",
+      "name": "FPT Recording Interface",
+      "targetDate": "2026-07-15",
+      "status": "NOT_STARTED",
+      "description": "Interface for logging functional performance tests",
+      "deliverables": [
+        "FPT entry UI with checklist templates",
+        "Mobile-friendly test recording",
+        "Photo/video evidence attachment",
+        "Pass/fail with conditions workflow"
+      ]
+    },
+    {
+      "id": "M3",
+      "name": "Decision Linkage Engine",
+      "targetDate": "2026-08-01",
+      "status": "NOT_STARTED",
+      "description": "Link commissioning issues to PM decisions",
+      "deliverables": [
+        "Root cause decision search",
+        "Graph traversal for related decisions",
+        "Issue-to-decision attachment workflow",
+        "Resolution tracking with decision reference"
+      ]
+    },
+    {
+      "id": "M4",
+      "name": "MCP Tools & Documentation Generation",
+      "targetDate": "2026-09-01",
+      "status": "NOT_STARTED",
+      "description": "MCP tools and automated documentation",
+      "deliverables": [
+        "log_fpt_result_tool",
+        "link_cx_issue_to_decision_tool",
+        "generate_cx_documentation_tool",
+        "Cx report PDF generation",
+        "O&M manual integration"
+      ]
+    }
+  ],
+  "systemTypes": [
+    {
+      "type": "HVAC",
+      "description": "Heating, ventilation, air conditioning",
+      "typicalTests": [
+        "Air balance",
+        "Temperature control",
+        "Economizer operation"
+      ]
+    },
+    {
+      "type": "PLUMBING",
+      "description": "Domestic water, drainage, fixtures",
+      "typicalTests": ["Flow rates", "Pressure testing", "Fixture operation"]
+    },
+    {
+      "type": "ELECTRICAL",
+      "description": "Power distribution, lighting, emergency",
+      "typicalTests": [
+        "Load testing",
+        "Lighting controls",
+        "Emergency transfer"
+      ]
+    },
+    {
+      "type": "FIRE_PROTECTION",
+      "description": "Sprinklers, alarms, suppression",
+      "typicalTests": ["Flow test", "Alarm verification", "Smoke detection"]
+    },
+    {
+      "type": "CONTROLS",
+      "description": "Building automation, DDC",
+      "typicalTests": ["Point-to-point", "Sequence verification", "Integration"]
+    },
+    {
+      "type": "SECURITY",
+      "description": "Access control, surveillance",
+      "typicalTests": [
+        "Card reader verification",
+        "Camera coverage",
+        "Alarm response"
+      ]
+    },
+    {
+      "type": "ELEVATOR",
+      "description": "Vertical transportation",
+      "typicalTests": ["Load testing", "Safety devices", "Call response"]
+    },
+    {
+      "type": "SPECIALTY",
+      "description": "Medical gases, lab equipment, clean rooms",
+      "typicalTests": ["Gas purity", "Pressure cascade", "Particulate count"]
+    },
+    {
+      "type": "ENVELOPE",
+      "description": "Building enclosure, waterproofing",
+      "typicalTests": ["Air barrier", "Water penetration", "Thermal imaging"]
+    }
+  ],
+  "dependencies": {
+    "schemas": [
+      ".roadmap/schemas/commissioning/commissioning-system.schema.json",
+      ".roadmap/schemas/commissioning/functional-test.schema.json",
+      ".roadmap/schemas/commissioning/cx-issue.schema.json"
+    ],
+    "features": ["decision-lifecycle", "closeout"],
+    "services": ["api-gateway", "postgresql", "file-storage"]
+  },
+  "integrations": {
+    "pmDecisions": {
+      "description": "Link Cx issues to PM decisions for root cause",
+      "edgeType": "CAUSED_BY",
+      "bidirectional": true
+    },
+    "voxels": {
+      "description": "Associate systems and tests with spatial locations",
+      "edgeType": "LOCATED_IN",
+      "bidirectional": true
+    },
+    "closeout": {
+      "description": "Commissioning status drives closeout phase progression",
+      "dependency": "All systems must pass FPT before substantial completion"
+    },
+    "warranty": {
+      "description": "Commissioned systems link to warranty records",
+      "edgeType": "WARRANTS",
+      "bidirectional": true
+    }
+  },
+  "graphMetadata": {
+    "inEdges": ["urn:luhtech:ectropy:file:roadmap"],
+    "outEdges": [
+      "urn:luhtech:ectropy:schema:commissioning-system",
+      "urn:luhtech:ectropy:schema:functional-test",
+      "urn:luhtech:ectropy:schema:cx-issue"
+    ]
+  },
+  "createdAt": "2026-01-15T23:50:00Z",
+  "updatedAt": "2026-01-15T23:50:00Z"
+}

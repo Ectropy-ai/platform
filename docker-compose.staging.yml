@@ -1,0 +1,1098 @@
+# Anchor definitions for reusable configuration
+# P1 Enterprise Infrastructure Fix: Aligned health check timeouts with development
+# Increased retries and start_period for TypeScript build time and production stability
+# ROOT CAUSE #233: Force redeploy to restart services and load NUXT_PUBLIC_SSL_ENABLED
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 5 # Increased from 3 for TypeScript build time
+  start_period: 60s # Increased from 40s for production-grade stability
+
+# Fortune 500 Container Security Defaults (CIS Docker Benchmark v1.6)
+# Applied to all services for defense-in-depth
+x-security-defaults: &security-defaults
+  security_opt:
+    - no-new-privileges:true # Prevent privilege escalation (CIS 5.25)
+
+services:
+  # ===========================================================================
+  # NGINX REVERSE PROXY (Enterprise Containerization Pattern)
+  # ===========================================================================
+  # ARCHITECTURE DECISION (2026-01-26): Containerized nginx for production parity
+  #
+  # Strategic Alignment:
+  #   - Production: nginx runs as container (docker-compose.production.yml:2-36)
+  #   - Development: nginx runs as container (docker-compose.development.yml)
+  #   - Staging: NOW containerized (previously host-based - anti-pattern)
+  #
+  # Benefits:
+  #   ✅ Production Parity: Identical architecture across all environments
+  #   ✅ Container-Native: No host-level services (Kubernetes-ready)
+  #   ✅ Atomic Deployments: docker-compose up/down handles complete stack
+  #   ✅ Network Isolation: All services on Docker bridge network
+  #   ✅ Easy Rollback: Container-based rollback via docker-compose
+  #
+  # Volume Mounts:
+  #   - nginx configs: Read-only mounts from infrastructure/nginx/
+  #   - Static files: /var/www/ectropy/dist/apps/web-dashboard/ (deployed by CI/CD)
+  #
+  # Migration Note:
+  #   - CI/CD previously deployed nginx to host (apt-get + systemctl)
+  #   - Now deploys via docker-compose (container-native)
+  #   - Static files still deployed to host path, volume-mounted into container
+  # ===========================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: ectropy-nginx
+    <<: *security-defaults
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      # nginx configuration files (read-only)
+      - ./infrastructure/nginx/ectropy-staging.conf:/etc/nginx/sites-enabled/ectropy-staging:ro
+      - ./infrastructure/nginx/main.conf:/etc/nginx/nginx.conf:ro
+    # Five Why 2026-02-20: REMOVED depends_on for backend services
+    # BEFORE: nginx waited for api-gateway, mcp-server, web-dashboard to start.
+    #   If db-migrate failed → api-gateway blocked → nginx blocked → port 80 closed → LB 503
+    # AFTER: nginx starts unconditionally. Runtime DNS resolution (set $var pattern in
+    #   ectropy-staging.conf) handles missing backends gracefully — returns 502 per-route
+    #   instead of blocking nginx startup entirely. /lb-health always responds 200.
+    depends_on: {}
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'nginx', '-t']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    networks:
+      - ectropy-network
+    labels:
+      com.ectropy.service: 'nginx-reverse-proxy'
+      com.ectropy.type: 'infrastructure'
+      com.ectropy.purpose: 'HTTP/HTTPS reverse proxy and static file serving'
+
+  # ===========================================================================
+  # DATABASE MIGRATION: INLINE PATTERN (Watchtower-Compatible)
+  # ===========================================================================
+  # ENTERPRISE FIX (2026-02-24): Removed db-migrate init container
+  #
+  # ROOT CAUSE: Init container pattern incompatible with Watchtower:
+  #   - db-migrate uses restart:'no' - runs once, exits
+  #   - api-gateway/mcp-server depend on service_completed_successfully
+  #   - Watchtower updates individual containers but does NOT re-run Docker
+  #     Compose dependency chains
+  #   - If db-migrate fails once, it stays "exited (1)" forever, blocking
+  #     api-gateway/mcp-server indefinitely
+  #
+  # FIX: Migrations now run inline in docker-entrypoint.sh of each service:
+  #   - apps/api-gateway/docker-entrypoint.sh
+  #   - apps/mcp-server/docker-entrypoint.sh
+  #
+  # Benefits:
+  #   - Watchtower restarts trigger migrations automatically
+  #   - Failure recovery: auto-retry with exponential backoff
+  #   - No dependency chain blocking
+  #   - Industry pattern: Kubernetes sidecar/inline migrations
+  #
+  # Reference: FIVE_WHY_STAGING_502_BACKEND_DOWN_2026-02-24.json
+  # ===========================================================================
+
+  api-gateway:
+    image: registry.digitalocean.com/ectropy-registry/api-gateway:staging
+    container_name: ectropy-api-gateway
+    <<: *security-defaults
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: staging
+      PORT: 4000
+      # ROOT CAUSE #208: DATABASE_* variables from .env (managed PostgreSQL)
+      # No hardcoded overrides - uses managed database connection from .env file
+      # ROOT CAUSE #222: Explicit SSL for managed PostgreSQL (matches production)
+      DATABASE_SSL: 'true'
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      API_BASE_URL: ${API_BASE_URL:-https://staging.ectropy.ai}
+      API_URL: https://staging.ectropy.ai/api
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      SESSION_SECRET: ${SESSION_SECRET}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      TRUST_PROXY: 'true'
+      # Rate limiting: 500 req/15min for staging (E2E tests share one user/IP bucket)
+      # Production keeps default 100 (not set = falls back to hardcoded default)
+      RATE_LIMIT_STANDARD_MAX: '500'
+      OAUTH_CALLBACK_URL: https://staging.ectropy.ai/api/auth/google/callback
+      COOKIE_SECURE: 'true'
+      SESSION_COOKIE_SECURE: 'true'
+      FRONTEND_URL: https://staging.ectropy.ai
+      ALLOWED_ORIGINS: http://staging.ectropy.ai,https://staging.ectropy.ai
+
+      # Speckle BIM Integration (ENTERPRISE FIX 2025-12-21 - ROOT CAUSE #45)
+      # API Gateway needs these to authenticate with Speckle Server's GraphQL API
+      # NOTE: SPECKLE_SERVER_TOKEN is loaded from shared volume at startup by
+      # docker-entrypoint.sh (created by speckle-admin-bootstrap via GraphQL).
+      # The .env fallback is kept for backwards compatibility but the shared volume
+      # token takes precedence (it's the only one with correct bcrypt hashing).
+      SPECKLE_SERVER_URL: ${SPECKLE_SERVER_URL:-http://ectropy-speckle-server:3000}
+      SPECKLE_SERVER_TOKEN: ${SPECKLE_SERVER_TOKEN}
+      SPECKLE_ADMIN_EMAIL: ${SPECKLE_ADMIN_EMAIL:-speckle-admin@ectropy.ai}
+      SPECKLE_ADMIN_PASSWORD: ${SPECKLE_ADMIN_PASSWORD}
+
+      # Email Service - Resend (ENTERPRISE FIX 2025-12-21)
+      # Transactional email for waitlist, password reset, email verification
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@ectropy.ai}
+      EMAIL_RETRY_ATTEMPTS: ${EMAIL_RETRY_ATTEMPTS:-3}
+
+      # Multi-Database Architecture (Phase 4 — DatabaseManager)
+      # ROOT CAUSE FIX: FIVE_WHY_INFRASTRUCTURE_GAPS_2026-03-01
+      # Required by @ectropy/database DatabaseManager for catalog/portfolio routes
+      PLATFORM_DATABASE_URL: ${PLATFORM_DATABASE_URL}
+      SHARED_DATABASE_URL: ${SHARED_DATABASE_URL}
+    ports:
+      - '${API_GATEWAY_PORT:-4000}:4000' # API Gateway port (host nginx → container:4000)
+    volumes:
+      - speckle-tokens:/shared-tokens:ro
+    depends_on:
+      # ENTERPRISE FIX (2026-02-24): Removed db-migrate dependency
+      # Migrations now run inline in docker-entrypoint.sh (Watchtower-compatible)
+      # See: FIVE_WHY_STAGING_502_BACKEND_DOWN_2026-02-24.json
+      redis:
+        condition: service_healthy
+      # NOTE: speckle-admin-bootstrap is NOT a hard dependency.
+      # The bootstrap writes the Speckle token to the shared volume asynchronously.
+      # docker-entrypoint.sh waits for the token file with a timeout, then starts
+      # regardless — falling back to SPECKLE_SERVER_TOKEN from environment.
+      # This prevents cascading failure: bootstrap failure must NOT block the entire
+      # application stack (api-gateway, web-dashboard, etc).
+    restart: unless-stopped
+    # NOTE: test-data/ directory is baked into api-gateway Docker image (Dockerfile:50 COPY . .)
+    # Volume mount removed - shadowed image contents when host path didn't exist
+    # See: apps/mcp-server/data/evidence/2026-02/FIVE_WHY_DEMO_SETUP_FAILURE_2026-02-10.json
+    healthcheck:
+      <<: *healthcheck-defaults
+      # Uses /livez (liveness probe) — zero-dependency, bypasses rate limiter.
+      # /health checks DB/Redis which can false-negative during dependency outages.
+      test: ['CMD', 'curl', '-f', 'http://localhost:4000/livez']
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+        reservations:
+          cpus: '1.0'
+          memory: 1024M
+    networks:
+      - ectropy-network
+    labels:
+      # Enable Watchtower auto-updates for zero-SSH deployment
+      com.centurylinklabs.watchtower.enable: 'true'
+
+  web-dashboard:
+    image: registry.digitalocean.com/ectropy-registry/web-dashboard:staging
+    <<: *security-defaults
+    # ENTERPRISE FIX (2025-12-22): P0 OAuth Routing - Consistent URL Pattern
+    # Problem: Duplicate /api path causing OAuth routing failure (/api/api/auth/google)
+    # Root Cause: REACT_APP_API_URL included /api suffix, useAuth.tsx appends /api/auth
+    # Solution: Remove /api suffix - frontend code appends path segments dynamically
+    # Pattern: Environment-agnostic base URLs + dynamic path construction
+    # NOTE: Build args removed - using pre-built image from CI/CD
+    container_name: ectropy-web-dashboard
+    environment:
+      NODE_ENV: staging
+      PORT: 3000
+    # ENTERPRISE PATTERN: Container proxy architecture (production parity)
+    # Nginx proxies to web-dashboard container on port 3000 via Docker network
+    # Architecture: Load Balancer → nginx container → web-dashboard container:3000
+    # Benefits: Container-native, Kubernetes-ready, GitOps-driven, environment parity
+    # No port publishing needed: nginx and web-dashboard communicate via Docker bridge network
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/']
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - ectropy-network
+    labels:
+      # Enable Watchtower auto-updates for zero-SSH deployment
+      com.centurylinklabs.watchtower.enable: 'true'
+
+  ectropy-console:
+    image: registry.digitalocean.com/ectropy-registry/ectropy-console:staging
+    container_name: ectropy-console
+    environment:
+      NODE_ENV: staging
+      PORT: 3001
+    # ROOT CAUSE FIX: Changed default host port from 3001 to 3003
+    # Port 3001 conflicts with mcp-server (MCP_STDIO_PORT defaults to 3001)
+    # Container still listens on 3001 internally, only the host mapping changes
+    ports:
+      - '${CONSOLE_PORT:-3003}:3001'
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ['CMD', 'curl', '-f', 'http://localhost:3001/']
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - ectropy-network
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+
+  mcp-server:
+    image: registry.digitalocean.com/ectropy-registry/mcp-server:staging
+    container_name: ectropy-mcp
+    <<: *security-defaults
+    env_file:
+      - .env
+    ports:
+      - '${MCP_STDIO_PORT:-3001}:3001' # MCP Server stdio/health endpoint
+      - '${MCP_API_PORT:-3002}:3002' # MCP Express API (/api/mcp/* routes)
+    environment:
+      NODE_ENV: staging
+      MCP_PORT: 3001
+      EXPRESS_PORT: 3002
+      # MCP API Key for external access
+      MCP_API_KEY: ${MCP_API_KEY}
+      # Trust proxy for accurate logging and request handling
+      TRUST_PROXY: 'true'
+      # API calls to gateway use Nginx with HTTPS
+      API_BASE_URL: https://staging.ectropy.ai/api
+      # Docker service name for inter-container communication
+      API_GATEWAY_HOST: ectropy-api-gateway
+      API_GATEWAY_PORT: 4000
+      # ROOT CAUSE #208: DATABASE_* variables from .env (managed PostgreSQL)
+      # No hardcoded overrides - uses managed database connection from .env file
+      # ROOT CAUSE #222: Explicit SSL for managed PostgreSQL (matches production)
+      DATABASE_SSL: 'true'
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    depends_on:
+      # ENTERPRISE FIX (2026-02-24): Removed db-migrate dependency
+      # Migrations now run inline in docker-entrypoint.sh (Watchtower-compatible)
+      # See: FIVE_WHY_STAGING_502_BACKEND_DOWN_2026-02-24.json
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    # Enterprise Health Check System - 4-Layer Architecture (Kubernetes-compatible)
+    # Available endpoints:
+    #   /ping          - Minimal check (container alive)
+    #   /health/live   - Liveness probe (process responsive)
+    #   /health/ready  - Readiness probe (ready to serve traffic)
+    #   /health/startup- Startup probe (initialization complete)
+    #   /health        - Full health check (all components, database, Redis)
+    # Docker healthcheck uses /health for comprehensive container health monitoring
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ['CMD', 'curl', '-f', 'http://localhost:3001/health']
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    networks:
+      - ectropy-network
+    labels:
+      # Enable Watchtower auto-updates for zero-SSH deployment
+      com.centurylinklabs.watchtower.enable: 'true'
+
+  # ROOT CAUSE #208: Containerized postgres for SPECKLE ONLY
+  # Ectropy application uses managed PostgreSQL (ectropy-staging-db via .env DATABASE_URL)
+  # This postgres container is ONLY for Speckle BIM services (separate "speckle" database)
+  # Architecture: Ectropy services → managed DB, Speckle services → containerized postgres
+  postgres:
+    image: postgres:15-alpine
+    container_name: ectropy-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: speckle # Speckle database (NOT ectropy database)
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # Port mappings removed - only accessible via Docker network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - ectropy-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: ectropy-redis
+    <<: *security-defaults
+    read_only: true
+    tmpfs:
+      - /tmp
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data # Persistent storage (removed /data from tmpfs — mount conflict)
+    # Port mappings removed - only accessible via Docker network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'redis-cli',
+          '--no-auth-warning',
+          '-a',
+          '${REDIS_PASSWORD}',
+          'ping',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - ectropy-network
+
+  # =========================================================================
+  # Seppä Agent Infrastructure - EIL (Ectropy Intelligence Layer)
+  # =========================================================================
+
+  # Qdrant Vector Database - Powers RAG layer for semantic search
+  # Required for: Assistant context retrieval, document search, similarity matching
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: ectropy-qdrant
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
+    volumes:
+      - qdrant-data:/qdrant/storage
+    restart: unless-stopped
+    # Qdrant image has no curl/wget, /bin/sh is dash (no /dev/tcp).
+    # Use bash explicitly for TCP probe.
+    # FIX (2026-03-06): curl-based check failed 27,705 times on staging.
+    healthcheck:
+      test:
+        ['CMD', 'bash', '-c', '(echo > /dev/tcp/localhost/6333) 2>/dev/null']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - ectropy-network
+
+  # =========================================================================
+  # SPECKLE BIM INTEGRATION SERVICES (STAGING)
+  # =========================================================================
+  # Enterprise-grade BIM viewing, sharing, and collaboration platform
+  # Official Speckle Server: https://github.com/specklesystems/speckle-server
+  # =========================================================================
+
+  # Speckle Database Initialization (Init Container Pattern)
+  # Creates "speckle" database before Speckle server starts
+  speckle-db-init:
+    image: postgres:15-alpine
+    container_name: ectropy-speckle-db-init
+    environment:
+      PGPASSWORD: ${DATABASE_PASSWORD}
+    command: >
+      sh -c '
+        echo "=========================================" &&
+        echo "SPECKLE DATABASE INITIALIZATION" &&
+        echo "=========================================" &&
+        echo "Waiting for PostgreSQL..." &&
+        until psql -h ectropy-postgres -U postgres -c "\q" 2>/dev/null; do
+          sleep 2
+        done &&
+        echo "PostgreSQL ready. Creating Speckle database..." &&
+        psql -h ectropy-postgres -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '\''speckle'\''" | grep -q 1 ||
+        psql -h ectropy-postgres -U postgres -c "CREATE DATABASE speckle;" &&
+        echo "✅ Speckle database ready" &&
+        echo "========================================="
+      '
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no' # Init container - runs once and exits
+    labels:
+      com.ectropy.service: 'speckle-database-init'
+      com.ectropy.type: 'init-container'
+      com.ectropy.purpose: 'Create Speckle database before server startup'
+    networks:
+      - ectropy-network
+
+  # Speckle Admin & Service Token Bootstrap
+  # ============================================================================
+  # INDUSTRY PATTERN: Credential-based ephemeral token (Five Why 2026-02-23)
+  #
+  # ROOT CAUSE of all previous failures: Using a static pre-shared token
+  # (SPECKLE_SERVER_TOKEN) required both server-side DB registration AND
+  # client-side CI/CD use — two paths that reliably diverged.
+  #
+  # FIX: Bootstrap generates its OWN Speckle token via apiTokenCreate (Speckle
+  #   handles bcrypt internally). This token goes to api-gateway via shared volume.
+  #   The seed workflow authenticates INDEPENDENTLY with admin credentials.
+  #   No static token is shared between bootstrap and CI/CD. No sync required.
+  #
+  # FLOW:
+  #   1. Register admin user via POST /auth/local/register (or login if exists)
+  #   2. Extract access_code from 302 redirect Location header
+  #   3. Exchange access_code for JWT via POST /auth/token (spklwebapp app)
+  #   4. Check shared volume — if valid token exists, skip creation (idempotent)
+  #   5. Create service PAT via GraphQL apiTokenCreate mutation
+  #   6. Write Speckle-generated token to shared volume for api-gateway
+  #   7. Validate token via GraphQL activeUser query (HARD FAIL if invalid)
+  #
+  # PATTERN: Kubernetes ServiceAccount — credentials are stable, tokens are
+  #   generated on-demand by the service and never manually replicated.
+  # ============================================================================
+  speckle-admin-bootstrap:
+    image: alpine:3.19
+    container_name: ectropy-speckle-admin-bootstrap
+    environment:
+      SPECKLE_ADMIN_EMAIL: ${SPECKLE_ADMIN_EMAIL:-speckle-admin@ectropy.ai}
+      SPECKLE_ADMIN_PASSWORD: ${SPECKLE_ADMIN_PASSWORD}
+    volumes:
+      - speckle-tokens:/shared-tokens
+    # DOCKER COMPOSE VARIABLE ESCAPING:
+    # All shell variables use $$ to prevent Docker Compose from interpolating
+    # them as empty strings at YAML parse time. $$ → $ after Compose processing.
+    command: >
+      sh -c '
+        echo "=========================================" &&
+        echo "SPECKLE ADMIN & TOKEN BOOTSTRAP" &&
+        echo "=========================================" &&
+
+        echo "Installing curl and jq..." &&
+        apk add --no-cache curl jq 2>&1 | tail -1 || {
+          echo "FATAL: Could not install curl/jq." &&
+          exit 1
+        } &&
+
+        SPECKLE_URL="http://ectropy-speckle-server:3000" &&
+        TOKEN_FILE="/shared-tokens/speckle-service-token" &&
+
+        if [ -z "$$SPECKLE_ADMIN_EMAIL" ] || [ -z "$$SPECKLE_ADMIN_PASSWORD" ]; then
+          echo "FATAL: SPECKLE_ADMIN_EMAIL and SPECKLE_ADMIN_PASSWORD are required" &&
+          exit 1
+        fi &&
+
+        echo "" &&
+        CHALLENGE=$$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32) &&
+        echo "Step 1: Registering admin user ($$SPECKLE_ADMIN_EMAIL)..." &&
+        echo "  Generated challenge: $${CHALLENGE:0:8}..." &&
+        REGISTER_RESP=$$(curl -s -o /dev/null -w "%{redirect_url}" \
+          -X POST "$$SPECKLE_URL/auth/local/register?challenge=$$CHALLENGE" \
+          -H "Content-Type: application/json" \
+          -d "{\"email\":\"$$SPECKLE_ADMIN_EMAIL\",\"password\":\"$$SPECKLE_ADMIN_PASSWORD\",\"name\":\"Ectropy Admin\",\"company\":\"Ectropy\"}") &&
+        ACCESS_CODE=$$(echo "$$REGISTER_RESP" | grep -oE "access_code=[^&]+" | cut -d= -f2) &&
+
+        if [ -z "$$ACCESS_CODE" ]; then
+          echo "  Registration returned no access_code (user may exist), trying login..." &&
+          LOGIN_RESP=$$(curl -s -o /dev/null -w "%{redirect_url}" \
+            -X POST "$$SPECKLE_URL/auth/local/login?challenge=$$CHALLENGE" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$$SPECKLE_ADMIN_EMAIL\",\"password\":\"$$SPECKLE_ADMIN_PASSWORD\"}") &&
+          ACCESS_CODE=$$(echo "$$LOGIN_RESP" | grep -oE "access_code=[^&]+" | cut -d= -f2)
+        fi &&
+
+        if [ -z "$$ACCESS_CODE" ]; then
+          echo "FATAL: Could not obtain access_code from register or login" &&
+          exit 1
+        fi &&
+        echo "  Got access_code: $${ACCESS_CODE:0:8}..." &&
+
+        echo "" &&
+        echo "Step 2: Exchanging access_code for JWT..." &&
+        TOKEN_RESP=$$(curl -sf "$$SPECKLE_URL/auth/token" \
+          -H "Content-Type: application/json" \
+          -d "{\"appId\":\"spklwebapp\",\"appSecret\":\"spklwebapp\",\"accessCode\":\"$$ACCESS_CODE\",\"challenge\":\"$$CHALLENGE\"}") &&
+        JWT=$$(echo "$$TOKEN_RESP" | sed -n "s/.*\"token\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p") &&
+
+        if [ -z "$$JWT" ]; then
+          echo "FATAL: Could not obtain JWT from token exchange" &&
+          echo "  Response: $$TOKEN_RESP" &&
+          exit 1
+        fi &&
+        echo "  Got JWT: $${JWT:0:20}..." &&
+
+        echo "" &&
+        echo "Step 3: Checking shared volume for existing valid token..." &&
+        if [ -f "$$TOKEN_FILE" ]; then
+          EXISTING=$$(cat "$$TOKEN_FILE" | tr -d "[:space:]") &&
+          if [ -n "$$EXISTING" ]; then
+            CHECK=$$(curl -s "$$SPECKLE_URL/graphql" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $$EXISTING" \
+              -d "{\"query\":\"{ activeUser { id } }\"}" 2>/dev/null || true) &&
+            if echo "$$CHECK" | grep -q '"activeUser"'; then
+              echo "  Existing token is valid — skipping PAT creation" &&
+              echo "=========================================" &&
+              echo "SPECKLE BOOTSTRAP COMPLETE (token reused)" &&
+              echo "=========================================" &&
+              exit 0
+            fi &&
+            echo "  Existing token is no longer valid — creating new PAT"
+          fi
+        else
+          echo "  No token file found — creating new PAT"
+        fi &&
+
+        echo "" &&
+        echo "Step 4: Creating service PAT via apiTokenCreate..." &&
+        CREATE_RESP=$$(curl -sf "$$SPECKLE_URL/graphql" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $$JWT" \
+          -d "{\"query\":\"mutation{apiTokenCreate(token:{name:\\\"Ectropy Service Token\\\",scopes:[\\\"streams:read\\\",\\\"streams:write\\\",\\\"profile:read\\\",\\\"users:read\\\"],lifespan:3154000000000})}\"}") &&
+        SERVICE_TOKEN=$$(echo "$$CREATE_RESP" | jq -r ".data.apiTokenCreate // empty" 2>/dev/null) &&
+
+        if [ -z "$$SERVICE_TOKEN" ]; then
+          echo "FATAL: apiTokenCreate returned no token" &&
+          echo "  Response: $$CREATE_RESP" &&
+          exit 1
+        fi &&
+        echo "  PAT created: $${SERVICE_TOKEN:0:10}..." &&
+
+        echo "" &&
+        echo "Step 5: Writing service token to shared volume..." &&
+        echo -n "$$SERVICE_TOKEN" > "$$TOKEN_FILE" &&
+        chmod 644 "$$TOKEN_FILE" &&
+        echo "  Written to $$TOKEN_FILE" &&
+
+        echo "" &&
+        echo "Step 6: Validating service token via GraphQL (HARD FAIL if invalid)..." &&
+        VERIFY=$$(curl -s "$$SPECKLE_URL/graphql" \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $$SERVICE_TOKEN" \
+          -d "{\"query\":\"{ activeUser { id email name role } }\"}") &&
+
+        if echo "$$VERIFY" | grep -q '"activeUser"'; then
+          VERIFIED_EMAIL=$$(echo "$$VERIFY" | jq -r ".data.activeUser.email // \"unknown\"" 2>/dev/null) &&
+          VERIFIED_ROLE=$$(echo "$$VERIFY" | jq -r ".data.activeUser.role // \"unknown\"" 2>/dev/null) &&
+          echo "  Token validation PASSED" &&
+          echo "  Authenticated as: $$VERIFIED_EMAIL (role: $$VERIFIED_ROLE)"
+        else
+          echo "FATAL: Service token validation FAILED after creation" &&
+          echo "  Response: $$VERIFY" &&
+          exit 1
+        fi &&
+
+        echo "" &&
+        echo "=========================================" &&
+        echo "SPECKLE BOOTSTRAP COMPLETE" &&
+        echo "  Admin: $$SPECKLE_ADMIN_EMAIL" &&
+        echo "  Token: $${SERVICE_TOKEN:0:10}... (Speckle-generated, bcrypt in DB)" &&
+        echo "  Scopes: streams:read, streams:write, profile:read, users:read" &&
+        echo "  Shared volume: $$TOKEN_FILE" &&
+        echo "  Pattern: apiTokenCreate (Speckle manages bcrypt internally)" &&
+        echo "========================================="
+      '
+    depends_on:
+      speckle-server:
+        condition: service_healthy
+    restart: on-failure:5
+    labels:
+      com.ectropy.service: 'speckle-admin-bootstrap'
+      com.ectropy.type: 'init-container'
+      com.ectropy.purpose: 'Bootstrap Speckle admin user and create service PAT via Speckle API'
+    networks:
+      - ectropy-network
+
+  speckle-server:
+    image: speckle/speckle-server:2
+    container_name: ectropy-speckle-server
+    restart: unless-stopped
+    environment:
+      # Server URL configuration (staging environment)
+      # ROOT CAUSE #232 GROUND TRUTH: Speckle Server v2 DOES NOT support path-based CANONICAL_URL
+      # CANONICAL_URL must be base domain ONLY (no /speckle path)
+      # nginx handles path-based routing via proxy_pass /speckle/ → http://speckle-server:3000/
+      # Evidence: Server parses URL and extracts only hostname, stripping paths
+      CANONICAL_URL: https://staging.ectropy.ai
+      PRIVATE_OBJECTS_SERVER_URL: http://speckle-server:3000
+
+      # Session security (from GitHub Secrets)
+      SESSION_SECRET: ${SPECKLE_SESSION_SECRET}
+
+      # Authentication strategy (local for staging, can add OAuth later)
+      STRATEGY_LOCAL: 'true'
+
+      # ENTERPRISE FIX (2026-01-10): First User Admin Bootstrap
+      # Industry standard pattern: First registered user becomes server admin
+      # Reference: https://speckle.guide/dev/server-manualsetup
+      FIRST_USER_ADMIN: 'true'
+
+      # Logging (ROOT CAUSE #232: warn suppressed ALL startup logs)
+      # Use 'info' to see startup progress, 'warn' for production silence
+      LOG_LEVEL: info
+      LOG_PRETTY: 'false'
+
+      # Database configuration (reuse existing PostgreSQL, separate database)
+      # ROOT CAUSE #234 CRITICAL FIX: Speckle Server expects POSTGRES_URL (hostname), not POSTGRES_HOST
+      # Evidence: "databaseHost":"undefined" despite POSTGRES_HOST being set in container
+      # Speckle Server 2.x uses POSTGRES_URL for hostname (not a full connection string)
+      # Pattern: Same as fileimport-service (line 568) and official Speckle documentation
+      POSTGRES_URL: ectropy-postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: speckle
+
+      # Redis configuration (reuse existing Redis, separate DB index)
+      REDIS_URL: redis://:${REDIS_PASSWORD}@ectropy-redis:6379/1
+      PREVIEW_SERVICE_USE_PRIVATE_OBJECTS_SERVER_URL: 'true'
+      PREVIEW_SERVICE_REDIS_URL: redis://:${REDIS_PASSWORD}@ectropy-redis:6379/1
+      FILEIMPORT_SERVICE_USE_PRIVATE_OBJECTS_SERVER_URL: 'true'
+      FILEIMPORT_SERVICE_REDIS_URL: redis://:${REDIS_PASSWORD}@ectropy-redis:6379/1
+
+      # MinIO S3-compatible object storage — DISABLED (2026-03-08)
+      # ROOT CAUSE: Speckle → MinIO S3 connection hangs indefinitely during file upload.
+      # MinIO is healthy but the Speckle S3 SDK hangs on write operations.
+      # Switching to local blob storage (Speckle default when S3_ENDPOINT is unset).
+      # Local blobs stored in /var/lib/speckle-server (Docker anonymous volume).
+      # Re-enable when MinIO connectivity is debugged via DigitalOcean Console.
+      # S3_ENDPOINT: http://minio:9000
+      # S3_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_URL:-https://staging.ectropy.ai/minio}
+      # S3_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      # S3_SECRET_KEY: ${MINIO_SECRET_KEY}
+      # S3_BUCKET: speckle-server
+      # S3_CREATE_BUCKET: 'true'
+      # S3_REGION: 'us-east-1'
+
+      # File upload limits (production-ready)
+      FILE_SIZE_LIMIT_MB: 2000
+
+      # Email configuration - Resend SMTP (ENTERPRISE FIX 2025-12-21)
+      # Speckle Server requires SMTP for user registration and notifications
+      # Resend SMTP: smtp.resend.com:587 (TLS) or :465 (SSL)
+      EMAIL_FROM: ${RESEND_FROM_EMAIL:-speckle@ectropy.ai}
+      EMAIL_HOST: smtp.resend.com
+      EMAIL_PORT: 587
+      EMAIL_USERNAME: resend
+      EMAIL_PASSWORD: ${RESEND_API_KEY}
+      EMAIL_SECURE: 'false'
+      EMAIL_REQUIRE_TLS: 'true'
+
+      # Frontend URL
+      # ROOT CAUSE #232 GROUND TRUTH: FRONTEND_ORIGIN must match CANONICAL_URL (base domain only)
+      FRONTEND_ORIGIN: https://staging.ectropy.ai
+
+      # File import queue
+      FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://postgres:${DATABASE_PASSWORD}@ectropy-postgres/speckle
+      FF_NEXT_GEN_FILE_IMPORTER_ENABLED: 'true'
+
+      # Trust proxy (nginx reverse proxy)
+      TRUST_PROXY: 'true'
+    ports:
+      - '${SPECKLE_SERVER_PORT:-3100}:3000' # Speckle API (host nginx proxy, container:3000)
+    depends_on:
+      speckle-db-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    # ENTERPRISE FIX (2026-02-25): Healthcheck using full node path for distroless images
+    # ROOT CAUSE: Speckle v2 images are distroless (no /bin/sh), node at /nodejs/bin/node not in PATH
+    # FIX: Use full path /nodejs/bin/node instead of 'node'
+    # This healthcheck gates speckle-admin-bootstrap via depends_on: service_healthy
+    # ensuring the schema migration is complete before token bootstrap begins.
+    # Pattern: Kubernetes readiness probe equivalent for Docker Compose
+    healthcheck:
+      test:
+        [
+          'CMD',
+          '/nodejs/bin/node',
+          '-e',
+          'fetch(''http://localhost:3000/graphql'',{method:''POST'',headers:{''Content-Type'':''application/json''},body:''{"query":"{serverInfo{name}}"}''}).then(r=>r.json()).then(d=>process.exit(d.data&&d.data.serverInfo?0:1)).catch(()=>process.exit(1))',
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - ectropy-network
+
+  speckle-frontend:
+    image: speckle/speckle-frontend-2:2
+    container_name: ectropy-speckle-frontend
+    restart: unless-stopped
+    environment:
+      # Server name
+      NUXT_PUBLIC_SERVER_NAME: 'Ectropy Staging'
+
+      # Public-facing URLs (accessed by browser via nginx)
+      # ROOT CAUSE #232 GROUND TRUTH: Frontend DOES support path-based routing (/speckle)
+      # Frontend (Nuxt.js) needs full path for client-side routing
+      # Backend (speckle-server) needs base domain only
+      NUXT_PUBLIC_API_ORIGIN: https://staging.ectropy.ai/speckle
+      NUXT_PUBLIC_BASE_URL: https://staging.ectropy.ai/speckle
+
+      # Backend URL (Docker network internal)
+      NUXT_PUBLIC_BACKEND_API_ORIGIN: http://speckle-server:3000
+
+      # SSL/HTTPS Configuration (ROOT CAUSE #233 - CRITICAL FIX)
+      # Tells Nuxt frontend to generate HTTPS URLs (not HTTP) when behind SSL termination
+      # Official Speckle documentation: Set to 'true' if running with SSL
+      # Without this, frontend generates HTTP redirects causing browser mixed content errors
+      NUXT_PUBLIC_SSL_ENABLED: 'true'
+
+      # Redis for SSR caching
+      NUXT_REDIS_URL: redis://:${REDIS_PASSWORD}@ectropy-redis:6379/1
+
+      # Logging (production level)
+      NUXT_PUBLIC_LOG_LEVEL: error
+      LOG_LEVEL: warn
+      LOG_PRETTY: 'false'
+
+      # Feature flags
+      NUXT_PUBLIC_FF_LARGE_FILE_IMPORTS_ENABLED: 'true'
+      NUXT_PUBLIC_FF_NEXT_GEN_FILE_IMPORTER_ENABLED: 'true'
+    ports:
+      - '${SPECKLE_FRONTEND_PORT:-3101}:8080' # Frontend UI (container Nuxt.js:8080)
+    depends_on:
+      speckle-server:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - ectropy-network
+
+  speckle-preview:
+    image: speckle/speckle-preview-service:2
+    container_name: ectropy-speckle-preview
+    restart: unless-stopped
+    # Memory managed by deploy.resources.limits.memory: 4096M
+    # Removed mem_limit/memswap_limit — conflicts with deploy.resources (Docker Compose v5 rejects)
+    environment:
+      HOST: '0.0.0.0'
+      PORT: '3001'
+      LOG_LEVEL: warn
+      LOG_PRETTY: 'false'
+      REDIS_URL: redis://:${REDIS_PASSWORD}@ectropy-redis:6379/1
+    depends_on:
+      - redis
+    # ENTERPRISE FIX (2025-12-18): ROOT CAUSE #59 & #60 - Healthcheck Removed
+    # Reason: Preview service container lacks shell/curl binaries
+    # Evidence: Service runs successfully, generates 3D previews
+    # Alternative: Monitor via application metrics or nginx upstream status
+    # healthcheck removed - service health validated via application metrics
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4096M
+        reservations:
+          cpus: '0.5'
+          memory: 1024M
+    networks:
+      - ectropy-network
+
+  speckle-webhook:
+    image: speckle/speckle-webhook-service:2
+    container_name: ectropy-speckle-webhook
+    restart: unless-stopped
+    environment:
+      LOG_LEVEL: warn
+      LOG_PRETTY: 'false'
+      PG_CONNECTION_STRING: postgres://postgres:${DATABASE_PASSWORD}@ectropy-postgres/speckle
+    depends_on:
+      - speckle-server
+      - postgres
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - ectropy-network
+
+  speckle-fileimport:
+    image: speckle/speckle-fileimport-service:2
+    container_name: ectropy-speckle-fileimport
+    restart: unless-stopped
+    environment:
+      LOG_LEVEL: warn
+      LOG_PRETTY: 'false'
+
+      # Speckle Server URLs (internal Docker network)
+      SPECKLE_SERVER_URL: http://ectropy-speckle-server:3000
+
+      # ENTERPRISE FIX (2026-01-10): Base Path Consistency
+      # Must match speckle-server and speckle-frontend CANONICAL_URL
+      # ROOT CAUSE #232 FIX: Path-based routing to match nginx configuration
+      # ENTERPRISE PATTERN: Use environment variable for deployment flexibility
+      CANONICAL_URL: ${SPECKLE_PUBLIC_URL:-https://staging.ectropy.ai/speckle}
+
+      # Redis configuration (same as speckle-server)
+      REDIS_URL: redis://:${REDIS_PASSWORD}@ectropy-redis:6379/1
+
+      # PostgreSQL configuration (separate variables + connection string)
+      POSTGRES_URL: ectropy-postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: speckle
+      PG_CONNECTION_STRING: postgresql://postgres:${DATABASE_PASSWORD}@ectropy-postgres/speckle
+      FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://postgres:${DATABASE_PASSWORD}@ectropy-postgres/speckle
+    depends_on:
+      - speckle-server
+      - postgres
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - ectropy-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: ectropy-minio
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+      # Domain for bucket virtual host (nginx proxy)
+      MINIO_DOMAIN: staging.ectropy.ai
+      MINIO_SERVER_URL: https://staging.ectropy.ai/minio
+    volumes:
+      - minio-data:/data
+    ports:
+      - '${MINIO_API_PORT:-9000}:9000' # MinIO S3 API (host nginx → container:9000)
+      - '${MINIO_CONSOLE_PORT:-9001}:9001' # MinIO Console UI (host nginx → container:9001)
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 60s
+      timeout: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - ectropy-network
+
+  # ===========================================================================
+  # WATCHTOWER - AUTOMATED CONTAINER UPDATES (Zero-SSH Deployment)
+  # ===========================================================================
+  # ARCHITECTURE DECISION (2026-01-26): Implement zero-SSH deployment pattern
+  #
+  # Strategic Problem:
+  #   - GitHub Actions hosted runners CANNOT SSH to staging server (firewall)
+  #   - appleboy/ssh-action fails with "dial tcp ***:22: i/o timeout"
+  #   - DOCR implemented but deployment still required SSH (architectural gap)
+  #
+  # Solution: Watchtower Auto-Deployment Pattern
+  #   1. GitHub Actions: Build images → Push to DOCR (no SSH needed)
+  #   2. Watchtower (on server): Polls DOCR for new images
+  #   3. Watchtower: Automatically pulls new images and restarts containers
+  #   4. Result: Zero-SSH deployment, fully automated, production-grade
+  #
+  # Industry Alignment:
+  #   - Battle-tested: 45M+ Docker Hub pulls
+  #   - Used by: HashiCorp, GitLab, Kubernetes clusters (via k8s operators)
+  #   - Pattern: Poll-based auto-update (Kubernetes-compatible)
+  #
+  # Configuration:
+  #   - Monitors: nginx, mcp-server, api-gateway, web-dashboard
+  #   - Poll interval: 5 minutes (WATCHTOWER_POLL_INTERVAL)
+  #   - Cleanup: Old images removed automatically (WATCHTOWER_CLEANUP)
+  #   - Notifications: Optional Slack/Discord integration (future)
+  #
+  # Benefits:
+  #   ✅ Zero SSH: No GitHub Actions → server SSH connection required
+  #   ✅ No firewall changes: Server polls DOCR (outbound only)
+  #   ✅ Automated: New images deployed automatically within 5 minutes
+  #   ✅ Kubernetes-ready: Same pattern works with k8s operators
+  #   ✅ Rollback: Tag previous image in DOCR, watchtower pulls it
+  #
+  # Security:
+  #   - DOCR authentication: Uses existing doctl/docker login credentials
+  #   - Container security: watchtower runs as read-only (docker.sock access)
+  #   - Network isolation: On ectropy-network bridge
+  #
+  # Future Enhancements:
+  #   - Phase 2: Add Slack notifications (WATCHTOWER_NOTIFICATIONS)
+  #   - Phase 3: Implement blue-green deployment pattern
+  #   - Phase 4: Migrate to Kubernetes with Flux/ArgoCD
+  #
+  # References:
+  #   - Evidence: apps/mcp-server/data/evidence/2026-01/P0_SSH_DOCR_ARCHITECTURAL_MISALIGNMENT_2026-01-26.json
+  #   - Watchtower docs: https://containrrr.dev/watchtower/
+  #   - Industry pattern: https://12factor.net/build-release-run
+  # ===========================================================================
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: ectropy-watchtower
+    restart: unless-stopped
+    # Five Why 2026-02-27: Custom sh -c loop was BROKEN — Watchtower's ENTRYPOINT is /watchtower,
+    # so command: "sh -c '...'" was parsed as container name filters ("sh", "while true; do..."),
+    # not as a shell script. Result: Watchtower polled nothing on a 24h default interval.
+    # Fix: Use native WATCHTOWER_POLL_INTERVAL=60 instead of broken custom loop.
+    # Deployment lock feature removed (was never functional due to this bug).
+    environment:
+      # Poll DOCR every 60 seconds for new images (Phase P1 requirement)
+      WATCHTOWER_POLL_INTERVAL: 60
+      # Docker API version compatibility (host uses 1.52)
+      DOCKER_API_VERSION: '1.44'
+      # Only update containers with label com.centurylinklabs.watchtower.enable=true
+      WATCHTOWER_LABEL_ENABLE: 'true'
+      # Clean up old images after update
+      WATCHTOWER_CLEANUP: 'true'
+      # Include stopped containers in updates
+      WATCHTOWER_INCLUDE_STOPPED: 'true'
+      # Include restarting containers
+      WATCHTOWER_INCLUDE_RESTARTING: 'true'
+      # Rolling restart (one at a time)
+      WATCHTOWER_ROLLING_RESTART: 'true'
+      # Log level (info, debug, trace)
+      WATCHTOWER_LOG_LEVEL: info
+      # ✅ ENABLED (2026-01-26): Slack notifications for deployment events
+      WATCHTOWER_NOTIFICATION_URL: ${WATCHTOWER_SLACK_WEBHOOK_URL}
+      # HTTP API for metrics (ROOT CAUSE #76 FIX: Removed WATCHTOWER_HTTP_API_UPDATE to restore periodic polling)
+      # ✅ ENABLED (2026-02-12): HTTP API token required for metrics endpoint and health checks
+      WATCHTOWER_HTTP_API_TOKEN: ${WATCHTOWER_HTTP_API_TOKEN}
+      WATCHTOWER_HTTP_API_METRICS: 'true'
+    volumes:
+      # Access to Docker socket for container management
+      - /var/run/docker.sock:/var/run/docker.sock
+      # DOCR authentication: config-sync deploys credentials to /opt/ectropy/.docker/config.json
+      # (NOT /root/.docker/ — systemd ProtectHome=yes makes /root/ inaccessible)
+      # Five Why 2026-02-26: Watchtower silent auth failure caused 2+ hour deploy gap
+      - /opt/ectropy/.docker/config.json:/config.json:ro
+      # /opt/ectropy mount removed (Five Why 2026-02-27): deployment lock feature
+      # was never functional due to broken command: directive (see above)
+    ports:
+      # Expose HTTP API for metrics collection (Prometheus)
+      - '8080:8080'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - ectropy-network
+    labels:
+      # Watchtower should not update itself automatically
+      com.centurylinklabs.watchtower.enable: 'false'
+
+volumes:
+  # ROOT CAUSE #208: postgres-data volume for Speckle services ONLY
+  # Ectropy application uses managed PostgreSQL (no volume needed)
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  minio-data:
+    driver: local
+  qdrant-data:
+    driver: local
+  # Shared volume for Speckle bootstrap → api-gateway token passing
+  # Bootstrap creates PAT via GraphQL, writes to this volume.
+  # API Gateway reads token at startup via docker-entrypoint.sh.
+  speckle-tokens:
+    driver: local
+
+networks:
+  # ENTERPRISE FIX (2026-01-26): Explicit bridge network for production parity
+  # Changed from: default network with name override (ectropy-staging)
+  # Changed to: Explicit ectropy-network (matches production/development)
+  # Benefits:
+  #   - Production parity (docker-compose.production.yml:630-632)
+  #   - Development parity (docker-compose.development.yml:525-527)
+  #   - Container DNS resolution via network name
+  #   - Easier debugging and network inspection
+  ectropy-network:
+    driver: bridge

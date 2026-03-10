@@ -1,0 +1,49 @@
+# =============================================================================
+# CI/CD Required Environment Variables
+# =============================================================================
+# This file lists all environment variables required for CI/CD workflows
+# Used by: scripts/core/validate-env.sh ci
+#
+# Format:
+# - One variable name per line
+# - Lines starting with # are comments
+# - Empty lines are ignored
+# - Section headers: # Section Name:
+# - Optional sections: # Optional Section Name:
+# =============================================================================
+
+# Core Environment Configuration:
+NODE_ENV
+CI
+
+# Database Configuration:
+DATABASE_HOST
+DATABASE_PORT
+DATABASE_NAME
+DATABASE_USER
+DATABASE_PASSWORD
+
+# Redis Configuration:
+REDIS_HOST
+REDIS_PORT
+
+# Application Ports:
+API_GATEWAY_PORT
+MCP_PORT
+WEB_PORT
+
+# Authentication Secrets (Required):
+JWT_SECRET
+JWT_REFRESH_SECRET
+SESSION_SECRET
+
+# OAuth Configuration (Required for E2E Tests):
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+TEST_GOOGLE_EMAIL
+TEST_GOOGLE_PASSWORD
+
+# Optional Configuration:
+REDIS_PASSWORD
+MCP_API_KEY
+METRICS_PORT

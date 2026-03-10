@@ -1,0 +1,189 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ectropy://schemas/schedule-proposal/v1",
+  "title": "ScheduleProposal",
+  "description": "Proposed change to the 10-day look-ahead schedule by field teams",
+  "type": "object",
+  "definitions": {
+    "Participant": {
+      "type": "object",
+      "required": ["id", "role", "organization"],
+      "properties": {
+        "id": { "type": "string", "description": "Unique participant ID" },
+        "name": { "type": "string", "description": "Display name" },
+        "role": { "type": "string", "description": "Job role/title" },
+        "organization": { "type": "string", "description": "Company/org name" },
+        "authorityLevel": {
+          "type": "string",
+          "enum": ["FIELD", "FOREMAN", "SUPERINTENDENT", "PM", "ARCHITECT", "OWNER", "REGULATORY"]
+        }
+      }
+    }
+  },
+  "required": ["id", "proposer", "proposedChanges", "justification"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^PROP-[0-9]{4}-[0-9]{4,}$",
+      "description": "Unique proposal identifier"
+    },
+    "proposer": {
+      "$ref": "#/definitions/Participant",
+      "description": "Person proposing the schedule change"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "WITHDRAWN"],
+      "default": "DRAFT"
+    },
+    "proposedChanges": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["taskId", "changeType"],
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "description": "ID of task being modified"
+          },
+          "taskName": {
+            "type": "string",
+            "description": "Human-readable task name"
+          },
+          "changeType": {
+            "type": "string",
+            "enum": ["RESCHEDULE", "RESEQUENCE", "ADD", "REMOVE", "MODIFY_SCOPE", "SWAP_LOCATION"],
+            "description": "Type of schedule change"
+          },
+          "currentStart": { "type": "string", "format": "date" },
+          "currentEnd": { "type": "string", "format": "date" },
+          "proposedStart": { "type": "string", "format": "date" },
+          "proposedEnd": { "type": "string", "format": "date" },
+          "currentLocation": { "type": "string" },
+          "proposedLocation": { "type": "string" },
+          "scopeChange": { "type": "string" }
+        }
+      },
+      "description": "List of proposed schedule modifications"
+    },
+    "justification": {
+      "type": "object",
+      "required": ["summary"],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "description": "Brief explanation of why this change benefits the project"
+        },
+        "benefits": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of benefits from this change"
+        },
+        "risks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Potential risks or concerns"
+        },
+        "affectedParties": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Participant" },
+          "description": "Other teams/trades affected by this change"
+        },
+        "coordinationNeeded": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "trade": { "type": "string" },
+              "contactPerson": { "type": "string" },
+              "reason": { "type": "string" },
+              "contactStatus": {
+                "type": "string",
+                "enum": ["NOT_CONTACTED", "CONTACTED", "AGREED", "DISAGREED", "PENDING_RESPONSE"]
+              }
+            },
+            "required": ["trade", "reason", "contactStatus"]
+          },
+          "description": "Coordination status with other trades"
+        }
+      }
+    },
+    "aiAnalysis": {
+      "type": "object",
+      "properties": {
+        "conflictsDetected": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Schedule conflicts identified by AI"
+        },
+        "rippleEffects": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Downstream effects on other tasks"
+        },
+        "recommendation": {
+          "type": "string",
+          "description": "AI recommendation (APPROVE, REJECT, MODIFY)"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "similarProposals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "proposalId": { "type": "string" },
+              "outcome": { "type": "string" },
+              "similarity": { "type": "number" }
+            }
+          },
+          "description": "Similar proposals from this project's history"
+        },
+        "alternativeProposals": {
+          "type": "array",
+          "items": { "type": "object" },
+          "description": "AI-suggested alternatives"
+        }
+      }
+    },
+    "approvalWorkflow": {
+      "type": "object",
+      "properties": {
+        "requiredApprovers": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Participant" },
+          "description": "People who must approve this change"
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "approver": { "$ref": "#/definitions/Participant" },
+              "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "comments": { "type": "string" }
+            },
+            "required": ["approver", "status"]
+          }
+        },
+        "allApproved": {
+          "type": "boolean",
+          "description": "True when all required approvers have approved"
+        }
+      }
+    },
+    "resultingDecision": {
+      "type": "string",
+      "description": "Decision ID if proposal is approved (e.g., DEC-2024-XXXX)"
+    }
+  }
+}

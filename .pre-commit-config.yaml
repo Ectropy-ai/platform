@@ -1,0 +1,142 @@
+# Ectropy Platform - Pre-Commit Hooks Configuration
+# Enterprise security and code quality gates
+# Run: pre-commit install (one-time setup)
+# Manual run: pre-commit run --all-files
+
+repos:
+  # Gitleaks - Secret detection
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+        name: Detect secrets with Gitleaks
+        entry: gitleaks protect --verbose --redact --staged
+        language: golang
+        pass_filenames: false
+
+  # Pre-commit hooks for file validation
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+        name: Ensure files end with newline
+      - id: check-yaml
+        name: Validate YAML syntax
+        args: [--safe]
+      - id: check-json
+        name: Validate JSON syntax
+      - id: check-toml
+        name: Validate TOML syntax
+      - id: check-merge-conflict
+        name: Check for merge conflict markers
+      - id: check-added-large-files
+        name: Prevent large files (>5MB)
+        args: [--maxkb=5120]
+      - id: detect-private-key
+        name: Detect private SSH/TLS keys
+      - id: mixed-line-ending
+        name: Check line endings consistency
+        args: [--fix=lf]
+
+  # TypeScript/JavaScript linting
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v9.17.0
+    hooks:
+      - id: eslint
+        name: ESLint code quality check
+        files: \.(js|jsx|ts|tsx)$
+        types: [file]
+        args: [--fix, --max-warnings=0]
+        additional_dependencies:
+          - eslint@9.17.0
+          - '@typescript-eslint/eslint-plugin@8.19.1'
+          - '@typescript-eslint/parser@8.19.1'
+
+  # Prettier - Code formatting
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        name: Format code with Prettier
+        files: \.(js|jsx|ts|tsx|json|yaml|yml|md)$
+        args: [--write]
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.43.0
+    hooks:
+      - id: markdownlint
+        name: Lint Markdown files
+        args: [--fix]
+
+  # Docker linting
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        name: Lint Dockerfiles
+        files: Dockerfile.*
+
+  # Prisma schema validation
+  - repo: local
+    hooks:
+      - id: prisma-validate
+        name: Validate Prisma schema
+        entry: pnpm prisma validate
+        language: system
+        files: ^prisma/schema\.prisma$
+        pass_filenames: false
+
+  # Roadmap Schema Validation (added 2026-01-22)
+  - repo: local
+    hooks:
+      - id: roadmap-json-syntax
+        name: Roadmap JSON syntax validation
+        entry: python3 -c "import json, sys; [json.load(open(f)) for f in sys.argv[1:]]"
+        language: system
+        files: ^\.roadmap/.*\.json$
+        types: [json]
+
+      - id: domain-schema-meta-validation
+        name: Domain schema meta-validation
+        entry: bash -c 'for f in "$@"; do npx ajv compile -s "$f" --spec=draft7 2>/dev/null || echo "Warning: $f may have schema issues"; done'
+        language: system
+        files: ^\.roadmap/schemas/.*\.schema\.json$
+        pass_filenames: true
+
+  # TypeScript type checking (fast)
+  - repo: local
+    hooks:
+      - id: typescript-check
+        name: TypeScript type check (staged files)
+        entry: pnpm nx run-many --target=type-check --parallel=3
+        language: system
+        types: [ts, tsx]
+        pass_filenames: false
+        stages: [commit]
+
+  # Prevent commits to main/master
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: no-commit-to-branch
+        name: Prevent direct commits to main/master
+        args: [--branch, main, --branch, master]
+
+# Configuration
+default_stages: [commit]
+fail_fast: false
+minimum_pre_commit_version: 3.0.0
+
+# CI configuration
+ci:
+  autofix_commit_msg: 'style: auto-fix pre-commit hooks'
+  autofix_prs: true
+  autoupdate_branch: develop
+  autoupdate_commit_msg: 'chore: update pre-commit hooks to {version}'
+  autoupdate_schedule: monthly
+  skip: []
+  submodules: false

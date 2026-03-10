@@ -1,0 +1,83 @@
+{
+  "types": {
+    "feat": {
+      "section": "✨ Features"
+    },
+    "fix": {
+      "section": "🐛 Bug Fixes"
+    },
+    "perf": {
+      "section": "⚡ Performance Improvements"
+    },
+    "refactor": {
+      "section": "♻️ Code Refactoring"
+    },
+    "docs": {
+      "section": "📚 Documentation"
+    },
+    "test": {
+      "section": "🧪 Tests"
+    },
+    "build": {
+      "section": "🏗️ Build System"
+    },
+    "ci": {
+      "section": "👷 CI/CD"
+    },
+    "chore": {
+      "section": "🔧 Maintenance"
+    },
+    "style": {
+      "section": "💄 Code Style"
+    },
+    "revert": {
+      "section": "⏪ Reverts"
+    }
+  },
+  "commitUrlFormat": "https://github.com/your-org/ectropy/commit/{{hash}}",
+  "compareUrlFormat": "https://github.com/your-org/ectropy/compare/{{previousTag}}...{{currentTag}}",
+  "issueUrlFormat": "https://github.com/your-org/ectropy/issues/{{id}}",
+  "userUrlFormat": "https://github.com/{{user}}",
+  "releaseCommitMessageFormat": "chore(release): {{currentTag}}",
+  "skip": {
+    "bump": false,
+    "changelog": false,
+    "commit": false,
+    "tag": false
+  },
+  "bumpFiles": [
+    {
+      "filename": "package.json",
+      "type": "json"
+    },
+    {
+      "filename": "apps/web-dashboard/package.json",
+      "type": "json"
+    },
+    {
+      "filename": "apps/api-gateway/package.json",
+      "type": "json"
+    },
+    {
+      "filename": "libs/speckle-integration/package.json",
+      "type": "json"
+    },
+    {
+      "filename": "libs/ifc-processing/package.json",
+      "type": "json"
+    }
+  ],
+  "packageFiles": [
+    {
+      "filename": "package.json",
+      "type": "json"
+    }
+  ],
+  "header": "# 📋 Changelog\n\nAll notable changes to the Ectropy Federated Construction Platform will be documented in this file.\n\nThe format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),\nand this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n",
+  "preset": "angular",
+  "preMajor": false,
+  "scripts": {
+    "prerelease": "npm run build && npm run test",
+    "postrelease": "echo 'Release completed successfully!'"
+  }
+}

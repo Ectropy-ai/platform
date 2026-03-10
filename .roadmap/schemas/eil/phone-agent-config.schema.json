@@ -1,0 +1,197 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://luhtech.dev/schemas/eil/phone-agent-config.schema.json",
+  "title": "Phone Agent Configuration Schema",
+  "description": "Per-project configuration for Phone Agent Service",
+  "type": "object",
+  "required": ["configId", "projectId", "tenantId"],
+  "properties": {
+    "configId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:phone-config:.+$",
+      "description": "URN identifier for graph integration"
+    },
+    "projectId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "phoneNumbers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["number", "type"],
+        "properties": {
+          "number": {
+            "type": "string",
+            "pattern": "^\\+[1-9]\\d{1,14}$",
+            "description": "E.164 format phone number"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["sms", "voice", "both"]
+          },
+          "label": {
+            "type": "string",
+            "description": "Friendly label (e.g., 'Main Line', 'Safety Hotline')"
+          },
+          "forwardTo": {
+            "type": "string",
+            "description": "Fallback number for escalation"
+          }
+        }
+      },
+      "description": "Twilio phone numbers assigned to this project"
+    },
+    "channels": {
+      "type": "object",
+      "properties": {
+        "sms": { "type": "boolean", "default": true },
+        "voice": { "type": "boolean", "default": false },
+        "teams": { "type": "boolean", "default": false },
+        "slack": { "type": "boolean", "default": false },
+        "email": { "type": "boolean", "default": false }
+      },
+      "description": "Enabled communication channels"
+    },
+    "authorityMapping": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "phoneNumber": {
+            "type": "string",
+            "pattern": "^\\+[1-9]\\d{1,14}$"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "authorityLevel": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Phone number to user/authority mapping"
+    },
+    "responseSettings": {
+      "type": "object",
+      "properties": {
+        "maxResponseLength": {
+          "type": "integer",
+          "default": 160,
+          "description": "Max chars per SMS segment"
+        },
+        "multiSegmentAllowed": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow responses spanning multiple SMS segments"
+        },
+        "maxSegments": {
+          "type": "integer",
+          "default": 3,
+          "description": "Maximum SMS segments per response"
+        },
+        "confirmationRequired": {
+          "type": "boolean",
+          "default": true,
+          "description": "Require confirmation before executing actions"
+        },
+        "language": {
+          "type": "string",
+          "default": "en",
+          "description": "Response language"
+        }
+      }
+    },
+    "timeoutSettings": {
+      "type": "object",
+      "properties": {
+        "sessionTimeoutMinutes": {
+          "type": "integer",
+          "default": 30,
+          "description": "Conversation session timeout"
+        },
+        "confirmationTimeoutMinutes": {
+          "type": "integer",
+          "default": 5,
+          "description": "Time to wait for confirmation"
+        }
+      }
+    },
+    "rateLimits": {
+      "type": "object",
+      "properties": {
+        "messagesPerUserPerDay": {
+          "type": "integer",
+          "default": 100
+        },
+        "messagesPerProjectPerDay": {
+          "type": "integer",
+          "default": 1000
+        }
+      }
+    },
+    "escalationConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "escalationPhoneNumbers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "level": { "type": "integer" },
+              "phoneNumber": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          }
+        },
+        "notifyOnEscalation": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "integrations": {
+      "type": "object",
+      "properties": {
+        "twilioAccountSid": {
+          "type": "string",
+          "description": "Reference to secrets manager"
+        },
+        "teamsWebhook": {
+          "type": "string",
+          "format": "uri"
+        },
+        "slackWebhook": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

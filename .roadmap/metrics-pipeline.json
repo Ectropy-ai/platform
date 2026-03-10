@@ -1,0 +1,407 @@
+{
+  "$schema": "./schemas/metrics-pipeline.schema.json",
+  "version": "1.0.0",
+  "lastUpdated": "2026-01-26T20:00:00.000Z",
+  "sources": {
+    "github-api": {
+      "id": "github-api",
+      "type": "github-api",
+      "endpoint": "https://api.github.com/repos/{owner}/{repo}/actions/runs",
+      "authentication": {
+        "type": "github-token",
+        "secretRef": "GITHUB_TOKEN"
+      },
+      "criticality": "important",
+      "timeout": 30,
+      "retries": 3,
+      "healthCheck": {
+        "endpoint": "https://api.github.com/rate_limit",
+        "expectedStatus": 200,
+        "interval": "1h"
+      },
+      "fallback": {
+        "type": "cache",
+        "cacheMaxAge": "24h",
+        "placeholderMessage": "GitHub API unavailable - using cached metrics"
+      }
+    },
+    "prometheus-staging": {
+      "id": "prometheus-staging",
+      "type": "prometheus",
+      "endpoint": "http://staging.ectropy.internal:9090",
+      "authentication": {
+        "type": "none"
+      },
+      "criticality": "informational",
+      "timeout": 15,
+      "retries": 2,
+      "healthCheck": {
+        "endpoint": "/-/healthy",
+        "expectedStatus": 200,
+        "interval": "15m"
+      },
+      "fallback": {
+        "type": "placeholder",
+        "placeholderMessage": "Staging Prometheus unavailable - metrics not collected"
+      }
+    },
+    "prometheus-production": {
+      "id": "prometheus-production",
+      "type": "prometheus",
+      "endpoint": "http://prometheus.ectropy.internal:9090",
+      "authentication": {
+        "type": "none"
+      },
+      "criticality": "critical",
+      "timeout": 30,
+      "retries": 3,
+      "healthCheck": {
+        "endpoint": "/-/healthy",
+        "expectedStatus": 200,
+        "interval": "5m"
+      },
+      "fallback": {
+        "type": "fail",
+        "placeholderMessage": "CRITICAL: Production Prometheus unreachable"
+      }
+    },
+    "grafana": {
+      "id": "grafana",
+      "type": "grafana",
+      "endpoint": "http://grafana.ectropy.internal:3000",
+      "authentication": {
+        "type": "api-key",
+        "secretRef": "GRAFANA_API_KEY"
+      },
+      "criticality": "informational",
+      "timeout": 15,
+      "retries": 2,
+      "fallback": {
+        "type": "skip",
+        "placeholderMessage": "Grafana unavailable - dashboard links not verified"
+      }
+    },
+    "alertmanager": {
+      "id": "alertmanager",
+      "type": "alertmanager",
+      "endpoint": "http://alertmanager.ectropy.internal:9093",
+      "authentication": {
+        "type": "none"
+      },
+      "criticality": "important",
+      "timeout": 15,
+      "retries": 2,
+      "fallback": {
+        "type": "placeholder",
+        "placeholderMessage": "Alertmanager unavailable - active alerts unknown"
+      }
+    },
+    "watchtower-staging": {
+      "id": "watchtower-staging",
+      "type": "custom-api",
+      "endpoint": "http://staging.ectropy.internal:8080/v1/metrics",
+      "authentication": {
+        "type": "bearer-token",
+        "secretRef": "WATCHTOWER_API_TOKEN"
+      },
+      "criticality": "important",
+      "timeout": 15,
+      "retries": 2,
+      "healthCheck": {
+        "endpoint": "http://staging.ectropy.internal:8080/v1/update",
+        "expectedStatus": 200,
+        "interval": "15m"
+      },
+      "fallback": {
+        "type": "placeholder",
+        "placeholderMessage": "Watchtower metrics unavailable - deployment stats not collected"
+      }
+    }
+  },
+  "destinations": {
+    "github-summary": {
+      "id": "github-summary",
+      "type": "github-step-summary",
+      "priority": "required",
+      "config": {
+        "maxLength": 65535
+      },
+      "filters": {
+        "onSuccess": true,
+        "onWarning": true,
+        "onFailure": true
+      },
+      "format": {
+        "template": "workflow-summary",
+        "includeMetrics": ["all"]
+      }
+    },
+    "slack-ops": {
+      "id": "slack-ops",
+      "type": "slack",
+      "priority": "best-effort",
+      "config": {
+        "webhookSecretRef": "SLACK_WEBHOOK_URL",
+        "channel": "#ops-alerts"
+      },
+      "filters": {
+        "onSuccess": false,
+        "onWarning": true,
+        "onFailure": true,
+        "minSeverity": "warning"
+      },
+      "format": {
+        "template": "slack-alert",
+        "includeMetrics": ["failed", "warnings"]
+      }
+    },
+    "slack-engineering": {
+      "id": "slack-engineering",
+      "type": "slack",
+      "priority": "best-effort",
+      "config": {
+        "webhookSecretRef": "SLACK_ENGINEERING_WEBHOOK",
+        "channel": "#engineering"
+      },
+      "filters": {
+        "onSuccess": false,
+        "onWarning": false,
+        "onFailure": true,
+        "minSeverity": "error"
+      }
+    },
+    "roadmap-file": {
+      "id": "roadmap-file",
+      "type": "file-commit",
+      "priority": "best-effort",
+      "config": {
+        "path": ".roadmap/roadmap.json",
+        "branch": "develop",
+        "commitMessage": "chore(metrics): Update {metric_type} metrics [skip ci]"
+      },
+      "filters": {
+        "onSuccess": true,
+        "onWarning": true,
+        "onFailure": false
+      }
+    }
+  },
+  "failureMatrix": {
+    "github-api": {
+      "sourceId": "github-api",
+      "scenarios": [
+        {
+          "condition": "rate-limited",
+          "action": "use-cache",
+          "workflowResult": "warning",
+          "message": "GitHub API rate limited - using cached workflow metrics from last successful collection",
+          "notify": ["github-summary"]
+        },
+        {
+          "condition": "connection-timeout",
+          "action": "retry",
+          "workflowResult": "warning",
+          "message": "GitHub API timeout after retries - workflow metrics unavailable",
+          "notify": ["github-summary", "slack-ops"]
+        },
+        {
+          "condition": "authentication-failed",
+          "action": "fail",
+          "workflowResult": "failure",
+          "message": "GitHub token invalid or expired - check GITHUB_TOKEN secret",
+          "notify": ["github-summary", "slack-ops", "slack-engineering"]
+        },
+        {
+          "condition": "server-error",
+          "action": "retry",
+          "workflowResult": "warning",
+          "message": "GitHub API returned 5xx error - metrics collection skipped",
+          "notify": ["github-summary"]
+        }
+      ]
+    },
+    "prometheus-staging": {
+      "sourceId": "prometheus-staging",
+      "scenarios": [
+        {
+          "condition": "connection-refused",
+          "action": "skip",
+          "workflowResult": "success",
+          "message": "Staging environment not running - this is expected outside of staging deployments",
+          "notify": ["github-summary"]
+        },
+        {
+          "condition": "connection-timeout",
+          "action": "skip",
+          "workflowResult": "success",
+          "message": "Staging Prometheus unreachable - staging may be scaled down",
+          "notify": ["github-summary"]
+        },
+        {
+          "condition": "invalid-response",
+          "action": "use-placeholder",
+          "workflowResult": "warning",
+          "message": "Staging Prometheus returned invalid data - check Prometheus configuration",
+          "notify": ["github-summary", "slack-ops"]
+        }
+      ]
+    },
+    "prometheus-production": {
+      "sourceId": "prometheus-production",
+      "scenarios": [
+        {
+          "condition": "connection-refused",
+          "action": "alert",
+          "workflowResult": "failure",
+          "message": "CRITICAL: Production Prometheus unreachable - monitoring may be down",
+          "notify": ["github-summary", "slack-ops", "slack-engineering"]
+        },
+        {
+          "condition": "connection-timeout",
+          "action": "retry",
+          "workflowResult": "warning",
+          "message": "Production Prometheus slow to respond - retrying",
+          "notify": ["github-summary", "slack-ops"]
+        },
+        {
+          "condition": "authentication-failed",
+          "action": "fail",
+          "workflowResult": "failure",
+          "message": "Production Prometheus authentication failed - check network/firewall",
+          "notify": ["github-summary", "slack-ops", "slack-engineering"]
+        },
+        {
+          "condition": "partial-data",
+          "action": "use-cache",
+          "workflowResult": "warning",
+          "message": "Production Prometheus returned partial metrics - some targets may be down",
+          "notify": ["github-summary", "slack-ops"]
+        }
+      ]
+    },
+    "grafana": {
+      "sourceId": "grafana",
+      "scenarios": [
+        {
+          "condition": "connection-refused",
+          "action": "skip",
+          "workflowResult": "success",
+          "message": "Grafana unavailable - dashboard status not verified",
+          "notify": ["github-summary"]
+        },
+        {
+          "condition": "authentication-failed",
+          "action": "skip",
+          "workflowResult": "warning",
+          "message": "Grafana API key invalid - update GRAFANA_API_KEY secret",
+          "notify": ["github-summary", "slack-ops"]
+        }
+      ]
+    },
+    "alertmanager": {
+      "sourceId": "alertmanager",
+      "scenarios": [
+        {
+          "condition": "connection-refused",
+          "action": "use-placeholder",
+          "workflowResult": "warning",
+          "message": "Alertmanager unavailable - active alert count unknown",
+          "notify": ["github-summary", "slack-ops"]
+        },
+        {
+          "condition": "connection-timeout",
+          "action": "use-placeholder",
+          "workflowResult": "warning",
+          "message": "Alertmanager timeout - alert routing may be impacted",
+          "notify": ["github-summary", "slack-ops"]
+        }
+      ]
+    },
+    "watchtower-staging": {
+      "sourceId": "watchtower-staging",
+      "scenarios": [
+        {
+          "condition": "connection-refused",
+          "action": "skip",
+          "workflowResult": "success",
+          "message": "Staging Watchtower not running - expected when staging is down",
+          "notify": ["github-summary"]
+        },
+        {
+          "condition": "authentication-failed",
+          "action": "skip",
+          "workflowResult": "warning",
+          "message": "Watchtower API token invalid - update WATCHTOWER_API_TOKEN secret",
+          "notify": ["github-summary", "slack-ops"]
+        },
+        {
+          "condition": "connection-timeout",
+          "action": "use-placeholder",
+          "workflowResult": "warning",
+          "message": "Watchtower API timeout - deployment metrics not collected",
+          "notify": ["github-summary"]
+        }
+      ]
+    }
+  },
+  "normalization": {
+    "resultMapping": {
+      "success": {
+        "githubStatus": "success",
+        "icon": "✅",
+        "meaning": "All metrics collected successfully from all available sources"
+      },
+      "warning": {
+        "githubStatus": "success",
+        "icon": "⚠️",
+        "meaning": "Metrics collected with some sources unavailable (non-critical) or using cached/placeholder data"
+      },
+      "failure": {
+        "githubStatus": "failure",
+        "icon": "❌",
+        "meaning": "Critical metrics source unavailable or authentication/configuration error requiring human intervention"
+      },
+      "skipped": {
+        "githubStatus": "success",
+        "icon": "⏭️",
+        "meaning": "Workflow skipped intentionally (e.g., no changes to collect, environment not applicable)"
+      }
+    },
+    "summaryFormat": {
+      "includeTimestamp": true,
+      "includeSourceStatus": true,
+      "includeMetricsTable": true,
+      "includeFailureDetails": true
+    },
+    "slackFormat": {
+      "successColor": "good",
+      "warningColor": "warning",
+      "failureColor": "danger",
+      "includeViewLogsButton": true
+    }
+  },
+  "workflows": [
+    {
+      "file": "update-cicd-metrics.yml",
+      "name": "Update CI/CD Metrics",
+      "schedule": "0 * * * *",
+      "sources": ["github-api"],
+      "destinations": ["github-summary", "roadmap-file", "slack-ops"],
+      "failureMode": "best-effort"
+    },
+    {
+      "file": "update-monitoring-metrics.yml",
+      "name": "Update Monitoring Metrics",
+      "schedule": "15 * * * *",
+      "sources": [
+        "prometheus-staging",
+        "prometheus-production",
+        "grafana",
+        "alertmanager",
+        "watchtower-staging"
+      ],
+      "destinations": ["github-summary", "roadmap-file", "slack-ops"],
+      "failureMode": "collect-all"
+    }
+  ]
+}

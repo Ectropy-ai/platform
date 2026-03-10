@@ -1,0 +1,39 @@
+# Simple Development Dockerfile for MCP Server
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install pnpm, postgresql-client for pg_isready, and curl for health checks
+# curl provides better IPv4/IPv6 control via -4 flag and clearer error messages
+RUN npm install -g pnpm@10.14.0 && apk add --no-cache postgresql-client curl
+
+# Copy dependency files first
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Copy scripts BEFORE installing to avoid lifecycle script issues
+COPY scripts ./scripts
+
+# Copy Prisma schema BEFORE installing to generate client
+COPY prisma ./prisma
+
+# Copy app-specific package.json files
+COPY apps/mcp-server/package.json ./apps/mcp-server/
+COPY libs/*/package.json ./libs/*/
+
+# Install dependencies with scripts disabled
+RUN pnpm install --no-frozen-lockfile --ignore-scripts
+
+# Generate Prisma Client (since we skipped install scripts)
+RUN pnpm prisma generate
+
+# Copy source code
+COPY . .
+
+# Set up permissions for scripts
+RUN chmod +x scripts/**/*.sh
+
+# Development mode
+EXPOSE 3001
+
+# Use startup script with proper shell execution
+CMD ["/bin/sh", "-c", "./scripts/core/startup-mcp-server.sh"]

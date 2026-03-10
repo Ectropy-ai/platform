@@ -1,0 +1,1025 @@
+openapi: 3.0.3
+info:
+  title: Ectropy Federated Construction Platform API
+  version: 2.0.0
+  description: |
+    Production-ready API for the Ectropy platform - a federated construction platform
+    targeting the $22 trillion global construction industry. Provides BIM collaboration,
+    AI orchestration, and DAO governance capabilities.
+    
+    ## Key Features
+    - **BIM Collaboration**: Real-time 3D model viewing/editing
+    - **AI Orchestration**: MCP server coordinates specialized AI agents
+    - **DAO Governance**: Decentralized decision-making
+    - **Document Analysis**: Process construction docs, blueprints, IFC files
+    
+    ## Authentication
+    The API uses JWT Bearer tokens for authentication. Include the token in the
+    `Authorization` header: `Bearer <token>`
+    
+    ## Rate Limiting
+    - API endpoints: 100 requests per 15 minutes
+    - Auth endpoints: 5 requests per 15 minutes
+  contact:
+    name: Ectropy Platform Team
+    url: https://staging.ectropy.ai
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: https://staging.ectropy.ai
+    description: Staging environment
+  - url: http://localhost:4000
+    description: Local development
+
+tags:
+  - name: Health
+    description: System health and status endpoints
+  - name: Authentication
+    description: User authentication and OAuth flows
+  - name: Projects
+    description: Construction project management
+  - name: Elements
+    description: BIM element operations (CRUD)
+  - name: Analytics
+    description: Project analytics and insights
+  - name: Governance
+    description: DAO governance and voting
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: System health check
+      description: Returns system health status including database and Redis connectivity
+      operationId: getHealth
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: System is degraded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/docs:
+    get:
+      tags:
+        - Health
+      summary: API documentation
+      description: Returns comprehensive API documentation with endpoint descriptions
+      operationId: getApiDocs
+      responses:
+        '200':
+          description: API documentation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiDocsResponse'
+
+  /api/auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user with email and password, returns JWT tokens
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Refresh expired access token using refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Invalidate current session and tokens
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user profile
+      description: Returns authenticated user's profile information
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/projects:
+    get:
+      tags:
+        - Projects
+      summary: List all projects
+      description: Returns paginated list of construction projects accessible to the user
+      operationId: listProjects
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: status
+          in: query
+          description: Filter by project status
+          schema:
+            type: string
+            enum: [planned, in_progress, completed, on_hold]
+      responses:
+        '200':
+          description: Projects retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Projects
+      summary: Create new project
+      description: Creates a new construction project
+      operationId: createProject
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: Project created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/projects/{projectId}:
+    get:
+      tags:
+        - Projects
+      summary: Get project details
+      description: Returns detailed information about a specific project
+      operationId: getProject
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          description: Project UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Project details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Projects
+      summary: Update project
+      description: Updates an existing project
+      operationId: updateProject
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          description: Project UUID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectRequest'
+      responses:
+        '200':
+          description: Project updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Projects
+      summary: Delete project
+      description: Deletes a project and all associated elements
+      operationId: deleteProject
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          description: Project UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Project deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/projects/{projectId}/elements:
+    get:
+      tags:
+        - Elements
+      summary: List project elements
+      description: Returns list of BIM elements for a specific project
+      operationId: listProjectElements
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          description: Project UUID
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+      responses:
+        '200':
+          description: Elements retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ElementListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Elements
+      summary: Create BIM element
+      description: Creates a new BIM element within a project
+      operationId: createElement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          description: Project UUID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateElementRequest'
+      responses:
+        '201':
+          description: Element created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Element'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/elements/{elementId}:
+    get:
+      tags:
+        - Elements
+      summary: Get element details
+      description: Returns detailed information about a specific BIM element
+      operationId: getElement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: elementId
+          in: path
+          required: true
+          description: Element UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Element details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Element'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Element not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Elements
+      summary: Update element
+      description: Updates an existing BIM element
+      operationId: updateElement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: elementId
+          in: path
+          required: true
+          description: Element UUID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateElementRequest'
+      responses:
+        '200':
+          description: Element updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Element'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Element not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Elements
+      summary: Delete element
+      description: Deletes a BIM element
+      operationId: deleteElement
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: elementId
+          in: path
+          required: true
+          description: Element UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Element deleted successfully
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Element not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /api/auth/login endpoint
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          description: Overall system health status
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of health check
+        version:
+          type: string
+          description: API version
+        environment:
+          type: string
+          enum: [development, staging, production]
+          description: Current environment
+        checks:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [healthy, unhealthy, unknown]
+            redis:
+              type: string
+              enum: [healthy, unhealthy, unknown]
+            memory:
+              type: object
+              properties:
+                heapUsed:
+                  type: number
+                heapTotal:
+                  type: number
+                rss:
+                  type: number
+
+    ApiDocsResponse:
+      type: object
+      properties:
+        title:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        baseUrl:
+          type: string
+        security:
+          type: object
+        endpoints:
+          type: object
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          description: User password
+          minLength: 8
+          example: securePassword123
+
+    LoginResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Authentication successful
+        user:
+          $ref: '#/components/schemas/UserProfile'
+        tokens:
+          $ref: '#/components/schemas/TokenPair'
+
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+          description: JWT refresh token
+
+    TokenResponse:
+      type: object
+      properties:
+        tokens:
+          $ref: '#/components/schemas/TokenPair'
+
+    TokenPair:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT access token
+        refreshToken:
+          type: string
+          description: JWT refresh token
+        expiresIn:
+          type: integer
+          description: Access token expiration time in seconds
+          example: 3600
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: User unique identifier
+        email:
+          type: string
+          format: email
+          description: User email address
+        role:
+          type: string
+          enum: [architect, engineer, contractor, owner, admin]
+          description: User role in the system
+        firstName:
+          type: string
+          description: User first name
+        lastName:
+          type: string
+          description: User last name
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Project unique identifier
+        name:
+          type: string
+          description: Project name
+          example: Downtown Office Complex
+        description:
+          type: string
+          description: Project description
+          example: 25-story mixed-use development in downtown area
+        status:
+          type: string
+          enum: [planned, in_progress, completed, on_hold]
+          description: Current project status
+        total_budget:
+          type: number
+          format: float
+          description: Total project budget in USD
+          example: 15000000
+        start_date:
+          type: string
+          format: date
+          description: Project start date
+        end_date:
+          type: string
+          format: date
+          description: Project planned end date
+        location:
+          type: string
+          description: Project location
+          example: 123 Main St, New York, NY 10001
+        created_at:
+          type: string
+          format: date-time
+          description: Project creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        owner_id:
+          type: string
+          format: uuid
+          description: Project owner user ID
+
+    ProjectListResponse:
+      type: object
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CreateProjectRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Project name
+          minLength: 1
+          maxLength: 255
+          example: Downtown Office Complex
+        description:
+          type: string
+          description: Project description
+          maxLength: 2000
+          example: 25-story mixed-use development
+        total_budget:
+          type: number
+          format: float
+          description: Total project budget in USD
+          minimum: 0
+          example: 15000000
+        start_date:
+          type: string
+          format: date
+          description: Project start date
+        end_date:
+          type: string
+          format: date
+          description: Project planned end date
+        location:
+          type: string
+          description: Project location
+          maxLength: 500
+          example: 123 Main St, New York, NY 10001
+
+    UpdateProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Project name
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          description: Project description
+          maxLength: 2000
+        status:
+          type: string
+          enum: [planned, in_progress, completed, on_hold]
+        total_budget:
+          type: number
+          format: float
+          minimum: 0
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        location:
+          type: string
+          maxLength: 500
+
+    Element:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Element unique identifier
+        project_id:
+          type: string
+          format: uuid
+          description: Parent project ID
+        element_name:
+          type: string
+          description: BIM element name
+          example: Column-A1
+        element_type:
+          type: string
+          description: Type of BIM element
+          example: structural_column
+        ifc_id:
+          type: string
+          description: IFC GUID
+          example: 2O2Fr$t4X7Zf8NOew3FL9r
+        status:
+          type: string
+          enum: [planned, design_approved, procurement, in_progress, completed, on_hold, rejected]
+          description: Current element status
+        material:
+          type: string
+          description: Material specification
+          example: Reinforced Concrete
+        dimensions:
+          type: object
+          description: Element dimensions
+          properties:
+            length:
+              type: number
+            width:
+              type: number
+            height:
+              type: number
+        cost:
+          type: number
+          format: float
+          description: Element cost in USD
+          example: 5000
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ElementListResponse:
+      type: object
+      properties:
+        elements:
+          type: array
+          items:
+            $ref: '#/components/schemas/Element'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CreateElementRequest:
+      type: object
+      required:
+        - element_name
+        - element_type
+      properties:
+        element_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Column-A1
+        element_type:
+          type: string
+          maxLength: 100
+          example: structural_column
+        ifc_id:
+          type: string
+          maxLength: 50
+        material:
+          type: string
+          maxLength: 255
+        dimensions:
+          type: object
+        cost:
+          type: number
+          format: float
+          minimum: 0
+
+    UpdateElementRequest:
+      type: object
+      properties:
+        element_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        element_type:
+          type: string
+          maxLength: 100
+        status:
+          type: string
+          enum: [planned, design_approved, procurement, in_progress, completed, on_hold, rejected]
+        material:
+          type: string
+          maxLength: 255
+        dimensions:
+          type: object
+        cost:
+          type: number
+          format: float
+          minimum: 0
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Current page number
+          example: 1
+        limit:
+          type: integer
+          description: Items per page
+          example: 20
+        total:
+          type: integer
+          description: Total number of items
+          example: 150
+        totalPages:
+          type: integer
+          description: Total number of pages
+          example: 8
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Success message
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: Unauthorized
+        message:
+          type: string
+          description: Detailed error description
+          example: Invalid or expired token
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 401

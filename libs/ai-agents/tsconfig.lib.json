@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist/out-tsc",
+    "declaration": true,
+    "types": ["node"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "performance/src/**/*.ts",
+    "procurement/src/**/*.ts",
+    "task-manager/src/**/*.ts",
+    "shared/**/*.ts",
+    "codebase-advisor/**/*.ts"
+  ],
+  "exclude": [
+    "jest.config.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts",
+    "**/jest.config.ts",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "shared/enhanced-agent.service.ts",
+    "compliance/**/*",
+    "performance/src/usage-example.ts",
+    "src/agents/compliance.ts"
+  ]
+}

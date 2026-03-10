@@ -1,0 +1,346 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ectropy.ai/schemas/architecture-roadmap.json",
+  "title": "Architecture Roadmap Schema",
+  "description": "Forward-looking infrastructure forecast for Phase 5b services with port allocation, database schemas, API specifications, and deployment architecture",
+  "type": "object",
+  "required": [
+    "version",
+    "lastUpdated",
+    "metadata",
+    "services",
+    "infrastructure",
+    "deployment"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the architecture roadmap"
+    },
+    "lastUpdated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of last update"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["purpose", "phase", "targetDate"],
+      "properties": {
+        "purpose": {
+          "type": "string",
+          "description": "Purpose of this architecture roadmap document"
+        },
+        "phase": {
+          "type": "string",
+          "description": "Roadmap phase this architecture supports"
+        },
+        "targetDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Target implementation date"
+        },
+        "author": {
+          "type": "string",
+          "description": "Document author"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["planning", "approved", "in-progress", "complete"],
+          "description": "Overall architecture status"
+        }
+      }
+    },
+    "services": {
+      "type": "array",
+      "description": "Array of service specifications",
+      "items": {
+        "type": "object",
+        "required": [
+          "serviceId",
+          "name",
+          "description",
+          "port",
+          "technology",
+          "deliverableId"
+        ],
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "description": "Unique service identifier"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable service name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Service purpose and responsibilities"
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 65535,
+            "description": "Reserved port number"
+          },
+          "technology": {
+            "type": "string",
+            "description": "Primary technology stack"
+          },
+          "deliverableId": {
+            "type": "string",
+            "description": "Corresponding roadmap deliverable ID"
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Service dependencies (other serviceIds)"
+          },
+          "database": {
+            "type": "object",
+            "description": "Database schema specifications",
+            "properties": {
+              "tables": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["name", "purpose"],
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "purpose": {
+                      "type": "string"
+                    },
+                    "estimatedRows": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "migrations": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "apiEndpoints": {
+            "type": "array",
+            "description": "REST/GraphQL endpoint specifications",
+            "items": {
+              "type": "object",
+              "required": ["method", "path", "description"],
+              "properties": {
+                "method": {
+                  "type": "string",
+                  "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "GraphQL"]
+                },
+                "path": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "authentication": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "integrations": {
+            "type": "array",
+            "description": "External service integrations",
+            "items": {
+              "type": "object",
+              "required": ["service", "purpose"],
+              "properties": {
+                "service": {
+                  "type": "string"
+                },
+                "purpose": {
+                  "type": "string"
+                },
+                "apiKey": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "estimatedHours": {
+            "type": "integer",
+            "description": "Development effort estimate in hours"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Planned start date"
+          },
+          "targetDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Target completion date"
+          }
+        }
+      }
+    },
+    "infrastructure": {
+      "type": "object",
+      "description": "Infrastructure and deployment specifications",
+      "properties": {
+        "portAllocation": {
+          "type": "object",
+          "description": "Reserved port ranges and allocations",
+          "properties": {
+            "reserved": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["port", "service", "status"],
+                "properties": {
+                  "port": {
+                    "type": "integer"
+                  },
+                  "service": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["reserved", "active", "deprecated"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "docker": {
+          "type": "object",
+          "description": "Docker service specifications",
+          "properties": {
+            "services": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "image", "port"],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "string"
+                  },
+                  "port": {
+                    "type": "integer"
+                  },
+                  "environment": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "nginx": {
+          "type": "object",
+          "description": "Nginx routing specifications",
+          "properties": {
+            "routes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["path", "upstream", "port"],
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "upstream": {
+                    "type": "string"
+                  },
+                  "port": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "description": "Deployment strategy and sequencing",
+      "properties": {
+        "phases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["phaseNumber", "name", "services"],
+            "properties": {
+              "phaseNumber": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "services": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "estimatedDuration": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "risks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["description", "mitigation"],
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "mitigation": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "critical"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "description": "Validation criteria and test plans",
+      "properties": {
+        "portConflicts": {
+          "type": "boolean",
+          "description": "No port conflicts detected"
+        },
+        "dependenciesResolved": {
+          "type": "boolean",
+          "description": "All service dependencies can be satisfied"
+        },
+        "schemaValid": {
+          "type": "boolean",
+          "description": "All database schemas validated"
+        }
+      }
+    }
+  }
+}

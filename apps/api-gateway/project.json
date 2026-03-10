@@ -1,0 +1,110 @@
+{
+  "name": "api-gateway",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/api-gateway/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nx/webpack:webpack",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "target": "node",
+        "compiler": "tsc",
+        "outputPath": "dist/apps/api-gateway",
+        "main": "apps/api-gateway/src/main.ts",
+        "tsConfig": "apps/api-gateway/tsconfig.app.json",
+        "assets": ["apps/api-gateway/src/assets"],
+        "generatePackageJson": true,
+        "externalDependencies": "all",
+        "webpackConfig": "apps/api-gateway/webpack.config.cjs"
+      },
+      "configurations": {
+        "development": {
+          "esbuildOptions": {
+            "sourcemap": true,
+            "outExtension": {
+              ".js": ".js"
+            }
+          }
+        },
+        "production": {
+          "esbuildOptions": {
+            "sourcemap": false,
+            "outExtension": {
+              ".js": ".js"
+            }
+          }
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "api-gateway:build",
+        "runBuildTargetDependencies": false,
+        "host": "localhost",
+        "port": 4000,
+        "inspect": false
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "api-gateway:build:development"
+        },
+        "production": {
+          "buildTarget": "api-gateway:build:production"
+        }
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["apps/api-gateway/**/*.js"]
+      }
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "config": "apps/api-gateway/vitest.config.ts",
+        "passWithNoTests": true,
+        "reportsDirectory": "{workspaceRoot}/coverage/{projectRoot}"
+      },
+      "configurations": {
+        "ci": {
+          "coverage": true,
+          "reporters": ["verbose"]
+        }
+      }
+    },
+    "type-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx tsc --noEmit -p apps/api-gateway/tsconfig.app.json"
+      }
+    },
+    "prepare": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/ci/prepare-api-gateway-dist.mjs"
+      }
+    },
+    "health": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          "echo '🔍 API Gateway Health Check'",
+          "curl -f -s http://localhost:4000/health > /dev/null && echo '✅ API Gateway: Accessible on port 4000' || echo '⚠️  API Gateway: Not accessible on port 4000'",
+          "test -d dist/apps/api-gateway && echo '✅ Build: Assets present' || echo '⚠️  Build: No build artifacts found'",
+          "pnpm nx test api-gateway --passWithNoTests > /dev/null 2>&1 && echo '✅ Tests: Passing' || echo '⚠️  Tests: Issues detected'",
+          "echo '🎯 API Gateway health check complete'"
+        ],
+        "parallel": false
+      }
+    }
+  },
+  "tags": ["scope:api", "type:app", "platform:node"]
+}

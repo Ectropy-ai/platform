@@ -1,0 +1,516 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://luhtech.dev/schemas/pm/pm-decision.schema.json",
+  "title": "PM Decision Schema",
+  "description": "Construction project decision with voxel attachment and 7-tier authority cascade",
+  "type": "object",
+  "required": ["$id", "$schema", "schemaVersion", "decisionId", "title", "type", "status", "authorityLevel", "voxelRef", "graphMetadata"],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:pm-decision:DEC-[0-9]{4}-[0-9]{4}$",
+      "description": "URN identifier for this decision"
+    },
+    "$schema": {
+      "const": "https://luhtech.dev/schemas/pm/pm-decision.schema.json"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "meta": {
+      "$ref": "#/$defs/meta"
+    },
+    "decisionId": {
+      "type": "string",
+      "pattern": "^DEC-[0-9]{4}-[0-9]{4}$",
+      "description": "Human-readable decision identifier (e.g., DEC-2026-0001)"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 200,
+      "description": "Brief title describing the decision"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 5000,
+      "description": "Detailed description of the decision context and rationale"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["APPROVAL", "REJECTION", "DEFERRAL", "ESCALATION", "PROPOSAL", "CONSEQUENCE"],
+      "description": "Decision type classification"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PENDING", "APPROVED", "REJECTED", "SUPERSEDED", "EXPIRED"],
+      "description": "Decision lifecycle status"
+    },
+    "authorityLevel": {
+      "$ref": "#/$defs/authorityLevel"
+    },
+    "voxelRef": {
+      "$ref": "#/$defs/urn",
+      "description": "URN of the primary voxel this decision is attached to"
+    },
+    "voxelAttachments": {
+      "type": "array",
+      "description": "All voxels affected by this decision",
+      "items": {
+        "$ref": "#/$defs/voxelAttachment"
+      }
+    },
+    "voxelContext": {
+      "$ref": "#/$defs/voxelContext"
+    },
+    "context": {
+      "$ref": "#/$defs/decisionContext"
+    },
+    "budgetImpact": {
+      "$ref": "#/$defs/budgetImpact"
+    },
+    "scheduleImpact": {
+      "$ref": "#/$defs/scheduleImpact"
+    },
+    "participants": {
+      "$ref": "#/$defs/participants"
+    },
+    "evidence": {
+      "type": "array",
+      "description": "Supporting evidence (photos, documents, voice notes)",
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "consequences": {
+      "type": "array",
+      "description": "URN references to consequence records triggered by this decision",
+      "items": {
+        "$ref": "#/$defs/urn"
+      }
+    },
+    "scheduleProposals": {
+      "type": "array",
+      "description": "URN references to schedule proposals created by this decision",
+      "items": {
+        "$ref": "#/$defs/urn"
+      }
+    },
+    "relatedDecisions": {
+      "type": "array",
+      "description": "URN references to related decisions (non-causal)",
+      "items": {
+        "$ref": "#/$defs/urn"
+      }
+    },
+    "supersedes": {
+      "$ref": "#/$defs/urn",
+      "description": "URN of decision this one replaces (if any)"
+    },
+    "supersededBy": {
+      "$ref": "#/$defs/urn",
+      "description": "URN of decision that replaced this one (if any)"
+    },
+    "escalationSource": {
+      "$ref": "#/$defs/urn",
+      "description": "URN of the decision this was escalated from"
+    },
+    "escalationTarget": {
+      "$ref": "#/$defs/urn",
+      "description": "URN of the decision this was escalated to"
+    },
+    "timestamps": {
+      "$ref": "#/$defs/timestamps"
+    },
+    "graphMetadata": {
+      "$ref": "#/$defs/graphMetadata"
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$",
+      "description": "LuhTech URN identifier"
+    },
+    "meta": {
+      "type": "object",
+      "description": "V3 file metadata for sync tracking",
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "description": "Project this decision belongs to"
+        },
+        "sourceOfTruth": {
+          "type": "string",
+          "description": "Canonical file path"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "syncStatus": {
+          "type": "object",
+          "properties": {
+            "syncDirection": {
+              "type": "string",
+              "enum": ["v3-is-source-of-truth", "bidirectional"]
+            }
+          }
+        }
+      }
+    },
+    "authorityLevel": {
+      "type": "object",
+      "description": "Authority cascade information",
+      "required": ["required", "current"],
+      "properties": {
+        "required": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6,
+          "description": "Authority level required to approve (0=FIELD, 6=REGULATORY)"
+        },
+        "current": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6,
+          "description": "Current authority level of decision maker"
+        },
+        "requiredName": {
+          "type": "string",
+          "enum": ["FIELD", "FOREMAN", "SUPERINTENDENT", "PM", "ARCHITECT", "OWNER", "REGULATORY"],
+          "description": "Human-readable required authority name"
+        },
+        "currentName": {
+          "type": "string",
+          "enum": ["FIELD", "FOREMAN", "SUPERINTENDENT", "PM", "ARCHITECT", "OWNER", "REGULATORY"],
+          "description": "Human-readable current authority name"
+        },
+        "authorityRef": {
+          "$ref": "#/$defs/urn",
+          "description": "URN reference to authority level definition"
+        },
+        "escalationRequired": {
+          "type": "boolean",
+          "description": "True if current < required"
+        },
+        "autoApproved": {
+          "type": "boolean",
+          "description": "True if decision was auto-approved at FIELD level"
+        }
+      }
+    },
+    "voxelAttachment": {
+      "type": "object",
+      "description": "Voxel attachment with type classification",
+      "required": ["voxelRef", "attachmentType"],
+      "properties": {
+        "voxelRef": {
+          "$ref": "#/$defs/urn"
+        },
+        "attachmentType": {
+          "type": "string",
+          "enum": ["PRIMARY", "AFFECTED", "ADJACENT", "DOWNSTREAM"],
+          "description": "How this decision relates to the voxel"
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable attachment description"
+        },
+        "attachedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "attachedBy": {
+          "type": "string",
+          "enum": ["SYSTEM", "USER", "AI"]
+        }
+      }
+    },
+    "voxelContext": {
+      "type": "object",
+      "description": "Denormalized voxel location context",
+      "properties": {
+        "voxelId": {
+          "type": "string",
+          "pattern": "^VOX-[A-Z0-9-]+$"
+        },
+        "coordinates": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "z": { "type": "number" }
+          },
+          "required": ["x", "y", "z"]
+        },
+        "building": { "type": "string" },
+        "level": { "type": "string" },
+        "zone": { "type": "string" },
+        "system": { "type": "string" },
+        "gridReference": { "type": "string" }
+      }
+    },
+    "decisionContext": {
+      "type": "object",
+      "description": "Decision question, options, and AI analysis",
+      "properties": {
+        "question": {
+          "type": "string",
+          "description": "The decision question being answered"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "The WHY - captured explanation for this decision"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "description"],
+            "properties": {
+              "id": { "type": "string" },
+              "description": { "type": "string" },
+              "consequences": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "selected": { "type": "boolean" },
+              "estimatedCost": { "type": "number" },
+              "estimatedDelay": { "type": "integer" }
+            }
+          }
+        },
+        "selectedOption": {
+          "type": "string",
+          "description": "ID of the selected option"
+        },
+        "aiAnalysis": {
+          "type": "object",
+          "properties": {
+            "recommendation": { "type": "string" },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "analysisPath": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "precedents": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/urn" }
+            },
+            "riskAssessment": { "type": "string" }
+          }
+        }
+      }
+    },
+    "budgetImpact": {
+      "type": "object",
+      "description": "Financial impact of the decision",
+      "properties": {
+        "estimated": {
+          "type": "number",
+          "description": "Estimated cost impact"
+        },
+        "actual": {
+          "type": "number",
+          "description": "Actual cost impact (post-implementation)"
+        },
+        "currency": {
+          "type": "string",
+          "default": "USD"
+        },
+        "variance": {
+          "type": "number",
+          "description": "Difference between actual and estimated"
+        },
+        "budgetLine": {
+          "type": "string",
+          "description": "Cost code or budget category"
+        }
+      }
+    },
+    "scheduleImpact": {
+      "type": "object",
+      "description": "Schedule impact of the decision",
+      "properties": {
+        "delayDays": {
+          "type": "integer",
+          "description": "Number of days delay"
+        },
+        "delayHours": {
+          "type": "number",
+          "description": "Number of hours delay (for sub-day impacts)"
+        },
+        "affectedMilestones": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" }
+        },
+        "criticalPath": {
+          "type": "boolean",
+          "description": "True if decision affects critical path"
+        },
+        "lookAheadWeek": {
+          "type": "integer",
+          "description": "Which week of the 10-day look-ahead is affected"
+        }
+      }
+    },
+    "participants": {
+      "type": "object",
+      "description": "People involved in the decision",
+      "properties": {
+        "requestedBy": {
+          "$ref": "#/$defs/urn",
+          "description": "Participant who requested the decision"
+        },
+        "approvedBy": {
+          "$ref": "#/$defs/urn",
+          "description": "Participant who approved the decision"
+        },
+        "rejectedBy": {
+          "$ref": "#/$defs/urn",
+          "description": "Participant who rejected the decision"
+        },
+        "escalatedTo": {
+          "$ref": "#/$defs/urn",
+          "description": "Participant decision was escalated to"
+        },
+        "escalatedBy": {
+          "$ref": "#/$defs/urn",
+          "description": "Participant who escalated the decision"
+        },
+        "notified": {
+          "type": "array",
+          "description": "Participants notified of the decision",
+          "items": { "$ref": "#/$defs/urn" }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "description": "Supporting evidence item",
+      "required": ["type", "timestamp"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["photo", "document", "voice-note", "video", "measurement", "sms", "email"]
+        },
+        "uri": {
+          "type": "string",
+          "format": "uri",
+          "description": "Storage URI for the evidence"
+        },
+        "hash": {
+          "type": "string",
+          "description": "SHA-256 hash for integrity verification"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "capturedBy": {
+          "$ref": "#/$defs/urn"
+        },
+        "description": {
+          "type": "string"
+        },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" },
+            "accuracy": { "type": "number" }
+          }
+        }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "description": "Decision lifecycle timestamps",
+      "properties": {
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "approvedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "rejectedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "escalatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "supersededAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "description": "V3 graph metadata for bidirectional traversal",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "description": "URNs of nodes with edges pointing TO this node",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "description": "URNs of nodes this node has edges pointing TO",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "edges": {
+          "type": "array",
+          "description": "Detailed edge definitions",
+          "items": {
+            "$ref": "#/$defs/edge"
+          }
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "description": "Graph edge definition",
+      "required": ["from", "to", "type"],
+      "properties": {
+        "from": { "$ref": "#/$defs/urn" },
+        "to": { "$ref": "#/$defs/urn" },
+        "type": {
+          "type": "string",
+          "enum": ["contains", "triggers", "proposes", "escalates-to", "validates", "authored-by", "approved-by", "affects", "supersedes", "references"]
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "label": { "type": "string" },
+        "metadata": { "type": "object" },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

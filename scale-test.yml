@@ -1,0 +1,282 @@
+config:
+  target: 'http://localhost:4000'
+  phases:
+    # Warm-up phase
+    - duration: 60
+      arrivalRate: 10
+      name: 'Warm-up - 10 users'
+
+    # Gradual ramp-up
+    - duration: 120
+      arrivalRate: 50
+      name: 'Ramp-up - 50 users'
+
+    # Load testing
+    - duration: 180
+      arrivalRate: 200
+      name: 'Load test - 200 users'
+
+    # Peak load testing
+    - duration: 300
+      arrivalRate: 500
+      name: 'Peak load - 500 users'
+
+    # Stress testing
+    - duration: 120
+      arrivalRate: 750
+      name: 'Stress test - 750 users'
+
+    # Cool-down
+    - duration: 60
+      arrivalRate: 10
+      name: 'Cool-down - 10 users'
+
+  defaults:
+    headers:
+      Content-Type: 'application/json'
+      User-Agent: 'Ectropy-LoadTest/2.0'
+
+  processor: './load-test-processor.js'
+
+  # Performance thresholds
+  ensure:
+    maxErrorRate: 1 # Max 1% error rate
+    p95: 200 # 95th percentile under 200ms
+    p99: 500 # 99th percentile under 500ms
+
+scenarios:
+  # Authentication and session management load test
+  - name: 'Authentication Load Test'
+    weight: 25
+    flow:
+      - post:
+          url: '/api/auth/login'
+          json:
+            email: 'loadtest-{{ $randomString() }}@example.com'
+            password: 'LoadTest123!'
+          capture:
+            json: '$.accessToken'
+            as: 'authToken'
+          expect:
+            - statusCode: [200, 201]
+            - hasProperty: 'accessToken'
+
+      - get:
+          url: '/api/auth/profile'
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          expect:
+            - statusCode: 200
+            - hasProperty: 'id'
+
+      - post:
+          url: '/api/auth/refresh'
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          expect:
+            - statusCode: 200
+
+  # Project management API load test
+  - name: 'Project API Load Test'
+    weight: 40
+    flow:
+      # Authenticate first
+      - post:
+          url: '/api/auth/login'
+          json:
+            email: 'loadtest-{{ $randomString() }}@example.com'
+            password: 'LoadTest123!'
+          capture:
+            json: '$.accessToken'
+            as: 'authToken'
+
+      # Create project
+      - post:
+          url: '/api/v1/projects'
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          json:
+            name: 'Load Test Project {{ $randomString() }}'
+            description: 'Automated load testing project'
+            type: 'residential'
+          capture:
+            json: '$.id'
+            as: 'projectId'
+          expect:
+            - statusCode: [200, 201]
+            - hasProperty: 'id'
+
+      # Get project details
+      - get:
+          url: '/api/v1/projects/{{ projectId }}'
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          expect:
+            - statusCode: 200
+            - hasProperty: 'name'
+
+      # List projects
+      - get:
+          url: '/api/v1/projects'
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          expect:
+            - statusCode: 200
+            - contentType: json
+
+      # Update project
+      - put:
+          url: '/api/v1/projects/{{ projectId }}'
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          json:
+            name: 'Updated Load Test Project {{ $randomString() }}'
+            status: 'in_progress'
+          expect:
+            - statusCode: 200
+
+  # BIM data and file upload load test
+  - name: 'BIM Processing Load Test'
+    weight: 20
+    flow:
+      # Authenticate
+      - post:
+          url: '/api/auth/login'
+          json:
+            email: 'loadtest-{{ $randomString() }}@example.com'
+            password: 'LoadTest123!'
+          capture:
+            json: '$.accessToken'
+            as: 'authToken'
+
+      # Create project for BIM data
+      - post:
+          url: '/api/v1/projects'
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          json:
+            name: 'BIM Load Test {{ $randomString() }}'
+            type: 'commercial'
+          capture:
+            json: '$.id'
+            as: 'projectId'
+
+      # Simulate IFC element creation
+      - post:
+          url: '/api/v1/projects/{{ projectId }}/elements'
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          json:
+            type: 'IFCWALL'
+            guid: '{{ $randomString() }}-{{ $randomString() }}-{{ $randomString() }}'
+            properties:
+              material: 'Concrete'
+              thickness: 200
+              height: 3000
+              length: 5000
+            geometry:
+              coordinates:
+                [{ { $randomInt(0, 1000) } }, { { $randomInt(0, 1000) } }, 0]
+          expect:
+            - statusCode: [200, 201]
+
+      # Query elements
+      - get:
+          url: '/api/v1/projects/{{ projectId }}/elements'
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          expect:
+            - statusCode: 200
+
+      # Simulate file upload metadata
+      - post:
+          url: '/api/v1/projects/{{ projectId }}/files'
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          json:
+            filename: 'loadtest-{{ $randomString() }}.ifc'
+            size: { { $randomInt(1000000, 10000000) } }
+            type: 'application/x-step'
+          expect:
+            - statusCode: [200, 201]
+
+  # MCP Agent communication load test
+  - name: 'MCP Agent Load Test'
+    weight: 10
+    flow:
+      # Test MCP server health
+      - get:
+          url: '/health'
+          expect:
+            - statusCode: 200
+
+      # Test MCP capabilities
+      - post:
+          url: '/mcp/capabilities'
+          json:
+            method: 'initialize'
+            params:
+              protocolVersion: '2024-11-05'
+              capabilities:
+                roots:
+                  listChanged: true
+                sampling: {}
+          expect:
+            - statusCode: 200
+
+      # Test tool execution
+      - post:
+          url: '/mcp/tools/call'
+          json:
+            method: 'tools/call'
+            params:
+              name: 'get_elements'
+              arguments:
+                projectId: 'test-project'
+                limit: 10
+          expect:
+            - statusCode: [200, 404] # 404 acceptable if project doesn't exist
+
+  # Search and analytics load test
+  - name: 'Search and Analytics Load Test'
+    weight: 5
+    flow:
+      # Authenticate
+      - post:
+          url: '/api/auth/login'
+          json:
+            email: 'loadtest-{{ $randomString() }}@example.com'
+            password: 'LoadTest123!'
+          capture:
+            json: '$.accessToken'
+            as: 'authToken'
+
+      # Search projects
+      - get:
+          url: '/api/v1/search/projects'
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          qs:
+            q: 'residential'
+            limit: 20
+          expect:
+            - statusCode: 200
+
+      # Search elements
+      - get:
+          url: '/api/v1/search/elements'
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          qs:
+            type: 'IFCWALL'
+            material: 'Concrete'
+          expect:
+            - statusCode: 200
+
+      # Get analytics data
+      - get:
+          url: '/api/v1/analytics/dashboard'
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          expect:
+            - statusCode: 200

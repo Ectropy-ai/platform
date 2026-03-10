@@ -1,0 +1,989 @@
+{
+  "version": "1.0.0",
+  "environment": "all",
+  "runbookType": "operational",
+  "metadata": {
+    "catalogId": "operational-runbook-v1-0-0",
+    "name": "Nginx Dual-Config Deployment",
+    "type": "operational",
+    "purpose": "Deploy and validate nginx configurations to staging and production servers using dual-config pattern (main nginx.conf + sites-available) with automated backup, testing, and rollback capabilities",
+    "maintainer": "DevOps / Infrastructure Team",
+    "author": "DevOps / Infrastructure Team",
+    "created": "2025-11-14T00:00:00Z",
+    "lastUpdated": "2025-11-16T00:00:00Z",
+    "estimatedDuration": "10 minutes",
+    "complexity": "medium",
+    "priority": "high",
+    "relatedDocuments": [
+      "docs/INFRASTRUCTURE_CATALOG.md",
+      "infrastructure/nginx/staging.conf",
+      "infrastructure/nginx/production.conf",
+      "infrastructure/nginx/ectropy-staging.conf",
+      "nginx.conf"
+    ],
+    "sourceFile": "scripts/deployment/deploy-nginx-config.sh",
+    "conversionDate": "2025-11-16T00:00:00Z",
+    "schemaVersion": "1.0.0"
+  },
+  "executiveSummary": {
+    "description": "Automated bash script for deploying nginx configurations to remote servers (staging.ectropy.ai or production) using a dual-configuration pattern. Handles both root nginx.conf and environment-specific sites-available configurations with comprehensive validation, automatic backup, configuration testing, and rollback on failure.",
+    "status": "READY",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "MEDIUM",
+    "keyChanges": [
+      "Implements dual-config pattern: root nginx.conf + sites-available per environment",
+      "Automatic timestamped backups before deployment",
+      "nginx -t validation before applying changes",
+      "Automatic rollback on configuration test or reload failure",
+      "Post-deployment endpoint health checks",
+      "SSH key cleanup for CI/CD security"
+    ],
+    "prerequisites": [
+      "Bash shell environment (Linux, macOS, WSL, Git Bash)",
+      "SSH access to target server (root@SERVER_IP)",
+      "SSH key configured (manual or via DO_SSH_KEY env var for CI/CD)",
+      "Target server has nginx installed and running",
+      "Server added to SSH known_hosts or StrictHostKeyChecking disabled",
+      "Configuration files exist locally: nginx.conf and environment-specific site config"
+    ],
+    "impact": {
+      "systems": [
+        "Nginx web server (staging.ectropy.ai or production)",
+        "Load balancer routing",
+        "API Gateway proxy",
+        "MCP Server proxy",
+        "Web Dashboard serving",
+        "Speckle BIM platform proxy (if configured)"
+      ],
+      "downtime": "Zero downtime (nginx reload is graceful)",
+      "rollbackTime": "Immediate (automatic on failure)"
+    }
+  },
+  "preFlightChecks": [
+    {
+      "id": "bash-shell",
+      "order": 1,
+      "category": "infrastructure",
+      "name": "Bash Shell Available",
+      "description": "Verify script is running in bash environment",
+      "command": "echo $BASH_VERSION",
+      "expectedResult": "Bash version 4.0 or higher",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "This script requires bash. Run in Linux, macOS, WSL, or Git Bash."
+      }
+    },
+    {
+      "id": "environment-arg",
+      "order": 2,
+      "category": "configuration",
+      "name": "Valid Environment Argument",
+      "description": "Validate environment parameter is 'staging' or 'production'",
+      "command": "[[ \"$ENVIRONMENT\" =~ ^(staging|production)$ ]]",
+      "expectedResult": "Environment is staging or production",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "Invalid environment. Use 'staging' or 'production'"
+      }
+    },
+    {
+      "id": "server-ip-set",
+      "order": 3,
+      "category": "configuration",
+      "name": "SERVER_IP Environment Variable",
+      "description": "Ensure SERVER_IP is set and not empty",
+      "command": "[[ -n \"${SERVER_IP}\" ]]",
+      "expectedResult": "SERVER_IP contains target server IP address",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "SERVER_IP environment variable is not set. Run: export SERVER_IP=<server-ip>"
+      }
+    },
+    {
+      "id": "ssh-key-available",
+      "order": 4,
+      "category": "security",
+      "name": "SSH Authentication Configured",
+      "description": "Verify SSH key exists (manual or CI/CD DO_SSH_KEY)",
+      "command": "[[ -f ~/.ssh/id_rsa ]] || [[ -n \"${DO_SSH_KEY}\" ]]",
+      "expectedResult": "SSH key file exists or DO_SSH_KEY env var is set",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "No SSH key found. Configure SSH key or set DO_SSH_KEY for CI/CD."
+      }
+    },
+    {
+      "id": "nginx-conf-exists",
+      "order": 5,
+      "category": "configuration",
+      "name": "Main nginx.conf Exists",
+      "description": "Verify root nginx.conf file is present",
+      "command": "[[ -f nginx.conf ]]",
+      "expectedResult": "nginx.conf file exists in current directory",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "Main configuration file not found: nginx.conf"
+      }
+    },
+    {
+      "id": "sites-conf-exists",
+      "order": 6,
+      "category": "configuration",
+      "name": "Sites Configuration Exists",
+      "description": "Verify environment-specific sites config exists",
+      "command": "[[ -f \"${SITES_CONFIG}\" ]]",
+      "expectedResult": "Environment-specific config file exists (staging.conf or production.conf)",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "Sites configuration file not found: ${SITES_CONFIG}"
+      }
+    },
+    {
+      "id": "ssh-connectivity",
+      "order": 7,
+      "category": "infrastructure",
+      "name": "SSH Connection Test",
+      "description": "Verify SSH connection to target server",
+      "command": "ssh -o ConnectTimeout=10 -o BatchMode=yes root@${SERVER_IP} 'echo connected' 2>/dev/null",
+      "expectedResult": "SSH connection succeeds",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "Cannot connect to server. Verify SERVER_IP and SSH key configuration."
+      }
+    },
+    {
+      "id": "remote-nginx-installed",
+      "order": 8,
+      "category": "infrastructure",
+      "name": "Nginx Installed on Server",
+      "description": "Verify nginx is installed on target server",
+      "command": "ssh root@${SERVER_IP} 'which nginx'",
+      "expectedResult": "nginx binary path returned",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "nginx is not installed on target server"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Initialization and Validation",
+      "description": "Set up SSH credentials for CI/CD, validate configurations, and display deployment parameters",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Display Deployment Banner",
+          "description": "Show deployment header with script information",
+          "command": "echo -e '${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\\n${BLUE}🚀 Nginx Dual-Config Deployment${NC}\\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}'",
+          "purpose": "Provide visual indication of deployment start",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "1.2",
+          "name": "Validate Environment Argument",
+          "description": "Ensure environment is 'staging' or 'production'",
+          "command": "if [[ ! \"$ENVIRONMENT\" =~ ^(staging|production)$ ]]; then echo -e \"${RED}❌ Error: Invalid environment${NC}\"; exit 1; fi",
+          "purpose": "Prevent deployment to invalid or unintended environments",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "abort",
+            "message": "Invalid environment specified"
+          }
+        },
+        {
+          "step": "1.3",
+          "name": "Verify SERVER_IP Set",
+          "description": "Check SERVER_IP environment variable is configured",
+          "command": "if [[ -z \"${SERVER_IP}\" ]]; then echo -e \"${RED}❌ Error: SERVER_IP not set${NC}\"; exit 1; fi",
+          "purpose": "Ensure target server is specified before attempting deployment",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "abort",
+            "message": "SERVER_IP environment variable must be set"
+          }
+        },
+        {
+          "step": "1.4",
+          "name": "Configure SSH Key (CI/CD)",
+          "description": "Write DO_SSH_KEY to ~/.ssh/id_rsa if running in CI/CD environment",
+          "command": "if [[ -n \"${DO_SSH_KEY}\" ]]; then mkdir -p ~/.ssh; echo \"${DO_SSH_KEY}\" > ~/.ssh/id_rsa; chmod 600 ~/.ssh/id_rsa; ssh-keyscan -H ${SERVER_IP} >> ~/.ssh/known_hosts 2>/dev/null || true; fi",
+          "purpose": "Enable SSH authentication for automated deployments",
+          "required": false,
+          "automatable": true,
+          "timeout": "15s",
+          "expectedStatus": 0,
+          "relatedFiles": [
+            "~/.ssh/id_rsa"
+          ]
+        },
+        {
+          "step": "1.5",
+          "name": "Set Configuration File Paths",
+          "description": "Determine sites-available config file based on environment",
+          "command": "if [[ \"$ENVIRONMENT\" == \"staging\" ]]; then SITES_CONFIG=\"infrastructure/nginx/ectropy-staging.conf\"; else SITES_CONFIG=\"infrastructure/nginx/production.conf\"; fi",
+          "purpose": "Select correct environment-specific configuration file",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "1.6",
+          "name": "Validate Configuration Files Exist",
+          "description": "Verify both nginx.conf and sites config exist locally",
+          "commands": [
+            "test -f nginx.conf",
+            "test -f \"${SITES_CONFIG}\""
+          ],
+          "purpose": "Prevent deployment attempt with missing configuration files",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "abort",
+            "message": "Required configuration files not found"
+          }
+        },
+        {
+          "step": "1.7",
+          "name": "Display Deployment Parameters",
+          "description": "Show environment, server, and file paths for confirmation",
+          "command": "echo \"Environment: ${ENVIRONMENT}\\nTarget Server: root@${SERVER_IP}\\nMain Config: ${MAIN_CONFIG} → ${MAIN_REMOTE_PATH}\\nSites Config: ${SITES_CONFIG} → ${SITES_REMOTE_PATH}\"",
+          "purpose": "Provide operator visibility into deployment targets",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "Deployment parameters summary"
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Backup Existing Configurations",
+      "description": "Create timestamped backups of current nginx configurations before making changes",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Generate Backup Timestamp",
+          "description": "Create timestamp for backup file naming",
+          "command": "TIMESTAMP=$(date +%Y%m%d_%H%M%S)",
+          "purpose": "Ensure unique backup filenames for version tracking",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "2.2",
+          "name": "Backup Main nginx.conf",
+          "description": "Copy /etc/nginx/nginx.conf to timestamped backup",
+          "command": "ssh root@${SERVER_IP} \"cp ${MAIN_REMOTE_PATH} ${MAIN_REMOTE_PATH}.backup.${TIMESTAMP}\" || echo -e \"${YELLOW}⚠️  Warning: Could not backup ${MAIN_REMOTE_PATH}${NC}\"",
+          "purpose": "Preserve current main configuration for potential rollback",
+          "required": true,
+          "automatable": true,
+          "timeout": "15s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Backup file created successfully"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "File may not exist on first deployment"
+          }
+        },
+        {
+          "step": "2.3",
+          "name": "Backup Sites-Available Config",
+          "description": "Copy sites-available config to timestamped backup",
+          "command": "ssh root@${SERVER_IP} \"cp ${SITES_REMOTE_PATH} ${SITES_REMOTE_PATH}.backup.${TIMESTAMP}\" 2>/dev/null || echo -e \"${YELLOW}⚠️  Warning: Could not backup ${SITES_REMOTE_PATH}${NC}\"",
+          "purpose": "Preserve current site configuration for potential rollback",
+          "required": true,
+          "automatable": true,
+          "timeout": "15s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": [0],
+          "onFailure": {
+            "action": "skip",
+            "message": "File may not exist on first deployment"
+          }
+        },
+        {
+          "step": "2.4",
+          "name": "Verify Backups Created",
+          "description": "Confirm backup files exist on server",
+          "commands": [
+            "ssh root@${SERVER_IP} \"ls -la ${MAIN_REMOTE_PATH}.backup.${TIMESTAMP}\" || true",
+            "ssh root@${SERVER_IP} \"ls -la ${SITES_REMOTE_PATH}.backup.${TIMESTAMP}\" || true"
+          ],
+          "purpose": "Validate backup operation before proceeding with deployment",
+          "required": false,
+          "automatable": true,
+          "timeout": "15s",
+          "expectedOutput": "Backup files listed or warning if not created"
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Deploy Configurations",
+      "description": "Copy new nginx configurations to server and create sites-enabled symlink",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Deploy Main nginx.conf",
+          "description": "SCP local nginx.conf to /etc/nginx/nginx.conf on server",
+          "command": "scp ${MAIN_CONFIG} root@${SERVER_IP}:${MAIN_REMOTE_PATH}",
+          "purpose": "Update root nginx configuration with new settings",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "File transferred successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "rollbackStep": "2.2",
+            "message": "Failed to deploy main nginx.conf. Check SSH connection and permissions."
+          },
+          "relatedFiles": [
+            "nginx.conf"
+          ]
+        },
+        {
+          "step": "3.2",
+          "name": "Deploy Sites-Available Config",
+          "description": "SCP environment-specific config to /etc/nginx/sites-available/",
+          "command": "scp ${SITES_CONFIG} root@${SERVER_IP}:${SITES_REMOTE_PATH}",
+          "purpose": "Update site-specific configuration (routing, upstreams, SSL)",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "File transferred successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "rollbackStep": "2.3",
+            "message": "Failed to deploy sites config. Check SSH connection and permissions."
+          },
+          "relatedFiles": [
+            "infrastructure/nginx/ectropy-staging.conf",
+            "infrastructure/nginx/production.conf"
+          ]
+        },
+        {
+          "step": "3.3",
+          "name": "Create Sites-Enabled Symlink",
+          "description": "Link sites-available config to sites-enabled to activate it",
+          "command": "ssh root@${SERVER_IP} \"ln -sf ${SITES_REMOTE_PATH} ${SITES_ENABLED_PATH}\"",
+          "purpose": "Enable the deployed site configuration in nginx",
+          "required": true,
+          "automatable": true,
+          "timeout": "15s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Symlink created successfully"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not create symlink. Site may not be activated."
+          }
+        },
+        {
+          "step": "3.4",
+          "name": "Verify Deployed Files",
+          "description": "List deployed configuration files on server",
+          "commands": [
+            "ssh root@${SERVER_IP} \"ls -la ${MAIN_REMOTE_PATH}\"",
+            "ssh root@${SERVER_IP} \"ls -la ${SITES_REMOTE_PATH}\"",
+            "ssh root@${SERVER_IP} \"ls -la ${SITES_ENABLED_PATH}\""
+          ],
+          "purpose": "Confirm all configuration files are in place",
+          "required": false,
+          "automatable": true,
+          "timeout": "15s",
+          "expectedOutput": "File listings showing recently modified timestamps"
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Test Configuration",
+      "description": "Validate nginx configuration syntax before applying changes",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Run nginx -t Validation",
+          "description": "Test nginx configuration syntax on server",
+          "command": "ssh root@${SERVER_IP} \"nginx -t\"",
+          "purpose": "Detect configuration errors before reloading nginx",
+          "required": true,
+          "automatable": true,
+          "timeout": "15s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "expectedOutput": "nginx: configuration file /etc/nginx/nginx.conf test is successful",
+          "validation": {
+            "type": "exitCode",
+            "criteria": "nginx -t returns 0 (success)"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "rollbackStep": "5.1",
+            "message": "Nginx configuration test failed. Rolling back to previous configuration."
+          }
+        },
+        {
+          "step": "4.2",
+          "name": "Display Test Results",
+          "description": "Show nginx -t output for verification",
+          "command": "echo -e \"${GREEN}✅ Configuration test passed${NC}\"",
+          "purpose": "Provide operator confirmation that syntax is valid",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "Success message displayed"
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Reload Nginx",
+      "description": "Apply new configuration by gracefully reloading nginx",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "5.1",
+          "name": "Reload Nginx Service",
+          "description": "Execute systemctl reload nginx to apply new configuration",
+          "command": "ssh root@${SERVER_IP} \"systemctl reload nginx\"",
+          "purpose": "Apply new configuration with zero downtime (graceful reload)",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Reload completes successfully"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "rollbackStep": "6.1",
+            "message": "Failed to reload nginx. Rolling back configurations."
+          }
+        },
+        {
+          "step": "5.2",
+          "name": "Verify Nginx Running",
+          "description": "Check nginx service status after reload",
+          "command": "ssh root@${SERVER_IP} \"systemctl is-active nginx\"",
+          "purpose": "Confirm nginx service is still running after reload",
+          "required": true,
+          "automatable": true,
+          "timeout": "15s",
+          "expectedOutput": "active",
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "rollback",
+            "rollbackStep": "6.1",
+            "message": "Nginx is not active after reload. Rolling back."
+          }
+        },
+        {
+          "step": "5.3",
+          "name": "Display Reload Success",
+          "description": "Show success message for reload completion",
+          "command": "echo -e \"${GREEN}✅ Nginx reloaded successfully${NC}\"",
+          "purpose": "Confirm reload completed without errors",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "Success message"
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Validate Endpoints (Health Checks)",
+      "description": "Test critical application endpoints to verify routing is working",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "6.1",
+          "name": "Determine Base URL",
+          "description": "Set BASE_URL based on environment (staging or production)",
+          "command": "if [[ \"$ENVIRONMENT\" == \"staging\" ]]; then BASE_URL=\"https://staging.ectropy.ai\"; elif [[ \"$ENVIRONMENT\" == \"production\" ]]; then BASE_URL=\"https://${PROD_DOMAIN}\"; fi",
+          "purpose": "Configure endpoint URLs for health checks",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "6.2",
+          "name": "Test Load Balancer Health",
+          "description": "Verify /lb-health endpoint responds",
+          "command": "curl -s -o /dev/null -w \"%{http_code}\" --max-time 10 \"${BASE_URL}/lb-health\"",
+          "purpose": "Confirm nginx load balancer is routing health checks",
+          "required": true,
+          "automatable": true,
+          "timeout": "15s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedOutput": "200",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "HTTP status code 200"
+          }
+        },
+        {
+          "step": "6.3",
+          "name": "Test MCP Server Health",
+          "description": "Verify /health endpoint responds via nginx proxy",
+          "command": "curl -s -o /dev/null -w \"%{http_code}\" --max-time 10 \"${BASE_URL}/health\"",
+          "purpose": "Confirm nginx is proxying requests to MCP Server",
+          "required": true,
+          "automatable": true,
+          "timeout": "15s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedOutput": "200",
+          "expectedStatus": 0
+        },
+        {
+          "step": "6.4",
+          "name": "Test API Gateway Health",
+          "description": "Verify /api/health endpoint responds via nginx proxy",
+          "command": "curl -s -o /dev/null -w \"%{http_code}\" --max-time 10 \"${BASE_URL}/api/health\"",
+          "purpose": "Confirm nginx is proxying /api/* requests to API Gateway",
+          "required": true,
+          "automatable": true,
+          "timeout": "15s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedOutput": "200",
+          "expectedStatus": 0
+        },
+        {
+          "step": "6.5",
+          "name": "Test Web Dashboard",
+          "description": "Verify root path serves web dashboard",
+          "command": "curl -s -o /dev/null -w \"%{http_code}\" --max-time 10 \"${BASE_URL}/\"",
+          "purpose": "Confirm nginx is serving static frontend or proxying to web service",
+          "required": true,
+          "automatable": true,
+          "timeout": "15s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedOutput": "200",
+          "expectedStatus": 0
+        },
+        {
+          "step": "6.6",
+          "name": "Evaluate Health Check Results",
+          "description": "Determine if any endpoints failed validation",
+          "command": "if [[ \"$VALIDATION_FAILED\" == \"true\" ]]; then echo -e \"${YELLOW}⚠️  Warning: Some endpoints failed${NC}\"; else echo -e \"${GREEN}✅ All endpoints validated${NC}\"; fi",
+          "purpose": "Summarize health check results",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "Validation summary message"
+        }
+      ]
+    },
+    {
+      "phase": 7,
+      "name": "Deployment Summary and Cleanup",
+      "description": "Display deployment summary, backup locations, and cleanup SSH keys",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "7.1",
+          "name": "Display Deployment Summary",
+          "description": "Show deployed files, backups, and next steps",
+          "command": "echo -e \"${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\\n${GREEN}✅ Deployment completed successfully!${NC}\\n\\nDeployed configurations:\\n  • ${MAIN_REMOTE_PATH}\\n  • ${SITES_REMOTE_PATH}\\n  • ${SITES_ENABLED_PATH}\\n\\nBackups created:\\n  • ${MAIN_REMOTE_PATH}.backup.${TIMESTAMP}\\n  • ${SITES_REMOTE_PATH}.backup.${TIMESTAMP}\"",
+          "purpose": "Provide operator with deployment confirmation and reference information",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "Formatted deployment summary"
+        },
+        {
+          "step": "7.2",
+          "name": "Display Next Steps",
+          "description": "Show commands for monitoring logs and checking status",
+          "command": "echo -e \"\\nNext steps:\\n  • Monitor error logs: ssh root@${SERVER_IP} 'tail -f /var/log/nginx/error.log'\\n  • Check nginx status: ssh root@${SERVER_IP} 'systemctl status nginx'\\n  • View access logs: ssh root@${SERVER_IP} 'tail -f /var/log/nginx/access.log'\"",
+          "purpose": "Guide operator on post-deployment monitoring activities",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "Next steps instructions"
+        },
+        {
+          "step": "7.3",
+          "name": "Cleanup SSH Key (CI/CD)",
+          "description": "Remove temporary SSH key created from DO_SSH_KEY",
+          "command": "if [[ -n \"${DO_SSH_KEY}\" ]] && [[ -f ~/.ssh/id_rsa ]]; then echo -e \"${BLUE}🧹 Cleaning up SSH key...${NC}\"; rm -f ~/.ssh/id_rsa; fi",
+          "purpose": "Security cleanup: remove SSH key after deployment completes",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "healthChecks": [
+      {
+        "service": "load-balancer",
+        "endpoint": "https://staging.ectropy.ai/lb-health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "mcp-server",
+        "endpoint": "https://staging.ectropy.ai/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "api-gateway",
+        "endpoint": "https://staging.ectropy.ai/api/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "web-dashboard",
+        "endpoint": "https://staging.ectropy.ai/",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      }
+    ],
+    "smokeTests": [
+      {
+        "test": "Nginx Configuration Syntax",
+        "endpoint": "ssh root@SERVER_IP 'nginx -t'",
+        "expectedBehavior": "Configuration test successful",
+        "priority": "P0"
+      },
+      {
+        "test": "Nginx Service Running",
+        "endpoint": "ssh root@SERVER_IP 'systemctl is-active nginx'",
+        "expectedBehavior": "Service returns 'active'",
+        "priority": "P0"
+      },
+      {
+        "test": "Sites-Enabled Symlink",
+        "endpoint": "ssh root@SERVER_IP 'ls -la /etc/nginx/sites-enabled/'",
+        "expectedBehavior": "Symlink points to sites-available config",
+        "priority": "P1"
+      },
+      {
+        "test": "Error Log Check",
+        "endpoint": "ssh root@SERVER_IP 'tail -20 /var/log/nginx/error.log'",
+        "expectedBehavior": "No recent critical errors",
+        "priority": "P1"
+      }
+    ]
+  },
+  "rollback": {
+    "supported": true,
+    "estimatedTime": "2 minutes",
+    "dataLossRisk": "none",
+    "triggerConditions": [
+      "nginx -t configuration test fails",
+      "systemctl reload nginx fails",
+      "Nginx service becomes inactive after reload",
+      "Critical endpoint health checks fail"
+    ],
+    "decisionMaker": "DevOps Engineer or Deployment Operator",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Restore Main nginx.conf Backup",
+        "command": "ssh root@${SERVER_IP} \"cp ${MAIN_REMOTE_PATH}.backup.${TIMESTAMP} ${MAIN_REMOTE_PATH}\"",
+        "purpose": "Revert root configuration to previous working state",
+        "required": true
+      },
+      {
+        "step": 2,
+        "name": "Restore Sites Config Backup",
+        "command": "ssh root@${SERVER_IP} \"cp ${SITES_REMOTE_PATH}.backup.${TIMESTAMP} ${SITES_REMOTE_PATH}\"",
+        "purpose": "Revert site configuration to previous working state",
+        "required": true
+      },
+      {
+        "step": 3,
+        "name": "Test Restored Configuration",
+        "command": "ssh root@${SERVER_IP} \"nginx -t\"",
+        "purpose": "Verify restored configuration is syntactically valid",
+        "required": true
+      },
+      {
+        "step": 4,
+        "name": "Reload with Restored Config",
+        "command": "ssh root@${SERVER_IP} \"systemctl reload nginx\"",
+        "purpose": "Apply restored configuration",
+        "required": true
+      },
+      {
+        "step": 5,
+        "name": "Verify Rollback Success",
+        "command": "ssh root@${SERVER_IP} \"systemctl is-active nginx\" && curl -f https://staging.ectropy.ai/lb-health",
+        "purpose": "Confirm nginx is running and responding after rollback",
+        "required": true
+      }
+    ],
+    "verification": {
+      "healthCheck": "curl -s -o /dev/null -w \"%{http_code}\" https://staging.ectropy.ai/lb-health",
+      "expectedStatus": 200,
+      "successCriteria": "Nginx is active and health endpoint returns 200 OK"
+    }
+  },
+  "successCriteria": [
+    {
+      "criterion": "Both nginx.conf and sites-available config deployed successfully",
+      "status": "REQUIRED",
+      "validation": "scp commands exit with code 0"
+    },
+    {
+      "criterion": "Sites-enabled symlink created",
+      "status": "REQUIRED",
+      "validation": "Symlink exists at /etc/nginx/sites-enabled/"
+    },
+    {
+      "criterion": "nginx -t configuration test passes",
+      "status": "REQUIRED",
+      "validation": "nginx -t returns exit code 0"
+    },
+    {
+      "criterion": "systemctl reload nginx completes successfully",
+      "status": "REQUIRED",
+      "validation": "Reload command exits with code 0"
+    },
+    {
+      "criterion": "Nginx service remains active after reload",
+      "status": "REQUIRED",
+      "validation": "systemctl is-active nginx returns 'active'"
+    },
+    {
+      "criterion": "All critical health endpoints return HTTP 200",
+      "status": "REQUIRED",
+      "validation": "/lb-health, /health, /api/health, / all respond with 200"
+    },
+    {
+      "criterion": "Timestamped backups created for both configs",
+      "status": "RECOMMENDED",
+      "validation": "Backup files exist on server with timestamp"
+    },
+    {
+      "criterion": "No error messages in nginx error log after reload",
+      "status": "RECOMMENDED",
+      "validation": "tail /var/log/nginx/error.log shows no recent errors"
+    }
+  ],
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "SERVER_IP",
+        "description": "IP address of target deployment server",
+        "example": "64.23.145.89",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "DO_SSH_KEY",
+        "description": "SSH private key for CI/CD authentication (optional for manual deployments)",
+        "example": "-----BEGIN OPENSSH PRIVATE KEY-----...",
+        "required": false,
+        "environment": "all",
+        "secret": true,
+        "minimumLength": 64
+      },
+      {
+        "name": "PROD_DOMAIN",
+        "description": "Production domain name for health checks (only for production deployments)",
+        "example": "ectropy.ai",
+        "required": false,
+        "environment": "production",
+        "secret": false
+      }
+    ]
+  },
+  "mcpIntegration": {
+    "queryableFields": [
+      "metadata.catalogId",
+      "metadata.purpose",
+      "environment",
+      "phases[].name",
+      "phases[].steps[].name",
+      "phases[].steps[].command",
+      "rollback.steps[].name",
+      "successCriteria[].criterion"
+    ],
+    "supportedQueries": [
+      {
+        "query": "How do I deploy nginx config to staging?",
+        "returns": "export SERVER_IP=<ip> && bash deploy-nginx-config.sh staging",
+        "purpose": "Quick deployment command for staging environment"
+      },
+      {
+        "query": "What files are deployed in the dual-config pattern?",
+        "returns": "nginx.conf (main) and infrastructure/nginx/ectropy-staging.conf (sites-available)",
+        "purpose": "Understand dual-config architecture"
+      },
+      {
+        "query": "What happens if nginx -t fails?",
+        "returns": "Automatic rollback to previous configuration backups",
+        "purpose": "Understand failure handling and safety mechanisms"
+      },
+      {
+        "query": "How are backups created during deployment?",
+        "returns": "Phase 2: Timestamped backups of both configs before any changes",
+        "purpose": "Understand backup strategy and rollback capability"
+      },
+      {
+        "query": "What health checks are performed after deployment?",
+        "returns": "Phase 6: /lb-health, /health, /api/health, / endpoints tested",
+        "purpose": "Validation and confidence in deployment success"
+      },
+      {
+        "query": "How do I rollback a failed nginx deployment?",
+        "returns": "5-step automatic rollback: restore configs, test, reload, verify",
+        "purpose": "Recover from deployment failures"
+      }
+    ],
+    "decisionSupport": [
+      "Always run in staging environment first before production",
+      "Verify SERVER_IP is correct before executing to avoid wrong-server deployments",
+      "For CI/CD, ensure DO_SSH_KEY secret is configured in GitHub Actions",
+      "Monitor error logs immediately after deployment for any issues",
+      "If health checks fail but nginx reloads successfully, investigate application layer issues",
+      "Keep backups for at least 7 days for potential rollback needs"
+    ],
+    "architectureAlignment": {
+      "routingConfig": "Deploys nginx configs that route traffic per routing-architecture.json",
+      "portAllocation": "Nginx proxies to standardized backend ports (3001, 4000, 3000)",
+      "oauthConfig": "Nginx must not interfere with OAuth callback routing (/api/auth/callback)"
+    }
+  },
+  "knownIssues": [
+    {
+      "id": "SSH-TIMEOUT-001",
+      "title": "SSH Connection Timeout in CI/CD",
+      "severity": "MEDIUM",
+      "impact": "Deployment fails if server is unreachable or SSH key is invalid",
+      "mitigation": "Pre-flight check validates SSH connectivity before deployment",
+      "action": "Verify DO_SSH_KEY secret is correctly configured and server allows connections",
+      "priority": "P1"
+    },
+    {
+      "id": "HEALTH-CHECK-002",
+      "title": "Health Checks May Fail on First Deployment",
+      "severity": "LOW",
+      "impact": "Endpoints may return non-200 if backend services not yet running",
+      "mitigation": "Health check failures marked as warnings, don't trigger rollback",
+      "action": "Verify backend services are deployed and running before nginx deployment",
+      "priority": "P2"
+    },
+    {
+      "id": "BACKUP-CLEANUP-003",
+      "title": "Backups Accumulate Over Time",
+      "severity": "LOW",
+      "impact": "Multiple deployments create many backup files consuming disk space",
+      "mitigation": "Manual cleanup or implement automated retention policy",
+      "action": "Periodically remove old backups: find /etc/nginx -name '*.backup.*' -mtime +30 -delete",
+      "priority": "P3"
+    },
+    {
+      "id": "PROD-DOMAIN-004",
+      "title": "Production Domain Required for Health Checks",
+      "severity": "MEDIUM",
+      "impact": "Health checks skipped if PROD_DOMAIN not set for production deployments",
+      "mitigation": "Script warns and skips validation if domain not configured",
+      "action": "Set PROD_DOMAIN environment variable for production deployments",
+      "priority": "P1"
+    }
+  ]
+}

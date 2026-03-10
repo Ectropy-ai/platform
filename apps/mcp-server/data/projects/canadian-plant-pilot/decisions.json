@@ -1,0 +1,4788 @@
+[
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0001",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.682Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0001",
+    "title": "Electrical Conduit Material - EMT to Rigid",
+    "description": "Decision regarding electrical conduit material - emt to rigid. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-30-12",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-36-30-12",
+      "coordinates": {
+        "x": 36,
+        "y": 30,
+        "z": 12
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 1195,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-07T13:23:13.535Z",
+      "updatedAt": "2026-03-08T12:23:13.535Z",
+      "approvedAt": "2026-03-08T12:23:13.535Z"
+    },
+    "consequences": [
+      "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0001"
+    ],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-30-12"],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0001"
+      ],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-30-12",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0001",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0002",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.683Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0002",
+    "title": "Equipment Rental Extension Required",
+    "description": "Decision regarding equipment rental extension required. schedule impact requiring review.",
+    "category": "SCHEDULE_IMPACT",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-15-1-3",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-15-1-3",
+      "coordinates": {
+        "x": 15,
+        "y": 1,
+        "z": 3
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 5453,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 5,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-01T17:15:29.666Z",
+      "updatedAt": "2026-04-10T17:15:29.666Z",
+      "approvedAt": "2026-04-10T17:15:29.666Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-15-1-3"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-15-1-3",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0002",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0003",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.683Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0003",
+    "title": "Door Hardware Manufacturer Change",
+    "description": "Decision regarding door hardware manufacturer change. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 1,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-57-14-5",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-B-57-14-5",
+      "coordinates": {
+        "x": 57,
+        "y": 14,
+        "z": 5
+      },
+      "zone": "ZONE-B",
+      "zoneName": "Office Block"
+    },
+    "budgetImpact": {
+      "estimated": 1290,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-13T17:38:10.573Z",
+      "updatedAt": "2026-02-13T17:38:10.573Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-57-14-5"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-57-14-5",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0003",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0004",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.683Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0004",
+    "title": "Owner-Requested Additional Electrical Outlets",
+    "description": "Decision regarding owner-requested additional electrical outlets. change order requiring review.",
+    "category": "CHANGE_ORDER",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 3,
+      "current": 3
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-59-4-9",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-B-59-4-9",
+      "coordinates": {
+        "x": 59,
+        "y": 4,
+        "z": 9
+      },
+      "zone": "ZONE-B",
+      "zoneName": "Office Block"
+    },
+    "budgetImpact": {
+      "estimated": 5153,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 2,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:sarah-thompson"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-06T15:05:34.781Z",
+      "updatedAt": "2026-02-18T15:05:34.781Z",
+      "approvedAt": "2026-02-18T15:05:34.781Z"
+    },
+    "consequences": [
+      "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0002"
+    ],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-59-4-9"],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0002"
+      ],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-59-4-9",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0004",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0005",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.683Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0005",
+    "title": "Temporary Scaffolding Configuration",
+    "description": "Decision regarding temporary scaffolding configuration. safety compliance requiring review.",
+    "category": "SAFETY_COMPLIANCE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-25-3-2",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-25-3-2",
+      "coordinates": {
+        "x": 25,
+        "y": 3,
+        "z": 2
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 989,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-05T21:56:19.699Z",
+      "updatedAt": "2026-04-07T21:56:19.699Z",
+      "approvedAt": "2026-04-07T21:56:19.699Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-25-3-2"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-25-3-2",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0005",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0006",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.684Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0006",
+    "title": "Steel Beam Substitution W12x26 to W12x30",
+    "description": "Decision regarding steel beam substitution w12x26 to w12x30. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-43-8-2",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-43-8-2",
+      "coordinates": {
+        "x": 43,
+        "y": 8,
+        "z": 2
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 2665,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-06T03:54:32.727Z",
+      "updatedAt": "2026-04-07T03:54:32.727Z",
+      "approvedAt": "2026-04-07T03:54:32.727Z"
+    },
+    "consequences": [
+      "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0003"
+    ],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-43-8-2"],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0003"
+      ],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-43-8-2",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0006",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0007",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.684Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0007",
+    "title": "Design Change: Conference Room Expansion",
+    "description": "Decision regarding design change: conference room expansion. change order requiring review.",
+    "category": "CHANGE_ORDER",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 3,
+      "current": 3
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-52-1-9",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-B-52-1-9",
+      "coordinates": {
+        "x": 52,
+        "y": 1,
+        "z": 9
+      },
+      "zone": "ZONE-B",
+      "zoneName": "Office Block"
+    },
+    "budgetImpact": {
+      "estimated": 21453,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 7,
+      "criticalPath": true
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:sarah-thompson"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-18T18:11:34.532Z",
+      "updatedAt": "2026-04-30T18:11:34.532Z",
+      "approvedAt": "2026-04-30T18:11:34.532Z"
+    },
+    "consequences": [
+      "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0004"
+    ],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-52-1-9"],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0004"
+      ],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-52-1-9",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0007",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0008",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.684Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0008",
+    "title": "Concrete Mix Design Change 4000 PSI to 4500 PSI",
+    "description": "Decision regarding concrete mix design change 4000 psi to 4500 psi. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 1,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-20-1-6",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-20-1-6",
+      "coordinates": {
+        "x": 20,
+        "y": 1,
+        "z": 6
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 1187,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:kevin-nguyen"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-05T07:36:51.947Z",
+      "updatedAt": "2026-03-05T07:36:51.947Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-20-1-6"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-20-1-6",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0008",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0009",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.684Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0009",
+    "title": "RFI: Column Grid Dimension Clarification",
+    "description": "Decision regarding rfi: column grid dimension clarification. design clarification requiring review.",
+    "category": "DESIGN_CLARIFICATION",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 0,
+      "current": -1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-5-2",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-41-5-2",
+      "coordinates": {
+        "x": 41,
+        "y": 5,
+        "z": 2
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 0,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:tom-bradley"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-12T11:09:08.391Z",
+      "updatedAt": "2026-03-12T11:09:08.391Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-5-2"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-5-2",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0009",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0010",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.684Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0010",
+    "title": "RFI: Structural Connection Detail",
+    "description": "Decision regarding rfi: structural connection detail. design clarification requiring review.",
+    "category": "DESIGN_CLARIFICATION",
+    "type": "REJECTION",
+    "status": "REJECTED",
+    "authorityLevel": {
+      "required": 0,
+      "current": -1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-37-7-8",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-37-7-8",
+      "coordinates": {
+        "x": 37,
+        "y": 7,
+        "z": 8
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 0,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:tom-bradley"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-01T16:19:19.835Z",
+      "updatedAt": "2026-03-01T16:19:19.835Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-37-7-8"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-37-7-8",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0010",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0011",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.685Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0011",
+    "title": "Temporary Scaffolding Configuration",
+    "description": "Decision regarding temporary scaffolding configuration. safety compliance requiring review.",
+    "category": "SAFETY_COMPLIANCE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-20-1-6",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-20-1-6",
+      "coordinates": {
+        "x": 20,
+        "y": 1,
+        "z": 6
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 2352,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-31T15:15:06.869Z",
+      "updatedAt": "2026-04-06T15:15:06.869Z",
+      "approvedAt": "2026-04-06T15:15:06.869Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-20-1-6"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-20-1-6",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0011",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0012",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.686Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0012",
+    "title": "Owner-Requested Additional Electrical Outlets",
+    "description": "Decision regarding owner-requested additional electrical outlets. change order requiring review.",
+    "category": "CHANGE_ORDER",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 3,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-78-17-8",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-B-78-17-8",
+      "coordinates": {
+        "x": 78,
+        "y": 17,
+        "z": 8
+      },
+      "zone": "ZONE-B",
+      "zoneName": "Office Block"
+    },
+    "budgetImpact": {
+      "estimated": 12450,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 2,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-01T13:14:23.967Z",
+      "updatedAt": "2026-04-01T13:14:23.967Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-78-17-8"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-78-17-8",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0012",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0013",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.686Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0013",
+    "title": "Door Hardware Manufacturer Change",
+    "description": "Decision regarding door hardware manufacturer change. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-67-11-6",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-B-67-11-6",
+      "coordinates": {
+        "x": 67,
+        "y": 11,
+        "z": 6
+      },
+      "zone": "ZONE-B",
+      "zoneName": "Office Block"
+    },
+    "budgetImpact": {
+      "estimated": 996,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-01T15:03:00.783Z",
+      "updatedAt": "2026-04-11T15:03:00.783Z",
+      "approvedAt": "2026-04-11T15:03:00.783Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-67-11-6"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-67-11-6",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0013",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0014",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.686Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0014",
+    "title": "Hot Work Permit Extension Request",
+    "description": "Decision regarding hot work permit extension request. safety compliance requiring review.",
+    "category": "SAFETY_COMPLIANCE",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 2,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-27-9-5",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-27-9-5",
+      "coordinates": {
+        "x": 27,
+        "y": 9,
+        "z": 5
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 390,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-12T10:18:10.065Z",
+      "updatedAt": "2026-03-12T10:18:10.065Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-27-9-5"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-27-9-5",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0014",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0015",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.686Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0015",
+    "title": "Temporary Scaffolding Configuration",
+    "description": "Decision regarding temporary scaffolding configuration. safety compliance requiring review.",
+    "category": "SAFETY_COMPLIANCE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-34-1",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-41-34-1",
+      "coordinates": {
+        "x": 41,
+        "y": 34,
+        "z": 1
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 2287,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-19T11:17:58.042Z",
+      "updatedAt": "2026-03-30T11:17:58.042Z",
+      "approvedAt": "2026-03-30T11:17:58.042Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-34-1"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-34-1",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0015",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0016",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.686Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0016",
+    "title": "Electrical Conduit Material - EMT to Rigid",
+    "description": "Decision regarding electrical conduit material - emt to rigid. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-5",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-36-26-5",
+      "coordinates": {
+        "x": 36,
+        "y": 26,
+        "z": 5
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 1234,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-03T18:42:13.889Z",
+      "updatedAt": "2026-04-12T18:42:13.889Z",
+      "approvedAt": "2026-04-12T18:42:13.889Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-5"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-5",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0016",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0017",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.686Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0017",
+    "title": "MEP Clash: Duct vs Beam Conflict",
+    "description": "Decision regarding mep clash: duct vs beam conflict. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 1,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-40-27-15",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-40-27-15",
+      "coordinates": {
+        "x": 40,
+        "y": 27,
+        "z": 15
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 1708,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 3,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-27T18:19:09.116Z",
+      "updatedAt": "2026-02-27T18:19:09.116Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-40-27-15"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-40-27-15",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0017",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0018",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.686Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0018",
+    "title": "Electrical Panel Conflict with HVAC Duct",
+    "description": "Decision regarding electrical panel conflict with hvac duct. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 3,
+      "current": 3
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-30-24-11",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-30-24-11",
+      "coordinates": {
+        "x": 30,
+        "y": 24,
+        "z": 11
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 7776,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 3,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:jennifer-park",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:sarah-thompson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-27T11:15:59.328Z",
+      "updatedAt": "2026-04-02T11:15:59.328Z",
+      "approvedAt": "2026-04-02T11:15:59.328Z"
+    },
+    "consequences": [
+      "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0005"
+    ],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-30-24-11"],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0005"
+      ],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-30-24-11",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0018",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0019",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.687Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0019",
+    "title": "RFI: Fire Rating Requirement Clarification",
+    "description": "Decision regarding rfi: fire rating requirement clarification. design clarification requiring review.",
+    "category": "DESIGN_CLARIFICATION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 0,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-21-3",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-32-21-3",
+      "coordinates": {
+        "x": 32,
+        "y": 21,
+        "z": 3
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 0,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:maria-santos",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:maria-santos"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-03T12:18:59.290Z",
+      "updatedAt": "2026-03-05T12:18:59.290Z",
+      "approvedAt": "2026-03-05T12:18:59.290Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-21-3"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-21-3",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0019",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0020",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.687Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0020",
+    "title": "RFI: Door Swing Direction Confirmation",
+    "description": "Decision regarding rfi: door swing direction confirmation. design clarification requiring review.",
+    "category": "DESIGN_CLARIFICATION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 0,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-55-4-7",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-B-55-4-7",
+      "coordinates": {
+        "x": 55,
+        "y": 4,
+        "z": 7
+      },
+      "zone": "ZONE-B",
+      "zoneName": "Office Block"
+    },
+    "budgetImpact": {
+      "estimated": 0,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:tom-bradley",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:tom-bradley"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-05T12:33:30.995Z",
+      "updatedAt": "2026-04-07T12:33:30.995Z",
+      "approvedAt": "2026-04-07T12:33:30.995Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-55-4-7"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-55-4-7",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0020",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0021",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.687Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0021",
+    "title": "Inspection Delay - Rescheduling Required",
+    "description": "Decision regarding inspection delay - rescheduling required. schedule impact requiring review.",
+    "category": "SCHEDULE_IMPACT",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 1,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-40-30-2",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-40-30-2",
+      "coordinates": {
+        "x": 40,
+        "y": 30,
+        "z": 2
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 1453,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 3,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-07T08:34:36.556Z",
+      "updatedAt": "2026-04-07T08:34:36.556Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-40-30-2"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-40-30-2",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0021",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0022",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.687Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0022",
+    "title": "Ceiling Height Coordination Issue",
+    "description": "Decision regarding ceiling height coordination issue. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-60-7-5",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-B-60-7-5",
+      "coordinates": {
+        "x": 60,
+        "y": 7,
+        "z": 5
+      },
+      "zone": "ZONE-B",
+      "zoneName": "Office Block"
+    },
+    "budgetImpact": {
+      "estimated": 446,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-03T23:10:34.003Z",
+      "updatedAt": "2026-04-06T23:10:34.003Z",
+      "approvedAt": "2026-04-06T23:10:34.003Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-60-7-5"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-60-7-5",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0022",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0023",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.687Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0023",
+    "title": "RFI: Dock Leveler Electrical Requirements",
+    "description": "Decision regarding rfi: dock leveler electrical requirements. design clarification requiring review.",
+    "category": "DESIGN_CLARIFICATION",
+    "type": "REJECTION",
+    "status": "REJECTED",
+    "authorityLevel": {
+      "required": 0,
+      "current": -1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-13-37-4",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-C-13-37-4",
+      "coordinates": {
+        "x": 13,
+        "y": 37,
+        "z": 4
+      },
+      "zone": "ZONE-C",
+      "zoneName": "Loading/Receiving"
+    },
+    "budgetImpact": {
+      "estimated": 0,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:tom-bradley"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-15T20:45:19.254Z",
+      "updatedAt": "2026-02-15T20:45:19.254Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-13-37-4"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-13-37-4",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0023",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0024",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.687Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0024",
+    "title": "Roofing Membrane Substitution",
+    "description": "Decision regarding roofing membrane substitution. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 2,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-17-6-11",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-E-17-6-11",
+      "coordinates": {
+        "x": 17,
+        "y": 6,
+        "z": 11
+      },
+      "zone": "ZONE-E",
+      "zoneName": "Site/Exterior"
+    },
+    "budgetImpact": {
+      "estimated": 4998,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:jennifer-park"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-16T00:54:54.747Z",
+      "updatedAt": "2026-03-16T00:54:54.747Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-17-6-11"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-17-6-11",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0024",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0025",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.687Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0025",
+    "title": "Fire Sprinkler Head Spacing Conflict",
+    "description": "Decision regarding fire sprinkler head spacing conflict. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-23-1",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-32-23-1",
+      "coordinates": {
+        "x": 32,
+        "y": 23,
+        "z": 1
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 2183,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-11T01:55:44.379Z",
+      "updatedAt": "2026-04-13T01:55:44.379Z",
+      "approvedAt": "2026-04-13T01:55:44.379Z"
+    },
+    "consequences": [
+      "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0006"
+    ],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-23-1"],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0006"
+      ],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-23-1",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0025",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0026",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.687Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0026",
+    "title": "Inspection Delay - Rescheduling Required",
+    "description": "Decision regarding inspection delay - rescheduling required. schedule impact requiring review.",
+    "category": "SCHEDULE_IMPACT",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 1,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-40-22-3",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-40-22-3",
+      "coordinates": {
+        "x": 40,
+        "y": 22,
+        "z": 3
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 1474,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-28T21:33:04.132Z",
+      "updatedAt": "2026-02-28T21:33:04.132Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-40-22-3"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-40-22-3",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0026",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0027",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0027",
+    "title": "Steel Delivery Delay - 10 Days",
+    "description": "Decision regarding steel delivery delay - 10 days. schedule impact requiring review.",
+    "category": "SCHEDULE_IMPACT",
+    "type": "REJECTION",
+    "status": "REJECTED",
+    "authorityLevel": {
+      "required": 3,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-2-5",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-41-2-5",
+      "coordinates": {
+        "x": 41,
+        "y": 2,
+        "z": 5
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 12192,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 12,
+      "criticalPath": true
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-10T08:37:15.664Z",
+      "updatedAt": "2026-03-10T08:37:15.664Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-2-5"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-2-5",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0027",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0028",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0028",
+    "title": "Weekend Overtime Authorization",
+    "description": "Decision regarding weekend overtime authorization. schedule impact requiring review.",
+    "category": "SCHEDULE_IMPACT",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 3,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-47-28-5",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-47-28-5",
+      "coordinates": {
+        "x": 47,
+        "y": 28,
+        "z": 5
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 21094,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": -3,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-03T11:40:27.401Z",
+      "updatedAt": "2026-02-03T11:40:27.401Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-47-28-5"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-47-28-5",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0028",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0029",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0029",
+    "title": "Concrete Mix Design Change 4000 PSI to 4500 PSI",
+    "description": "Decision regarding concrete mix design change 4000 psi to 4500 psi. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-5-2",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-41-5-2",
+      "coordinates": {
+        "x": 41,
+        "y": 5,
+        "z": 2
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 2596,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-07T11:57:13.558Z",
+      "updatedAt": "2026-03-20T10:57:13.558Z",
+      "approvedAt": "2026-03-20T10:57:13.558Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-5-2"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-5-2",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0029",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0030",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0030",
+    "title": "RFI: Structural Connection Detail",
+    "description": "Decision regarding rfi: structural connection detail. design clarification requiring review.",
+    "category": "DESIGN_CLARIFICATION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 0,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-9-18-10",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-9-18-10",
+      "coordinates": {
+        "x": 9,
+        "y": 18,
+        "z": 10
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 0,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:maria-santos",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:maria-santos"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-01T06:50:42.443Z",
+      "updatedAt": "2026-02-09T06:50:42.443Z",
+      "approvedAt": "2026-02-09T06:50:42.443Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-9-18-10"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-9-18-10",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0030",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0031",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0031",
+    "title": "Concrete Mix Design Change 4000 PSI to 4500 PSI",
+    "description": "Decision regarding concrete mix design change 4000 psi to 4500 psi. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-1-35-5",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-1-35-5",
+      "coordinates": {
+        "x": 1,
+        "y": 35,
+        "z": 5
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 2552,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-17T23:16:27.015Z",
+      "updatedAt": "2026-04-29T23:16:27.015Z",
+      "approvedAt": "2026-04-29T23:16:27.015Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-1-35-5"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-1-35-5",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0031",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0032",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0032",
+    "title": "Conduit Routing Through Structural Member",
+    "description": "Decision regarding conduit routing through structural member. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 2,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-18-25-8",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-18-25-8",
+      "coordinates": {
+        "x": 18,
+        "y": 25,
+        "z": 8
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 2638,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 2,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-13T00:39:40.051Z",
+      "updatedAt": "2026-02-13T00:39:40.051Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-18-25-8"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-18-25-8",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0032",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0033",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0033",
+    "title": "Electrical Conduit Material - EMT to Rigid",
+    "description": "Decision regarding electrical conduit material - emt to rigid. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-33-24-4",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-33-24-4",
+      "coordinates": {
+        "x": 33,
+        "y": 24,
+        "z": 4
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 1793,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-24T03:40:18.862Z",
+      "updatedAt": "2026-03-25T03:40:18.862Z",
+      "approvedAt": "2026-03-25T03:40:18.862Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-33-24-4"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-33-24-4",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0033",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0034",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0034",
+    "title": "RFI: Electrical Panel Location Confirmation",
+    "description": "Decision regarding rfi: electrical panel location confirmation. design clarification requiring review.",
+    "category": "DESIGN_CLARIFICATION",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 0,
+      "current": -1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-33-20-6",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-33-20-6",
+      "coordinates": {
+        "x": 33,
+        "y": 20,
+        "z": 6
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 0,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:maria-santos"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-07T21:07:21.077Z",
+      "updatedAt": "2026-04-07T21:07:21.077Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-33-20-6"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-33-20-6",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0034",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0035",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0035",
+    "title": "RFI: Column Grid Dimension Clarification",
+    "description": "Decision regarding rfi: column grid dimension clarification. design clarification requiring review.",
+    "category": "DESIGN_CLARIFICATION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 0,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-30-29-6",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-30-29-6",
+      "coordinates": {
+        "x": 30,
+        "y": 29,
+        "z": 6
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 0,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:tom-bradley",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:maria-santos"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-15T11:59:57.859Z",
+      "updatedAt": "2026-03-20T11:59:57.859Z",
+      "approvedAt": "2026-03-20T11:59:57.859Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-30-29-6"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-30-29-6",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0035",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0036",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0036",
+    "title": "Ceiling Height Coordination Issue",
+    "description": "Decision regarding ceiling height coordination issue. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-74-5-6",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-B-74-5-6",
+      "coordinates": {
+        "x": 74,
+        "y": 5,
+        "z": 6
+      },
+      "zone": "ZONE-B",
+      "zoneName": "Office Block"
+    },
+    "budgetImpact": {
+      "estimated": 1387,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-12T11:21:26.118Z",
+      "updatedAt": "2026-04-20T11:21:26.118Z",
+      "approvedAt": "2026-04-20T11:21:26.118Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-74-5-6"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-74-5-6",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0036",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0037",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0037",
+    "title": "MEP Clash: Duct vs Beam Conflict",
+    "description": "Decision regarding mep clash: duct vs beam conflict. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-31-26-14",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-31-26-14",
+      "coordinates": {
+        "x": 31,
+        "y": 26,
+        "z": 14
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 4058,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-02T09:41:15.035Z",
+      "updatedAt": "2026-03-07T09:41:15.035Z",
+      "approvedAt": "2026-03-07T09:41:15.035Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-31-26-14"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-31-26-14",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0037",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0038",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0038",
+    "title": "Equipment Rental Extension Required",
+    "description": "Decision regarding equipment rental extension required. schedule impact requiring review.",
+    "category": "SCHEDULE_IMPACT",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-42-12-2",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-42-12-2",
+      "coordinates": {
+        "x": 42,
+        "y": 12,
+        "z": 2
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 3000,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 5,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-22T10:28:06.127Z",
+      "updatedAt": "2026-02-24T10:28:06.127Z",
+      "approvedAt": "2026-02-24T10:28:06.127Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-42-12-2"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-42-12-2",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0038",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0039",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0039",
+    "title": "Weather Delay - Concrete Pour Rescheduled",
+    "description": "Decision regarding weather delay - concrete pour rescheduled. schedule impact requiring review.",
+    "category": "SCHEDULE_IMPACT",
+    "type": "REJECTION",
+    "status": "REJECTED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-1-20-3",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-1-20-3",
+      "coordinates": {
+        "x": 1,
+        "y": 20,
+        "z": 3
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 1418,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 3,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:kevin-nguyen"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-24T16:22:02.674Z",
+      "updatedAt": "2026-03-24T16:22:02.674Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-1-20-3"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-1-20-3",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0039",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0040",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0040",
+    "title": "Ceiling Height Coordination Issue",
+    "description": "Decision regarding ceiling height coordination issue. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-79-13-4",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-B-79-13-4",
+      "coordinates": {
+        "x": 79,
+        "y": 13,
+        "z": 4
+      },
+      "zone": "ZONE-B",
+      "zoneName": "Office Block"
+    },
+    "budgetImpact": {
+      "estimated": 1017,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-19T07:51:01.425Z",
+      "updatedAt": "2026-03-20T07:51:01.425Z",
+      "approvedAt": "2026-03-20T07:51:01.425Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-79-13-4"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-79-13-4",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0040",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0041",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0041",
+    "title": "MEP Clash: Duct vs Beam Conflict",
+    "description": "Decision regarding mep clash: duct vs beam conflict. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-37-21-11",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-37-21-11",
+      "coordinates": {
+        "x": 37,
+        "y": 21,
+        "z": 11
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 4447,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:jennifer-park"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-13T19:37:50.388Z",
+      "updatedAt": "2026-03-25T19:37:50.388Z",
+      "approvedAt": "2026-03-25T19:37:50.388Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-37-21-11"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-37-21-11",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0041",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0042",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0042",
+    "title": "Roofing Membrane Substitution",
+    "description": "Decision regarding roofing membrane substitution. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 2,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-64-45-14",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-E-64-45-14",
+      "coordinates": {
+        "x": 64,
+        "y": 45,
+        "z": 14
+      },
+      "zone": "ZONE-E",
+      "zoneName": "Site/Exterior"
+    },
+    "budgetImpact": {
+      "estimated": 4262,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 3,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-21T20:19:24.745Z",
+      "updatedAt": "2026-03-21T20:19:24.745Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-64-45-14"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-64-45-14",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0042",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0043",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0043",
+    "title": "Hot Work Permit Extension Request",
+    "description": "Decision regarding hot work permit extension request. safety compliance requiring review.",
+    "category": "SAFETY_COMPLIANCE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-7-6-0",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-7-6-0",
+      "coordinates": {
+        "x": 7,
+        "y": 6,
+        "z": 0
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 104,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-18T16:33:36.316Z",
+      "updatedAt": "2026-03-28T16:33:36.316Z",
+      "approvedAt": "2026-03-28T16:33:36.316Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-7-6-0"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-7-6-0",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0043",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0044",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0044",
+    "title": "RFI: Dock Leveler Electrical Requirements",
+    "description": "Decision regarding rfi: dock leveler electrical requirements. design clarification requiring review.",
+    "category": "DESIGN_CLARIFICATION",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 0,
+      "current": -1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-16-45-4",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-C-16-45-4",
+      "coordinates": {
+        "x": 16,
+        "y": 45,
+        "z": 4
+      },
+      "zone": "ZONE-C",
+      "zoneName": "Loading/Receiving"
+    },
+    "budgetImpact": {
+      "estimated": 0,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:tom-bradley"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-02T17:17:52.850Z",
+      "updatedAt": "2026-03-02T17:17:52.850Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-16-45-4"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-16-45-4",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0044",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0045",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0045",
+    "title": "Concrete Mix Design Change 4000 PSI to 4500 PSI",
+    "description": "Decision regarding concrete mix design change 4000 psi to 4500 psi. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-18-25-8",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-18-25-8",
+      "coordinates": {
+        "x": 18,
+        "y": 25,
+        "z": 8
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 430,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:kevin-nguyen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:kevin-nguyen"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-12T22:03:30.330Z",
+      "updatedAt": "2026-04-20T22:03:30.330Z",
+      "approvedAt": "2026-04-20T22:03:30.330Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-18-25-8"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-18-25-8",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0045",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0046",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0046",
+    "title": "Fire Sprinkler Head Spacing Conflict",
+    "description": "Decision regarding fire sprinkler head spacing conflict. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-38-21-12",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-38-21-12",
+      "coordinates": {
+        "x": 38,
+        "y": 21,
+        "z": 12
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 3140,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 2,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:jennifer-park",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:jennifer-park"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-14T09:48:28.466Z",
+      "updatedAt": "2026-02-20T09:48:28.466Z",
+      "approvedAt": "2026-02-20T09:48:28.466Z"
+    },
+    "consequences": [
+      "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0007"
+    ],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-38-21-12"],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0007"
+      ],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-38-21-12",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0046",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0047",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0047",
+    "title": "Steel Delivery Delay - 10 Days",
+    "description": "Decision regarding steel delivery delay - 10 days. schedule impact requiring review.",
+    "category": "SCHEDULE_IMPACT",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 3,
+      "current": 3
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-43-8-2",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-43-8-2",
+      "coordinates": {
+        "x": 43,
+        "y": 8,
+        "z": 2
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 4483,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 8,
+      "criticalPath": true
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:sarah-thompson"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-04T20:47:21.613Z",
+      "updatedAt": "2026-02-11T20:47:21.613Z",
+      "approvedAt": "2026-02-11T20:47:21.613Z"
+    },
+    "consequences": [
+      "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0008"
+    ],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-43-8-2"],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0008"
+      ],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-43-8-2",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0047",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0048",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0048",
+    "title": "Conduit Routing Through Structural Member",
+    "description": "Decision regarding conduit routing through structural member. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 1,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-24-17-3",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-24-17-3",
+      "coordinates": {
+        "x": 24,
+        "y": 17,
+        "z": 3
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 1597,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:kevin-nguyen"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-09T01:36:02.508Z",
+      "updatedAt": "2026-02-09T01:36:02.508Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-24-17-3"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-24-17-3",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0048",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0049",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0049",
+    "title": "Hot Work Permit Extension Request",
+    "description": "Decision regarding hot work permit extension request. safety compliance requiring review.",
+    "category": "SAFETY_COMPLIANCE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-19-28-3",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-19-28-3",
+      "coordinates": {
+        "x": 19,
+        "y": 28,
+        "z": 3
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 499,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-15T00:17:56.030Z",
+      "updatedAt": "2026-03-27T00:17:56.030Z",
+      "approvedAt": "2026-03-27T00:17:56.030Z"
+    },
+    "consequences": [
+      "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0009"
+    ],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-19-28-3"],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0009"
+      ],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-19-28-3",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0049",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0050",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0050",
+    "title": "Temporary Scaffolding Configuration",
+    "description": "Decision regarding temporary scaffolding configuration. safety compliance requiring review.",
+    "category": "SAFETY_COMPLIANCE",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 2,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-40-1-7",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-40-1-7",
+      "coordinates": {
+        "x": 40,
+        "y": 1,
+        "z": 7
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 1763,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-09T07:06:09.910Z",
+      "updatedAt": "2026-02-09T07:06:09.910Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-40-1-7"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-40-1-7",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0050",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0051",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0051",
+    "title": "Door Hardware Manufacturer Change",
+    "description": "Decision regarding door hardware manufacturer change. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-67-11-6",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-B-67-11-6",
+      "coordinates": {
+        "x": 67,
+        "y": 11,
+        "z": 6
+      },
+      "zone": "ZONE-B",
+      "zoneName": "Office Block"
+    },
+    "budgetImpact": {
+      "estimated": 1029,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-19T16:22:35.301Z",
+      "updatedAt": "2026-02-20T16:22:35.301Z",
+      "approvedAt": "2026-02-20T16:22:35.301Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-67-11-6"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-67-11-6",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0051",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0052",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0052",
+    "title": "Electrical Panel Conflict with HVAC Duct",
+    "description": "Decision regarding electrical panel conflict with hvac duct. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 3,
+      "current": 3
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-31-25-0",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-31-25-0",
+      "coordinates": {
+        "x": 31,
+        "y": 25,
+        "z": 0
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 7938,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 4,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:jennifer-park",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:sarah-thompson"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-25T18:49:00.272Z",
+      "updatedAt": "2026-03-08T17:49:00.272Z",
+      "approvedAt": "2026-03-08T17:49:00.272Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-31-25-0"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-31-25-0",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0052",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0053",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0053",
+    "title": "Fire Sprinkler Head Spacing Conflict",
+    "description": "Decision regarding fire sprinkler head spacing conflict. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-34-20-7",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-34-20-7",
+      "coordinates": {
+        "x": 34,
+        "y": 20,
+        "z": 7
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 2123,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-29T04:21:15.625Z",
+      "updatedAt": "2026-04-03T04:21:15.625Z",
+      "approvedAt": "2026-04-03T04:21:15.625Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-34-20-7"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-34-20-7",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0053",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0054",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0054",
+    "title": "Steel Beam Substitution W12x26 to W12x30",
+    "description": "Decision regarding steel beam substitution w12x26 to w12x30. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-31-28-10",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-31-28-10",
+      "coordinates": {
+        "x": 31,
+        "y": 28,
+        "z": 10
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 1822,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:kevin-nguyen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:kevin-nguyen"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-07T09:46:00.811Z",
+      "updatedAt": "2026-03-18T08:46:00.811Z",
+      "approvedAt": "2026-03-18T08:46:00.811Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-31-28-10"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-31-28-10",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0054",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0055",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0055",
+    "title": "Equipment Rental Extension Required",
+    "description": "Decision regarding equipment rental extension required. schedule impact requiring review.",
+    "category": "SCHEDULE_IMPACT",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-11-29-10",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-11-29-10",
+      "coordinates": {
+        "x": 11,
+        "y": 29,
+        "z": 10
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 6803,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 6,
+      "criticalPath": true
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-16T11:41:08.437Z",
+      "updatedAt": "2026-03-22T11:41:08.437Z",
+      "approvedAt": "2026-03-22T11:41:08.437Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-11-29-10"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-11-29-10",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0055",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0056",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0056",
+    "title": "Equipment Rental Extension Required",
+    "description": "Decision regarding equipment rental extension required. schedule impact requiring review.",
+    "category": "SCHEDULE_IMPACT",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-35-35-10",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-35-35-10",
+      "coordinates": {
+        "x": 35,
+        "y": 35,
+        "z": 10
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 7393,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 5,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-16T13:13:11.869Z",
+      "updatedAt": "2026-03-27T13:13:11.869Z",
+      "approvedAt": "2026-03-27T13:13:11.869Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-35-35-10"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-35-35-10",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0056",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0057",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0057",
+    "title": "RFI: Electrical Panel Location Confirmation",
+    "description": "Decision regarding rfi: electrical panel location confirmation. design clarification requiring review.",
+    "category": "DESIGN_CLARIFICATION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 0,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-38-21-0",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-38-21-0",
+      "coordinates": {
+        "x": 38,
+        "y": 21,
+        "z": 0
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 0,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:maria-santos",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:maria-santos"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-24T02:09:57.437Z",
+      "updatedAt": "2026-02-28T02:09:57.437Z",
+      "approvedAt": "2026-02-28T02:09:57.437Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-38-21-0"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-38-21-0",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0057",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0058",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0058",
+    "title": "Weekend Overtime Authorization",
+    "description": "Decision regarding weekend overtime authorization. schedule impact requiring review.",
+    "category": "SCHEDULE_IMPACT",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 3,
+      "current": 3
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-47-20-0",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-47-20-0",
+      "coordinates": {
+        "x": 47,
+        "y": 20,
+        "z": 0
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 24146,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": -2,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:sarah-thompson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-05T01:25:32.869Z",
+      "updatedAt": "2026-03-15T00:25:32.869Z",
+      "approvedAt": "2026-03-15T00:25:32.869Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-47-20-0"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-47-20-0",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0058",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0059",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0059",
+    "title": "Electrical Conduit Material - EMT to Rigid",
+    "description": "Decision regarding electrical conduit material - emt to rigid. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-5",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-36-26-5",
+      "coordinates": {
+        "x": 36,
+        "y": 26,
+        "z": 5
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 1006,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-24T04:46:46.486Z",
+      "updatedAt": "2026-03-04T04:46:46.486Z",
+      "approvedAt": "2026-03-04T04:46:46.486Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-5"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-5",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0059",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0060",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.688Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0060",
+    "title": "MEP Clash: Duct vs Beam Conflict",
+    "description": "Decision regarding mep clash: duct vs beam conflict. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-13",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-36-26-13",
+      "coordinates": {
+        "x": 36,
+        "y": 26,
+        "z": 13
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 4971,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:jennifer-park",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-13T03:28:43.840Z",
+      "updatedAt": "2026-04-15T03:28:43.840Z",
+      "approvedAt": "2026-04-15T03:28:43.840Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-13"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-13",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0060",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0061",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.689Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0061",
+    "title": "Fire Sprinkler Head Spacing Conflict",
+    "description": "Decision regarding fire sprinkler head spacing conflict. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-39-25-15",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-39-25-15",
+      "coordinates": {
+        "x": 39,
+        "y": 25,
+        "z": 15
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 3038,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 2,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:jennifer-park"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-23T04:49:19.972Z",
+      "updatedAt": "2026-03-06T04:49:19.972Z",
+      "approvedAt": "2026-03-06T04:49:19.972Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-39-25-15"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-39-25-15",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0061",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0062",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.689Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0062",
+    "title": "Electrical Conduit Material - EMT to Rigid",
+    "description": "Decision regarding electrical conduit material - emt to rigid. material substitution requiring review.",
+    "category": "MATERIAL_SUBSTITUTION",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 1,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-23-1",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-32-23-1",
+      "coordinates": {
+        "x": 32,
+        "y": 23,
+        "z": 1
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 1131,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-25T12:29:09.546Z",
+      "updatedAt": "2026-02-25T12:29:09.546Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-23-1"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-23-1",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0062",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0063",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.689Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0063",
+    "title": "RFI: Electrical Panel Location Confirmation",
+    "description": "Decision regarding rfi: electrical panel location confirmation. design clarification requiring review.",
+    "category": "DESIGN_CLARIFICATION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 0,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-23-4",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-32-23-4",
+      "coordinates": {
+        "x": 32,
+        "y": 23,
+        "z": 4
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 0,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:maria-santos",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:maria-santos"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-03T16:14:02.379Z",
+      "updatedAt": "2026-04-12T16:14:02.379Z",
+      "approvedAt": "2026-04-12T16:14:02.379Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-23-4"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-23-4",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0063",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0064",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.689Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0064",
+    "title": "Inspection Delay - Rescheduling Required",
+    "description": "Decision regarding inspection delay - rescheduling required. schedule impact requiring review.",
+    "category": "SCHEDULE_IMPACT",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-13",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-36-26-13",
+      "coordinates": {
+        "x": 36,
+        "y": 26,
+        "z": 13
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 1018,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-10T10:56:59.772Z",
+      "updatedAt": "2026-04-16T10:56:59.772Z",
+      "approvedAt": "2026-04-16T10:56:59.772Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-13"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-13",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0064",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0065",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.689Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0065",
+    "title": "Electrical Panel Conflict with HVAC Duct",
+    "description": "Decision regarding electrical panel conflict with hvac duct. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 3,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-21-3",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-32-21-3",
+      "coordinates": {
+        "x": 32,
+        "y": 21,
+        "z": 3
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 7626,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 2,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:jennifer-park"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-29T05:29:38.938Z",
+      "updatedAt": "2026-04-29T05:29:38.938Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-21-3"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-21-3",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0065",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0066",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.689Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0066",
+    "title": "RFI: Door Swing Direction Confirmation",
+    "description": "Decision regarding rfi: door swing direction confirmation. design clarification requiring review.",
+    "category": "DESIGN_CLARIFICATION",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 0,
+      "current": 0
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-61-9-9",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-B-61-9-9",
+      "coordinates": {
+        "x": 61,
+        "y": 9,
+        "z": 9
+      },
+      "zone": "ZONE-B",
+      "zoneName": "Office Block"
+    },
+    "budgetImpact": {
+      "estimated": 0,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:tom-bradley",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:tom-bradley"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-26T11:43:33.126Z",
+      "updatedAt": "2026-03-11T10:43:33.126Z",
+      "approvedAt": "2026-03-11T10:43:33.126Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-61-9-9"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-61-9-9",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0066",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0067",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.689Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0067",
+    "title": "Owner-Requested Additional Electrical Outlets",
+    "description": "Decision regarding owner-requested additional electrical outlets. change order requiring review.",
+    "category": "CHANGE_ORDER",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 3,
+      "current": 3
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-68-11-8",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-B-68-11-8",
+      "coordinates": {
+        "x": 68,
+        "y": 11,
+        "z": 8
+      },
+      "zone": "ZONE-B",
+      "zoneName": "Office Block"
+    },
+    "budgetImpact": {
+      "estimated": 17586,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 5,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:sarah-thompson"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-13T10:30:12.528Z",
+      "updatedAt": "2026-04-23T10:30:12.528Z",
+      "approvedAt": "2026-04-23T10:30:12.528Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-68-11-8"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-68-11-8",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0067",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0068",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.689Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0068",
+    "title": "Unforeseen Condition: Additional Foundation Work",
+    "description": "Decision regarding unforeseen condition: additional foundation work. change order requiring review.",
+    "category": "CHANGE_ORDER",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 4,
+      "current": 4
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-37-9-3",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-37-9-3",
+      "coordinates": {
+        "x": 37,
+        "y": 9,
+        "z": 3
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 38980,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 9,
+      "criticalPath": true
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:amanda-foster"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-18T02:07:03.415Z",
+      "updatedAt": "2026-03-26T02:07:03.415Z",
+      "approvedAt": "2026-03-26T02:07:03.415Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-37-9-3"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-37-9-3",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0068",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0069",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.689Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0069",
+    "title": "Fire Sprinkler Head Spacing Conflict",
+    "description": "Decision regarding fire sprinkler head spacing conflict. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "REJECTION",
+    "status": "REJECTED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-31-27-8",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-31-27-8",
+      "coordinates": {
+        "x": 31,
+        "y": 27,
+        "z": 8
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 2793,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 2,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-05T06:52:54.178Z",
+      "updatedAt": "2026-03-05T06:52:54.178Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-31-27-8"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-31-27-8",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0069",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0070",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.689Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0070",
+    "title": "Temporary Scaffolding Configuration",
+    "description": "Decision regarding temporary scaffolding configuration. safety compliance requiring review.",
+    "category": "SAFETY_COMPLIANCE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-13-29-4",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-13-29-4",
+      "coordinates": {
+        "x": 13,
+        "y": 29,
+        "z": 4
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 1132,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-21T04:41:17.227Z",
+      "updatedAt": "2026-03-27T04:41:17.227Z",
+      "approvedAt": "2026-03-27T04:41:17.227Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-13-29-4"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-13-29-4",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0070",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0071",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.689Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0071",
+    "title": "Inspection Delay - Rescheduling Required",
+    "description": "Decision regarding inspection delay - rescheduling required. schedule impact requiring review.",
+    "category": "SCHEDULE_IMPACT",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 1,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-37-23-0",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-D-37-23-0",
+      "coordinates": {
+        "x": 37,
+        "y": 23,
+        "z": 0
+      },
+      "zone": "ZONE-D",
+      "zoneName": "MEP Core"
+    },
+    "budgetImpact": {
+      "estimated": 536,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 3,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:lisa-chen"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-25T04:54:19.096Z",
+      "updatedAt": "2026-03-29T04:54:19.096Z",
+      "approvedAt": "2026-03-29T04:54:19.096Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-37-23-0"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-37-23-0",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0071",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0072",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.695Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0072",
+    "title": "Conduit Routing Through Structural Member",
+    "description": "Decision regarding conduit routing through structural member. coordination issue requiring review.",
+    "category": "COORDINATION_ISSUE",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 2,
+      "current": 2
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-29-17-4",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-29-17-4",
+      "coordinates": {
+        "x": 29,
+        "y": 17,
+        "z": 4
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 2820,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 2,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-08T16:32:18.098Z",
+      "updatedAt": "2026-02-17T16:32:18.098Z",
+      "approvedAt": "2026-02-17T16:32:18.098Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-29-17-4"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-29-17-4",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0072",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0073",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.695Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0073",
+    "title": "RFI: Column Grid Dimension Clarification",
+    "description": "Decision regarding rfi: column grid dimension clarification. design clarification requiring review.",
+    "category": "DESIGN_CLARIFICATION",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 0,
+      "current": -1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-47-20-0",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-47-20-0",
+      "coordinates": {
+        "x": 47,
+        "y": 20,
+        "z": 0
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 0,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 0,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:maria-santos"
+    },
+    "timestamps": {
+      "createdAt": "2026-02-23T10:35:14.759Z",
+      "updatedAt": "2026-02-23T10:35:14.759Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-47-20-0"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-47-20-0",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0073",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0074",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.695Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0074",
+    "title": "Fall Protection Plan Modification",
+    "description": "Decision regarding fall protection plan modification. safety compliance requiring review.",
+    "category": "SAFETY_COMPLIANCE",
+    "type": "PROPOSAL",
+    "status": "PENDING",
+    "authorityLevel": {
+      "required": 2,
+      "current": 1
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-49-11-15",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-E-49-11-15",
+      "coordinates": {
+        "x": 49,
+        "y": 11,
+        "z": 15
+      },
+      "zone": "ZONE-E",
+      "zoneName": "Site/Exterior"
+    },
+    "budgetImpact": {
+      "estimated": 691,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": 1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:jennifer-park"
+    },
+    "timestamps": {
+      "createdAt": "2026-03-03T21:00:13.432Z",
+      "updatedAt": "2026-03-03T21:00:13.432Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-49-11-15"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-49-11-15",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0074",
+          "type": "contains"
+        }
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0075",
+    "$schema": "https://luhtech.dev/schemas/pm/decision.schema.json",
+    "schemaVersion": "3.0.0",
+    "meta": {
+      "projectId": "canadian-plant-pilot",
+      "sourceOfTruth": "data/projects/canadian-plant-pilot/decisions.json",
+      "lastUpdated": "2026-01-09T02:45:01.695Z",
+      "syncStatus": {
+        "syncDirection": "v3-is-source-of-truth"
+      }
+    },
+    "decisionId": "DEC-2026-0075",
+    "title": "Weekend Overtime Authorization",
+    "description": "Decision regarding weekend overtime authorization. schedule impact requiring review.",
+    "category": "SCHEDULE_IMPACT",
+    "type": "APPROVAL",
+    "status": "APPROVED",
+    "authorityLevel": {
+      "required": 3,
+      "current": 3
+    },
+    "voxelRef": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-16-14-10",
+    "voxelContext": {
+      "voxelId": "VOX-ZONE-A-16-14-10",
+      "coordinates": {
+        "x": 16,
+        "y": 14,
+        "z": 10
+      },
+      "zone": "ZONE-A",
+      "zoneName": "Manufacturing Hall"
+    },
+    "budgetImpact": {
+      "estimated": 7621,
+      "currency": "CAD"
+    },
+    "scheduleImpact": {
+      "delayDays": -1,
+      "criticalPath": false
+    },
+    "participants": {
+      "requestedBy": "urn:luhtech:canadian-plant-pilot:participant:mike-wilson",
+      "approvedBy": "urn:luhtech:canadian-plant-pilot:participant:sarah-thompson"
+    },
+    "timestamps": {
+      "createdAt": "2026-04-26T14:12:17.846Z",
+      "updatedAt": "2026-04-29T14:12:17.846Z",
+      "approvedAt": "2026-04-29T14:12:17.846Z"
+    },
+    "consequences": [],
+    "relatedDecisions": [],
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-16-14-10"],
+      "outEdges": [],
+      "edges": [
+        {
+          "from": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-16-14-10",
+          "to": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0075",
+          "type": "contains"
+        }
+      ]
+    }
+  }
+]

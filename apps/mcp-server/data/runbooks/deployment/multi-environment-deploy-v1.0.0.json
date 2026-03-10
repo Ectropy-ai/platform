@@ -1,0 +1,1144 @@
+{
+  "version": "1.0.0",
+  "environment": "all",
+  "runbookType": "deployment",
+  "metadata": {
+    "catalogId": "multi-environment-deployment-runbook-v1-0-0",
+    "name": "Multi-Environment Feature-Flag Deployment",
+    "type": "deployment",
+    "purpose": "Universal deployment orchestrator with progressive feature rollout across alpha, beta, staging, and production environments",
+    "maintainer": "infrastructure-team",
+    "author": "Infrastructure Team",
+    "created": "2025-11-16T19:00:00Z",
+    "lastUpdated": "2025-11-16T19:00:00Z",
+    "estimatedDuration": "15 minutes",
+    "complexity": "medium",
+    "priority": "high",
+    "relatedDocuments": [
+      "scripts/deployment/unified-deploy.sh",
+      "docs/DEPLOYMENT_RUNBOOK_v2.1.1.md",
+      "apps/mcp-server/data/routing-architecture.json",
+      "scripts/enterprise-rollback.sh"
+    ],
+    "sourceFile": "scripts/core/deploy.sh",
+    "conversionDate": "2025-11-16T19:00:00Z",
+    "schemaVersion": "1.0.0"
+  },
+  "executiveSummary": {
+    "description": "Feature flag-controlled deployment system supporting 4 environments with progressive rollout strategy and comprehensive health validation. Orchestrates NX monorepo builds, Docker Compose deployments, and automated health checks with rollback safety.",
+    "status": "READY",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "MEDIUM",
+    "keyChanges": [
+      "4 deployment environments (alpha/beta/staging/production)",
+      "6 feature flags for progressive rollout",
+      "NX monorepo build orchestration",
+      "Multi-service health checking",
+      "Pre-deployment snapshot creation",
+      "Deployment record tracking with feature flag state"
+    ],
+    "prerequisites": [
+      "Docker daemon running",
+      "Docker Compose available",
+      "pnpm and Node.js installed",
+      "NX build tools available",
+      "curl available for health checks",
+      "Valid package.json in project root",
+      "Docker Compose files for target environment",
+      "Environment-specific .env files configured"
+    ],
+    "impact": {
+      "systems": [
+        "web-dashboard",
+        "mcp-server",
+        "api-gateway",
+        "postgres",
+        "redis",
+        "qdrant",
+        "minio",
+        "speckle-server",
+        "speckle-frontend"
+      ],
+      "downtime": "30-60 seconds during container restart",
+      "rollbackTime": "2-5 minutes"
+    }
+  },
+  "environmentConfigurations": {
+    "alpha": {
+      "description": "Alpha environment with all experimental features enabled",
+      "nodeEnv": "development",
+      "buildTarget": "development",
+      "featureFlags": {
+        "FF_MCP_SERVER": true,
+        "FF_SEMANTIC_SEARCH": true,
+        "FF_NEW_IFC": true,
+        "FF_ENHANCED_CACHING": true,
+        "FF_NEW_DASHBOARD": true,
+        "FF_REAL_TIME_COLLAB": true
+      },
+      "dockerComposeFile": "docker-compose.alpha.yml",
+      "fallbackDockerComposeFile": "docker-compose.dev.yml",
+      "purpose": "Test all experimental features in isolated environment",
+      "riskLevel": "HIGH",
+      "audienceSize": "Internal team only"
+    },
+    "beta": {
+      "description": "Beta environment with stable features enabled",
+      "nodeEnv": "staging",
+      "buildTarget": "staging",
+      "featureFlags": {
+        "FF_MCP_SERVER": true,
+        "FF_SEMANTIC_SEARCH": true,
+        "FF_NEW_IFC": true,
+        "FF_ENHANCED_CACHING": true,
+        "FF_NEW_DASHBOARD": true,
+        "FF_REAL_TIME_COLLAB": false
+      },
+      "dockerComposeFile": "docker-compose.beta.yml",
+      "fallbackDockerComposeFile": "docker-compose.dev.yml",
+      "purpose": "Test stable features before staging promotion",
+      "riskLevel": "MEDIUM",
+      "audienceSize": "Early adopters and beta testers"
+    },
+    "staging": {
+      "description": "Staging environment with production-like configuration",
+      "nodeEnv": "staging",
+      "buildTarget": "production",
+      "featureFlags": {
+        "FF_MCP_SERVER": true,
+        "FF_SEMANTIC_SEARCH": true,
+        "FF_NEW_IFC": false,
+        "FF_ENHANCED_CACHING": true,
+        "FF_NEW_DASHBOARD": false,
+        "FF_REAL_TIME_COLLAB": false
+      },
+      "dockerComposeFile": "docker-compose.staging.yml",
+      "fallbackDockerComposeFile": null,
+      "purpose": "Final validation before production deployment",
+      "riskLevel": "LOW",
+      "audienceSize": "QA team and stakeholders",
+      "required": true
+    },
+    "production": {
+      "description": "Production environment with only proven stable features",
+      "nodeEnv": "production",
+      "buildTarget": "production",
+      "featureFlags": {
+        "FF_MCP_SERVER": true,
+        "FF_SEMANTIC_SEARCH": false,
+        "FF_NEW_IFC": false,
+        "FF_ENHANCED_CACHING": true,
+        "FF_NEW_DASHBOARD": false,
+        "FF_REAL_TIME_COLLAB": false
+      },
+      "dockerComposeFile": "docker-compose.production.yml",
+      "fallbackDockerComposeFile": null,
+      "purpose": "Serve production traffic with stable features only",
+      "riskLevel": "CRITICAL",
+      "audienceSize": "All users",
+      "required": true
+    }
+  },
+  "featureFlags": {
+    "FF_MCP_SERVER": {
+      "name": "MCP Server Integration",
+      "description": "Enable Model Context Protocol server for AI agent capabilities",
+      "environments": {
+        "alpha": true,
+        "beta": true,
+        "staging": true,
+        "production": true
+      },
+      "status": "STABLE",
+      "rolloutPhase": "GENERAL_AVAILABILITY",
+      "dataPath": "apps/mcp-server",
+      "healthCheck": "http://localhost:3001/health"
+    },
+    "FF_SEMANTIC_SEARCH": {
+      "name": "Semantic Search with Vector Database",
+      "description": "Enable Qdrant vector search for BIM elements and documentation",
+      "environments": {
+        "alpha": true,
+        "beta": true,
+        "staging": true,
+        "production": false
+      },
+      "status": "BETA",
+      "rolloutPhase": "STAGING_VALIDATION",
+      "dataPath": "libs/semantic-search",
+      "dependencies": ["qdrant"],
+      "healthCheck": "http://localhost:6333/healthz"
+    },
+    "FF_NEW_IFC": {
+      "name": "Next-Generation IFC Processor",
+      "description": "Enable experimental IFC 4.3 parser with enhanced geometry extraction",
+      "environments": {
+        "alpha": true,
+        "beta": true,
+        "staging": false,
+        "production": false
+      },
+      "status": "EXPERIMENTAL",
+      "rolloutPhase": "ALPHA_TESTING",
+      "dataPath": "libs/ifc-processor",
+      "dependencies": []
+    },
+    "FF_ENHANCED_CACHING": {
+      "name": "Enhanced Redis Caching Strategy",
+      "description": "Multi-layer caching with Redis for BIM data and API responses",
+      "environments": {
+        "alpha": true,
+        "beta": true,
+        "staging": true,
+        "production": true
+      },
+      "status": "STABLE",
+      "rolloutPhase": "GENERAL_AVAILABILITY",
+      "dataPath": "libs/caching",
+      "dependencies": ["redis"],
+      "healthCheck": "redis-cli ping"
+    },
+    "FF_NEW_DASHBOARD": {
+      "name": "Redesigned Dashboard UI",
+      "description": "New Material-UI based dashboard with enhanced role-based views",
+      "environments": {
+        "alpha": true,
+        "beta": true,
+        "staging": false,
+        "production": false
+      },
+      "status": "BETA",
+      "rolloutPhase": "BETA_TESTING",
+      "dataPath": "apps/web-dashboard/src/pages/Dashboard",
+      "dependencies": []
+    },
+    "FF_REAL_TIME_COLLAB": {
+      "name": "Real-Time Collaboration",
+      "description": "WebSocket-based real-time collaboration for BIM viewing and markup",
+      "environments": {
+        "alpha": true,
+        "beta": false,
+        "staging": false,
+        "production": false
+      },
+      "status": "EXPERIMENTAL",
+      "rolloutPhase": "ALPHA_TESTING",
+      "dataPath": "libs/collaboration",
+      "dependencies": ["redis"],
+      "notes": "Requires WebSocket infrastructure and testing"
+    }
+  },
+  "preFlightChecks": [
+    {
+      "id": "check-project-root",
+      "order": 1,
+      "category": "configuration",
+      "name": "Validate project root directory",
+      "description": "Ensure deployment is run from valid Ectropy project directory",
+      "command": "test -f package.json",
+      "expectedResult": "File exists",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates package.json exists",
+      "onFailure": {
+        "action": "abort",
+        "message": "Not in a valid Ectropy project directory. Navigate to project root before deploying."
+      }
+    },
+    {
+      "id": "check-docker-daemon",
+      "order": 2,
+      "category": "infrastructure",
+      "name": "Validate Docker daemon running",
+      "description": "Ensure Docker daemon is operational for container deployments",
+      "command": "docker info",
+      "expectedResult": "Docker system information",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates Docker daemon is running",
+      "onFailure": {
+        "action": "abort",
+        "message": "Docker daemon is not running. Start Docker daemon before proceeding."
+      }
+    },
+    {
+      "id": "check-pnpm-available",
+      "order": 3,
+      "category": "infrastructure",
+      "name": "Validate pnpm package manager",
+      "description": "Ensure pnpm is available for NX build orchestration",
+      "command": "command -v pnpm",
+      "expectedResult": "Path to pnpm binary",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates pnpm is installed",
+      "onFailure": {
+        "action": "abort",
+        "message": "pnpm is not installed or not in PATH. Install pnpm before proceeding."
+      }
+    },
+    {
+      "id": "check-curl-available",
+      "order": 4,
+      "category": "infrastructure",
+      "name": "Validate curl for health checks",
+      "description": "Ensure curl is available for post-deployment health validation",
+      "command": "command -v curl",
+      "expectedResult": "Path to curl binary",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates curl is installed",
+      "onFailure": {
+        "action": "abort",
+        "message": "curl is not installed or not in PATH. Install curl for health checks."
+      }
+    },
+    {
+      "id": "check-docker-compose-file",
+      "order": 5,
+      "category": "configuration",
+      "name": "Validate Docker Compose configuration",
+      "description": "Ensure appropriate docker-compose file exists for target environment",
+      "command": "test -f docker-compose.${ENVIRONMENT}.yml || test -f docker-compose.dev.yml",
+      "expectedResult": "Compose file exists",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Environment-specific or fallback compose file must exist",
+      "onFailure": {
+        "action": "abort",
+        "message": "Docker Compose file not found for environment. Verify compose file exists."
+      }
+    },
+    {
+      "id": "check-git-repository",
+      "order": 6,
+      "category": "configuration",
+      "name": "Validate Git repository",
+      "description": "Ensure deployment is from Git repository for version tracking",
+      "command": "git rev-parse --git-dir",
+      "expectedResult": ".git directory path",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates Git repository",
+      "onFailure": {
+        "action": "warn",
+        "message": "Not a Git repository. Deployment record will not include commit information."
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Pre-Deployment Validation",
+      "description": "Validate environment configuration and create safety snapshot",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Configure environment variables",
+          "description": "Set environment-specific NODE_ENV, feature flags, and build targets",
+          "command": "configure_environment",
+          "purpose": "Load feature flags and configuration for target environment",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "retryable": false,
+          "expectedOutput": "Environment variables exported successfully",
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to configure environment. Verify environment name is valid (alpha/beta/staging/production)."
+          },
+          "relatedFiles": [
+            "scripts/core/deploy.sh:30-81"
+          ]
+        },
+        {
+          "step": "1.2",
+          "name": "Create pre-deployment snapshot",
+          "description": "Create rollback snapshot for non-development environments",
+          "command": "./scripts/enterprise-rollback.sh snapshot \"pre-deploy-${ENVIRONMENT}-$(date +%Y%m%d-%H%M%S)\"",
+          "purpose": "Enable rapid rollback if deployment fails",
+          "required": false,
+          "automatable": true,
+          "timeout": "60s",
+          "retryable": false,
+          "expectedOutput": "Snapshot created successfully",
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0 or snapshot script not found"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Failed to create pre-deployment snapshot. Deployment will continue but rollback may be slower."
+          },
+          "relatedFiles": [
+            "scripts/core/deploy.sh:232-251",
+            "scripts/enterprise-rollback.sh"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Application Build",
+      "description": "Build web dashboard and MCP server using NX with environment-specific configuration",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Build web dashboard",
+          "description": "Build React SPA frontend with NX",
+          "commands": [
+            "pnpm nx build web-dashboard --configuration=production",
+            "pnpm nx build web-dashboard"
+          ],
+          "purpose": "Compile frontend application for deployment",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedOutput": "Build completed successfully",
+          "validation": {
+            "type": "fileExists",
+            "criteria": "dist/apps/web-dashboard directory exists"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Frontend build failed. Check NX build logs for errors."
+          },
+          "relatedFiles": [
+            "scripts/core/deploy.sh:88-93",
+            "apps/web-dashboard/project.json"
+          ]
+        },
+        {
+          "step": "2.2",
+          "name": "Build MCP server",
+          "description": "Build Model Context Protocol server with NX",
+          "commands": [
+            "pnpm nx build mcp-server --configuration=production",
+            "pnpm nx build mcp-server"
+          ],
+          "purpose": "Compile backend MCP agent server",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedOutput": "Build completed successfully",
+          "validation": {
+            "type": "fileExists",
+            "criteria": "dist/apps/mcp-server directory exists"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "MCP server build failed. Check NX build logs for errors."
+          },
+          "relatedFiles": [
+            "scripts/core/deploy.sh:96-101",
+            "apps/mcp-server/project.json"
+          ]
+        },
+        {
+          "step": "2.3",
+          "name": "Build additional components",
+          "description": "Build supporting libraries and services in parallel (staging/production only)",
+          "command": "pnpm nx run-many --target=build --configuration=${BUILD_TARGET} --parallel=3",
+          "purpose": "Build additional libraries and microservices",
+          "required": false,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedOutput": "Builds completed or warnings for non-critical failures",
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0 or non-zero but script continues"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Some additional builds failed. Core components built successfully, continuing with deployment."
+          },
+          "relatedFiles": [
+            "scripts/core/deploy.sh:104-109"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Container Deployment",
+      "description": "Deploy containers using Docker Compose with environment-specific configuration",
+      "estimatedDuration": "3 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Deploy containers (alpha/beta)",
+          "description": "Deploy development environment containers with fallback",
+          "commands": [
+            "docker compose -f docker-compose.${ENVIRONMENT}.yml up -d",
+            "docker compose -f docker-compose.dev.yml up -d"
+          ],
+          "purpose": "Start all containerized services for alpha or beta environment",
+          "required": true,
+          "automatable": true,
+          "timeout": "180s",
+          "retryable": false,
+          "expectedOutput": "Containers started successfully",
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Container deployment failed. Check Docker Compose logs for errors."
+          },
+          "relatedFiles": [
+            "scripts/core/deploy.sh:119-129",
+            "docker-compose.alpha.yml",
+            "docker-compose.beta.yml",
+            "docker-compose.dev.yml"
+          ]
+        },
+        {
+          "step": "3.2",
+          "name": "Deploy containers (staging)",
+          "description": "Deploy staging environment containers with strict validation",
+          "command": "docker compose -f docker-compose.staging.yml up -d",
+          "purpose": "Start all containerized services for staging environment",
+          "required": true,
+          "automatable": true,
+          "timeout": "180s",
+          "retryable": false,
+          "expectedOutput": "Containers started successfully",
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Staging deployment failed. Ensure docker-compose.staging.yml exists and is valid."
+          },
+          "relatedFiles": [
+            "scripts/core/deploy.sh:131-138",
+            "docker-compose.staging.yml"
+          ]
+        },
+        {
+          "step": "3.3",
+          "name": "Deploy containers (production)",
+          "description": "Deploy production environment with blue-green strategy",
+          "command": "docker compose -f docker-compose.production.yml up -d",
+          "purpose": "Start all containerized services for production environment",
+          "required": true,
+          "automatable": true,
+          "timeout": "180s",
+          "retryable": false,
+          "expectedOutput": "Containers started successfully",
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Production deployment failed. Ensure docker-compose.production.yml exists and is valid."
+          },
+          "relatedFiles": [
+            "scripts/core/deploy.sh:140-148",
+            "docker-compose.production.yml"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Health Validation",
+      "description": "Wait for services to start and validate all critical endpoints",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Wait for service startup",
+          "description": "Allow 30 seconds for containers to initialize",
+          "command": "sleep 30",
+          "purpose": "Give containers time to start and initialize",
+          "required": true,
+          "automatable": true,
+          "timeout": "35s",
+          "retryable": false,
+          "expectedOutput": "30-second delay completed",
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0"
+          },
+          "relatedFiles": [
+            "scripts/core/deploy.sh:158-160"
+          ]
+        },
+        {
+          "step": "4.2",
+          "name": "Check web dashboard health",
+          "description": "Validate web dashboard is responding on port 4200",
+          "command": "curl -f http://localhost:4200",
+          "purpose": "Verify frontend is accessible",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedOutput": "HTTP 200 OK",
+          "expectedStatus": 200,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "HTTP status 200"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "message": "Web dashboard not responding. Consider rolling back deployment."
+          },
+          "relatedFiles": [
+            "scripts/core/deploy.sh:166-174"
+          ]
+        },
+        {
+          "step": "4.3",
+          "name": "Check MCP server health",
+          "description": "Validate MCP server is responding on port 3001",
+          "command": "curl -f http://localhost:3001/health",
+          "purpose": "Verify MCP agent server is operational",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedOutput": "HTTP 200 OK with health status",
+          "expectedStatus": 200,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "HTTP status 200 and JSON response with status field"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "message": "MCP server not responding. Consider rolling back deployment."
+          },
+          "relatedFiles": [
+            "scripts/core/deploy.sh:177-185"
+          ]
+        },
+        {
+          "step": "4.4",
+          "name": "Check API gateway health",
+          "description": "Validate API gateway is responding on port 3000",
+          "command": "curl -f http://localhost:3000/health",
+          "purpose": "Verify API gateway is operational",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedOutput": "HTTP 200 OK",
+          "expectedStatus": 200,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "HTTP status 200"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "API gateway not responding (may not be deployed in this environment)."
+          },
+          "relatedFiles": [
+            "scripts/core/deploy.sh:188-192"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Deployment Recording",
+      "description": "Create deployment record with feature flag state and metadata",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "5.1",
+          "name": "Create deployment record",
+          "description": "Generate JSON deployment record with feature flags and Git metadata",
+          "command": "cat > logs/deployments/${DEPLOYMENT_ID}.json",
+          "purpose": "Track deployment history and feature flag state for audit trail",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedOutput": "Deployment record created at logs/deployments/${DEPLOYMENT_ID}.json",
+          "validation": {
+            "type": "fileExists",
+            "criteria": "logs/deployments/${DEPLOYMENT_ID}.json exists"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Failed to create deployment record. Deployment succeeded but tracking may be incomplete."
+          },
+          "relatedFiles": [
+            "scripts/core/deploy.sh:204-229"
+          ]
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "healthChecks": [
+      {
+        "service": "web-dashboard",
+        "endpoint": "http://localhost:4200",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "mcp-server",
+        "endpoint": "http://localhost:3001/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "expectedBody": {
+          "status": "healthy"
+        },
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "api-gateway",
+        "endpoint": "http://localhost:3000/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": false
+      }
+    ],
+    "smokeTests": [
+      {
+        "test": "Frontend loads landing page",
+        "endpoint": "http://localhost:4200",
+        "expectedBehavior": "Returns HTML with application title",
+        "priority": "P0"
+      },
+      {
+        "test": "MCP server responds to health check",
+        "endpoint": "http://localhost:3001/health",
+        "expectedBehavior": "Returns JSON with status field",
+        "priority": "P0"
+      },
+      {
+        "test": "API gateway OAuth initiation",
+        "endpoint": "http://localhost:3000/api/auth/google",
+        "expectedBehavior": "Redirects to Google OAuth",
+        "priority": "P1"
+      }
+    ],
+    "performanceThresholds": [
+      {
+        "metric": "Container startup time",
+        "threshold": "< 30 seconds",
+        "measurement": "Time from docker compose up to first health check success"
+      },
+      {
+        "metric": "Health check response time",
+        "threshold": "< 500ms",
+        "measurement": "HTTP response time for /health endpoints"
+      }
+    ],
+    "dataIntegrity": [
+      {
+        "check": "Feature flag state recorded",
+        "validation": "Deployment record contains all 6 feature flags",
+        "expected": "JSON file with MCP_SERVER_ENABLED, SEMANTIC_SEARCH, NEW_IFC_PROCESSING, ENHANCED_CACHING, NEW_DASHBOARD_UI, REAL_TIME_COLLABORATION"
+      },
+      {
+        "check": "Git commit hash captured",
+        "validation": "Deployment record contains commit and branch information",
+        "expected": "JSON file with commit and branch fields populated"
+      }
+    ]
+  },
+  "rollback": {
+    "supported": true,
+    "estimatedTime": "2 minutes",
+    "dataLossRisk": "minimal",
+    "triggerConditions": [
+      "Health checks fail for critical services (web-dashboard or mcp-server)",
+      "Container deployment fails",
+      "Build process fails",
+      "Manual operator decision based on monitoring alerts"
+    ],
+    "decisionMaker": "DevOps engineer or automated health check monitoring",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Stop current containers",
+        "command": "docker compose -f docker-compose.${ENVIRONMENT}.yml down",
+        "purpose": "Shut down failed deployment containers",
+        "required": true
+      },
+      {
+        "step": 2,
+        "name": "Restore pre-deployment snapshot",
+        "command": "./scripts/enterprise-rollback.sh restore \"pre-deploy-${ENVIRONMENT}-*\"",
+        "purpose": "Restore previous working state from snapshot",
+        "required": true
+      },
+      {
+        "step": 3,
+        "name": "Restart containers from snapshot",
+        "command": "docker compose -f docker-compose.${ENVIRONMENT}.yml up -d",
+        "purpose": "Start containers with previous configuration",
+        "required": true
+      },
+      {
+        "step": 4,
+        "name": "Validate rollback health",
+        "command": "curl -f http://localhost:4200 && curl -f http://localhost:3001/health",
+        "purpose": "Verify services are healthy after rollback",
+        "required": true
+      },
+      {
+        "step": 5,
+        "name": "Update deployment record to failed status",
+        "command": "sed -i 's/\"status\": \"deployed\"/\"status\": \"failed\"/' logs/deployments/${DEPLOYMENT_ID}.json",
+        "purpose": "Mark deployment as failed in tracking system",
+        "required": true
+      }
+    ],
+    "verification": {
+      "healthCheck": "curl -f http://localhost:4200 && curl -f http://localhost:3001/health",
+      "expectedStatus": 200,
+      "successCriteria": "All critical services responding with HTTP 200"
+    }
+  },
+  "monitoring": {
+    "duration": "24 hours post-deployment",
+    "keyMetrics": [
+      {
+        "metric": "Container health status",
+        "threshold": "All containers healthy",
+        "alertOn": "Any container unhealthy for > 5 minutes",
+        "severity": "critical"
+      },
+      {
+        "metric": "HTTP response time",
+        "threshold": "< 500ms for /health endpoints",
+        "alertOn": "Response time > 1000ms",
+        "severity": "warning"
+      },
+      {
+        "metric": "Error rate",
+        "threshold": "< 0.1% of requests",
+        "alertOn": "Error rate > 1%",
+        "severity": "critical"
+      },
+      {
+        "metric": "Feature flag effectiveness",
+        "threshold": "No unexpected feature activations",
+        "alertOn": "Feature flag mismatch detected",
+        "severity": "warning"
+      }
+    ],
+    "alertThresholds": [
+      {
+        "condition": "Health check fails 3 consecutive times",
+        "severity": "critical",
+        "action": "Trigger rollback procedure",
+        "escalation": "Page on-call engineer"
+      },
+      {
+        "condition": "Build takes > 10 minutes",
+        "severity": "warning",
+        "action": "Log performance issue",
+        "escalation": "Review build optimization opportunities"
+      }
+    ],
+    "dashboards": [
+      "Docker container health dashboard",
+      "Application performance monitoring (APM)",
+      "Feature flag activation dashboard"
+    ]
+  },
+  "successCriteria": [
+    {
+      "criterion": "All containers start successfully",
+      "status": "REQUIRED",
+      "validation": "docker ps shows all expected containers running"
+    },
+    {
+      "criterion": "Web dashboard responds to health check",
+      "status": "REQUIRED",
+      "validation": "curl -f http://localhost:4200 returns HTTP 200"
+    },
+    {
+      "criterion": "MCP server responds to health check",
+      "status": "REQUIRED",
+      "validation": "curl -f http://localhost:3001/health returns HTTP 200"
+    },
+    {
+      "criterion": "API gateway responds to health check",
+      "status": "RECOMMENDED",
+      "validation": "curl -f http://localhost:3000/health returns HTTP 200"
+    },
+    {
+      "criterion": "Deployment record created with feature flags",
+      "status": "REQUIRED",
+      "validation": "logs/deployments/${DEPLOYMENT_ID}.json exists and contains feature_flags object"
+    },
+    {
+      "criterion": "Pre-deployment snapshot created",
+      "status": "RECOMMENDED",
+      "validation": "Snapshot exists for rollback capability"
+    },
+    {
+      "criterion": "All enabled feature flags operational",
+      "status": "REQUIRED",
+      "validation": "Services with enabled feature flags are accessible and functional"
+    }
+  ],
+  "mcpIntegration": {
+    "queryableFields": [
+      "phases",
+      "environmentVariables",
+      "featureFlags",
+      "validation",
+      "environmentConfigurations",
+      "deploymentRecordSchema",
+      "preFlightChecks"
+    ],
+    "supportedQueries": [
+      {
+        "query": "getEnvironmentConfig",
+        "returns": "Environment configuration with feature flags",
+        "purpose": "Retrieve feature flag settings for specific environment",
+        "args": ["environment"]
+      },
+      {
+        "query": "getFeatureFlagStatus",
+        "returns": "Boolean status of feature flag by environment",
+        "purpose": "Check if specific feature is enabled in target environment",
+        "args": ["featureFlagName", "environment"]
+      },
+      {
+        "query": "getHealthCheckEndpoints",
+        "returns": "Array of health check URLs",
+        "purpose": "Get all health monitoring endpoints for environment"
+      },
+      {
+        "query": "getDeploymentPhases",
+        "returns": "Array of deployment phases with steps",
+        "purpose": "Retrieve complete deployment workflow"
+      },
+      {
+        "query": "getRollbackProcedure",
+        "returns": "Rollback steps and validation criteria",
+        "purpose": "Get rollback instructions for failed deployment"
+      },
+      {
+        "query": "getFeatureRolloutStatus",
+        "returns": "Current rollout phase for each feature flag",
+        "purpose": "Understand which features are in which rollout stage"
+      }
+    ],
+    "decisionSupport": [
+      "Recommend environment for feature testing based on flag status",
+      "Suggest rollback if health checks fail",
+      "Identify next environment in promotion pipeline",
+      "Determine if feature is ready for production based on rollout phase",
+      "Calculate deployment risk based on feature flag changes",
+      "Recommend feature flag configuration for new environment"
+    ],
+    "architectureAlignment": {
+      "routingConfig": "apps/mcp-server/data/routing-architecture.json",
+      "portAllocation": "routing-architecture.json#/portAllocationMatrix",
+      "featureFlagConfig": "This runbook defines authoritative feature flag states per environment",
+      "deploymentPipeline": "Defines progressive rollout: alpha → beta → staging → production"
+    }
+  },
+  "knownIssues": [
+    {
+      "id": "issue-1",
+      "title": "Docker Compose file fallback for alpha/beta",
+      "severity": "LOW",
+      "impact": "Alpha and beta environments fall back to dev compose file if specific file not found",
+      "mitigation": "Script attempts environment-specific file first, then dev file",
+      "action": "Create dedicated docker-compose.alpha.yml and docker-compose.beta.yml",
+      "priority": "P2"
+    },
+    {
+      "id": "issue-2",
+      "title": "No staging/production compose file validation",
+      "severity": "MEDIUM",
+      "impact": "Deployment aborts if staging or production compose file missing",
+      "mitigation": "Pre-flight checks validate compose file existence before build",
+      "action": "Consider adding compose file validation to pre-flight checks",
+      "priority": "P1"
+    },
+    {
+      "id": "issue-3",
+      "title": "Additional builds may fail without aborting",
+      "severity": "LOW",
+      "impact": "Step 2.3 continues deployment even if some builds fail",
+      "mitigation": "Only core components (web-dashboard and mcp-server) are required",
+      "action": "Review which additional builds are critical and enforce their success",
+      "priority": "P2"
+    },
+    {
+      "id": "issue-4",
+      "title": "Health check timing may be insufficient",
+      "severity": "MEDIUM",
+      "impact": "30-second startup delay may not be enough for all services",
+      "mitigation": "Health checks have retry logic built into curl commands",
+      "action": "Implement exponential backoff health checking instead of fixed delay",
+      "priority": "P1"
+    }
+  ],
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "NODE_ENV",
+        "description": "Node.js environment mode (development/staging/production)",
+        "example": "production",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "BUILD_TARGET",
+        "description": "NX build configuration target (development/staging/production)",
+        "example": "production",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "FF_MCP_SERVER",
+        "description": "Feature flag: Enable MCP server integration",
+        "example": "true",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "FF_SEMANTIC_SEARCH",
+        "description": "Feature flag: Enable semantic search with Qdrant",
+        "example": "true",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "FF_NEW_IFC",
+        "description": "Feature flag: Enable experimental IFC 4.3 parser",
+        "example": "false",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "FF_ENHANCED_CACHING",
+        "description": "Feature flag: Enable multi-layer Redis caching",
+        "example": "true",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "FF_NEW_DASHBOARD",
+        "description": "Feature flag: Enable redesigned dashboard UI",
+        "example": "false",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "FF_REAL_TIME_COLLAB",
+        "description": "Feature flag: Enable real-time collaboration features",
+        "example": "false",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "DEPLOYMENT_ID",
+        "description": "Unique identifier for this deployment (timestamp + UUID)",
+        "example": "20251116_190000_a1b2c3d4",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      }
+    ]
+  },
+  "deploymentRecordSchema": {
+    "description": "JSON schema for deployment records created in logs/deployments/",
+    "location": "logs/deployments/${DEPLOYMENT_ID}.json",
+    "fields": {
+      "deployment_id": {
+        "type": "string",
+        "description": "Unique deployment identifier (YYYYMMDD_HHMMSS_uuid)",
+        "example": "20251116_190000_a1b2c3d4"
+      },
+      "environment": {
+        "type": "string",
+        "enum": ["alpha", "beta", "staging", "production"],
+        "description": "Target deployment environment"
+      },
+      "timestamp": {
+        "type": "string",
+        "format": "ISO 8601",
+        "description": "Deployment execution timestamp",
+        "example": "2025-11-16T19:00:00Z"
+      },
+      "commit": {
+        "type": "string",
+        "description": "Git commit hash at deployment time",
+        "example": "12b75073abc123"
+      },
+      "branch": {
+        "type": "string",
+        "description": "Git branch name at deployment time",
+        "example": "develop"
+      },
+      "feature_flags": {
+        "type": "object",
+        "description": "State of all feature flags for this deployment",
+        "properties": {
+          "MCP_SERVER_ENABLED": "boolean",
+          "SEMANTIC_SEARCH": "boolean",
+          "NEW_IFC_PROCESSING": "boolean",
+          "ENHANCED_CACHING": "boolean",
+          "NEW_DASHBOARD_UI": "boolean",
+          "REAL_TIME_COLLABORATION": "boolean"
+        }
+      },
+      "status": {
+        "type": "string",
+        "enum": ["deployed", "failed"],
+        "description": "Final deployment status"
+      }
+    }
+  }
+}

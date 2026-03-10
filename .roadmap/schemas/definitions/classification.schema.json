@@ -1,0 +1,162 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:definitions:classification",
+  "title": "Classification Definitions",
+  "description": "Shared classification definitions for Atomic Reference Strategy. Used by both roadmap milestones and decision events to ensure consistency across the platform planning lifecycle.",
+  "definitions": {
+    "Classification": {
+      "type": "string",
+      "description": "Atomic Reference Strategy classification for milestones and decisions",
+      "enum": ["LEAD", "DERIVED", "EXTERNAL", "FLEXIBLE"],
+      "enumDescriptions": {
+        "LEAD": "Primary deliverable - direct outcome of intentional work. LEAD items are the source of truth that DERIVED items depend on. Changes to LEAD items propagate downstream.",
+        "DERIVED": "Dependent on LEAD items - computed, generated, or consequential. DERIVED items automatically update when their LEAD dependencies change.",
+        "EXTERNAL": "From outside sources - regulatory requirements, third-party integrations, market conditions. EXTERNAL items are inputs that the team cannot directly control.",
+        "FLEXIBLE": "Can vary based on context - approach decisions, optional enhancements. FLEXIBLE items allow exploration without violating architectural constraints."
+      }
+    },
+    "AuthorityLevel": {
+      "type": "object",
+      "description": "Authority level definition for platform decision cascade",
+      "required": ["level", "role", "maxEffortHours", "scopeLimit"],
+      "properties": {
+        "level": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "description": "Numeric authority level (0=lowest, 3=highest)"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["CLAUDE_AGENT", "DEVELOPER", "ARCHITECT", "ERIK"],
+          "description": "Role name for this authority level"
+        },
+        "maxEffortHours": {
+          "type": ["integer", "string"],
+          "description": "Maximum effort hours this level can authorize (or 'unlimited')"
+        },
+        "scopeLimit": {
+          "type": "string",
+          "description": "Maximum scope this level can affect",
+          "enum": ["single_file", "single_feature", "multi_feature", "strategic"]
+        },
+        "patternConfidenceRequired": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum pattern match confidence to authorize without escalation"
+        },
+        "explorationPermitted": {
+          "type": "boolean",
+          "description": "Whether this level can authorize novel exploration"
+        }
+      }
+    },
+    "HealthScore": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "SDI-derived health score (0=crisis, 0.3=warning, 0.6=healthy, 0.9=abundant)"
+    },
+    "EigenmodeVector": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "minItems": 12,
+      "maxItems": 12,
+      "description": "12-element eigenmode vector capturing system state"
+    },
+    "MonitoringTrigger": {
+      "type": "object",
+      "description": "Early warning condition for proactive intervention",
+      "required": ["type", "threshold", "action"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique trigger identifier"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "SDI_BREACH",
+            "TIMELINE_DEVIATION",
+            "SCOPE_CREEP",
+            "DEPENDENCY_BLOCK",
+            "RESOURCE_EXHAUSTION",
+            "CONFIDENCE_COLLAPSE"
+          ],
+          "description": "Type of condition to monitor"
+        },
+        "metric": {
+          "type": "string",
+          "description": "Specific metric to track (e.g., 'healthScore', 'daysRemaining')"
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["<", ">", "<=", ">=", "==", "!="],
+          "description": "Comparison operator"
+        },
+        "threshold": {
+          "type": "number",
+          "description": "Threshold value that triggers the action"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["alert", "escalate", "constrain", "re_mediate", "fallback"],
+          "description": "Action to take when threshold is breached"
+        },
+        "checkIntervalMs": {
+          "type": "integer",
+          "description": "How often to check this trigger (milliseconds)",
+          "default": 3600000
+        }
+      }
+    },
+    "PatternMatch": {
+      "type": "object",
+      "description": "Reference to a Success Stack pattern match",
+      "properties": {
+        "patternUrn": {
+          "type": "string",
+          "pattern": "^urn:luhtech:[^:]+:success-pattern:PAT-.+$",
+          "description": "URN of the matched pattern"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Match confidence score"
+        },
+        "similarityScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Eigenmode similarity score"
+        }
+      }
+    },
+    "GraphMetadata": {
+      "type": "object",
+      "description": "Bidirectional graph traversal metadata",
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "URNs of predecessor/dependency nodes"
+        },
+        "outEdges": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "URNs of successor/dependent nodes"
+        },
+        "sourceOfTruth": {
+          "type": "string",
+          "description": "File path that defines this node"
+        }
+      }
+    }
+  }
+}

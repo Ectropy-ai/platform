@@ -1,0 +1,47 @@
+{
+  "name": "speckle-integration",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/speckle-integration/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "libs/speckle-integration/dist",
+        "main": "libs/speckle-integration/src/index.ts",
+        "tsConfig": "libs/speckle-integration/tsconfig.lib.json",
+        "assets": ["libs/speckle-integration/*.md"],
+        "platform": "node",
+        "format": ["esm"],
+        "esbuildOptions": {
+          "sourcemap": true,
+          "outExtension": {
+            ".js": ".js"
+          }
+        }
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/speckle-integration/**/*.js"]
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --passWithNoTests=false libs/speckle-integration/src",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "type-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx tsc --noEmit -p libs/speckle-integration/tsconfig.lib.json"
+      }
+    }
+  },
+  "tags": ["scope:shared", "type:lib", "domain:bim"]
+}

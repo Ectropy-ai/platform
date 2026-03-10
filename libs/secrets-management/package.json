@@ -1,0 +1,15 @@
+{
+  "name": "@ectropy/secrets-management",
+  "version": "0.1.0",
+  "description": "Hybrid secrets management for Infisical and AWS Secrets Manager",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "types": "./src/index.ts"
+    }
+  },
+  "type": "commonjs",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts"
+}

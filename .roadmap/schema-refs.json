@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "meta": {
+    "schemaFirst": true,
+    "canonicalSource": "luh-tech/luh-tech-roadmap-template",
+    "version": "1.5.0",
+    "lastUpdated": "2026-01-28T00:00:00Z"
+  },
+  "schemas": {
+    "feature": "https://raw.githubusercontent.com/luh-tech/luh-tech-roadmap-template/main/schemas/feature.schema.json",
+    "interfaces": "https://raw.githubusercontent.com/luh-tech/luh-tech-roadmap-template/main/schemas/interfaces.schema.json",
+    "workflow-registry": "https://raw.githubusercontent.com/luh-tech/luh-tech-roadmap-template/main/schemas/workflow-registry.schema.json",
+    "metrics-pipeline": "https://raw.githubusercontent.com/luh-tech/luh-tech-roadmap-template/main/schemas/metrics-pipeline.schema.json",
+    "deployment-metrics": "https://raw.githubusercontent.com/luh-tech/luh-tech-roadmap-template/main/schemas/deployment-metrics.schema.json",
+    "roadmap-business": "https://raw.githubusercontent.com/luh-tech/luh-tech-roadmap-template/main/schemas/roadmap-business.schema.json",
+    "roadmap": "https://raw.githubusercontent.com/luh-tech/luh-tech-roadmap-template/main/schemas/roadmap.schema.v2.2.json",
+    "venture-summary": "https://raw.githubusercontent.com/luh-tech/luh-tech-roadmap-template/main/schemas/venture-summary.schema.json",
+    "dependencies": "https://raw.githubusercontent.com/luh-tech/luh-tech-roadmap-template/main/schemas/dependencies.schema.json",
+    "boundaries": "https://raw.githubusercontent.com/luh-tech/luh-tech-roadmap-template/main/schemas/boundaries.schema.json"
+  }
+}

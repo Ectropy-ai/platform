@@ -1,0 +1,108 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Ectropy AECO Industry Platform Monitor",
+    "description": "Specialized monitoring for federated construction platform",
+    "tags": ["ectropy", "aeco", "construction", "bim"],
+    "timezone": "browser",
+    "time": {
+      "from": "now-12h",
+      "to": "now"
+    },
+    "refresh": "2m",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Construction Projects",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "active_projects_total",
+            "legendFormat": "Active Projects"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "BIM Model Processing",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+        "targets": [
+          {
+            "expr": "ifc_models_processed_total",
+            "legendFormat": "IFC Models Processed"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Speckle Collaborations",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "speckle_collaborations_active",
+            "legendFormat": "Active Collaborations"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Stakeholder Connections",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+        "targets": [
+          {
+            "expr": "stakeholder_connections_total",
+            "legendFormat": "Connected Stakeholders"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "IFC File Processing Performance",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+        "targets": [
+          {
+            "expr": "ifc_processing_duration_seconds",
+            "legendFormat": "Processing Time (s)"
+          },
+          {
+            "expr": "ifc_file_size_bytes / 1024 / 1024",
+            "legendFormat": "File Size (MB)"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Construction Project Metrics",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+        "targets": [
+          {
+            "expr": "construction_elements_total",
+            "legendFormat": "Total Elements"
+          },
+          {
+            "expr": "rate(construction_elements_processed[1h])",
+            "legendFormat": "Elements/hour"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Stakeholder Activity",
+        "type": "heatmap",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12},
+        "targets": [
+          {
+            "expr": "rate(stakeholder_actions_total[1h])",
+            "legendFormat": "{{stakeholder_role}}"
+          }
+        ]
+      }
+    ]
+  }
+}

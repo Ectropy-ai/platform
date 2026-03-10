@@ -1,0 +1,216 @@
+# =============================================================================
+# ENTERPRISE DOCKER IGNORE FILE
+# =============================================================================
+# Optimizes Docker build context by excluding unnecessary files
+
+# === VERSION CONTROL ===
+.git
+.gitignore
+.gitattributes
+.github
+
+# === NODE.JS ===
+node_modules
+**/node_modules
+apps/*/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# === BUILD ARTIFACTS ===
+# CRITICAL: Exclude build artifact directories to prevent Nx from
+# auto-discovering them as projects during Docker builds
+docker-images/
+dist/
+build/
+out/
+
+# === PACKAGE MANAGERS ===
+.npm
+.yarn
+.pnpm-store
+
+# === ENVIRONMENT FILES ===
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+.env.development
+
+# === LOGS ===
+logs
+*.log
+logs/
+execution-logs/
+audit-results/
+
+# === EVIDENCE & DOCUMENTATION (CRITICAL: 38.9MB in dev containers) ===
+evidence/
+evidence/**
+
+# === RUNTIME DATA ===
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# === COVERAGE DIRECTORY ===
+lib-cov
+coverage
+*.lcov
+.nyc_output
+
+# === TESTING (Exclude from production builds) ===
+__tests__
+**/__tests__/**
+**/*.test.*
+**/*.spec.*
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+tests/
+e2e-tests/
+test-data/
+test-results/
+playwright-report/
+**/__mocks__/**
+.playwright/
+
+# === BUILD OUTPUTS ===
+# CRITICAL: dist/ must NOT be excluded - Docker builds require compiled artifacts
+# - dist/apps/mcp-server/main.js (Node.js entry point)
+# - dist/apps/api-gateway/main.js (Node.js entry point)
+# - dist/apps/web-dashboard/index.html (React app)
+# dist  # DO NOT UNCOMMENT - build artifacts must be included in Docker context
+build
+.next
+.nuxt
+.vuepress/dist
+.serverless/
+.fusebox/
+.dynamodb/
+
+# === CACHE ===
+.cache
+.parcel-cache
+.next/cache
+.eslintcache
+.stylelintcache
+
+# === TEMPORARY FILES ===
+*.tmp
+*.temp
+.tmp/
+.temp/
+tmp/
+temp/
+
+# === OS GENERATED FILES ===
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# === IDE/EDITOR FILES ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# === DOCUMENTATION ===
+# Exclude docs directory (JSON data now in apps/mcp-server/data/)
+docs/
+*.md
+!README.md
+CHANGELOG.md
+CONTRIBUTING.md
+LICENSE
+DEPLOYMENT_*.md
+
+# === CONFIGURATION FILES ===
+.prettierrc*
+.eslintrc*
+jest.config.*
+playwright.config.*
+.husky/
+lint-staged.*
+
+# === DOCKER ===
+Dockerfile*
+!Dockerfile.staging
+!Dockerfile.production
+docker-compose*.yml
+.dockerignore
+
+# === SECURITY ===
+secrets/
+ssl/
+*.pem
+*.key
+*.crt
+*.cert
+
+# === ARCHIVES ===
+archive/
+*.zip
+*.tar.gz
+*.rar
+
+# === MONITORING ===
+monitoring/
+reports/
+*.report
+
+# === SCRIPTS (exclude build scripts) ===
+# Allow specific scripts needed for Docker builds
+!scripts/core/prepare-api-gateway-dist.mjs
+!scripts/mcp/prepare-mcp-dist.mjs
+!scripts/validate-staging-build.sh
+!scripts/start-staging.sh
+!scripts/staging-healthcheck.sh
+!scripts/staging-startup.sh
+!scripts/enterprise-monitor.sh
+!scripts/enterprise-rollback.sh
+!scripts/docker-entrypoint.sh
+
+# === ASSETS (exclude if too large) ===
+assets/large/
+static/videos/
+*.mp4
+*.avi
+*.mov
+
+# === BACKUP FILES ===
+*.bak
+*.backup
+.security-remediation-backup/
+
+# === WORKSPACE FILES ===
+.versionrc.json
+# nx.json - REQUIRED for Docker build (Nx workspace configuration)
+workspace-graph.html
+
+# === EXAMPLES ===
+examples/
+api-test.html
+
+# === INFRASTRUCTURE ===
+infrastructure/
+.copilot-access-check
+.notifications.conf
+
+# === SETUP FILES ===
+.setup-backups/
+!scripts/core/prepare-api-gateway-dist.mjs
+!scripts/mcp/prepare-mcp-dist.mjs

@@ -1,0 +1,2771 @@
+// Prisma Schema for Ectropy Platform
+// This schema represents the database structure for the construction platform
+// ==============================================================================
+// M3 Decision Lifecycle Models - Added 2026-01-08
+// Derived from V3 JSON Schemas in .roadmap/schemas/
+// ==============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==============================================================================
+// Multi-Tenant Foundation (MT-M1)
+// ==============================================================================
+// Enables organization-level data isolation for PIPEDA compliance (Canada pilot)
+// Architecture: Shared schema with tenant_id (cost-effective, scalable)
+// All tenant-scoped models include tenant_id for RLS and query efficiency
+// ==============================================================================
+
+enum TenantStatus {
+  TRIAL // Initial trial period
+  ACTIVE // Active subscription
+  SUSPENDED // Payment issues or violations
+  CANCELLED // Subscription cancelled
+  ARCHIVED // Retained for compliance, read-only
+}
+
+enum SubscriptionTier {
+  FREE // Limited features, 1 project
+  BASIC // Small teams, 5 projects
+  PROFESSIONAL // Growing teams, 25 projects
+  ENTERPRISE // Unlimited, custom features
+}
+
+// ==============================================================================
+// Model 0: Tenant
+// Organization/customer isolation for multi-tenant SaaS
+// URN: urn:luhtech:ectropy:tenant:{slug}
+// ==============================================================================
+model Tenant {
+  id                String           @id @default(uuid()) @db.Uuid
+  slug              String           @unique @db.VarChar(100) // URL-safe identifier: "acme-construction"
+  name              String           @db.VarChar(255) // Display name: "Acme Construction Inc."
+  status            TenantStatus     @default(TRIAL)
+  subscription_tier SubscriptionTier @default(FREE) @map("subscription_tier")
+
+  // Contact
+  primary_email String? @map("primary_email") @db.VarChar(255)
+  billing_email String? @map("billing_email") @db.VarChar(255)
+  phone         String? @db.VarChar(50)
+
+  // Branding
+  logo_url      String? @map("logo_url") @db.VarChar(500)
+  primary_color String? @map("primary_color") @db.VarChar(7) // Hex color
+
+  // Domain
+  custom_domain String? @unique @map("custom_domain") @db.VarChar(255)
+
+  // Limits (enforced by tier)
+  max_projects   Int @default(1) @map("max_projects")
+  max_users      Int @default(5) @map("max_users")
+  max_storage_gb Int @default(5) @map("max_storage_gb")
+
+  // Compliance
+  data_region      String   @default("us-west-2") @map("data_region") @db.VarChar(50)
+  compliance_flags String[] @default([]) @map("compliance_flags") // ["PIPEDA", "SOC2"]
+  retention_days   Int      @default(2555) @map("retention_days") // 7 years default
+
+  // Settings
+  settings Json? @db.JsonB // Tenant-specific configuration
+  features Json? @db.JsonB // Feature flags for this tenant
+
+  // Billing
+  stripe_customer_id String? @map("stripe_customer_id") @db.VarChar(100)
+  billing_cycle_day  Int     @default(1) @map("billing_cycle_day")
+
+  // Timestamps
+  trial_ends_at DateTime? @map("trial_ends_at") @db.Timestamptz(6)
+  suspended_at  DateTime? @map("suspended_at") @db.Timestamptz(6)
+  cancelled_at  DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  created_at    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  users      User[]
+  projects   Project[]
+  audit_logs AuditLog[]
+
+  // User Management M2 Relations
+  user_registrations   UserRegistration[]
+  user_invitations     UserInvitation[]
+  tenant_members       TenantMember[]
+  subscription_history SubscriptionHistory[]
+
+  // Phase 10.2: Storage tracking
+  file_uploads FileUpload[]
+
+  // Phase 4: Portfolio Foundation
+  user_portfolios UserPortfolio[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([subscription_tier])
+  @@index([created_at(sort: Desc)])
+  @@map("tenants")
+}
+
+// ==============================================================================
+// Model 0.1: FileUpload
+// Phase 10.2 - Storage Usage Tracking
+// Tracks all file uploads for tenant storage calculation
+// ==============================================================================
+model FileUpload {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Multi-tenant scoping
+  tenant_id String  @map("tenant_id") @db.Uuid
+  tenant    Tenant  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  project_id String? @map("project_id") @db.Uuid
+  project    Project? @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  // Uploader
+  uploaded_by String @map("uploaded_by") @db.Uuid
+  uploader    User   @relation(fields: [uploaded_by], references: [id], onDelete: Restrict)
+
+  // File metadata
+  filename     String  @db.VarChar(255)
+  original_name String @map("original_name") @db.VarChar(255)
+  mime_type    String  @map("mime_type") @db.VarChar(100)
+  size_bytes   BigInt  @map("size_bytes") // File size in bytes
+  storage_path String  @map("storage_path") @db.VarChar(1000) // S3/storage path
+  public_url   String? @map("public_url") @db.VarChar(1000) // Public URL if applicable
+
+  // File type categorization
+  file_category String? @map("file_category") @db.VarChar(50) // 'IFC', 'PDF', 'IMAGE', 'DOCUMENT'
+
+  // Metadata
+  metadata Json? @db.JsonB // Additional file metadata (dimensions, duration, etc.)
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([tenant_id])
+  @@index([project_id])
+  @@index([uploaded_by])
+  @@index([created_at(sort: Desc)])
+  @@map("file_uploads")
+}
+
+enum ProjectStatus {
+  planning
+  active
+  on_hold
+  completed
+  cancelled
+}
+
+enum StakeholderRole {
+  owner
+  architect
+  contractor
+  engineer
+  consultant
+  inspector
+  site_manager
+  admin
+}
+
+enum ElementStatus {
+  planned
+  design_approved
+  procurement
+  in_progress
+  completed
+  on_hold
+  rejected
+}
+
+model User {
+  id                String            @id @default(uuid()) @db.Uuid
+  tenant_id         String?           @map("tenant_id") @db.Uuid // Multi-tenant: null for platform admins
+  email             String            @unique @db.VarChar(255)
+  full_name         String            @map("full_name") @db.VarChar(255)
+  password_hash     String?           @map("password_hash") @db.VarChar(255)
+  picture           String?           @db.VarChar(500)
+  provider          String?           @db.VarChar(50)
+  provider_id       String?           @map("provider_id") @db.VarChar(255)
+  role              StakeholderRole   @default(contractor) // Legacy: kept for backward compatibility
+  roles             StakeholderRole[] @default([contractor]) // New: array of roles for multi-role support
+  company           String?           @db.VarChar(255)
+  is_active         Boolean           @default(true) @map("is_active")
+  is_platform_admin Boolean           @default(false) @map("is_platform_admin") // Platform-level admin (cross-tenant)
+  is_authorized     Boolean           @default(false) @map("is_authorized") // User Management M1: Database-driven authorization (replaces AUTHORIZED_USERS env var)
+  authorized_at     DateTime?         @map("authorized_at") @db.Timestamptz(6) // User Management M1: Audit trail for authorization grant
+  authorized_by     String?           @map("authorized_by") @db.Uuid // User Management M1: Admin who granted authorization
+  last_login        DateTime?         @map("last_login") @db.Timestamptz(6)
+  created_at        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at        DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  tenant               Tenant?               @relation(fields: [tenant_id], references: [id], onDelete: SetNull)
+  sessions             UserSession[]
+  owned_projects       Project[]             @relation("ProjectOwner")
+  project_roles        ProjectRole[]
+  created_elements     ConstructionElement[]
+  uploaded_files       UploadedIfcFile[]
+  proposals            Proposal[]            @relation("ProposalProposer")
+  votes                Vote[]                @relation("VoteCaster")
+  voxel_status_changes VoxelStatusHistory[]  @relation("VoxelStatusChanges") // Sprint 5 ROS MRO
+
+  // Phase 10.2: Storage tracking
+  file_uploads         FileUpload[]
+
+  // Phase 4: Portfolio Foundation
+  user_portfolios      UserPortfolio[]
+
+  // User Management M2 Relations
+  user_registrations       UserRegistration[]
+  invitations_sent         UserInvitation[]      @relation("InvitationsSent")
+  invitations_accepted     UserInvitation[]      @relation("InvitationsAccepted")
+  tenant_memberships       TenantMember[]        @relation("TenantMemberships")
+  subscription_transitions SubscriptionHistory[] @relation("SubscriptionTransitions")
+  api_keys                 ApiKey[]              @relation("ApiKeys")
+
+  @@unique([provider, provider_id])
+  @@index([email])
+  @@index([tenant_id])
+  @@map("users")
+}
+
+model UserSession {
+  id            String   @id @default(uuid()) @db.Uuid
+  user_id       String   @map("user_id") @db.Uuid
+  refresh_token String   @unique @map("refresh_token") @db.VarChar(512)
+  expires_at    DateTime @map("expires_at") @db.Timestamptz(6)
+  is_active     Boolean  @default(true) @map("is_active")
+  created_at    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+// ==============================================================================
+// API Keys for Server-to-Server Authentication
+// Purpose: Enable business-tools n8n workflows to authenticate with Ectropy
+// Security: bcrypt hashed keys, scoped permissions, audit trail
+// URN: urn:luhtech:ectropy:api-key:{id}
+// ==============================================================================
+model ApiKey {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(255) // "business-tools-n8n"
+  key_hash     String   @unique @map("key_hash") @db.VarChar(255) // bcrypt hash
+  user_id      String   @map("user_id") @db.Uuid // Maps to platform admin
+  scopes       String[] @default([]) // ["authorize_user", "list_users", "revoke_user"]
+  is_active    Boolean  @default(true) @map("is_active")
+  last_used_at DateTime? @map("last_used_at") @db.Timestamptz(6)
+  expires_at   DateTime? @map("expires_at") @db.Timestamptz(6)
+  created_at   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation("ApiKeys", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([is_active])
+  @@index([expires_at])
+  @@map("api_keys")
+}
+
+model Project {
+  id                  String        @id @default(uuid()) @db.Uuid
+  tenant_id           String        @map("tenant_id") @db.Uuid // Multi-tenant: required for all projects
+  name                String        @db.VarChar(255)
+  description         String?       @db.Text
+  owner_id            String        @map("owner_id") @db.Uuid
+  status              ProjectStatus @default(planning)
+  total_budget        Decimal?      @map("total_budget") @db.Decimal(15, 2)
+  currency            String?       @default("USD") @db.VarChar(3)
+  start_date          DateTime?     @map("start_date") @db.Date
+  expected_completion DateTime?     @map("expected_completion") @db.Date
+  dao_address         String?       @map("dao_address") @db.VarChar(42)
+  created_at          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at          DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  tenant                Tenant                @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  owner                 User                  @relation("ProjectOwner", fields: [owner_id], references: [id])
+  project_roles         ProjectRole[]
+  construction_elements ConstructionElement[]
+  uploaded_files        UploadedIfcFile[]
+  proposals             Proposal[]
+  speckle_streams       SpeckleStream[]
+  speckle_sync_logs     SpeckleSyncLog[]
+  // M3 Decision Lifecycle Relations
+  voxels                Voxel[]
+  pm_decisions          PMDecision[]
+  consequences          Consequence[]
+  schedule_proposals    ScheduleProposal[]
+  inspections           Inspection[]
+  participants          Participant[]
+
+  // Phase 10.2: Storage tracking
+  file_uploads          FileUpload[]
+
+  // Phase 4: Portfolio Foundation
+  user_portfolios       UserPortfolio[]
+
+  @@index([tenant_id])
+  @@index([owner_id])
+  @@index([status])
+  @@index([tenant_id, status])
+  @@index([created_at(sort: Desc)])
+  @@map("projects")
+}
+
+model ProjectRole {
+  id           String          @id @default(uuid()) @db.Uuid
+  user_id      String          @map("user_id") @db.Uuid
+  project_id   String          @map("project_id") @db.Uuid
+  role         StakeholderRole
+  permissions  String[]        @default([])
+  voting_power Int             @default(0) @map("voting_power")
+  is_active    Boolean         @default(true) @map("is_active")
+  assigned_at  DateTime        @default(now()) @map("assigned_at") @db.Timestamptz(6)
+
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, project_id, role])
+  @@map("project_roles")
+}
+
+// ==============================================================================
+// Phase 4: Model Catalog & Portfolio Foundation
+// Bridges demo/portfolio flow using single-database Prisma client
+// Replaces undeployed multi-database DatabaseManager architecture
+// ==============================================================================
+
+model ModelCatalog {
+  id                  String   @id @default(uuid()) @db.Uuid
+  building_type       String   @unique @map("building_type") @db.VarChar(100)
+  display_name        String   @map("display_name") @db.VarChar(255)
+  description         String?  @db.Text
+  icon_url            String?  @map("icon_url") @db.VarChar(500)
+  ifc_file_path       String?  @map("ifc_file_path") @db.VarChar(500)
+  speckle_stream_id   String?  @map("speckle_stream_id") @db.VarChar(255)
+  speckle_object_id   String?  @map("speckle_object_id") @db.VarChar(255)
+  metadata            Json?    @db.JsonB
+  element_count       Int?     @map("element_count")
+  estimated_budget_usd Decimal? @map("estimated_budget_usd") @db.Decimal(15, 2)
+  is_active           Boolean  @default(true) @map("is_active")
+  created_at          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([building_type])
+  @@index([is_active])
+  @@map("model_catalog")
+}
+
+model UserPortfolio {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenant_id      String   @map("tenant_id") @db.Uuid
+  user_id        String   @map("user_id") @db.Uuid
+  project_id     String   @map("project_id") @db.Uuid
+  portfolio_type String   @default("custom") @map("portfolio_type") @db.VarChar(50) // "demo" | "custom"
+  is_pinned      Boolean  @default(false) @map("is_pinned")
+  added_at       DateTime @default(now()) @map("added_at") @db.Timestamptz(6)
+
+  tenant  Tenant  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, project_id])
+  @@index([tenant_id])
+  @@index([user_id])
+  @@map("user_portfolios")
+}
+
+model ConstructionElement {
+  id           String        @id @default(uuid()) @db.Uuid
+  project_id   String        @map("project_id") @db.Uuid
+  element_type String        @map("element_type") @db.VarChar(100)
+  element_name String        @map("element_name") @db.VarChar(255)
+  ifc_id       String?       @map("ifc_id") @db.VarChar(255)
+  properties   Json          @default("{}") @db.JsonB
+  status       ElementStatus @default(planned)
+  created_by   String?       @map("created_by") @db.Uuid
+  created_at   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  creator User?   @relation(fields: [created_by], references: [id])
+
+  @@index([project_id, status])
+  @@index([element_type])
+  @@index([created_at(sort: Desc)])
+  @@map("construction_elements")
+}
+
+model UploadedIfcFile {
+  id            String   @id @default(uuid()) @db.Uuid
+  project_id    String   @map("project_id") @db.Uuid
+  user_id       String?  @map("user_id") @db.Uuid
+  file_name     String   @map("file_name") @db.VarChar(255)
+  file_path     String   @map("file_path") @db.VarChar(500)
+  file_size     BigInt   @map("file_size")
+  mime_type     String   @map("mime_type") @db.VarChar(100)
+  upload_status String   @default("pending") @map("upload_status") @db.VarChar(50)
+  uploaded_at   DateTime @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+
+  project  Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  uploader User?   @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([project_id, upload_status])
+  @@index([uploaded_at(sort: Desc)])
+  @@map("uploaded_ifc_files")
+}
+
+enum ProposalType {
+  design_change
+  budget_allocation
+  timeline_adjustment
+  contractor_selection
+  material_change
+  governance
+}
+
+enum ProposalStatus {
+  draft
+  active
+  passed
+  rejected
+  expired
+}
+
+enum VoteDecision {
+  approve
+  reject
+  abstain
+}
+
+model Proposal {
+  id              String         @id @default(uuid()) @db.Uuid
+  project_id      String         @map("project_id") @db.Uuid
+  title           String         @db.VarChar(255)
+  description     String         @db.Text
+  proposer_id     String         @map("proposer_id") @db.Uuid
+  proposal_type   ProposalType   @map("proposal_type")
+  status          ProposalStatus @default(draft)
+  required_votes  Int            @default(1) @map("required_votes")
+  voting_deadline DateTime       @map("voting_deadline") @db.Timestamptz(6)
+  created_at      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project  Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  proposer User    @relation("ProposalProposer", fields: [proposer_id], references: [id])
+  votes    Vote[]
+
+  @@index([project_id])
+  @@index([status])
+  @@map("proposals")
+}
+
+model Vote {
+  id          String       @id @default(uuid()) @db.Uuid
+  proposal_id String       @map("proposal_id") @db.Uuid
+  voter_id    String       @map("voter_id") @db.Uuid
+  decision    VoteDecision
+  comment     String?      @db.Text
+  weight      Int          @default(1)
+  voted_at    DateTime     @default(now()) @map("voted_at") @db.Timestamptz(6)
+
+  proposal Proposal @relation(fields: [proposal_id], references: [id], onDelete: Cascade)
+  voter    User     @relation("VoteCaster", fields: [voter_id], references: [id])
+
+  @@unique([proposal_id, voter_id])
+  @@index([proposal_id])
+  @@index([voter_id])
+  @@map("votes")
+}
+
+model AuditLog {
+  id            BigInt   @id @default(autoincrement())
+  tenant_id     String?  @map("tenant_id") @db.Uuid // Multi-tenant: null for platform-level events
+  event_hash    String   @unique @db.VarChar(64)
+  event_type    String   @db.VarChar(50)
+  resource_id   String   @db.VarChar(255)
+  resource_type String   @db.VarChar(50)
+  actor_id      String   @db.VarChar(255)
+  event_data    Json     @db.JsonB
+  previous_hash String?  @db.VarChar(64)
+  created_at    DateTime @default(now()) @db.Timestamp(6)
+
+  // Metadata fields for compliance
+  source_ip  String? @db.VarChar(45)
+  user_agent String? @db.Text
+  session_id String? @db.VarChar(255)
+  request_id String? @db.VarChar(255)
+
+  // Relations
+  tenant Tenant? @relation(fields: [tenant_id], references: [id], onDelete: SetNull)
+
+  @@index([tenant_id], name: "idx_audit_tenant")
+  @@index([tenant_id, created_at], name: "idx_audit_tenant_time")
+  @@index([resource_id, created_at], name: "idx_audit_chain")
+  @@index([event_hash], name: "idx_audit_hash")
+  @@index([event_type], name: "idx_audit_type")
+  @@index([actor_id], name: "idx_audit_actor")
+  @@index([created_at(sort: Desc)], name: "idx_audit_created")
+  @@index([previous_hash], name: "idx_audit_prev_hash")
+  @@map("audit_log")
+}
+
+// Waitlist model for landing page email capture
+// Simple public-facing table for marketing/early access
+model Waitlist {
+  id         Int      @id @default(autoincrement())
+  email      String   @unique @db.VarChar(255)
+  source     String?  @default("landing_page") @db.VarChar(50)
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([email])
+  @@index([created_at(sort: Desc)])
+  @@map("waitlist")
+}
+
+// ==============================================================================
+// Speckle BIM Integration Models
+// ==============================================================================
+// Enterprise-grade BIM viewing, sharing, and collaboration platform integration
+// Purpose: Track Speckle streams for construction projects and sync operations
+// ==============================================================================
+
+model SpeckleStream {
+  id                      String   @id @default(uuid()) @db.Uuid
+  construction_project_id String   @map("construction_project_id") @db.Uuid
+  stream_id               String   @unique @db.VarChar(255)
+  stream_name             String   @db.VarChar(500)
+  created_at              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at              DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project Project @relation(fields: [construction_project_id], references: [id], onDelete: Cascade)
+
+  @@unique([construction_project_id])
+  @@index([construction_project_id])
+  @@index([stream_id])
+  @@map("speckle_streams")
+}
+
+model SpeckleSyncLog {
+  id                      String    @id @default(uuid()) @db.Uuid
+  construction_project_id String    @map("construction_project_id") @db.Uuid
+  operation               String    @db.VarChar(50)
+  status                  String    @db.VarChar(50)
+  started_at              DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  completed_at            DateTime? @map("completed_at") @db.Timestamptz(6)
+  objects_processed       Int       @default(0) @map("objects_processed")
+  objects_successful      Int       @default(0) @map("objects_successful")
+  objects_failed          Int       @default(0) @map("objects_failed")
+  error_details           Json?     @map("error_details") @db.JsonB
+
+  project Project @relation(fields: [construction_project_id], references: [id], onDelete: Cascade)
+
+  @@index([construction_project_id])
+  @@index([status])
+  @@index([operation])
+  @@index([started_at(sort: Desc)])
+  @@map("speckle_sync_logs")
+}
+
+// ==============================================================================
+// M3: Decision Lifecycle Models
+// ==============================================================================
+// Derived from V3 JSON Schemas:
+// - .roadmap/schemas/decision/pm-decision.schema.json
+// - .roadmap/schemas/voxel/voxel-v3.schema.json
+// - .roadmap/schemas/consequence/consequence-v3.schema.json
+// - .roadmap/schemas/schedule/schedule-proposal-v3.schema.json
+// - .roadmap/schemas/inspection/inspection.schema.json
+// - .roadmap/schemas/authority/authority-level.schema.json
+// ==============================================================================
+
+// Enums for Decision Lifecycle (from V3 schemas)
+enum PMDecisionType {
+  APPROVAL
+  REJECTION
+  DEFERRAL
+  ESCALATION
+  PROPOSAL
+  CONSEQUENCE
+}
+
+enum PMDecisionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUPERSEDED
+  EXPIRED
+}
+
+enum VoxelStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETE
+  BLOCKED
+  ON_HOLD
+  INSPECTION_REQUIRED
+}
+
+// VoxelHealthStatus - Sprint 5 ROS MRO (2026-01-24)
+// Represents the operational health state of a voxel zone
+enum VoxelHealthStatus {
+  HEALTHY // All systems nominal, on schedule
+  AT_RISK // Minor issues, attention needed
+  CRITICAL // Major blockers, immediate action required
+}
+
+enum ConsequenceCategory {
+  SCHEDULE_DELAY
+  COST_INCREASE
+  SAFETY_RISK
+  QUALITY_IMPACT
+  SCOPE_CHANGE
+  REWORK_REQUIRED
+  RESOURCE_CONFLICT
+  PERMIT_REQUIRED
+  DESIGN_CHANGE
+  WARRANTY_IMPACT
+  COORDINATION_CONFLICT
+  TOLERANCE_VARIANCE
+  MATERIAL_MISMATCH
+  ACCESS_ISSUE
+  REGULATORY_CONCERN
+}
+
+enum ConsequenceSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ConsequenceStatus {
+  IDENTIFIED
+  ASSESSED
+  MITIGATED
+  ACCEPTED
+  CLOSED
+}
+
+enum InspectionType {
+  ROUGH_IN
+  COVER_UP
+  FINAL
+  SAFETY
+  QUALITY
+  SPECIAL
+  REGULATORY
+}
+
+enum InspectionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  PASSED
+  FAILED
+  CONDITIONAL
+  CANCELLED
+}
+
+enum ScheduleProposalStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum AuthorityLevelName {
+  FIELD
+  FOREMAN
+  SUPERINTENDENT
+  PM
+  ARCHITECT
+  OWNER
+  REGULATORY
+}
+
+enum VoxelAttachmentType {
+  PRIMARY
+  AFFECTED
+  ADJACENT
+  DOWNSTREAM
+}
+
+enum AlertPriority {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AcknowledgmentMethod {
+  APP_TAP
+  SMS_REPLY
+  VOICE
+  AR_GESTURE
+}
+
+enum ToleranceType {
+  WALL_FLATNESS
+  CEILING_HEIGHT
+  FLOOR_LEVEL
+  PROTRUSION
+  GAP
+  ALIGNMENT
+  FINISH_QUALITY
+  EQUIPMENT_CLEARANCE
+  PIPE_SLOPE
+  DUCT_SIZE
+}
+
+// ==============================================================================
+// Model 1: AuthorityLevel
+// From: authority-level.schema.json
+// URN: urn:luhtech:ectropy:authority-level:pm-level-{N}
+// ==============================================================================
+model AuthorityLevel {
+  id                       Int                @id @default(autoincrement())
+  urn                      String             @unique @db.VarChar(200) // urn:luhtech:ectropy:authority-level:pm-level-{N}
+  level                    Int                @unique // 0-6
+  name                     AuthorityLevelName
+  title                    String             @db.VarChar(100) // e.g., "Project Manager"
+  budget_limit             Decimal?           @map("budget_limit") @db.Decimal(15, 2) // null for special scopes
+  budget_limit_scope       String?            @map("budget_limit_scope") @db.VarChar(50) // "design", "project", "code"
+  variance_tolerance       String?            @map("variance_tolerance") @db.VarChar(50) // e.g., "1/4\"" or "visible"
+  schedule_authority       String?            @map("schedule_authority") @db.VarChar(50) // e.g., "1 week"
+  schedule_authority_hours Int?               @map("schedule_authority_hours") // converted hours
+  auto_approve             Boolean            @default(false) @map("auto_approve")
+  permissions              String[]           @default([])
+  graph_metadata           Json?              @map("graph_metadata") @db.JsonB
+  created_at               DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at               DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  pm_decisions PMDecision[]
+  participants Participant[]
+
+  @@index([urn])
+  @@index([level])
+  @@map("authority_levels")
+}
+
+// ==============================================================================
+// Model 2: Participant
+// From: graph-architecture.json nodeType "participant"
+// URN: urn:luhtech:{project}:participant:{participantId}
+// ==============================================================================
+model Participant {
+  id                 String   @id @default(uuid()) @db.Uuid
+  urn                String   @unique @db.VarChar(200)
+  project_id         String   @map("project_id") @db.Uuid
+  participant_id     String   @map("participant_id") @db.VarChar(100) // e.g., "john-doe-pm"
+  name               String   @db.VarChar(255)
+  email              String?  @db.VarChar(255)
+  phone              String?  @db.VarChar(50)
+  company            String?  @db.VarChar(255)
+  trade              String?  @db.VarChar(100)
+  authority_level_id Int?     @map("authority_level_id")
+  is_active          Boolean  @default(true) @map("is_active")
+  graph_metadata     Json?    @map("graph_metadata") @db.JsonB
+  created_at         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  project            Project          @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  authority_level    AuthorityLevel?  @relation(fields: [authority_level_id], references: [id])
+  authored_decisions PMDecision[]     @relation("DecisionAuthor")
+  approved_decisions PMDecision[]     @relation("DecisionApprover")
+  inspections        Inspection[]     @relation("InspectionInspector")
+  acknowledgments    Acknowledgment[]
+
+  @@unique([project_id, participant_id])
+  @@index([urn])
+  @@index([project_id])
+  @@index([authority_level_id])
+  @@map("participants")
+}
+
+// ==============================================================================
+// Model 3: Voxel
+// From: voxel-v3.schema.json
+// URN: urn:luhtech:{project}:voxel:{voxelId}
+// ==============================================================================
+model Voxel {
+  id            String            @id @default(uuid()) @db.Uuid
+  urn           String            @unique @db.VarChar(200)
+  project_id    String            @map("project_id") @db.Uuid
+  voxel_id      String            @map("voxel_id") @db.VarChar(50) // e.g., VOX-L2-MECH-047
+  status        VoxelStatus       @default(PLANNED)
+  health_status VoxelHealthStatus @default(HEALTHY) @map("health_status")
+
+  // Coordinates (center point)
+  coord_x    Float @map("coord_x")
+  coord_y    Float @map("coord_y")
+  coord_z    Float @map("coord_z")
+  resolution Float @default(1.0) // voxel size in meters
+
+  // Bounds
+  min_x Float @map("min_x")
+  max_x Float @map("max_x")
+  min_y Float @map("min_y")
+  max_y Float @map("max_y")
+  min_z Float @map("min_z")
+  max_z Float @map("max_z")
+
+  // Location (human-readable)
+  building       String? @db.VarChar(100)
+  level          String? @db.VarChar(50)
+  zone           String? @db.VarChar(100)
+  room           String? @db.VarChar(100)
+  grid_reference String? @map("grid_reference") @db.VarChar(50)
+  system         String? @db.VarChar(50) // HVAC, ELEC, PLUMB, etc.
+
+  // IFC elements
+  ifc_elements String[] @default([]) @map("ifc_elements")
+
+  // Decision surface (embedded summary)
+  decision_count       Int @default(0) @map("decision_count")
+  unacknowledged_count Int @default(0) @map("unacknowledged_count")
+
+  // Work status
+  current_phase    String? @map("current_phase") @db.VarChar(50)
+  percent_complete Float?  @map("percent_complete")
+
+  // Schedule
+  planned_start    DateTime? @map("planned_start") @db.Timestamptz(6)
+  planned_end      DateTime? @map("planned_end") @db.Timestamptz(6)
+  actual_start     DateTime? @map("actual_start") @db.Timestamptz(6)
+  actual_end       DateTime? @map("actual_end") @db.Timestamptz(6)
+  is_critical_path Boolean   @default(false) @map("is_critical_path")
+
+  // Cost & Labor
+  estimated_cost  Decimal? @map("estimated_cost") @db.Decimal(15, 2)
+  actual_cost     Decimal? @map("actual_cost") @db.Decimal(15, 2)
+  estimated_hours Float?   @map("estimated_hours")
+  actual_hours    Float?   @map("actual_hours")
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+  meta           Json? @db.JsonB
+
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  project              Project                   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  decision_attachments VoxelDecisionAttachment[]
+  tolerance_overrides  ToleranceOverride[]
+  pre_approvals        PreApproval[]
+  alerts               VoxelAlert[]
+  inspections          Inspection[]              @relation("VoxelInspections")
+  consequences         Consequence[]             @relation("VoxelConsequences")
+  status_history       VoxelStatusHistory[] // Sprint 5 ROS MRO - status change tracking
+
+  @@unique([project_id, voxel_id])
+  @@index([urn])
+  @@index([project_id, status])
+  @@index([coord_x, coord_y, coord_z])
+  @@index([building, level, zone])
+  @@index([level, system]) // Sprint 5: Aggregation query optimization
+  @@map("voxels")
+}
+
+// ==============================================================================
+// Model: VoxelStatusHistory
+// Sprint 5 ROS MRO (2026-01-24) - Track status changes for audit and analytics
+// ==============================================================================
+model VoxelStatusHistory {
+  id       String @id @default(uuid()) @db.Uuid
+  voxel_id String @map("voxel_id") @db.Uuid
+
+  // Status change
+  previous_status VoxelStatus?       @map("previous_status")
+  new_status      VoxelStatus        @map("new_status")
+  previous_health VoxelHealthStatus? @map("previous_health")
+  new_health      VoxelHealthStatus? @map("new_health")
+
+  // Progress
+  percent_complete Float? @map("percent_complete")
+
+  // Context
+  note            String? @db.Text
+  changed_by_id   String? @map("changed_by_id") @db.Uuid
+  changed_by_name String? @map("changed_by_name") @db.VarChar(200)
+
+  // Metadata
+  source     String? @db.VarChar(50) // API, WEBSOCKET, SYSTEM, IMPORT
+  ip_address String? @map("ip_address") @db.VarChar(45)
+  user_agent String? @map("user_agent") @db.VarChar(500)
+
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  voxel      Voxel @relation(fields: [voxel_id], references: [id], onDelete: Cascade)
+  changed_by User? @relation("VoxelStatusChanges", fields: [changed_by_id], references: [id], onDelete: SetNull)
+
+  @@index([voxel_id, created_at(sort: Desc)])
+  @@index([changed_by_id])
+  @@index([new_status])
+  @@index([created_at(sort: Desc)])
+  @@map("voxel_status_history")
+}
+
+// ==============================================================================
+// Model 4: PMDecision
+// From: pm-decision.schema.json
+// URN: urn:luhtech:{project}:pm-decision:{decisionId}
+// ==============================================================================
+model PMDecision {
+  id          String           @id @default(uuid()) @db.Uuid
+  urn         String           @unique @db.VarChar(200)
+  project_id  String           @map("project_id") @db.Uuid
+  decision_id String           @map("decision_id") @db.VarChar(20) // DEC-2026-0001
+  title       String           @db.VarChar(200)
+  description String?          @db.Text
+  type        PMDecisionType
+  status      PMDecisionStatus @default(PENDING)
+
+  // Authority (from authorityLevel object in schema)
+  authority_required  Int     @map("authority_required") // 0-6
+  authority_current   Int     @map("authority_current") // 0-6
+  authority_level_id  Int?    @map("authority_level_id")
+  escalation_required Boolean @default(false) @map("escalation_required")
+  auto_approved       Boolean @default(false) @map("auto_approved")
+
+  // Voxel reference (primary)
+  primary_voxel_urn String? @map("primary_voxel_urn") @db.VarChar(200)
+
+  // Context
+  question        String? @db.Text
+  rationale       String? @db.Text
+  options         Json?   @db.JsonB // Array of option objects
+  selected_option String? @map("selected_option") @db.VarChar(50)
+  ai_analysis     Json?   @map("ai_analysis") @db.JsonB
+
+  // Budget impact
+  budget_estimated Decimal? @map("budget_estimated") @db.Decimal(15, 2)
+  budget_actual    Decimal? @map("budget_actual") @db.Decimal(15, 2)
+  budget_currency  String   @default("USD") @map("budget_currency") @db.VarChar(3)
+  budget_line      String?  @map("budget_line") @db.VarChar(100)
+
+  // Schedule impact
+  delay_days      Int?    @map("delay_days")
+  delay_hours     Float?  @map("delay_hours")
+  critical_path   Boolean @default(false) @map("critical_path")
+  look_ahead_week Int?    @map("look_ahead_week")
+
+  // Participants (URN references stored, with FK for common queries)
+  requested_by_id String? @map("requested_by_id") @db.Uuid
+  approved_by_id  String? @map("approved_by_id") @db.Uuid
+
+  // Evidence
+  evidence Json? @db.JsonB // Array of evidence objects
+
+  // Escalation chain
+  escalation_source_urn String? @map("escalation_source_urn") @db.VarChar(200)
+  escalation_target_urn String? @map("escalation_target_urn") @db.VarChar(200)
+  supersedes_urn        String? @map("supersedes_urn") @db.VarChar(200)
+  superseded_by_urn     String? @map("superseded_by_urn") @db.VarChar(200)
+
+  // Timestamps
+  approved_at   DateTime? @map("approved_at") @db.Timestamptz(6)
+  rejected_at   DateTime? @map("rejected_at") @db.Timestamptz(6)
+  escalated_at  DateTime? @map("escalated_at") @db.Timestamptz(6)
+  expired_at    DateTime? @map("expired_at") @db.Timestamptz(6)
+  superseded_at DateTime? @map("superseded_at") @db.Timestamptz(6)
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+  meta           Json? @db.JsonB
+
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  project               Project                   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  authority_level       AuthorityLevel?           @relation(fields: [authority_level_id], references: [id])
+  requested_by          Participant?              @relation("DecisionAuthor", fields: [requested_by_id], references: [id])
+  approved_by           Participant?              @relation("DecisionApprover", fields: [approved_by_id], references: [id])
+  voxel_attachments     VoxelDecisionAttachment[]
+  consequences          Consequence[]
+  schedule_proposals    ScheduleProposal[]
+  inspections_validated Inspection[]              @relation("InspectionDecisionsValidated")
+  acknowledgments       Acknowledgment[]
+
+  @@unique([project_id, decision_id])
+  @@index([urn])
+  @@index([project_id, status])
+  @@index([project_id, type])
+  @@index([authority_required])
+  @@index([primary_voxel_urn])
+  @@index([created_at(sort: Desc)])
+  @@map("pm_decisions")
+}
+
+// ==============================================================================
+// Model 5: VoxelDecisionAttachment (Join table)
+// From: voxel-v3.schema.json attachedDecision
+// ==============================================================================
+model VoxelDecisionAttachment {
+  id                      String              @id @default(uuid()) @db.Uuid
+  voxel_id                String              @map("voxel_id") @db.Uuid
+  decision_id             String              @map("decision_id") @db.Uuid
+  attachment_type         VoxelAttachmentType @map("attachment_type")
+  label                   String?             @db.VarChar(200)
+  affected_trades         String[]            @default([]) @map("affected_trades")
+  summary                 String?             @db.Text
+  requires_acknowledgment Boolean             @default(false) @map("requires_acknowledgment")
+  acknowledged            Boolean             @default(false)
+  attached_by             String              @default("USER") @map("attached_by") @db.VarChar(20) // SYSTEM, USER, AI
+  attached_at             DateTime            @default(now()) @map("attached_at") @db.Timestamptz(6)
+
+  // Relations
+  voxel    Voxel      @relation(fields: [voxel_id], references: [id], onDelete: Cascade)
+  decision PMDecision @relation(fields: [decision_id], references: [id], onDelete: Cascade)
+
+  @@unique([voxel_id, decision_id])
+  @@index([voxel_id])
+  @@index([decision_id])
+  @@index([attachment_type])
+  @@map("voxel_decision_attachments")
+}
+
+// ==============================================================================
+// Model 6: ToleranceOverride
+// From: voxel-v3.schema.json toleranceOverride
+// URN: urn:luhtech:{project}:tolerance:{toleranceId}
+// ==============================================================================
+model ToleranceOverride {
+  id             String        @id @default(uuid()) @db.Uuid
+  urn            String        @unique @db.VarChar(200)
+  voxel_id       String        @map("voxel_id") @db.Uuid
+  tolerance_type ToleranceType @map("tolerance_type")
+
+  // Standard value
+  standard_value     Float?  @map("standard_value")
+  standard_unit      String? @map("standard_unit") @db.VarChar(20)
+  standard_direction String? @map("standard_direction") @db.VarChar(5) // +, -, ±
+
+  // Approved value
+  approved_value     Float   @map("approved_value")
+  approved_unit      String  @map("approved_unit") @db.VarChar(20)
+  approved_direction String? @map("approved_direction") @db.VarChar(5)
+
+  // Source
+  source_decision_urn String   @map("source_decision_urn") @db.VarChar(200)
+  approved_by_urn     String?  @map("approved_by_urn") @db.VarChar(200)
+  rationale           String?  @db.Text
+  applicable_trades   String[] @default([]) @map("applicable_trades")
+
+  // Validity
+  approval_date DateTime  @map("approval_date") @db.Timestamptz(6)
+  expires_at    DateTime? @map("expires_at") @db.Timestamptz(6)
+
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  voxel Voxel @relation(fields: [voxel_id], references: [id], onDelete: Cascade)
+
+  @@index([urn])
+  @@index([voxel_id])
+  @@index([tolerance_type])
+  @@index([source_decision_urn])
+  @@map("tolerance_overrides")
+}
+
+// ==============================================================================
+// Model 7: PreApproval
+// From: voxel-v3.schema.json preApproval
+// ==============================================================================
+model PreApproval {
+  id                  String             @id @default(uuid()) @db.Uuid
+  voxel_id            String             @map("voxel_id") @db.Uuid
+  scope               String             @db.Text
+  conditions          String[]           @default([])
+  authority_level     AuthorityLevelName @map("authority_level")
+  source_decision_urn String             @map("source_decision_urn") @db.VarChar(200)
+  applicable_trades   String[]           @default([]) @map("applicable_trades")
+
+  // Validity
+  valid_from  DateTime  @map("valid_from") @db.Timestamptz(6)
+  valid_until DateTime? @map("valid_until") @db.Timestamptz(6)
+  usage_count Int       @default(0) @map("usage_count")
+
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  voxel Voxel @relation(fields: [voxel_id], references: [id], onDelete: Cascade)
+
+  @@index([voxel_id])
+  @@index([authority_level])
+  @@index([source_decision_urn])
+  @@map("pre_approvals")
+}
+
+// ==============================================================================
+// Model 8: VoxelAlert
+// From: voxel-v3.schema.json voxelAlert
+// ==============================================================================
+model VoxelAlert {
+  id                      String        @id @default(uuid()) @db.Uuid
+  voxel_id                String        @map("voxel_id") @db.Uuid
+  priority                AlertPriority
+  title                   String        @db.VarChar(200)
+  message                 String        @db.Text
+  source_decision_urn     String?       @map("source_decision_urn") @db.VarChar(200)
+  target_trades           String[]      @default([]) @map("target_trades")
+  requires_acknowledgment Boolean       @default(false) @map("requires_acknowledgment")
+  acknowledged_by         String[]      @default([]) @map("acknowledged_by") // Array of participant URNs
+
+  expires_at DateTime? @map("expires_at") @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  voxel Voxel @relation(fields: [voxel_id], references: [id], onDelete: Cascade)
+
+  @@index([voxel_id])
+  @@index([priority])
+  @@index([created_at(sort: Desc)])
+  @@map("voxel_alerts")
+}
+
+// ==============================================================================
+// Model 9: Acknowledgment
+// From: voxel-v3.schema.json acknowledgment
+// ==============================================================================
+model Acknowledgment {
+  id             String               @id @default(uuid()) @db.Uuid
+  decision_id    String               @map("decision_id") @db.Uuid
+  participant_id String               @map("participant_id") @db.Uuid
+  worker_name    String?              @map("worker_name") @db.VarChar(255)
+  worker_trade   String?              @map("worker_trade") @db.VarChar(100)
+  method         AcknowledgmentMethod
+  notes          String?              @db.Text
+
+  // Location verification
+  gps_lat      Float? @map("gps_lat")
+  gps_lng      Float? @map("gps_lng")
+  gps_accuracy Float? @map("gps_accuracy")
+  uwb_x        Float? @map("uwb_x")
+  uwb_y        Float? @map("uwb_y")
+  uwb_z        Float? @map("uwb_z")
+  uwb_accuracy Float? @map("uwb_accuracy")
+
+  timestamp DateTime @default(now()) @db.Timestamptz(6)
+
+  // Relations
+  decision    PMDecision  @relation(fields: [decision_id], references: [id], onDelete: Cascade)
+  participant Participant @relation(fields: [participant_id], references: [id], onDelete: Cascade)
+
+  @@unique([decision_id, participant_id])
+  @@index([decision_id])
+  @@index([participant_id])
+  @@index([timestamp(sort: Desc)])
+  @@map("acknowledgments")
+}
+
+// ==============================================================================
+// Model 10: Consequence
+// From: consequence-v3.schema.json
+// URN: urn:luhtech:{project}:consequence:{consequenceId}
+// ==============================================================================
+model Consequence {
+  id                 String              @id @default(uuid()) @db.Uuid
+  urn                String              @unique @db.VarChar(200)
+  project_id         String              @map("project_id") @db.Uuid
+  consequence_id     String              @map("consequence_id") @db.VarChar(20) // CONSQ-2026-0001
+  source_decision_id String              @map("source_decision_id") @db.Uuid
+  title              String?             @db.VarChar(200)
+  description        String?             @db.Text
+  category           ConsequenceCategory
+  severity           ConsequenceSeverity @default(MEDIUM)
+  status             ConsequenceStatus   @default(IDENTIFIED)
+
+  // Discovery
+  discovered_by_urn String?   @map("discovered_by_urn") @db.VarChar(200)
+  discovered_at     DateTime? @map("discovered_at") @db.Timestamptz(6)
+
+  // Spatial reference
+  primary_voxel_id  String? @map("primary_voxel_id") @db.Uuid
+  spatial_reference Json?   @map("spatial_reference") @db.JsonB
+
+  // Budget impact
+  budget_estimated Decimal? @map("budget_estimated") @db.Decimal(15, 2)
+  budget_actual    Decimal? @map("budget_actual") @db.Decimal(15, 2)
+  budget_confirmed Boolean  @default(false) @map("budget_confirmed")
+
+  // Schedule impact
+  delay_days    Int?    @map("delay_days")
+  critical_path Boolean @default(false) @map("critical_path")
+
+  // Resolution
+  mitigation_plan         String? @map("mitigation_plan") @db.Text
+  resolution_path         Json?   @map("resolution_path") @db.JsonB
+  resolution_decision_urn String? @map("resolution_decision_urn") @db.VarChar(200)
+
+  // AI analysis
+  ai_trace_analysis Json? @map("ai_trace_analysis") @db.JsonB
+
+  // Evidence
+  evidence Json? @db.JsonB
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+  meta           Json? @db.JsonB
+
+  // Timestamps
+  resolved_at DateTime? @map("resolved_at") @db.Timestamptz(6)
+  created_at  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  project         Project    @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  source_decision PMDecision @relation(fields: [source_decision_id], references: [id], onDelete: Cascade)
+  primary_voxel   Voxel?     @relation("VoxelConsequences", fields: [primary_voxel_id], references: [id])
+
+  @@unique([project_id, consequence_id])
+  @@index([urn])
+  @@index([project_id, status])
+  @@index([category])
+  @@index([severity])
+  @@index([source_decision_id])
+  @@index([created_at(sort: Desc)])
+  @@map("consequences")
+}
+
+// ==============================================================================
+// Model 11: ScheduleProposal
+// From: schedule-proposal-v3.schema.json
+// URN: urn:luhtech:{project}:schedule-proposal:{proposalId}
+// ==============================================================================
+model ScheduleProposal {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  urn                String                 @unique @db.VarChar(200)
+  project_id         String                 @map("project_id") @db.Uuid
+  proposal_id        String                 @map("proposal_id") @db.VarChar(20) // PROP-2026-0001
+  proposer_urn       String                 @map("proposer_urn") @db.VarChar(200)
+  source_decision_id String?                @map("source_decision_id") @db.Uuid
+  title              String?                @db.VarChar(200)
+  status             ScheduleProposalStatus @default(DRAFT)
+
+  // Proposed changes (array of change objects)
+  proposed_changes Json @map("proposed_changes") @db.JsonB
+
+  // Justification
+  justification_summary  String   @map("justification_summary") @db.Text
+  justification_benefits String[] @default([]) @map("justification_benefits")
+  justification_risks    String[] @default([]) @map("justification_risks")
+  coordination_needed    Json?    @map("coordination_needed") @db.JsonB
+
+  // AI analysis
+  ai_analysis Json? @map("ai_analysis") @db.JsonB
+
+  // Approval workflow
+  required_approvers String[] @default([]) @map("required_approvers") // Array of participant URNs
+  approvals          Json?    @db.JsonB // Array of approval objects
+  all_approved       Boolean  @default(false) @map("all_approved")
+
+  // Resulting decision
+  resulting_decision_urn String? @map("resulting_decision_urn") @db.VarChar(200)
+
+  // Look-ahead info
+  look_ahead_week Int? @map("look_ahead_week") // 1 or 2
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+  meta           Json? @db.JsonB
+
+  // Timestamps
+  submitted_at DateTime? @map("submitted_at") @db.Timestamptz(6)
+  decided_at   DateTime? @map("decided_at") @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  project         Project     @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  source_decision PMDecision? @relation(fields: [source_decision_id], references: [id])
+
+  @@unique([project_id, proposal_id])
+  @@index([urn])
+  @@index([project_id, status])
+  @@index([proposer_urn])
+  @@index([created_at(sort: Desc)])
+  @@map("schedule_proposals")
+}
+
+// ==============================================================================
+// Model 12: Inspection
+// From: inspection.schema.json
+// URN: urn:luhtech:{project}:inspection:{inspectionId}
+// ==============================================================================
+model Inspection {
+  id              String           @id @default(uuid()) @db.Uuid
+  urn             String           @unique @db.VarChar(200)
+  project_id      String           @map("project_id") @db.Uuid
+  inspection_id   String           @map("inspection_id") @db.VarChar(20) // INSP-2026-0001
+  title           String?          @db.VarChar(200)
+  description     String?          @db.Text
+  inspection_type InspectionType   @map("inspection_type")
+  status          InspectionStatus @default(SCHEDULED)
+
+  // Inspector
+  inspector_id   String? @map("inspector_id") @db.Uuid
+  inspector_info Json?   @map("inspector_info") @db.JsonB
+
+  // Regulatory info
+  regulatory_body   String? @map("regulatory_body") @db.VarChar(200)
+  permit_number     String? @map("permit_number") @db.VarChar(100)
+  code_reference    String? @map("code_reference") @db.VarChar(200)
+  jurisdiction_code String? @map("jurisdiction_code") @db.VarChar(50)
+
+  // Schedule
+  scheduled_date   DateTime? @map("scheduled_date") @db.Timestamptz(6)
+  actual_date      DateTime? @map("actual_date") @db.Timestamptz(6)
+  duration_minutes Int?      @map("duration_minutes")
+
+  // Decision validation
+  decisions_reviewed  String[] @default([]) @map("decisions_reviewed") // Array of decision URNs
+  decisions_validated String[] @default([]) @map("decisions_validated") // Array of decision URNs
+  decisions_failed    String[] @default([]) @map("decisions_failed") // Array of decision URNs
+
+  // Findings
+  findings   Json? @db.JsonB // Array of finding objects
+  punch_list Json? @map("punch_list") @db.JsonB // Array of punch items
+
+  // Result
+  result_outcome        String?   @map("result_outcome") @db.VarChar(20) // PASSED, FAILED, CONDITIONAL
+  result_conditions     String[]  @default([]) @map("result_conditions")
+  reinspection_required Boolean   @default(false) @map("reinspection_required")
+  reinspection_date     DateTime? @map("reinspection_date") @db.Date
+  result_notes          String?   @map("result_notes") @db.Text
+
+  // Evidence
+  evidence Json? @db.JsonB
+
+  // Consequences & Decisions triggered
+  consequences_created String[] @default([]) @map("consequences_created") // Array of consequence URNs
+  decisions_triggered  String[] @default([]) @map("decisions_triggered") // Array of decision URNs
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+  meta           Json? @db.JsonB
+
+  // Timestamps
+  started_at   DateTime? @map("started_at") @db.Timestamptz(6)
+  completed_at DateTime? @map("completed_at") @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  project             Project      @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  inspector           Participant? @relation("InspectionInspector", fields: [inspector_id], references: [id])
+  voxels              Voxel[]      @relation("VoxelInspections")
+  validated_decisions PMDecision[] @relation("InspectionDecisionsValidated")
+
+  @@unique([project_id, inspection_id])
+  @@index([urn])
+  @@index([project_id, status])
+  @@index([inspection_type])
+  @@index([inspector_id])
+  @@index([scheduled_date])
+  @@index([created_at(sort: Desc)])
+  @@map("inspections")
+}
+
+// ==============================================================================
+// Universal Service Factors (USF) Models
+// ==============================================================================
+// From: .roadmap/schemas/usf/usf-profile.schema.json
+//       .roadmap/schemas/usf/usf-work-packet.schema.json
+// URN: urn:luhtech:{project}:usf-profile:{profileId}
+//      urn:luhtech:{project}:usf-work-packet:{workPacketId}
+// ==============================================================================
+
+enum USFProviderType {
+  human
+  robot
+  agent
+  team
+  subcontractor
+  aggregate
+}
+
+enum USFPricingTier {
+  economy
+  standard
+  premium
+  expedited
+}
+
+enum USFWorkPacketStatus {
+  planned
+  in_progress
+  completed
+  cancelled
+  disputed
+}
+
+// ==============================================================================
+// Model 13: USFProfile
+// Provider performance profile with Quality/Cost/Speed factors
+// ==============================================================================
+model USFProfile {
+  id            String          @id @default(uuid()) @db.Uuid
+  urn           String          @unique @db.VarChar(200) // urn:luhtech:{project}:usf-profile:{profileId}
+  project_id    String?         @map("project_id") @db.Uuid // Optional - can be global
+  profile_id    String          @map("profile_id") @db.VarChar(50) // e.g., USF-CREW-ELEC-001
+  provider_id   String          @map("provider_id") @db.VarChar(200)
+  provider_type USFProviderType @map("provider_type")
+
+  // Provider info
+  provider_name    String?  @map("provider_name") @db.VarChar(255)
+  provider_company String?  @map("provider_company") @db.VarChar(255)
+  provider_trade   String?  @map("provider_trade") @db.VarChar(100)
+  certifications   String[] @default([])
+  location         String?  @db.VarChar(200)
+
+  // USF Factors (0.0-1.0 normalized scores)
+  quality_score Decimal @map("quality_score") @db.Decimal(4, 3) // Better
+  cost_score    Decimal @map("cost_score") @db.Decimal(4, 3) // Cheaper
+  speed_score   Decimal @map("speed_score") @db.Decimal(4, 3) // Faster
+
+  // Composite score
+  composite_score Decimal? @map("composite_score") @db.Decimal(4, 3)
+  weight_quality  Decimal  @default(0.4) @map("weight_quality") @db.Decimal(3, 2)
+  weight_cost     Decimal  @default(0.3) @map("weight_cost") @db.Decimal(3, 2)
+  weight_speed    Decimal  @default(0.3) @map("weight_speed") @db.Decimal(3, 2)
+
+  // Confidence metrics
+  confidence_score Decimal? @map("confidence_score") @db.Decimal(4, 3)
+  sample_size      Int      @default(0) @map("sample_size")
+  variance         Decimal? @db.Decimal(6, 4)
+
+  // Pricing tier
+  pricing_tier     USFPricingTier? @map("pricing_tier")
+  tier_quality_min Decimal?        @map("tier_quality_min") @db.Decimal(4, 3)
+  tier_cost_mult   Decimal?        @map("tier_cost_mult") @db.Decimal(4, 2)
+
+  // Work types with proficiency
+  work_types Json? @map("work_types") @db.JsonB
+
+  // Availability
+  availability_status String?   @map("availability_status") @db.VarChar(20)
+  next_available      DateTime? @map("next_available") @db.Timestamptz(6)
+  capacity_percent    Decimal?  @map("capacity_percent") @db.Decimal(5, 2)
+
+  // History (array of snapshots)
+  history Json? @db.JsonB
+
+  // Active contracts
+  active_contracts String[] @default([]) @map("active_contracts")
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+  meta           Json? @db.JsonB
+
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  work_packet_allocations USFLaborAllocation[]
+  attributions            USFAttribution[]
+
+  @@unique([project_id, profile_id])
+  @@index([urn])
+  @@index([provider_type])
+  @@index([pricing_tier])
+  @@index([provider_trade])
+  @@index([composite_score(sort: Desc)])
+  @@map("usf_profiles")
+}
+
+// ==============================================================================
+// Model 14: USFWorkPacket
+// Tracks USF metrics for a unit of work
+// ==============================================================================
+model USFWorkPacket {
+  id             String              @id @default(uuid()) @db.Uuid
+  urn            String              @unique @db.VarChar(200) // urn:luhtech:{project}:usf-work-packet:{workPacketId}
+  project_id     String              @map("project_id") @db.Uuid
+  work_packet_id String              @map("work_packet_id") @db.VarChar(20) // WP-2026-0001
+  status         USFWorkPacketStatus @default(planned)
+  description    String?             @db.Text
+  work_type      String?             @map("work_type") @db.VarChar(100)
+
+  // Source reference (wagon, voxel, etc.)
+  source_type        String? @map("source_type") @db.VarChar(20)
+  source_urn         String? @map("source_urn") @db.VarChar(200)
+  source_external_id String? @map("source_external_id") @db.VarChar(100)
+
+  // Targets
+  target_quality   Decimal  @map("target_quality") @db.Decimal(4, 3)
+  target_budget    Decimal? @map("target_budget") @db.Decimal(15, 2)
+  target_currency  String   @default("USD") @map("target_currency") @db.VarChar(3)
+  target_duration  Decimal? @map("target_duration") @db.Decimal(8, 2) // hours
+  target_takt      Decimal? @map("target_takt") @db.Decimal(8, 2)
+  market_benchmark Decimal? @map("market_benchmark") @db.Decimal(15, 2)
+
+  // Actuals
+  actual_quality  Decimal? @map("actual_quality") @db.Decimal(4, 3)
+  actual_defects  Int?     @map("actual_defects")
+  actual_rework   Decimal? @map("actual_rework") @db.Decimal(8, 2) // hours
+  actual_cost     Decimal? @map("actual_cost") @db.Decimal(15, 2)
+  actual_duration Decimal? @map("actual_duration") @db.Decimal(8, 2) // hours
+  actual_takt     Decimal? @map("actual_takt") @db.Decimal(8, 2)
+
+  // USF Results (calculated scores)
+  usf_quality   Decimal? @map("usf_quality") @db.Decimal(4, 3)
+  usf_cost      Decimal? @map("usf_cost") @db.Decimal(4, 3)
+  usf_speed     Decimal? @map("usf_speed") @db.Decimal(4, 3)
+  usf_composite Decimal? @map("usf_composite") @db.Decimal(4, 3)
+
+  // Variance
+  variance_quality   Decimal? @map("variance_quality") @db.Decimal(5, 4)
+  variance_cost      Decimal? @map("variance_cost") @db.Decimal(15, 2)
+  variance_cost_pct  Decimal? @map("variance_cost_pct") @db.Decimal(6, 3)
+  variance_schedule  Decimal? @map("variance_schedule") @db.Decimal(8, 2)
+  variance_sched_pct Decimal? @map("variance_sched_pct") @db.Decimal(6, 3)
+
+  // Pricing tier
+  pricing_tier USFPricingTier? @map("pricing_tier")
+
+  // Billing
+  billing_base_rate    Decimal? @map("billing_base_rate") @db.Decimal(15, 2)
+  billing_tier_mult    Decimal? @map("billing_tier_mult") @db.Decimal(4, 2)
+  billing_rep_mult     Decimal? @map("billing_rep_mult") @db.Decimal(4, 2)
+  billing_variance_adj Decimal? @map("billing_variance_adj") @db.Decimal(15, 2)
+  billing_final        Decimal? @map("billing_final") @db.Decimal(15, 2)
+  billing_status       String?  @map("billing_status") @db.VarChar(20)
+  pay_application_urn  String?  @map("pay_application_urn") @db.VarChar(200)
+
+  // Contract thresholds
+  contract_urn            String?  @map("contract_urn") @db.VarChar(200)
+  threshold_min_quality   Decimal? @map("threshold_min_quality") @db.Decimal(4, 3)
+  threshold_max_cost_var  Decimal? @map("threshold_max_cost_var") @db.Decimal(6, 3)
+  threshold_max_sched_var Decimal? @map("threshold_max_sched_var") @db.Decimal(6, 3)
+  threshold_bonus_trig    Decimal? @map("threshold_bonus_trig") @db.Decimal(4, 3)
+  threshold_bonus_pct     Decimal? @map("threshold_bonus_pct") @db.Decimal(5, 2)
+  threshold_penalty_trig  Decimal? @map("threshold_penalty_trig") @db.Decimal(4, 3)
+  threshold_penalty_pct   Decimal? @map("threshold_penalty_pct") @db.Decimal(5, 2)
+
+  // Related voxels
+  voxel_urns String[] @default([]) @map("voxel_urns")
+
+  // Inspection reference
+  inspection_urn String? @map("inspection_urn") @db.VarChar(200)
+
+  // Evidence
+  evidence Json? @db.JsonB
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+  meta           Json? @db.JsonB
+
+  // Timestamps
+  started_at   DateTime? @map("started_at") @db.Timestamptz(6)
+  completed_at DateTime? @map("completed_at") @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  labor_allocations USFLaborAllocation[]
+  attributions      USFAttribution[]
+
+  @@unique([project_id, work_packet_id])
+  @@index([urn])
+  @@index([project_id, status])
+  @@index([work_type])
+  @@index([source_urn])
+  @@index([created_at(sort: Desc)])
+  @@map("usf_work_packets")
+}
+
+// ==============================================================================
+// Model 15: USFLaborAllocation
+// Labor allocation for work packets
+// ==============================================================================
+model USFLaborAllocation {
+  id                 String   @id @default(uuid()) @db.Uuid
+  work_packet_id     String   @map("work_packet_id") @db.Uuid
+  profile_id         String   @map("profile_id") @db.Uuid
+  allocation_percent Decimal  @map("allocation_percent") @db.Decimal(5, 2)
+  role               String?  @db.VarChar(100)
+  planned_hours      Decimal? @map("planned_hours") @db.Decimal(8, 2)
+
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  work_packet USFWorkPacket @relation(fields: [work_packet_id], references: [id], onDelete: Cascade)
+  profile     USFProfile    @relation(fields: [profile_id], references: [id], onDelete: Cascade)
+
+  @@unique([work_packet_id, profile_id])
+  @@index([work_packet_id])
+  @@index([profile_id])
+  @@map("usf_labor_allocations")
+}
+
+// ==============================================================================
+// Model 16: USFAttribution
+// USF attribution for mixed labor teams
+// ==============================================================================
+model USFAttribution {
+  id               String   @id @default(uuid()) @db.Uuid
+  work_packet_id   String   @map("work_packet_id") @db.Uuid
+  profile_id       String   @map("profile_id") @db.Uuid
+  contribution_pct Decimal? @map("contribution_pct") @db.Decimal(5, 2)
+  quality_contrib  Decimal? @map("quality_contrib") @db.Decimal(4, 3)
+  cost_contrib     Decimal? @map("cost_contrib") @db.Decimal(4, 3)
+  speed_contrib    Decimal? @map("speed_contrib") @db.Decimal(4, 3)
+  notes            String?  @db.Text
+
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  work_packet USFWorkPacket @relation(fields: [work_packet_id], references: [id], onDelete: Cascade)
+  profile     USFProfile    @relation(fields: [profile_id], references: [id], onDelete: Cascade)
+
+  @@unique([work_packet_id, profile_id])
+  @@index([work_packet_id])
+  @@index([profile_id])
+  @@map("usf_attributions")
+}
+
+// ==============================================================================
+// Dual-Process Decision Models (DP-M1)
+// ==============================================================================
+// Implements Kahneman's System 1/System 2 decision framework for construction
+// System 1: Fast, intuitive, pattern-based decisions (field-level)
+// System 2: Slow, deliberate, analytical decisions (escalation)
+// URN: urn:luhtech:{project}:decision-event:{eventId}
+//      urn:luhtech:{project}:success-pattern:{patternId}
+//      urn:luhtech:{project}:sdi-snapshot:{snapshotId}
+// ==============================================================================
+
+enum DecisionProcessType {
+  SYSTEM_1 // Fast, intuitive, pattern-matched
+  SYSTEM_2 // Slow, deliberate, analytical
+  HYBRID // Started as System 1, escalated to System 2
+  AUTO_APPROVED // Pre-approved pattern match
+}
+
+enum DecisionEventType {
+  INITIATED // Decision request created
+  PATTERN_MATCHED // System 1 pattern recognition
+  ESCALATED // Moved to System 2 processing
+  ANALYZED // System 2 analysis complete
+  APPROVED // Final approval
+  REJECTED // Final rejection
+  DEFERRED // Postponed for more info
+  SUPERSEDED // Replaced by another decision
+  ACKNOWLEDGED // Worker acknowledged
+}
+
+enum PatternConfidenceLevel {
+  LOW // <60% confidence
+  MEDIUM // 60-80% confidence
+  HIGH // 80-95% confidence
+  VERIFIED // >95% with validation
+}
+
+enum SDISnapshotType {
+  PERIODIC // Scheduled snapshot
+  EVENT_TRIGGERED // Triggered by significant event
+  PRE_INSPECTION // Before inspection
+  POST_INSPECTION // After inspection
+  MILESTONE // Project milestone
+  ANOMALY // Detected anomaly
+}
+
+// ==============================================================================
+// Model 17: DecisionEvent
+// Tracks the dual-process decision lifecycle events
+// ==============================================================================
+model DecisionEvent {
+  id           String              @id @default(uuid()) @db.Uuid
+  urn          String              @unique @db.VarChar(200) // urn:luhtech:{project}:decision-event:{eventId}
+  project_id   String              @map("project_id") @db.Uuid
+  event_id     String              @map("event_id") @db.VarChar(30) // DEVT-2026-0001
+  decision_urn String              @map("decision_urn") @db.VarChar(200) // Reference to PMDecision
+  event_type   DecisionEventType   @map("event_type")
+  process_type DecisionProcessType @map("process_type")
+
+  // Timing metrics (critical for System 1 vs 2 classification)
+  processing_time_ms  Int? @map("processing_time_ms")
+  time_to_decision_ms Int? @map("time_to_decision_ms")
+  queue_wait_ms       Int? @map("queue_wait_ms")
+
+  // Pattern matching (System 1)
+  pattern_id          String?  @map("pattern_id") @db.VarChar(200) // Reference to SuccessPattern if matched
+  pattern_confidence  Decimal? @map("pattern_confidence") @db.Decimal(4, 3)
+  pattern_match_score Decimal? @map("pattern_match_score") @db.Decimal(4, 3)
+
+  // Authority context
+  authority_level Int?    @map("authority_level") // 0-6
+  actor_urn       String? @map("actor_urn") @db.VarChar(200) // Who triggered event
+  delegated_from  String? @map("delegated_from") @db.VarChar(200)
+
+  // Voxel context
+  voxel_urn         String? @map("voxel_urn") @db.VarChar(200)
+  location_verified Boolean @default(false) @map("location_verified")
+
+  // Cognitive load indicators
+  concurrent_decisions Int?     @map("concurrent_decisions") // How many active decisions
+  actor_fatigue_score  Decimal? @map("actor_fatigue_score") @db.Decimal(4, 3)
+  time_of_day          String?  @map("time_of_day") @db.VarChar(20) // morning, afternoon, etc.
+
+  // AI analysis
+  ai_recommendation String?  @map("ai_recommendation") @db.VarChar(50)
+  ai_confidence     Decimal? @map("ai_confidence") @db.Decimal(4, 3)
+  ai_reasoning      Json?    @map("ai_reasoning") @db.JsonB
+
+  // Outcome (for completed events)
+  outcome       String?  @db.VarChar(50)
+  outcome_value Decimal? @map("outcome_value") @db.Decimal(15, 2) // $ value impact
+  quality_score Decimal? @map("quality_score") @db.Decimal(4, 3)
+
+  // Evidence
+  evidence Json?   @db.JsonB
+  notes    String? @db.Text
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+  meta           Json? @db.JsonB
+
+  // Timestamps
+  event_timestamp DateTime @default(now()) @map("event_timestamp") @db.Timestamptz(6)
+  created_at      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([project_id, event_id])
+  @@index([urn])
+  @@index([decision_urn])
+  @@index([project_id, event_type])
+  @@index([process_type])
+  @@index([pattern_id])
+  @@index([event_timestamp(sort: Desc)])
+  @@map("decision_events")
+}
+
+// ==============================================================================
+// Model 18: SuccessPattern
+// Captures patterns from successful decisions for System 1 matching
+// ==============================================================================
+model SuccessPattern {
+  id          String  @id @default(uuid()) @db.Uuid
+  urn         String  @unique @db.VarChar(200) // urn:luhtech:{project}:success-pattern:{patternId}
+  project_id  String? @map("project_id") @db.Uuid // Null for global patterns
+  pattern_id  String  @map("pattern_id") @db.VarChar(30) // PAT-2026-0001
+  name        String  @db.VarChar(200)
+  description String? @db.Text
+
+  // Pattern classification
+  category    String  @db.VarChar(100) // tolerance, schedule, budget, safety, etc.
+  subcategory String? @db.VarChar(100)
+  trade       String? @db.VarChar(100)
+  work_type   String? @map("work_type") @db.VarChar(100)
+
+  // Pattern definition
+  trigger_conditions   Json  @map("trigger_conditions") @db.JsonB // Conditions that activate pattern
+  context_requirements Json? @map("context_requirements") @db.JsonB // Required context for match
+  decision_template    Json  @map("decision_template") @db.JsonB // Template for auto-decision
+
+  // Confidence metrics
+  confidence_level         PatternConfidenceLevel @default(LOW) @map("confidence_level")
+  confidence_score         Decimal                @default(0.5) @map("confidence_score") @db.Decimal(4, 3)
+  min_confidence_threshold Decimal                @default(0.7) @map("min_confidence_threshold") @db.Decimal(4, 3)
+
+  // Authority scope
+  max_authority_level  Int     @default(1) @map("max_authority_level") // Max level that can auto-approve
+  auto_approve_enabled Boolean @default(false) @map("auto_approve_enabled")
+  requires_location    Boolean @default(true) @map("requires_location")
+
+  // Limits and constraints
+  budget_limit         Decimal? @map("budget_limit") @db.Decimal(15, 2)
+  schedule_limit_hours Int?     @map("schedule_limit_hours")
+  variance_limit       Decimal? @map("variance_limit") @db.Decimal(6, 4) // e.g., 0.0625 = 1/16 inch
+
+  // Learning metrics
+  times_matched          Int      @default(0) @map("times_matched")
+  times_succeeded        Int      @default(0) @map("times_succeeded")
+  times_failed           Int      @default(0) @map("times_failed")
+  times_overridden       Int      @default(0) @map("times_overridden")
+  success_rate           Decimal? @map("success_rate") @db.Decimal(4, 3)
+  avg_processing_time_ms Int?     @map("avg_processing_time_ms")
+  total_value_saved      Decimal? @map("total_value_saved") @db.Decimal(15, 2)
+
+  // Source decisions (training data)
+  source_decisions String[] @default([]) @map("source_decisions") // Array of decision URNs
+  last_match_urn   String?  @map("last_match_urn") @db.VarChar(200)
+
+  // Validity
+  is_active     Boolean   @default(true) @map("is_active")
+  valid_from    DateTime  @default(now()) @map("valid_from") @db.Timestamptz(6)
+  valid_until   DateTime? @map("valid_until") @db.Timestamptz(6)
+  deprecated_by String?   @map("deprecated_by") @db.VarChar(200)
+
+  // Version control
+  version            Int     @default(1)
+  parent_pattern_urn String? @map("parent_pattern_urn") @db.VarChar(200)
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+  meta           Json? @db.JsonB
+
+  // Timestamps
+  last_matched_at DateTime? @map("last_matched_at") @db.Timestamptz(6)
+  created_at      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([project_id, pattern_id])
+  @@index([urn])
+  @@index([category])
+  @@index([trade])
+  @@index([confidence_level])
+  @@index([is_active, confidence_score(sort: Desc)])
+  @@index([created_at(sort: Desc)])
+  @@map("success_patterns")
+}
+
+// ==============================================================================
+// Model 19: SDISnapshot
+// Spatial Decision Intelligence snapshot for voxel decision state
+// ==============================================================================
+model SDISnapshot {
+  id            String          @id @default(uuid()) @db.Uuid
+  urn           String          @unique @db.VarChar(200) // urn:luhtech:{project}:sdi-snapshot:{snapshotId}
+  project_id    String          @map("project_id") @db.Uuid
+  snapshot_id   String          @map("snapshot_id") @db.VarChar(30) // SDI-2026-0001
+  snapshot_type SDISnapshotType @map("snapshot_type")
+  description   String?         @db.Text
+
+  // Scope
+  voxel_urns String[] @default([]) @map("voxel_urns") // Voxels included
+  building   String?  @db.VarChar(100)
+  level      String?  @db.VarChar(50)
+  zone       String?  @db.VarChar(100)
+
+  // Aggregate metrics - Decisions
+  total_decisions     Int @default(0) @map("total_decisions")
+  pending_decisions   Int @default(0) @map("pending_decisions")
+  approved_decisions  Int @default(0) @map("approved_decisions")
+  rejected_decisions  Int @default(0) @map("rejected_decisions")
+  escalated_decisions Int @default(0) @map("escalated_decisions")
+
+  // Dual-Process metrics
+  system_1_decisions Int      @default(0) @map("system_1_decisions")
+  system_2_decisions Int      @default(0) @map("system_2_decisions")
+  auto_approved      Int      @default(0) @map("auto_approved")
+  pattern_match_rate Decimal? @map("pattern_match_rate") @db.Decimal(4, 3)
+
+  // Time metrics
+  avg_decision_time_ms Int? @map("avg_decision_time_ms")
+  avg_system_1_time_ms Int? @map("avg_system_1_time_ms")
+  avg_system_2_time_ms Int? @map("avg_system_2_time_ms")
+  p95_decision_time_ms Int? @map("p95_decision_time_ms")
+
+  // Value metrics
+  total_value_at_risk Decimal? @map("total_value_at_risk") @db.Decimal(15, 2)
+  total_value_saved   Decimal? @map("total_value_saved") @db.Decimal(15, 2)
+  avoided_delay_hours Decimal? @map("avoided_delay_hours") @db.Decimal(8, 2)
+
+  // Acknowledgment metrics
+  total_acknowledgments   Int      @default(0) @map("total_acknowledgments")
+  pending_acknowledgments Int      @default(0) @map("pending_acknowledgments")
+  acknowledgment_rate     Decimal? @map("acknowledgment_rate") @db.Decimal(4, 3)
+  avg_ack_time_ms         Int?     @map("avg_ack_time_ms")
+
+  // Tolerance metrics
+  tolerance_overrides Int @default(0) @map("tolerance_overrides")
+  active_tolerances   Int @default(0) @map("active_tolerances")
+  expired_tolerances  Int @default(0) @map("expired_tolerances")
+
+  // Alert metrics
+  active_alerts         Int @default(0) @map("active_alerts")
+  critical_alerts       Int @default(0) @map("critical_alerts")
+  unacknowledged_alerts Int @default(0) @map("unacknowledged_alerts")
+
+  // Inspection metrics
+  pending_inspections Int @default(0) @map("pending_inspections")
+  passed_inspections  Int @default(0) @map("passed_inspections")
+  failed_inspections  Int @default(0) @map("failed_inspections")
+
+  // Consequence metrics
+  active_consequences    Int      @default(0) @map("active_consequences")
+  mitigated_consequences Int      @default(0) @map("mitigated_consequences")
+  total_consequence_cost Decimal? @map("total_consequence_cost") @db.Decimal(15, 2)
+
+  // Pattern learning metrics
+  patterns_matched     Int      @default(0) @map("patterns_matched")
+  patterns_created     Int      @default(0) @map("patterns_created")
+  pattern_success_rate Decimal? @map("pattern_success_rate") @db.Decimal(4, 3)
+
+  // Health scores
+  decision_health_score Decimal? @map("decision_health_score") @db.Decimal(4, 3)
+  acknowledgment_health Decimal? @map("acknowledgment_health") @db.Decimal(4, 3)
+  overall_health_score  Decimal? @map("overall_health_score") @db.Decimal(4, 3)
+
+  // Detailed breakdown
+  decision_breakdown  Json? @map("decision_breakdown") @db.JsonB // By type, authority, etc.
+  trade_breakdown     Json? @map("trade_breakdown") @db.JsonB // By trade
+  authority_breakdown Json? @map("authority_breakdown") @db.JsonB // By authority level
+  temporal_breakdown  Json? @map("temporal_breakdown") @db.JsonB // By time of day, day of week
+
+  // Trigger context
+  trigger_event_urn String? @map("trigger_event_urn") @db.VarChar(200)
+  trigger_reason    String? @map("trigger_reason") @db.VarChar(200)
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+  meta           Json? @db.JsonB
+
+  // Timestamps
+  snapshot_at  DateTime  @default(now()) @map("snapshot_at") @db.Timestamptz(6)
+  period_start DateTime? @map("period_start") @db.Timestamptz(6)
+  period_end   DateTime? @map("period_end") @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([project_id, snapshot_id])
+  @@index([urn])
+  @@index([project_id, snapshot_type])
+  @@index([snapshot_at(sort: Desc)])
+  @@index([building, level, zone])
+  @@map("sdi_snapshots")
+}
+
+// ==============================================================================
+// User Management & Self-Service Onboarding (M2)
+// ==============================================================================
+// Enables self-service customer onboarding, email-based registration,
+// team invitations, and marketing-controlled email communication
+// Target: March 2026 Canadian pilot customer onboarding
+// ==============================================================================
+
+enum LifecycleStage {
+  WAITLIST // Initial interest captured (landing page signup)
+  EMAIL_SENT // Verification email sent
+  EMAIL_VERIFIED // Email verified, ready for trial
+  TRIAL // Trial tenant created, using platform
+  TRIAL_EXPIRED // Trial period ended, awaiting conversion
+  PAID // Active paying customer
+  CHURNED // Cancelled subscription
+  REACTIVATED // Returned after churn
+}
+
+enum InvitationStatus {
+  PENDING // Invitation created, email sent
+  ACCEPTED // User clicked link and joined
+  EXPIRED // Token expired (default 7 days)
+  REVOKED // Admin cancelled invitation
+  BOUNCED // Email delivery failed
+}
+
+enum EmailTemplateType {
+  VERIFICATION_EMAIL // "Verify your email address"
+  WELCOME_TRIAL // "Welcome to Ectropy - Start your trial"
+  TRIAL_REMINDER // "Your trial expires in X days"
+  TRIAL_EXPIRED // "Your trial has expired - Upgrade now"
+  INVITATION // "You've been invited to join [Tenant]"
+  PAYMENT_SUCCESS // "Payment confirmed - Welcome to [Tier]"
+  PAYMENT_FAILED // "Payment issue - Update your card"
+  TEAM_MEMBER_ADDED // "New team member joined: [Name]"
+  PROJECT_MILESTONE // "Project milestone achieved"
+  SYSTEM_NOTIFICATION // Generic system notifications
+}
+
+enum EmailTemplateStatus {
+  DRAFT // Being edited by marketing team
+  ACTIVE // Currently in use for campaigns
+  ARCHIVED // Replaced by newer version, kept for history
+  A_B_TEST // Part of A/B testing variant
+}
+
+// ==============================================================================
+// Model: EmailTemplate
+// Marketing-controlled email content (replaces hardcoded templates)
+// Enables marketing team to edit email content without code deployments
+// ==============================================================================
+model EmailTemplate {
+  id            String              @id @default(uuid()) @db.Uuid
+  template_type EmailTemplateType
+  status        EmailTemplateStatus @default(DRAFT)
+
+  // Content (supports handlebars-style variables like {{user_name}})
+  subject      String  @db.VarChar(255)
+  body_text    String  @db.Text // Plain text version
+  body_html    String  @db.Text // HTML version
+  preview_text String? @db.VarChar(255) // Email preview/snippet
+
+  // Versioning (for A/B testing and rollback)
+  version      Int     @default(1)
+  parent_id    String? @map("parent_id") @db.Uuid // Previous version
+  variant_name String? @map("variant_name") @db.VarChar(50) // "A", "B", "control"
+
+  // Variables expected (JSON array of variable names for validation)
+  required_variables String[] @default([]) @map("required_variables") // ["user_name", "verification_link"]
+
+  // Metadata
+  created_by String? @map("created_by") @db.Uuid
+  updated_by String? @map("updated_by") @db.Uuid
+  notes      String? @db.Text // Internal notes for marketing team
+
+  // Timestamps
+  active_from  DateTime? @map("active_from") @db.Timestamptz(6)
+  active_until DateTime? @map("active_until") @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  parent   EmailTemplate?  @relation("TemplateVersions", fields: [parent_id], references: [id], onDelete: SetNull)
+  children EmailTemplate[] @relation("TemplateVersions")
+
+  @@unique([template_type, version])
+  @@index([template_type, status])
+  @@index([status, active_from, active_until])
+  @@map("email_templates")
+}
+
+// ==============================================================================
+// Model: UserRegistration
+// Tracks user signup flow from waitlist to paid customer
+// Central record for CRM integration and lifecycle management
+// ==============================================================================
+model UserRegistration {
+  id        String  @id @default(uuid()) @db.Uuid
+  email     String  @unique @db.VarChar(255)
+  full_name String? @map("full_name") @db.VarChar(255)
+
+  // Lifecycle tracking
+  lifecycle_stage LifecycleStage @default(WAITLIST) @map("lifecycle_stage")
+
+  // Email verification
+  verification_token   String?   @unique @map("verification_token") @db.VarChar(128)
+  verification_sent_at DateTime? @map("verification_sent_at") @db.Timestamptz(6)
+  verified_at          DateTime? @map("verified_at") @db.Timestamptz(6)
+
+  // Trial tracking
+  trial_started_at DateTime? @map("trial_started_at") @db.Timestamptz(6)
+  trial_ends_at    DateTime? @map("trial_ends_at") @db.Timestamptz(6)
+
+  // Conversion tracking
+  converted_at      DateTime?         @map("converted_at") @db.Timestamptz(6)
+  subscription_tier SubscriptionTier? @map("subscription_tier")
+
+  // CRM integration
+  crm_lead_id    String? @map("crm_lead_id") @db.VarChar(100) // Twenty CRM Lead ID
+  crm_contact_id String? @map("crm_contact_id") @db.VarChar(100) // Twenty CRM Contact ID
+  crm_company_id String? @map("crm_company_id") @db.VarChar(100) // Twenty CRM Company ID
+
+  // Tenant linkage (set when trial tenant created)
+  tenant_id String? @map("tenant_id") @db.Uuid
+  user_id   String? @map("user_id") @db.Uuid // User record created after email verification
+
+  // Signup metadata
+  registration_source String  @default("landing_page") @map("registration_source") @db.VarChar(50) // "landing_page", "invitation", "referral", "integration"
+  utm_source          String? @map("utm_source") @db.VarChar(100)
+  utm_medium          String? @map("utm_medium") @db.VarChar(100)
+  utm_campaign        String? @map("utm_campaign") @db.VarChar(100)
+  referrer            String? @db.VarChar(500)
+  ip_address          String? @map("ip_address") @db.VarChar(45) // IPv6 support
+  user_agent          String? @map("user_agent") @db.Text
+
+  // Metadata
+  metadata Json? @db.JsonB // Additional tracking data
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  tenant Tenant? @relation(fields: [tenant_id], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([lifecycle_stage])
+  @@index([verification_token])
+  @@index([tenant_id])
+  @@index([crm_lead_id])
+  @@index([created_at(sort: Desc)])
+  @@map("user_registrations")
+}
+
+// ==============================================================================
+// Model: UserInvitation
+// Team invitations for adding users to existing tenants
+// Secure token-based flow with expiration and role assignment
+// ==============================================================================
+model UserInvitation {
+  id        String @id @default(uuid()) @db.Uuid
+  tenant_id String @map("tenant_id") @db.Uuid
+  email     String @db.VarChar(255)
+  token     String @unique @db.VarChar(128) // Cryptographically secure token
+
+  // Role assignment
+  role        StakeholderRole @default(contractor)
+  permissions Json?           @db.JsonB // Custom permissions if needed
+
+  // Status tracking
+  status InvitationStatus @default(PENDING)
+
+  // Invitation metadata
+  invited_by  String  @map("invited_by") @db.Uuid
+  accepted_by String? @map("accepted_by") @db.Uuid // User ID when accepted
+  message     String? @db.Text // Personal message from inviter
+
+  // Email tracking
+  email_sent_at    DateTime? @map("email_sent_at") @db.Timestamptz(6)
+  last_reminder_at DateTime? @map("last_reminder_at") @db.Timestamptz(6)
+  reminder_count   Int       @default(0) @map("reminder_count")
+
+  // Expiration (default 7 days)
+  expires_at  DateTime  @map("expires_at") @db.Timestamptz(6)
+  accepted_at DateTime? @map("accepted_at") @db.Timestamptz(6)
+  revoked_at  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revoked_by  String?   @map("revoked_by") @db.Uuid
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  tenant   Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  inviter  User   @relation("InvitationsSent", fields: [invited_by], references: [id], onDelete: Cascade)
+  acceptor User?  @relation("InvitationsAccepted", fields: [accepted_by], references: [id], onDelete: SetNull)
+
+  @@unique([tenant_id, email, status]) // Prevent duplicate pending invitations
+  @@index([token])
+  @@index([email])
+  @@index([tenant_id, status])
+  @@index([status, expires_at])
+  @@index([created_at(sort: Desc)])
+  @@map("user_invitations")
+}
+
+// ==============================================================================
+// Model: TenantMember
+// Team membership tracking (replaces implicit tenant_id on User)
+// Enables users to belong to multiple tenants with different roles
+// ==============================================================================
+model TenantMember {
+  id        String @id @default(uuid()) @db.Uuid
+  tenant_id String @map("tenant_id") @db.Uuid
+  user_id   String @map("user_id") @db.Uuid
+
+  // Role within this tenant
+  role        StakeholderRole @default(contractor)
+  permissions Json?           @db.JsonB
+
+  // Status
+  is_active Boolean @default(true) @map("is_active")
+  is_owner  Boolean @default(false) @map("is_owner") // Tenant owner (billing admin)
+
+  // Activity tracking
+  last_active_at DateTime? @map("last_active_at") @db.Timestamptz(6)
+
+  // Timestamps
+  joined_at  DateTime  @default(now()) @map("joined_at") @db.Timestamptz(6)
+  removed_at DateTime? @map("removed_at") @db.Timestamptz(6)
+  removed_by String?   @map("removed_by") @db.Uuid
+
+  // Relations
+  tenant Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  user   User   @relation("TenantMemberships", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, user_id])
+  @@index([user_id])
+  @@index([tenant_id, is_active])
+  @@index([is_active, last_active_at(sort: Desc)])
+  @@map("tenant_members")
+}
+
+// ==============================================================================
+// Model: SubscriptionHistory
+// Tracks lifecycle transitions for analytics and compliance
+// Enables conversion funnel analysis and retention metrics
+// ==============================================================================
+model SubscriptionHistory {
+  id        String @id @default(uuid()) @db.Uuid
+  tenant_id String @map("tenant_id") @db.Uuid
+
+  // Lifecycle transition
+  from_stage LifecycleStage? @map("from_stage") // null for initial creation
+  to_stage   LifecycleStage  @map("to_stage")
+
+  // Subscription details
+  from_tier SubscriptionTier? @map("from_tier")
+  to_tier   SubscriptionTier? @map("to_tier")
+
+  // Financial tracking
+  mrr_change Decimal? @map("mrr_change") @db.Decimal(10, 2) // Monthly Recurring Revenue change
+  arr_change Decimal? @map("arr_change") @db.Decimal(10, 2) // Annual Recurring Revenue change
+
+  // Transition metadata
+  trigger         String  @db.VarChar(100) // "trial_started", "payment_success", "trial_expired", "cancellation"
+  trigger_user_id String? @map("trigger_user_id") @db.Uuid // Who triggered this change
+  notes           String? @db.Text
+
+  // CRM sync
+  synced_to_crm Boolean   @default(false) @map("synced_to_crm")
+  crm_synced_at DateTime? @map("crm_synced_at") @db.Timestamptz(6)
+
+  // Timestamp
+  transitioned_at DateTime @default(now()) @map("transitioned_at") @db.Timestamptz(6)
+
+  // Relations
+  tenant       Tenant @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  trigger_user User?  @relation("SubscriptionTransitions", fields: [trigger_user_id], references: [id], onDelete: SetNull)
+
+  @@index([tenant_id, transitioned_at(sort: Desc)])
+  @@index([to_stage, transitioned_at(sort: Desc)])
+  @@index([trigger, transitioned_at(sort: Desc)])
+  @@map("subscription_history")
+}
+
+// ==============================================================================
+// Roadmap Database Models
+// ==============================================================================
+// Database-backed storage for .roadmap/ JSON data.
+// Replaces 3 independent file readers (FileDataSource, PlatformContextAdapter,
+// RoadmapService) with a single Prisma-backed DataSource.
+// Multi-venture ready via venture_id FK.
+// ==============================================================================
+
+enum RoadmapNodeType {
+  FILE
+  DIRECTORY
+  SERVICE
+  WORKFLOW
+  DELIVERABLE
+  MILESTONE
+  DECISION
+  EVIDENCE
+  PERSON
+  IP_ASSET
+  DEPENDENCY
+  PHASE
+  TASK
+  METRIC
+  EXTENSION
+  NODE
+  WORKSTREAM
+  DOCUMENT
+}
+
+enum RoadmapNodeStatus {
+  ACTIVE
+  ARCHIVED
+  DEPRECATED
+}
+
+enum RoadmapPhaseStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
+
+enum RoadmapFeatureStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  DEFERRED
+}
+
+enum DocDecisionImpact {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum DocDecisionStatus {
+  PROPOSED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  IMPLEMENTED
+  DEPRECATED
+}
+
+// ==============================================================================
+// Model: RoadmapVenture
+// Source: venture-summary.json + roadmap.json .venture
+// URN: urn:luhtech:{ventureId}:venture:{ventureId}
+// ==============================================================================
+model RoadmapVenture {
+  id         String @id @default(uuid()) @db.Uuid
+  urn        String @unique @db.VarChar(300)
+  venture_id String @unique @map("venture_id") @db.VarChar(100)
+
+  // Core identity
+  name        String  @db.VarChar(255)
+  tagline     String? @db.VarChar(500)
+  type        String? @db.VarChar(100) // "platform", "saas", etc.
+  stage       String? @db.VarChar(50) // "active", "pre-revenue", etc.
+  domain      String? @db.VarChar(255)
+  license     String? @db.VarChar(100)
+  founded     String? @db.VarChar(20) // Year or date string
+
+  // Architecture
+  architecture Json? @db.JsonB // monorepo structure, tech stack
+
+  // Mission & vision
+  mission String? @db.Text
+  vision  String? @db.Text
+
+  // Metrics
+  overall_progress            Float?   @map("overall_progress")
+  production_readiness_score  Int?     @map("production_readiness_score")
+  type_safety_score           Int?     @map("type_safety_score")
+  metrics                     Json?    @db.JsonB // General metrics blob
+
+  // Pitch data
+  pitch Json? @db.JsonB // problem, solution, market, businessModel, differentiator, traction
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  phases         RoadmapPhase[]
+  features       RoadmapFeature[]
+  state_nodes    StateNode[]
+  platform_state PlatformState[]
+  doc_decisions  DocumentationDecision[]
+  environments   InfraEnvironment[]
+  infra_services InfraService[]
+  votes          RoadmapVote[]
+  dependencies   ExternalDependency[]
+
+  @@index([venture_id])
+  @@map("roadmap_ventures")
+}
+
+// ==============================================================================
+// Model: RoadmapPhase
+// Source: roadmap.json .quarters[]
+// URN: urn:luhtech:{ventureId}:phase:{phaseId}
+// ==============================================================================
+model RoadmapPhase {
+  id         String @id @default(uuid()) @db.Uuid
+  urn        String @unique @db.VarChar(300)
+  venture_id String @map("venture_id") @db.VarChar(100)
+
+  phase_id   String             @map("phase_id") @db.VarChar(50)
+  name       String             @db.VarChar(255)
+  status     RoadmapPhaseStatus @default(PLANNED)
+  progress   Float?
+
+  // Dates
+  start_date      String? @map("start_date") @db.VarChar(30)
+  target_date     String? @map("target_date") @db.VarChar(30)
+  completion_date String? @map("completion_date") @db.VarChar(30)
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  venture      RoadmapVenture       @relation(fields: [venture_id], references: [venture_id], onDelete: Cascade)
+  deliverables RoadmapDeliverableDb[]
+
+  @@unique([venture_id, phase_id])
+  @@index([venture_id])
+  @@index([status])
+  @@map("roadmap_phases")
+}
+
+// ==============================================================================
+// Model: RoadmapFeature
+// Source: roadmap.json .features[]
+// URN: urn:luhtech:{ventureId}:feature:{featureId}
+// ==============================================================================
+model RoadmapFeature {
+  id         String @id @default(uuid()) @db.Uuid
+  urn        String @unique @db.VarChar(300)
+  venture_id String @map("venture_id") @db.VarChar(100)
+
+  feature_id   String               @map("feature_id") @db.VarChar(100)
+  name         String               @db.VarChar(255)
+  category     String?              @db.VarChar(100)
+  status       RoadmapFeatureStatus @default(PLANNED)
+  priority     Int?
+  phase        String?              @db.VarChar(50)
+  dependencies String[]             @default([])
+  description  String?              @db.Text
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  venture RoadmapVenture @relation(fields: [venture_id], references: [venture_id], onDelete: Cascade)
+
+  @@unique([venture_id, feature_id])
+  @@index([venture_id])
+  @@index([status])
+  @@index([category])
+  @@map("roadmap_features")
+}
+
+// ==============================================================================
+// Model: RoadmapDeliverableDb
+// Source: roadmap.json .quarters[].deliverables[]
+// URN: urn:luhtech:{ventureId}:deliverable:{deliverableId}
+// ==============================================================================
+model RoadmapDeliverableDb {
+  id         String @id @default(uuid()) @db.Uuid
+  urn        String @unique @db.VarChar(300)
+  venture_id String @map("venture_id") @db.VarChar(100)
+
+  deliverable_id String  @map("deliverable_id") @db.VarChar(100)
+  title          String  @db.VarChar(500)
+  description    String? @db.Text
+  status         String  @default("planned") @db.VarChar(50)
+  phase_id       String  @map("phase_id") @db.VarChar(50)
+  assigned_to    String? @map("assigned_to") @db.VarChar(255)
+  completed_date String? @map("completed_date") @db.VarChar(30)
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  phase RoadmapPhase @relation(fields: [venture_id, phase_id], references: [venture_id, phase_id], onDelete: Cascade)
+
+  @@unique([venture_id, deliverable_id])
+  @@index([venture_id])
+  @@index([phase_id])
+  @@index([status])
+  @@map("roadmap_deliverables")
+}
+
+// ==============================================================================
+// Model: StateNode
+// Source: current-truth.json .nodes[]
+// URN: urn:luhtech:{ventureId}:node:{nodeId}
+// ==============================================================================
+model StateNode {
+  id         String @id @default(uuid()) @db.Uuid
+  urn        String @unique @db.VarChar(300)
+  venture_id String @map("venture_id") @db.VarChar(100)
+
+  node_id     String            @map("node_id") @db.VarChar(200)
+  title       String            @db.VarChar(500)
+  node_type   RoadmapNodeType   @default(NODE) @map("node_type")
+  status      RoadmapNodeStatus @default(ACTIVE)
+  phase       String?           @db.VarChar(50)
+  path        String?           @db.VarChar(1000)
+  description String?           @db.Text
+  owner       String?           @db.VarChar(255)
+
+  // Content (summary, problem, solution, impact, filesModified, evidence)
+  content Json? @db.JsonB
+
+  // Relationships (dependsOn, blockedBy, relatedTo)
+  relationships Json? @db.JsonB
+
+  // Metadata (size, lines, language, etc.)
+  metadata Json? @db.JsonB
+
+  // Evidence & tags
+  evidence String[] @default([])
+  tags     String[] @default([])
+
+  // Dates from source
+  source_created_at  String? @map("source_created_at") @db.VarChar(30)
+  source_modified_at String? @map("source_modified_at") @db.VarChar(30)
+  retention_date     String? @map("retention_date") @db.VarChar(30)
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  venture RoadmapVenture @relation(fields: [venture_id], references: [venture_id], onDelete: Cascade)
+
+  @@unique([venture_id, node_id])
+  @@index([venture_id])
+  @@index([node_type])
+  @@index([status])
+  @@index([phase])
+  @@map("state_nodes")
+}
+
+// ==============================================================================
+// Model: PlatformState
+// Source: current-truth.json .platformState
+// URN: urn:luhtech:{ventureId}:platform-state:{ventureId}
+// ==============================================================================
+model PlatformState {
+  id         String @id @default(uuid()) @db.Uuid
+  urn        String @unique @db.VarChar(300)
+  venture_id String @map("venture_id") @db.VarChar(100)
+
+  health                     String? @db.VarChar(50)
+  phase                      String? @db.VarChar(50)
+  completed_deliverables     Int?    @map("completed_deliverables")
+  total_deliverables         Int?    @map("total_deliverables")
+  active_workstreams         Int?    @map("active_workstreams")
+  production_readiness_score Int?    @map("production_readiness_score")
+  type_safety_score          Int?    @map("type_safety_score")
+  typescript_errors_resolved Int?    @map("typescript_errors_resolved")
+
+  // Full state blob for fields not explicitly modeled
+  state_data Json? @map("state_data") @db.JsonB
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  venture RoadmapVenture @relation(fields: [venture_id], references: [venture_id], onDelete: Cascade)
+
+  @@unique([venture_id])
+  @@index([venture_id])
+  @@map("platform_states")
+}
+
+// ==============================================================================
+// Model: DocumentationDecision
+// Source: decision-log.json .decisions[]
+// URN: urn:luhtech:{ventureId}:decision:{decisionId}
+// ==============================================================================
+model DocumentationDecision {
+  id         String @id @default(uuid()) @db.Uuid
+  urn        String @unique @db.VarChar(300)
+  venture_id String @map("venture_id") @db.VarChar(100)
+
+  decision_id String            @map("decision_id") @db.VarChar(200)
+  title       String            @db.VarChar(500)
+  status      DocDecisionStatus @default(PROPOSED)
+  category    String            @db.VarChar(100)
+  impact      DocDecisionImpact @default(MEDIUM)
+  proposed_by String?           @map("proposed_by") @db.VarChar(255)
+
+  // Dates
+  proposed_date    String? @map("proposed_date") @db.VarChar(30)
+  approved_date    String? @map("approved_date") @db.VarChar(30)
+  implemented_date String? @map("implemented_date") @db.VarChar(30)
+
+  // Content
+  context      String? @db.Text
+  decision     String? @db.Text
+  consequences String? @db.Text
+  rationale    String? @db.Text
+
+  // Alternatives (array of {title, description, pros, cons, effort, risk, rejectionReason})
+  alternatives Json? @db.JsonB
+
+  // Related
+  related_decisions      String[] @default([]) @map("related_decisions")
+  supersedes             String?  @db.VarChar(200)
+  superseded_by          String?  @map("superseded_by") @db.VarChar(200)
+  evidence               String[] @default([])
+  tags                   String[] @default([])
+  impacted_deliverables  String[] @default([]) @map("impacted_deliverables")
+  impacted_services      String[] @default([]) @map("impacted_services")
+  impacted_infrastructure String[] @default([]) @map("impacted_infrastructure")
+  implementation_notes   String?  @map("implementation_notes") @db.Text
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  venture RoadmapVenture @relation(fields: [venture_id], references: [venture_id], onDelete: Cascade)
+
+  @@unique([venture_id, decision_id])
+  @@index([venture_id])
+  @@index([status])
+  @@index([category])
+  @@index([impact])
+  @@map("documentation_decisions")
+}
+
+// ==============================================================================
+// Model: InfraEnvironment
+// Source: infrastructure-catalog.json .catalog.environments[]
+// URN: urn:luhtech:{ventureId}:environment:{environmentId}
+// ==============================================================================
+model InfraEnvironment {
+  id         String @id @default(uuid()) @db.Uuid
+  urn        String @unique @db.VarChar(300)
+  venture_id String @map("venture_id") @db.VarChar(100)
+
+  environment_id String  @map("environment_id") @db.VarChar(100)
+  name           String  @db.VarChar(255)
+  type           String? @db.VarChar(100) // "development", "staging", "production", "preview"
+  url            String? @db.VarChar(500)
+  status         String  @default("active") @db.VarChar(50)
+  provider       String? @db.VarChar(100)
+  region         String? @db.VarChar(100)
+  notes          String? @db.Text
+
+  // Servers data (nested server objects for this environment)
+  servers_data Json? @map("servers_data") @db.JsonB
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  venture  RoadmapVenture @relation(fields: [venture_id], references: [venture_id], onDelete: Cascade)
+  services InfraService[]
+
+  @@unique([venture_id, environment_id])
+  @@index([venture_id])
+  @@index([status])
+  @@map("infra_environments")
+}
+
+// ==============================================================================
+// Model: InfraService
+// Source: infrastructure-catalog.json (flattened from environments + services)
+// URN: urn:luhtech:{ventureId}:service:{serviceId}
+// ==============================================================================
+model InfraService {
+  id         String @id @default(uuid()) @db.Uuid
+  urn        String @unique @db.VarChar(300)
+  venture_id String @map("venture_id") @db.VarChar(100)
+
+  service_id     String  @map("service_id") @db.VarChar(100)
+  name           String  @db.VarChar(255)
+  type           String? @db.VarChar(100)
+  version        String? @db.VarChar(50)
+  status         String  @default("running") @db.VarChar(50)
+  environment_id String? @map("environment_id") @db.VarChar(100)
+  port           Int?
+  health_check   String? @map("health_check") @db.VarChar(500)
+  dependencies   String[] @default([])
+  repository     String?  @db.VarChar(500)
+  documentation  String?  @db.VarChar(500)
+  tags           String[] @default([])
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  venture     RoadmapVenture    @relation(fields: [venture_id], references: [venture_id], onDelete: Cascade)
+  environment InfraEnvironment? @relation(fields: [venture_id, environment_id], references: [venture_id, environment_id])
+
+  @@unique([venture_id, service_id])
+  @@index([venture_id])
+  @@index([status])
+  @@index([type])
+  @@map("infra_services")
+}
+
+// ==============================================================================
+// Model: RoadmapVote
+// Source: votes.json .votes[]
+// URN: urn:luhtech:{ventureId}:vote:{voteId}
+// ==============================================================================
+model RoadmapVote {
+  id         String @id @default(uuid()) @db.Uuid
+  urn        String @unique @db.VarChar(300)
+  venture_id String @map("venture_id") @db.VarChar(100)
+
+  vote_id     String  @map("vote_id") @db.VarChar(200)
+  decision_id String  @map("decision_id") @db.VarChar(200)
+  status      String  @default("open") @db.VarChar(50)
+
+  // Voters and result stored as JSON for flexibility
+  voters Json? @db.JsonB // Array of {voter, decision, timestamp, comment}
+  result Json? @db.JsonB // {approved, rejected, abstained, outcome}
+
+  // Dates
+  closed_at String? @map("closed_at") @db.VarChar(30)
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  venture RoadmapVenture @relation(fields: [venture_id], references: [venture_id], onDelete: Cascade)
+
+  @@unique([venture_id, vote_id])
+  @@index([venture_id])
+  @@index([status])
+  @@index([decision_id])
+  @@map("roadmap_votes")
+}
+
+// ==============================================================================
+// Model: ExternalDependency
+// Source: dependencies.json .dependencies[]
+// URN: urn:luhtech:{ventureId}:dependency:{dependencyId}
+// ==============================================================================
+model ExternalDependency {
+  id         String @id @default(uuid()) @db.Uuid
+  urn        String @unique @db.VarChar(300)
+  venture_id String @map("venture_id") @db.VarChar(100)
+
+  dependency_id String  @map("dependency_id") @db.VarChar(200)
+  name          String? @db.VarChar(255)
+  type          String? @db.VarChar(100) // "infrastructure", "api", "external"
+  description   String? @db.Text
+  status        String  @default("active") @db.VarChar(50)
+  impact        String? @db.VarChar(50)
+  blocking      Boolean @default(false)
+  notes         String? @db.Text
+
+  // Version tracking
+  version       String? @db.VarChar(100)
+  provider      String? @db.VarChar(255)
+  category      String? @db.VarChar(100)
+  risk_level    String? @map("risk_level") @db.VarChar(50)
+
+  // Graph metadata
+  graph_metadata Json? @map("graph_metadata") @db.JsonB
+
+  // Timestamps
+  created_at DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  venture RoadmapVenture @relation(fields: [venture_id], references: [venture_id], onDelete: Cascade)
+
+  @@unique([venture_id, dependency_id])
+  @@index([venture_id])
+  @@index([status])
+  @@index([type])
+  @@map("external_dependencies")
+}

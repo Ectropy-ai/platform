@@ -1,0 +1,38 @@
+name: 🤖 AI Module Development
+description: Template for AI agent development tasks
+title: '[MODULE] {Module Name} - {Brief Description}'
+labels: ['ai-development', 'module']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 🎯 AI Module Development Task
+        This template is designed for AI agents working with junior developers.
+
+  - type: input
+    id: module_id
+    attributes:
+      label: Module ID
+      description: Unique module identifier
+      placeholder: '1.2-database-foundation'
+    validations:
+      required: true
+
+  - type: textarea
+    id: ai_prompt
+    attributes:
+      label: AI Agent Instructions
+      description: Detailed prompt for the AI agent
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      options:
+        - label: Core functionality implemented
+        - label: Unit tests with 90%+ coverage
+        - label: Integration tests passing
+        - label: Documentation updated
+        - label: Code review completed

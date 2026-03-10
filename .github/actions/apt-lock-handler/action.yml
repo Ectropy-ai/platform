@@ -1,0 +1,259 @@
+name: 'APT Lock Handler'
+description: 'Diagnose and resolve APT lock issues with progressive backoff and comprehensive health checks'
+author: 'Ectropy Platform Team'
+
+inputs:
+  max-retries:
+    description: 'Maximum retry attempts for lock waiting'
+    required: false
+    default: '30'
+  retry-delay:
+    description: 'Delay between retries (seconds)'
+    required: false
+    default: '10'
+  skip-if-cached:
+    description: 'Skip execution if a cache was hit (for use with Playwright cache)'
+    required: false
+    default: 'false'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 🏥 Enhanced APT Health Diagnostics
+      if: inputs.skip-if-cached != 'true'
+      shell: bash -e {0} # Remove pipefail to allow diagnostic commands to complete without triggering pipeline failures
+      run: |
+        echo "🏥 Running comprehensive APT health diagnostics..."
+
+        # 1. Check for active APT processes
+        echo "📊 Checking for active APT processes..."
+        # Check for apt-get, apt, or dpkg processes (pgrep -x with multiple patterns)
+        if pgrep -x 'apt-get' > /dev/null 2>&1 || pgrep -x 'apt' > /dev/null 2>&1 || pgrep -x 'dpkg' > /dev/null 2>&1; then
+          echo "⚠️  Active APT processes detected:"
+          ps aux | grep -E 'apt-get|apt|dpkg' | grep -v grep
+        else
+          echo "✅ No active APT processes"
+        fi
+
+        # 2. Check for lock files
+        echo "📊 Checking for APT lock files..."
+        LOCKS_FOUND=0
+        for lock in /var/lib/apt/lists/lock /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend; do
+          if [ -f "$lock" ]; then
+            echo "⚠️  Lock file exists: $lock"
+            ls -lh "$lock"
+            LOCKS_FOUND=1
+          fi
+        done
+
+        if [ $LOCKS_FOUND -eq 0 ]; then
+          echo "✅ No APT lock files found"
+        fi
+
+        # 3. Check network connectivity (APT repositories)
+        echo "📊 Checking network connectivity to APT repositories..."
+        if timeout 5 curl -s http://archive.ubuntu.com > /dev/null; then
+          echo "✅ Network connectivity to APT repositories confirmed"
+        else
+          echo "⚠️  Network connectivity issues detected"
+          echo "   This may be a transient issue - will retry"
+        fi
+
+        # 4. Check APT configuration
+        echo "📊 Checking APT configuration..."
+        if [ -f /etc/apt/sources.list ]; then
+          echo "✅ APT sources.list exists"
+        else
+          echo "❌ APT sources.list missing (critical)"
+        fi
+
+        # 5. Test APT with retry logic (not fail-fast)
+        echo "📊 Testing APT operational status (with retry)..."
+        RETRY_COUNT=0
+        MAX_RETRIES=3
+        RETRY_DELAY=5
+
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+          if sudo apt-get update --dry-run > /dev/null 2>&1; then
+            echo "✅ APT is operational (attempt $((RETRY_COUNT + 1)))"
+            exit 0
+          else
+            echo "⚠️  APT test failed (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+              echo "   Waiting ${RETRY_DELAY}s before retry..."
+              sleep $RETRY_DELAY
+            fi
+          fi
+        done
+
+        # 6. Final diagnostic dump (non-blocking)
+        echo "⚠️  APT not operational after $MAX_RETRIES attempts"
+        echo "📋 Final diagnostic information:"
+        APT_GET_COUNT=$(pgrep -x 'apt-get' 2>/dev/null | wc -l)
+        APT_GET_COUNT=${APT_GET_COUNT:-0}
+        APT_COUNT=$(pgrep -x 'apt' 2>/dev/null | wc -l)
+        APT_COUNT=${APT_COUNT:-0}
+        DPKG_COUNT=$(pgrep -x 'dpkg' 2>/dev/null | wc -l)
+        DPKG_COUNT=${DPKG_COUNT:-0}
+        TOTAL_PROCS=$((APT_GET_COUNT + APT_COUNT + DPKG_COUNT))
+        echo "   Active processes: $TOTAL_PROCS"
+        LOCK_FILES=$(ls -1 /var/lib/apt/lists/lock /var/lib/dpkg/lock* 2>/dev/null | wc -l)
+        LOCK_FILES=${LOCK_FILES:-0}
+        echo "   Lock files: $LOCK_FILES"
+        echo "   Network: $(timeout 2 curl -s http://archive.ubuntu.com > /dev/null && echo 'OK' || echo 'FAIL')"
+
+        # CRITICAL FIX: Don't fail here - continue to allow pre-installed browsers to be used
+        # If browsers are already installed/cached, APT is not needed
+        # This scenario occurs when:
+        # 1. Playwright browsers are pre-installed in runner image
+        # 2. Browsers are restored from GitHub Actions cache
+        # 3. APT is temporarily unavailable but browsers don't need reinstall
+        # Downstream impact: setup-playwright will use pre-installed browsers
+        # If no browsers available, that step will fail with clear error message
+        echo "⏭️  Continuing anyway - pre-installed browsers may be available..."
+        echo "⏭️  If Playwright install fails later, that step will handle the error"
+        exit 0
+
+    - name: 🔒 Wait for APT Lock Release (with exponential backoff)
+      if: inputs.skip-if-cached != 'true'
+      shell: bash -e {0} # Match Step 1 shell options - no pipefail to prevent premature exit
+      run: |
+        echo "🔒 Waiting for APT lock availability with exponential backoff..."
+
+        RETRY_COUNT=0
+        MAX_RETRIES=${{ inputs.max-retries }}
+        BASE_DELAY=${{ inputs.retry-delay }}
+        TOTAL_WAIT=0
+
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+          # Check both process locks and file locks
+          # Count processes for apt-get, apt, and dpkg separately
+          APT_GET_PROCS=$(pgrep -x 'apt-get' 2>/dev/null | wc -l)
+          APT_GET_PROCS=${APT_GET_PROCS:-0}
+          APT_PROCS=$(pgrep -x 'apt' 2>/dev/null | wc -l)
+          APT_PROCS=${APT_PROCS:-0}
+          DPKG_PROCS=$(pgrep -x 'dpkg' 2>/dev/null | wc -l)
+          DPKG_PROCS=${DPKG_PROCS:-0}
+          PROCESSES=$((APT_GET_PROCS + APT_PROCS + DPKG_PROCS))
+          LOCKS=$(ls -1 /var/lib/apt/lists/lock /var/lib/dpkg/lock* 2>/dev/null | wc -l)
+          LOCKS=${LOCKS:-0}
+
+          if [ $PROCESSES -eq 0 ] && [ $LOCKS -eq 0 ]; then
+            echo "✅ APT lock available (no processes, no lock files)"
+            echo "   Resolved after $RETRY_COUNT attempts (${TOTAL_WAIT}s total wait)"
+            exit 0
+          fi
+
+          # Enhanced diagnostic logging with process identification
+          if [ $((RETRY_COUNT % 5)) -eq 0 ]; then
+            echo "📊 APT lock status (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES):"
+            echo "   Active processes: $PROCESSES"
+            echo "   Lock files: $LOCKS"
+
+            if [ $PROCESSES -gt 0 ]; then
+              echo "   Process details:"
+              ps aux | grep -E 'apt-get|apt|dpkg' | grep -v grep | head -3
+
+              # Identify lock holders using lsof
+              echo "   Lock file holders:"
+              for lock in /var/lib/apt/lists/lock /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend; do
+                if [ -f "$lock" ]; then
+                  LOCK_HOLDER=$(sudo lsof "$lock" 2>/dev/null | awk 'NR==2 {print $2}')
+                  if [ -n "$LOCK_HOLDER" ]; then
+                    echo "     $lock: PID $LOCK_HOLDER ($(ps -p $LOCK_HOLDER -o comm= 2>/dev/null || echo 'unknown'))"
+                  fi
+                fi
+              done
+            fi
+          else
+            echo "⏳ Waiting for APT lock (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
+          fi
+
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+
+          # Exponential backoff progression (after each failed attempt):
+          # Attempts 1-3:   10s delay each (fast recovery for quick locks)
+          # Attempts 4-5:   20s delay each
+          # Attempts 6-7:   30s delay each
+          # Attempts 8-10:  40s delay each
+          # Attempts 11-15: 50s delay each
+          # Attempts 16+:   60s delay each (capped for reasonable total time)
+          if [ $RETRY_COUNT -le 3 ]; then
+            DELAY=$BASE_DELAY
+          elif [ $RETRY_COUNT -le 5 ]; then
+            DELAY=$((BASE_DELAY * 2))
+          elif [ $RETRY_COUNT -le 7 ]; then
+            DELAY=$((BASE_DELAY * 3))
+          elif [ $RETRY_COUNT -le 10 ]; then
+            DELAY=$((BASE_DELAY * 4))
+          elif [ $RETRY_COUNT -le 15 ]; then
+            DELAY=$((BASE_DELAY * 5))
+          else
+            DELAY=$((BASE_DELAY * 6))  # Cap at 60s for base_delay=10
+          fi
+
+          if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+            echo "   Waiting ${DELAY}s before retry (exponential backoff)..."
+            TOTAL_WAIT=$((TOTAL_WAIT + DELAY))
+            sleep $DELAY
+          fi
+        done
+
+        # Timeout reached - ALWAYS attempt aggressive cleanup
+        echo "⚠️  Timeout after ${TOTAL_WAIT}s (${MAX_RETRIES} attempts with exponential backoff)"
+        echo "🧹 Starting AGGRESSIVE cleanup of APT locks..."
+
+        # Step 1: Kill any hanging processes (unconditional)
+        echo "   Step 1/4: Killing any APT processes..."
+        sudo pkill -9 apt-get || true
+        sudo pkill -9 apt || true
+        sudo pkill -9 dpkg || true
+        sudo pkill -9 unattended-upgrade || true
+        sleep 2
+
+        # Step 2: Remove ALL lock files (unconditional)
+        echo "   Step 2/4: Removing all APT lock files..."
+        sudo rm -f /var/lib/apt/lists/lock
+        sudo rm -f /var/lib/dpkg/lock
+        sudo rm -f /var/lib/dpkg/lock-frontend
+        sudo rm -f /var/cache/apt/archives/lock
+        sleep 1
+
+        # Step 3: Fix any interrupted dpkg operations
+        echo "   Step 3/4: Fixing interrupted dpkg operations..."
+        sudo dpkg --configure -a || true
+
+        # CRITICAL: Remove locks created by dpkg --configure -a
+        echo "   Step 3.5/4: Removing locks created by dpkg..."
+        sudo rm -f /var/lib/apt/lists/lock
+        sudo rm -f /var/lib/dpkg/lock
+        sudo rm -f /var/lib/dpkg/lock-frontend
+        sudo rm -f /var/cache/apt/archives/lock
+        sleep 1
+
+        # Step 4: Verify cleanup succeeded
+        echo "   Step 4/4: Verifying cleanup..."
+        APT_GET_REMAIN=$(pgrep -x 'apt-get' 2>/dev/null | wc -l)
+        APT_GET_REMAIN=${APT_GET_REMAIN:-0}
+        APT_REMAIN=$(pgrep -x 'apt' 2>/dev/null | wc -l)
+        APT_REMAIN=${APT_REMAIN:-0}
+        DPKG_REMAIN=$(pgrep -x 'dpkg' 2>/dev/null | wc -l)
+        DPKG_REMAIN=${DPKG_REMAIN:-0}
+        REMAINING_PROCESSES=$((APT_GET_REMAIN + APT_REMAIN + DPKG_REMAIN))
+        REMAINING_LOCKS=$(ls -1 /var/lib/apt/lists/lock /var/lib/dpkg/lock* 2>/dev/null | wc -l)
+        REMAINING_LOCKS=${REMAINING_LOCKS:-0}
+
+        if [ "$REMAINING_PROCESSES" -eq 0 ] && [ "$REMAINING_LOCKS" -eq 0 ]; then
+          echo "✅ APT lock cleanup SUCCESSFUL"
+          echo "   - Processes killed: All"
+          echo "   - Lock files removed: All"
+          echo "   - dpkg status: Fixed"
+          exit 0
+        else
+          echo "⚠️  APT lock cleanup PARTIALLY successful"
+          echo "   - Remaining processes: $REMAINING_PROCESSES"
+          echo "   - Remaining locks: $REMAINING_LOCKS"
+          echo "   - Continuing anyway (may fail on install-deps)"
+          exit 0  # Don't fail - let install-deps try anyway
+        fi

@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:carbon:epd-cache",
+  "title": "EPD Cache Entry",
+  "description": "Cached Environmental Product Declaration data from EC3/2050 Materials APIs",
+  "type": "object",
+  "required": ["id", "source", "externalId", "gwp"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^EPD-[0-9]{4}-[0-9]{4,}$",
+      "description": "Internal cache identifier"
+    },
+    "source": {
+      "type": "string",
+      "enum": ["EC3", "2050_MATERIALS", "PROPRIETARY"],
+      "description": "EPD data source"
+    },
+    "externalId": {
+      "type": "string",
+      "description": "External EPD ID from source database"
+    },
+    "materialName": {
+      "type": "string",
+      "description": "Material name/description"
+    },
+    "masterformatCode": {
+      "type": "string",
+      "description": "MasterFormat division code"
+    },
+    "gwp": {
+      "$ref": "#/definitions/GWPData",
+      "description": "Global Warming Potential data"
+    },
+    "manufacturer": {
+      "type": "string",
+      "description": "Material manufacturer"
+    },
+    "verificationStatus": {
+      "type": "string",
+      "enum": ["VERIFIED", "INDUSTRY_AVERAGE", "UNVERIFIED"],
+      "description": "EPD verification level"
+    },
+    "publicationDate": {
+      "type": "string",
+      "format": "date",
+      "description": "EPD publication date"
+    },
+    "expirationDate": {
+      "type": "string",
+      "format": "date",
+      "description": "EPD expiration date"
+    },
+    "geography": {
+      "type": "string",
+      "description": "Geographic region for EPD (e.g., US, EU, Global)"
+    },
+    "cachedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this entry was cached"
+    },
+    "ttl": {
+      "type": "number",
+      "description": "Cache TTL in hours (default 24)"
+    }
+  },
+  "definitions": {
+    "GWPData": {
+      "type": "object",
+      "required": ["total"],
+      "properties": {
+        "total": {
+          "type": "number",
+          "description": "Total GWP in kgCO2e per declared unit"
+        },
+        "a1a3": {
+          "type": "number",
+          "description": "Product stage GWP (cradle-to-gate)"
+        },
+        "a4": {
+          "type": "number",
+          "description": "Transportation GWP"
+        },
+        "a5": {
+          "type": "number",
+          "description": "Construction/installation GWP"
+        },
+        "c1c4": {
+          "type": "number",
+          "description": "End-of-life GWP"
+        },
+        "d": {
+          "type": "number",
+          "description": "Benefits beyond system boundary"
+        },
+        "declaredUnit": {
+          "type": "string",
+          "description": "Unit for GWP values (kg, m3, m2, etc.)"
+        },
+        "dataQuality": {
+          "type": "string",
+          "enum": ["HIGH", "MEDIUM", "LOW"],
+          "description": "EPD data quality rating"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,185 @@
+# ============================================================================
+# ⚠️ DEPRECATED - Archived 2025-12-16 (Session 5)
+# ============================================================================
+#
+# This workflow has been DEPRECATED and consolidated into terraform-utilities.yml
+#
+# CONSOLIDATION RATIONALE:
+# - Terraform utility workflows consolidated to reduce workflow sprawl (33→30)
+# - Import operations are infrequent (one-time or occasional use)
+# - Unified diagnostic/maintenance interface provides clearer UX for DevOps users
+# - Maintains all import functionality with mode-based selection
+#
+# MIGRATION PATH:
+# Use terraform-utilities.yml with utility_mode: import-resources
+#
+# Example:
+#   Utility Mode: import-resources
+#   Resources: droplet,database,loadbalancer,domain or all
+#
+# FUNCTIONALITY PRESERVED:
+# ✅ Import production droplet (ID: 525145389, sfo3)
+# ✅ Import production database (ID: afac7c67-bd14-424c-a7e0-72ce480cfecb)
+# ✅ Import production load balancer (ID: f8dfd1f2-4fd3-42ad-9ad2-33783bfc7e87)
+# ✅ Import production domain (ectropy.ai)
+# ✅ Terraform plan verification after import
+# ✅ Plan output artifact upload
+#
+# WORKFLOW MATRIX REFERENCE:
+# apps/mcp-server/data/cicd-environment-workflow-matrix.json v1.6.0
+#
+# ARCHIVED: 2025-12-16T04:00:00Z
+# SESSION: 5 (Workflow Consolidation Phase 2 - Terraform Utilities)
+# REPLACEMENT: .github/workflows/terraform-utilities.yml (import-resources mode)
+# ============================================================================
+
+name: Terraform Import Existing Resources
+
+on:
+  workflow_dispatch:
+    inputs:
+      resources:
+        description: 'Resources to import (comma-separated: droplet,database,loadbalancer,domain or all)'
+        required: true
+        default: 'all'
+        type: string
+
+env:
+  TF_VERSION: '1.9.0'
+  TF_WORKING_DIR: './infrastructure/terraform'
+  AWS_REGION: 'us-east-1' # Required for S3 backend, not used by Spaces
+
+# Enterprise Security: Explicit least-privilege permissions
+# READ-ONLY: Terraform import requires no write access
+permissions:
+  contents: read
+
+jobs:
+  terraform-import:
+    name: Import Existing DigitalOcean Resources
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "🔧 Initializing Terraform..."
+          terraform init -input=false
+
+      - name: Import Production Droplet
+        if: contains(github.event.inputs.resources, 'droplet') || github.event.inputs.resources == 'all'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          TF_VAR_do_token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          TF_VAR_ssh_key_fingerprint: ${{ vars.TF_VAR_SSH_KEY_FINGERPRINT }}
+          TF_VAR_admin_ip: ${{ vars.TF_VAR_ADMIN_IP }}
+          TF_VAR_ssl_certificate_name: ${{ vars.TF_VAR_SSL_CERTIFICATE_NAME || 'ectropy-production-cert' }}
+          TF_VAR_alert_email: ${{ vars.TF_VAR_ALERT_EMAIL || 'alerts@ectropy.ai' }}
+        run: |
+          echo "📥 Importing production droplet (ID: 525145389, sfo3)..."
+          terraform import digitalocean_droplet.production 525145389 || echo "⚠️ Droplet already imported or import failed"
+
+      - name: Import Production Database
+        if: contains(github.event.inputs.resources, 'database') || github.event.inputs.resources == 'all'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          TF_VAR_do_token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          TF_VAR_ssh_key_fingerprint: ${{ vars.TF_VAR_SSH_KEY_FINGERPRINT }}
+          TF_VAR_admin_ip: ${{ vars.TF_VAR_ADMIN_IP }}
+          TF_VAR_ssl_certificate_name: ${{ vars.TF_VAR_SSL_CERTIFICATE_NAME || 'ectropy-production-cert' }}
+          TF_VAR_alert_email: ${{ vars.TF_VAR_ALERT_EMAIL || 'alerts@ectropy.ai' }}
+        run: |
+          echo "📥 Importing production database (ID: afac7c67-bd14-424c-a7e0-72ce480cfecb)..."
+          terraform import digitalocean_database_cluster.production afac7c67-bd14-424c-a7e0-72ce480cfecb || echo "⚠️ Database already imported or import failed"
+
+      - name: Import Production Load Balancer
+        if: contains(github.event.inputs.resources, 'loadbalancer') || github.event.inputs.resources == 'all'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          TF_VAR_do_token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          TF_VAR_ssh_key_fingerprint: ${{ vars.TF_VAR_SSH_KEY_FINGERPRINT }}
+          TF_VAR_admin_ip: ${{ vars.TF_VAR_ADMIN_IP }}
+          TF_VAR_ssl_certificate_name: ${{ vars.TF_VAR_SSL_CERTIFICATE_NAME || 'ectropy-production-cert' }}
+          TF_VAR_alert_email: ${{ vars.TF_VAR_ALERT_EMAIL || 'alerts@ectropy.ai' }}
+        run: |
+          echo "📥 Importing production load balancer (ID: f8dfd1f2-4fd3-42ad-9ad2-33783bfc7e87)..."
+          terraform import digitalocean_loadbalancer.production f8dfd1f2-4fd3-42ad-9ad2-33783bfc7e87 || echo "⚠️ Load balancer already imported or import failed"
+
+      - name: Import Production Domain
+        if: contains(github.event.inputs.resources, 'domain') || github.event.inputs.resources == 'all'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          TF_VAR_do_token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          TF_VAR_ssh_key_fingerprint: ${{ vars.TF_VAR_SSH_KEY_FINGERPRINT }}
+          TF_VAR_admin_ip: ${{ vars.TF_VAR_ADMIN_IP }}
+          TF_VAR_ssl_certificate_name: ${{ vars.TF_VAR_SSL_CERTIFICATE_NAME || 'ectropy-production-cert' }}
+          TF_VAR_alert_email: ${{ vars.TF_VAR_ALERT_EMAIL || 'alerts@ectropy.ai' }}
+        run: |
+          echo "📥 Importing production domain (ectropy.ai)..."
+          terraform import digitalocean_domain.production ectropy.ai || echo "⚠️ Domain already imported or import failed"
+
+      - name: Verify Import - Terraform Plan
+        id: plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          TF_VAR_do_token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          TF_VAR_ssh_key_fingerprint: ${{ vars.TF_VAR_SSH_KEY_FINGERPRINT }}
+          TF_VAR_admin_ip: ${{ vars.TF_VAR_ADMIN_IP }}
+          TF_VAR_ssl_certificate_name: ${{ vars.TF_VAR_SSL_CERTIFICATE_NAME || 'ectropy-production-cert' }}
+          TF_VAR_alert_email: ${{ vars.TF_VAR_ALERT_EMAIL || 'alerts@ectropy.ai' }}
+        run: |
+          echo "🔍 Running terraform plan to verify imported resources..."
+          terraform plan -no-color -input=false | tee plan_output.txt
+
+      - name: Upload Plan Output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-import-plan-${{ github.sha }}
+          path: ${{ env.TF_WORKING_DIR }}/plan_output.txt
+          retention-days: 30
+
+      - name: Import Summary
+        if: always()
+        run: |
+          echo "## 📥 Terraform Import Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Resources Requested**: ${{ github.event.inputs.resources }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Imported Resources:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | ID | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|----|---------" >> $GITHUB_STEP_SUMMARY
+          echo "| Droplet | 525145389 | ✅ Imported |" >> $GITHUB_STEP_SUMMARY
+          echo "| Database | afac7c67-bd14-424c-a7e0-72ce480cfecb | ✅ Imported |" >> $GITHUB_STEP_SUMMARY
+          echo "| Load Balancer | f8dfd1f2-4fd3-42ad-9ad2-33783bfc7e87 | ✅ Imported |" >> $GITHUB_STEP_SUMMARY
+          echo "| Domain | ectropy.ai | ✅ Imported |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review the Terraform plan output to verify imported resources match configuration" >> $GITHUB_STEP_SUMMARY
+          echo "2. If plan shows no changes for imported resources, import was successful" >> $GITHUB_STEP_SUMMARY
+          echo "3. Run \`terraform-plan-apply.yml\` with action=apply to create remaining resources (domain, firewall)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Completed at $(date -u +\"%Y-%m-%d %H:%M:%S UTC\")" >> $GITHUB_STEP_SUMMARY

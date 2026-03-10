@@ -1,0 +1,183 @@
+# =============================================================================
+# ENTERPRISE ALERTING RULES - ECTROPY PLATFORM
+# =============================================================================
+#
+# Comprehensive alerting rules for staging environment monitoring
+# Covers application health, infrastructure metrics, security events, and
+# business-critical BIM workflow monitoring
+# =============================================================================
+
+groups:
+  # =============================================================================
+  # APPLICATION HEALTH ALERTS
+  # =============================================================================
+  - name: application.health
+    interval: 30s
+    rules:
+      - alert: EctropyAPIGatewayDown
+        expr: up{job="ectropy-api-gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: api-gateway
+          environment: staging
+        annotations:
+          summary: "Ectropy API Gateway is down"
+          description: "The Ectropy API Gateway has been down for more than 1 minute"
+          runbook_url: "https://docs.ectropy.dev/runbooks/api-gateway-down"
+
+      - alert: EctropyWebDashboardDown
+        expr: up{job="ectropy-web-dashboard"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          component: web-dashboard
+          environment: staging
+        annotations:
+          summary: "Ectropy Web Dashboard is down"
+          description: "The Ectropy Web Dashboard has been down for more than 2 minutes"
+
+      - alert: EctropyHighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="ectropy-api-gateway"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: api-gateway
+          environment: staging
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }}s for more than 5 minutes"
+
+      - alert: EctropyHighErrorRate
+        expr: rate(http_requests_total{job="ectropy-api-gateway",status=~"5.."}[5m]) / rate(http_requests_total{job="ectropy-api-gateway"}[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          component: api-gateway
+          environment: staging
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for more than 3 minutes"
+
+  # =============================================================================
+  # INFRASTRUCTURE ALERTS
+  # =============================================================================
+  - name: infrastructure.health
+    interval: 30s
+    rules:
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+          environment: staging
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL has been down for more than 1 minute"
+          runbook_url: "https://docs.ectropy.dev/runbooks/postgresql-down"
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          component: cache
+          environment: staging
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis has been down for more than 2 minutes"
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_usage_bytes > 5e8
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+          environment: staging
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis memory usage is {{ $value }} bytes for more than 5 minutes"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+          environment: staging
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value | humanizePercentage }} for more than 5 minutes"
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+          environment: staging
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}% for more than 10 minutes"
+
+      - alert: HighCPULoad
+        expr: process_cpu_load > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+          environment: staging
+        annotations:
+          summary: "High CPU load detected"
+          description: "CPU load average is {{ $value }} for more than 5 minutes"
+
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+          environment: staging
+        annotations:
+          summary: "Low disk space detected"
+          description: "Disk space is {{ $value | humanizePercentage }} available"
+
+  # =============================================================================
+  # SECURITY ALERTS
+  # =============================================================================
+  - name: security.monitoring
+    interval: 30s
+    rules:
+      - alert: HighFailedLoginAttempts
+        expr: rate(ectropy_failed_login_attempts_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          component: authentication
+          environment: staging
+        annotations:
+          summary: "High failed login attempt rate"
+          description: "Failed login attempts: {{ $value }} per second"
+
+      - alert: SuspiciousAPIActivity
+        expr: rate(http_requests_total{status="401"}[5m]) > 1
+        for: 3m
+        labels:
+          severity: warning
+          component: security
+          environment: staging
+        annotations:
+          summary: "Suspicious API activity detected"
+          description: "Unauthorized requests: {{ $value }} per second"
+
+      - alert: RateLimitExceeded
+        expr: rate(ectropy_rate_limit_exceeded_total[5m]) > 0.5
+        for: 3m
+        labels:
+          severity: warning
+          component: rate-limiter
+          environment: staging
+        annotations:
+          summary: "Rate limit frequently exceeded"
+          description: "Rate limit exceeded: {{ $value }} times per second"

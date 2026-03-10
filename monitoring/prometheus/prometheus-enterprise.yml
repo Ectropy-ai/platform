@@ -1,0 +1,201 @@
+# =============================================================================
+# ENTERPRISE MONITORING CONFIGURATION - PROMETHEUS
+# =============================================================================
+# 
+# Comprehensive monitoring configuration for Ectropy staging environment
+# Includes application metrics, infrastructure monitoring, and alerting rules
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'ectropy-staging'
+    environment: 'staging'
+    platform: 'ectropy'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Rule files for alerting
+rule_files:
+  - "alerts/*.yml"
+  - "recording_rules/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # API Gateway monitoring
+  - job_name: 'ectropy-api-gateway'
+    static_configs:
+      - targets: ['api-gateway:4000']
+    scrape_interval: 15s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    honor_labels: false
+    params:
+      format: ['prometheus']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: api-gateway:4000
+
+  # Web Dashboard monitoring
+  - job_name: 'ectropy-web-dashboard'
+    static_configs:
+      - targets: ['web-dashboard:80']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+
+  # PostgreSQL monitoring
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    params:
+      auth_module: [postgres]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: postgres-exporter:9187
+
+  # Redis monitoring  
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: redis-exporter:9121
+
+  # Speckle Server monitoring
+  - job_name: 'speckle-server'
+    static_configs:
+      - targets: ['speckle-server:3000']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    honor_labels: false
+
+  # Node Exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # Docker container monitoring
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    honor_labels: false
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: '/(.*)'
+        target_label: container_name
+        replacement: '${1}'
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        target_label: service_name
+
+  # Grafana monitoring
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+    scrape_interval: 60s
+    metrics_path: /metrics
+
+  # MinIO monitoring (if enabled)
+  - job_name: 'minio'
+    static_configs:
+      - targets: ['minio:9000']
+    scrape_interval: 30s
+    metrics_path: /minio/v2/metrics/cluster
+    bearer_token_file: /etc/prometheus/minio-token
+    scheme: http
+
+  # Application-specific BIM metrics
+  - job_name: 'ectropy-bim-metrics'
+    static_configs:
+      - targets: ['api-gateway:4000']
+    scrape_interval: 30s
+    metrics_path: /metrics/bim
+    scrape_timeout: 15s
+    honor_labels: true
+
+  # Custom health check endpoints
+  - job_name: 'health-checks'
+    static_configs:
+      - targets: 
+          - 'api-gateway:4000'
+          - 'web-dashboard:80'
+          - 'speckle-server:3000'
+    scrape_interval: 10s
+    metrics_path: /health/prometheus
+    scrape_timeout: 5s
+    params:
+      format: ['prometheus']
+
+  # Performance testing metrics (when enabled)
+  - job_name: 'performance-tests'
+    static_configs:
+      - targets: ['api-gateway:4000']
+    scrape_interval: 60s
+    metrics_path: /metrics/performance
+    scrape_timeout: 30s
+    honor_labels: true
+    params:
+      detailed: ['true']
+
+# Remote write configuration (for long-term storage)
+remote_write:
+  - url: "http://prometheus-remote-storage:9090/api/v1/write"
+    write_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'ectropy_.*'
+        action: keep
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 10
+      capacity: 10000
+
+# Remote read configuration
+remote_read:
+  - url: "http://prometheus-remote-storage:9090/api/v1/read"
+    read_recent: true
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 30d
+    retention.size: 10GB
+    wal-compression: true
+
+# Feature flags
+feature_flags:
+  enable_auto_gomaxprocs: true
+  enable_new_service_discovery_manager: true

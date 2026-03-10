@@ -1,0 +1,11 @@
+# Trivy configuration for Ectropy Platform
+format: json
+output: reports/security/trivy-report.json
+severity:
+  - CRITICAL
+  - HIGH
+  - MEDIUM
+ignore-unfixed: false
+skip-update: false
+cache-dir: .trivy-cache
+timeout: 10m

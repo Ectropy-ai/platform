@@ -1,0 +1,117 @@
+# 🐳 STAGING DOCKERFILE - ECTROPY FEDERATED PLATFORM
+# Optimized for staging deployment with development tools and debugging
+
+# Build stage
+FROM node:20-bullseye AS builder
+
+# Build arguments for staging environment
+ARG NODE_ENV=staging
+ARG PORT=4000
+ARG BUILD_OPTIMIZATION=true
+
+WORKDIR /app
+
+# Set environment variables for build
+ENV DEBIAN_FRONTEND=noninteractive
+ENV NODE_ENV=${NODE_ENV}
+ENV PORT=${PORT}
+
+# Add staging metadata
+LABEL environment="staging"
+LABEL build_optimization="${BUILD_OPTIMIZATION}"
+
+# Install build dependencies
+RUN set -eux; \
+    apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y \
+        build-essential \
+        python3 \
+        curl \
+        bash \
+        ca-certificates \
+        git \
+        && rm -rf /var/lib/apt/lists/*
+
+# Install pnpm using npm global install (more reliable in containers)
+RUN npm install -g pnpm@10.14.0
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/ ./apps/
+COPY libs/ ./libs/
+COPY tools/ ./tools/
+COPY nx.json tsconfig.base.json ./
+COPY scripts ./scripts
+
+# CRITICAL: Prisma schema must exist before pnpm install
+# because package.json postinstall hook runs "prisma generate"
+COPY prisma ./prisma
+
+# Install dependencies (including dev dependencies for staging)
+RUN pnpm install --frozen-lockfile
+
+# Build applications for staging
+RUN pnpm nx build web-dashboard --configuration=development
+RUN pnpm nx build api-gateway --configuration=development || echo "API Gateway build failed - continuing"
+RUN pnpm nx build mcp-server --configuration=development
+
+# Staging stage (includes debugging tools)
+FROM node:20-bullseye-slim AS staging
+
+# Staging environment variables
+ENV NODE_ENV=staging
+ENV PORT=4000
+
+WORKDIR /app
+
+# Install runtime and debugging dependencies
+RUN set -eux; \
+    apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y \
+        ca-certificates \
+        curl \
+        htop \
+        vim \
+        && rm -rf /var/lib/apt/lists/* \
+        && groupadd -r ectropy \
+        && useradd -r -g ectropy ectropy
+
+# Install pnpm for dependency management
+RUN npm install -g pnpm@10.14.0
+
+# Copy package files and Prisma schema
+COPY --from=builder --chown=ectropy:ectropy /app/package.json ./package.json
+COPY --from=builder --chown=ectropy:ectropy /app/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=builder --chown=ectropy:ectropy /app/prisma ./prisma
+
+# Install dependencies from generated package.json
+# Cannot use --frozen-lockfile because package.json was modified by prepare script
+# and no longer matches the builder stage lockfile
+# Staging includes all dependencies for debugging
+RUN pnpm install --no-frozen-lockfile
+
+# Generate Prisma client for staging runtime
+RUN npx prisma generate
+
+# Copy built applications
+COPY --from=builder --chown=ectropy:ectropy /app/dist ./dist
+
+# Copy staging configuration files
+COPY --chown=ectropy:ectropy docker-compose.staging.yml ./
+COPY --chown=ectropy:ectropy .env.staging.template ./
+COPY --chown=ectropy:ectropy .env.staging.example ./
+
+# Switch to non-root user
+USER ectropy
+
+# Health check (more frequent for staging)
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
+
+# Expose port
+EXPOSE ${PORT}
+
+# Start the application with development flags
+CMD ["node", "dist/apps/api-gateway/main.js"]

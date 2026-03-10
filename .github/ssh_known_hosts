@@ -1,0 +1,22 @@
+# SSH Known Hosts for CI/CD Deployment
+# Enterprise Pattern: Host key verification without StrictHostKeyChecking=no
+# Source: ssh-keyscan -H 24.144.93.139 (verified 2026-02-03)
+#
+# ROOT CAUSE #157: Updated for infrastructure drift resolution
+# OLD Server (destroyed): 143.110.236.82 (stale droplet ID 548830662)
+# NEW Server (current staging): 24.144.93.139 (droplet ID 548984053)
+#
+# Infrastructure validated 2026-02-03:
+# - Droplet: ectropy-staging (548984053)
+# - Region: sfo3
+# - VPC: 10.20.0.0/20 (vpc-isolated)
+# - Status: Active
+# - SSH: OpenSSH 8.9p1 Ubuntu-3ubuntu0.13
+#
+# Staging Server (ectropy-staging): 24.144.93.139
+# ED25519 host key (preferred, most secure)
+|1|qh39LTE0cBysKYQW3XWOf6+V1dA=|4YKT7ilG8OsR93l26Jly8fLVYYE= ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAK5aUJqPj9etl6R+vHnuXntRvt8Dx7xyr8ZIGXnbiP7
+# ECDSA host key
+|1|5TEKr5aNgZ1q7VfRlyLtZyN02kM=|4eQKjecBDrk3VKUzNRSJJeB2jHY= ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBCCY/0ElQsHnciX6Wi6nBijyNJlKvG+tBFYjpvpxi42ucmyz0jJhhhTT456kzYWaPSM3RAHbJyRXKJVx+2gtJBs=
+# RSA host key
+|1|iPBaewbtv5tfh0M/T6ePdCVtje4=|u3YEOSJrVxp7fwA9Rf9crxcO+1s= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCrJE4gZ9Rn6g1nBv0HnNXs5H8n6abz/g91hM273+ms0N39oeUQqSMW1gj9rNPTTGVtuZJZxJCy4S3vOjwuFdf9pIPcmcBwRvtlY0kwDNvwmi5G5+66FkLy2vELia/d2k7ZuauGK6eG2PeyLbUpAqiq5U/ESghasgVkUQ8vCPWDB1UPZoU4hLDtU5TnUxg3nQo0DNaiBXkSKCQ3+HgzprRgSaGBt2P4j6HQEX5C8niQy9RZS+LtDCv9RNIkR26FLAXK1S5HYbKxYL8c4ybcpPGv4ortOPfAjPCXozKCPPMcRTcoNizMVjDl/7PNarDDM26UWgxKXBcQvJpxCjTVaawTCcJlXSW8JhoStbmpWFLWdnHswir9SR9wdl1fZdHH1C9BeOWUxruB2eboMChtBTht77JgR4d06To55K93i0tUumB3jep7vZuFi+qg5HJPozTo9T9G85LAKh//aoMcqYG1TjEbv8dwBxDJb9Eycc6Vc1AmwjSm7yQuOBwmcTpRMxU=

@@ -1,0 +1,57 @@
+name: Terraform Bucket Setup
+
+# One-time workflow to diagnose and create the Terraform state bucket
+# Run this manually to set up the DigitalOcean Spaces bucket for Terraform state
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_bucket:
+        description: 'Attempt to create bucket if it does not exist'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  SPACES_REGION: 'sfo3'
+  SPACES_BUCKET: 'ectropy-terraform-state'
+
+# Enterprise Security: Explicit least-privilege permissions
+# READ + DEPLOY: Bucket setup needs read config and deploy backend
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  setup-bucket:
+    name: Setup Terraform State Bucket
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Diagnostic Script
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "🔍 Running DigitalOcean Spaces bucket diagnostics..."
+          bash scripts/terraform/diagnose-spaces-bucket.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Terraform State Bucket Setup" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Bucket**: ${{ env.SPACES_BUCKET }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Region**: ${{ env.SPACES_REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: Check job output above" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "If the bucket was created successfully, you can now:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Run the Terraform drift detection workflow" >> $GITHUB_STEP_SUMMARY
+          echo "2. Initialize Terraform locally with \`terraform init\`" >> $GITHUB_STEP_SUMMARY

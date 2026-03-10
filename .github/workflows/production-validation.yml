@@ -1,0 +1,134 @@
+name: Production Validation
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      run_full_suite:
+        description: 'Run full test suite'
+        required: false
+        default: 'true'
+      allow_failures:
+        description: 'Allow tests to fail (monitoring mode)'
+        required: false
+        default: 'true'
+
+# Enterprise Security: Explicit least-privilege permissions
+# READ + DEPLOY: Validation needs read code and trigger checks
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  validate-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20 # Increased from 15 to 20 minutes to accommodate longer timeouts and retries
+    environment: production
+    env:
+      # NOTE: Using staging.ectropy.ai as production proxy until ectropy.ai domain is configured
+      # ectropy.ai domain does not resolve (DNS not configured as of 2025-10-31)
+      # staging.ectropy.ai is the actual deployed production-like environment
+      PRODUCTION_URL: https://staging.ectropy.ai
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Browsers
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Run Production Validation Tests
+        id: validation_tests
+        run: pnpm test:e2e:production
+        continue-on-error: ${{ github.event.inputs.allow_failures == 'true' || github.event_name == 'schedule' }}
+
+      - name: Run Automated Validation Script
+        run: bash scripts/validation/validate-production.sh
+        continue-on-error: true
+
+      - name: Upload Validation Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-script-results
+          path: evidence/production-validation-*.txt
+          retention-days: 30
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-test-results
+          path: test-results/production/
+          retention-days: 30
+
+      - name: Upload Test Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-test-report
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Create Summary
+        if: always()
+        run: |
+          echo "## Production Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Test Status:** ${{ steps.validation_tests.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Mode:** ${{ github.event.inputs.allow_failures == 'true' && 'Monitoring (failures allowed)' || 'Strict (failures block)' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.validation_tests.outcome }}" != "success" ]; then
+            echo "⚠️ **Production environment may be experiencing issues**" >> $GITHUB_STEP_SUMMARY
+            echo "- Check if production is operational" >> $GITHUB_STEP_SUMMARY
+            echo "- Review test artifacts for details" >> $GITHUB_STEP_SUMMARY
+            echo "- Verify DNS/SSL/Load balancer configuration" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **Production environment is operational**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Checkout (for Slack action)
+        if: steps.validation_tests.outcome == 'failure'
+        uses: actions/checkout@v4
+
+      - name: Notify Slack on Production Issues
+        if: steps.validation_tests.outcome == 'failure'
+        uses: ./.github/actions/slack-notify
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: warning
+          workflow-name: 'Production Validation'
+          custom-message: |
+            ⚠️ *Production Validation Tests Failed*
+
+            Production environment may be experiencing issues.
+
+            **Mode:** ${{ github.event.inputs.allow_failures == 'true' && 'Monitoring (non-blocking)' || 'Strict' }}
+            **Trigger:** ${{ github.event_name }}
+
+            **Action Required:**
+            • Check if production is operational
+            • Review test artifacts for details
+            • Verify DNS/SSL/Load balancer
+
+            <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>
+
+      - name: Notify on Failure (Strict Mode)
+        if: failure() && github.event.inputs.allow_failures != 'true' && github.event_name != 'schedule'
+        run: |
+          echo "::error::Production validation tests failed in strict mode!"
+          echo "Review test results artifact for details"
+          exit 1

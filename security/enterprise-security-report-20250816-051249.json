@@ -1,0 +1,26 @@
+{
+  "timestamp": "2025-08-16T05:12:50+00:00",
+  "environment": "unknown",
+  "project_root": "/home/runner/work/Ectropy/Ectropy",
+  "security_validation": {
+    "total_checks": 24,
+    "passed_checks": 20,
+    "failed_checks": 0,
+    "warnings": 3,
+    "security_score": "83.33%"
+  },
+  "validation_categories": {
+    "environment_files": "completed",
+    "dependency_security": "completed",
+    "docker_security": "completed",
+    "authentication_security": "completed",
+    "cors_and_headers": "completed",
+    "file_permissions": "completed"
+  },
+  "compliance": {
+    "enterprise_ready": false,
+    "production_ready": false,
+    "critical_issues": 0,
+    "security_warnings": 3
+  }
+}

@@ -1,0 +1,386 @@
+name: 'Validate Playwright Browser Installation'
+description: 'Enterprise-grade validation of Playwright browser binaries with automatic recovery'
+author: 'Ectropy Platform Team'
+
+# Browser validation based on:
+# - Playwright official CI/CD documentation (2024)
+# - Industry best practices for test infrastructure
+# - Automatic recovery patterns for self-healing workflows
+
+inputs:
+  browser:
+    description: 'Browser to validate (chromium, firefox, webkit, or all)'
+    required: false
+    default: 'chromium'
+  auto-install-on-failure:
+    description: 'Automatically install browser if validation fails'
+    required: false
+    default: 'true'
+  with-deps:
+    description: 'Install system dependencies when auto-installing'
+    required: false
+    default: 'true'
+  fail-on-missing:
+    description: 'Fail workflow if browser not found (false = install automatically)'
+    required: false
+    default: 'false'
+
+outputs:
+  browser-path:
+    description: 'Validated browser installation directory'
+    value: ${{ steps.validate.outputs.browser-path }}
+  browser-version:
+    description: 'Browser version detected'
+    value: ${{ steps.validate.outputs.browser-version }}
+  validation-status:
+    description: 'Validation result (valid, missing, corrupted, recovered)'
+    value: ${{ steps.validate.outputs.status }}
+  binary-path:
+    description: 'Full path to browser binary'
+    value: ${{ steps.validate.outputs.binary-path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 🔍 Validate Playwright browser installation
+      id: validate
+      shell: bash
+      run: |
+        echo "::group::Playwright Browser Validation"
+        echo "🔍 Validating Playwright browser: ${{ inputs.browser }}"
+
+        # ENTERPRISE: Browser cache path resolution for self-hosted runners
+        # Priority order:
+        # 1. PLAYWRIGHT_BROWSERS_PATH (shared cache: /opt/shared-playwright-cache)
+        # 2. Runner-specific path (legacy: /opt/actions-runner-X/.cache/ms-playwright)
+        # 3. HOME-based path (GitHub-hosted runners)
+        #
+        # Shared cache implementation:
+        # - Runner .env sets PLAYWRIGHT_BROWSERS_PATH=/opt/shared-playwright-cache
+        # - All runners on same host share browser binaries (1.8GB disk savings)
+        # - Workflow cache@v4 uses /opt/shared-playwright-cache as path
+        # - Eliminates path mismatches in matrix jobs (root cause of E2E failures)
+        # - Setup: scripts/ci/setup-shared-playwright-cache.sh
+
+        # Check if PLAYWRIGHT_BROWSERS_PATH env variable is explicitly set
+        if [ -n "$PLAYWRIGHT_BROWSERS_PATH" ]; then
+          echo "✅ Using explicit PLAYWRIGHT_BROWSERS_PATH: $PLAYWRIGHT_BROWSERS_PATH"
+          BROWSER_DIR="$PLAYWRIGHT_BROWSERS_PATH"
+        elif [ -n "$RUNNER_NAME" ]; then
+          # Self-hosted runner - construct path from runner name
+          echo "ℹ️  Self-hosted runner detected: $RUNNER_NAME"
+          RUNNER_NUM="${RUNNER_NAME##*-}"
+          BROWSER_DIR="/opt/actions-runner-${RUNNER_NUM}/.cache/ms-playwright"
+          echo "ℹ️  Constructed runner-specific path: $BROWSER_DIR"
+        elif [ -n "$HOME" ] && [ "$HOME" != "/" ]; then
+          # HOME is set and not root - use it
+          BROWSER_DIR="$HOME/.cache/ms-playwright"
+          echo "ℹ️  Using HOME-based path: $BROWSER_DIR"
+        else
+          # Fallback to common locations
+          echo "⚠️  HOME not reliably set (HOME=${HOME:-'<not set>'}), using fallback"
+          BROWSER_DIR="/home/runner/.cache/ms-playwright"
+        fi
+
+        echo "📍 Browser cache directory: $BROWSER_DIR"
+
+        # ENTERPRISE FIX: Always export browser-path for downstream steps
+        echo "browser-path=$BROWSER_DIR" >> $GITHUB_OUTPUT
+
+        # Check if browser directory exists
+        if [ ! -d "$BROWSER_DIR" ]; then
+          echo "❌ Browser cache directory not found"
+          echo "status=missing" >> $GITHUB_OUTPUT
+
+          if [ "${{ inputs.fail-on-missing }}" = "true" ]; then
+            echo "::endgroup::"
+            exit 1
+          fi
+
+          echo "ℹ️  Browser will be installed automatically"
+          echo "::endgroup::"
+          exit 0  # Will be handled by install step
+        fi
+
+        # List browser directories
+        echo ""
+        echo "📂 Browser cache contents:"
+        ls -lah "$BROWSER_DIR" || true
+
+        # Find browser directory (support 'all' for validation)
+        BROWSERS_TO_CHECK="${{ inputs.browser }}"
+        if [ "$BROWSERS_TO_CHECK" = "all" ]; then
+          BROWSERS_TO_CHECK="chromium firefox webkit"
+        fi
+
+        validation_failed=false
+
+        for browser_name in $BROWSERS_TO_CHECK; do
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Validating: $browser_name"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # Find browser installation directory
+          BROWSER_PATH=$(find "$BROWSER_DIR" -maxdepth 1 -type d -name "${browser_name}-*" 2>/dev/null | head -1)
+
+          if [ -z "$BROWSER_PATH" ]; then
+            echo "❌ $browser_name not found in cache"
+            validation_failed=true
+            continue
+          fi
+
+          echo "✅ Found: $BROWSER_PATH"
+
+          # Determine binary path based on browser and OS
+          case "$browser_name" in
+            chromium)
+              if [ "$RUNNER_OS" = "Linux" ]; then
+                BINARY="$BROWSER_PATH/chrome-linux/chrome"
+              elif [ "$RUNNER_OS" = "macOS" ]; then
+                BINARY="$BROWSER_PATH/chrome-mac/Chromium.app/Contents/MacOS/Chromium"
+              elif [ "$RUNNER_OS" = "Windows" ]; then
+                BINARY="$BROWSER_PATH\\chrome-win\\chrome.exe"
+              fi
+              ;;
+            firefox)
+              if [ "$RUNNER_OS" = "Linux" ]; then
+                BINARY="$BROWSER_PATH/firefox/firefox"
+              elif [ "$RUNNER_OS" = "macOS" ]; then
+                BINARY="$BROWSER_PATH/firefox/Firefox.app/Contents/MacOS/firefox"
+              elif [ "$RUNNER_OS" = "Windows" ]; then
+                BINARY="$BROWSER_PATH\\firefox\\firefox.exe"
+              fi
+              ;;
+            webkit)
+              if [ "$RUNNER_OS" = "Linux" ]; then
+                BINARY="$BROWSER_PATH/minibrowser-gtk/pw_run.sh"
+              elif [ "$RUNNER_OS" = "macOS" ]; then
+                BINARY="$BROWSER_PATH/Playwright.app/Contents/MacOS/Playwright"
+              elif [ "$RUNNER_OS" = "Windows" ]; then
+                BINARY="$BROWSER_PATH\\Playwright.exe"
+              fi
+              ;;
+          esac
+
+          # Validate binary exists
+          if [ ! -f "$BINARY" ] && [ ! -x "$BINARY" ]; then
+            echo "❌ Binary not found: $BINARY"
+            echo "   Directory contents:"
+            ls -laR "$BROWSER_PATH" | head -30 || true
+            validation_failed=true
+            continue
+          fi
+
+          echo "✅ Binary exists: $BINARY"
+
+          # Check if executable (Unix-like systems)
+          if [ "$RUNNER_OS" != "Windows" ]; then
+            if [ ! -x "$BINARY" ]; then
+              echo "⚠️  Binary not executable, attempting to fix permissions..."
+              chmod +x "$BINARY" || true
+
+              if [ ! -x "$BINARY" ]; then
+                echo "❌ Failed to make binary executable"
+                validation_failed=true
+                continue
+              fi
+
+              echo "✅ Permissions fixed"
+            fi
+          fi
+
+          # Test browser execution with enterprise retry logic
+          echo "🧪 Testing browser execution..."
+
+          # ENTERPRISE: Retry logic with increased timeout (aligned with infrastructure patterns)
+          # Infrastructure pattern: 5 retries, 10s interval (from infrastructure-catalog.json)
+          # Timeout: 30s (aligned with deployment-runbook wait patterns for service initialization)
+          retry_count=0
+          max_retries=5
+          retry_interval=10
+          timeout_seconds=30
+          browser_validated=false
+
+          while [ $retry_count -lt $max_retries ]; do
+            echo "   Attempt $((retry_count + 1))/$max_retries (timeout: ${timeout_seconds}s)..."
+            if timeout $timeout_seconds "$BINARY" --version >/dev/null 2>&1; then
+              browser_validated=true
+              break
+            fi
+
+            retry_count=$((retry_count + 1))
+            if [ $retry_count -lt $max_retries ]; then
+              echo "   ⏳ Browser not ready, waiting ${retry_interval}s before retry..."
+              sleep $retry_interval
+            fi
+          done
+
+          if [ "$browser_validated" = "true" ]; then
+            VERSION=$("$BINARY" --version 2>/dev/null || echo "unknown")
+            echo "✅ Browser executable and responsive"
+            echo "   Version: $VERSION"
+            echo "   Validated on attempt: $((retry_count + 1))/$max_retries"
+
+            # Set outputs for primary browser
+            if [ "$browser_name" = "${{ inputs.browser }}" ] || [ "${{ inputs.browser }}" = "all" ]; then
+              echo "browser-path=$BROWSER_PATH" >> $GITHUB_OUTPUT
+              echo "binary-path=$BINARY" >> $GITHUB_OUTPUT
+              echo "browser-version=$VERSION" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "❌ Browser failed to execute after $max_retries attempts (total wait: $((max_retries * timeout_seconds))s)"
+            echo "   This may indicate a corrupted installation or resource contention"
+            validation_failed=true
+            continue
+          fi
+
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ $browser_name validation PASSED"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        done
+
+        echo ""
+        echo "::endgroup::"
+
+        if [ "$validation_failed" = "true" ]; then
+          echo "status=corrupted" >> $GITHUB_OUTPUT
+
+          if [ "${{ inputs.fail-on-missing }}" = "true" ]; then
+            echo "❌ Browser validation failed and fail-on-missing is true"
+            exit 1
+          fi
+
+          echo "ℹ️  Browser will be reinstalled automatically"
+          exit 0  # Will be handled by install step
+        fi
+
+        echo "status=valid" >> $GITHUB_OUTPUT
+
+    - name: 📥 Auto-install browser on validation failure
+      if: |
+        always() &&
+        steps.validate.outputs.status != 'valid' &&
+        inputs.auto-install-on-failure == 'true'
+      shell: bash
+      run: |
+        echo "::group::Automatic Browser Recovery"
+        echo "🔧 Browser validation failed, initiating automatic recovery..."
+
+        validation_status="${{ steps.validate.outputs.status }}"
+        echo "Validation status: $validation_status"
+
+        # Remove corrupted installation if exists
+        if [ "$validation_status" = "corrupted" ]; then
+          echo "🧹 Removing corrupted browser installation..."
+
+          if [ "$RUNNER_OS" = "Linux" ] || [ "$RUNNER_OS" = "macOS" ]; then
+            BROWSER_DIR="${HOME}/.cache/ms-playwright"
+          else
+            BROWSER_DIR="${USERPROFILE}\\AppData\\Local\\ms-playwright"
+          fi
+
+          browser_path=$(find "$BROWSER_DIR" -maxdepth 1 -type d -name "${{ inputs.browser }}-*" 2>/dev/null | head -1)
+
+          if [ -n "$browser_path" ]; then
+            echo "Removing: $browser_path"
+            rm -rf "$browser_path"
+            echo "✅ Corrupted installation removed"
+          fi
+        fi
+
+        # Install browser
+        echo ""
+        echo "📦 Installing Playwright browser: ${{ inputs.browser }}"
+
+        # Enterprise Fix: Configure APT lock timeout for concurrent installations
+        # Prevents race conditions on self-hosted runners with background updates
+        if [ "$RUNNER_OS" = "Linux" ] && [ "${{ inputs.with-deps }}" = "true" ]; then
+          echo "🔧 Configuring APT lock timeout (enterprise pattern)"
+          sudo mkdir -p /etc/apt/apt.conf.d/
+          echo 'DPkg::Lock::Timeout "300";' | sudo tee /etc/apt/apt.conf.d/99lock-timeout > /dev/null
+          echo "   Timeout: 300 seconds (handles concurrent APT operations)"
+        fi
+
+        install_cmd="npx playwright install ${{ inputs.browser }}"
+
+        if [ "${{ inputs.with-deps }}" = "true" ]; then
+          install_cmd="npx playwright install --with-deps ${{ inputs.browser }}"
+          echo "   Including system dependencies"
+        fi
+
+        echo "Command: $install_cmd"
+        echo ""
+
+        if $install_cmd; then
+          echo "✅ Browser installed successfully"
+
+          # ENTERPRISE: Wait for browser to stabilize after installation
+          # Infrastructure pattern: 30-60s wait for service initialization (from deployment-runbook)
+          # Prevents race conditions between download completion and binary availability
+          echo ""
+          echo "⏳ Waiting 30s for browser to stabilize (enterprise pattern)..."
+          sleep 30
+          echo "✅ Wait complete, browser ready for validation"
+        else
+          echo "❌ Browser installation failed"
+          echo "::endgroup::"
+          exit 1
+        fi
+
+        echo "::endgroup::"
+
+    - name: ✅ Final verification
+      if: always() && steps.validate.outputs.status != 'valid'
+      shell: bash
+      run: |
+        echo "::group::Post-Installation Verification"
+        echo "🔍 Verifying browser installation after recovery..."
+
+        # Re-run validation logic
+        if [ "$RUNNER_OS" = "Linux" ] || [ "$RUNNER_OS" = "macOS" ]; then
+          BROWSER_DIR="${HOME}/.cache/ms-playwright"
+        else
+          BROWSER_DIR="${USERPROFILE}\\AppData\\Local\\ms-playwright"
+        fi
+
+        BROWSER_PATH=$(find "$BROWSER_DIR" -maxdepth 1 -type d -name "${{ inputs.browser }}-*" 2>/dev/null | head -1)
+
+        if [ -z "$BROWSER_PATH" ]; then
+          echo "❌ Browser still not found after installation"
+          echo "::endgroup::"
+          exit 1
+        fi
+
+        echo "✅ Browser directory found: $BROWSER_PATH"
+
+        # Quick binary check
+        case "${{ inputs.browser }}" in
+          chromium)
+            BINARY="$BROWSER_PATH/chrome-linux/chrome"
+            ;;
+          firefox)
+            BINARY="$BROWSER_PATH/firefox/firefox"
+            ;;
+          webkit)
+            BINARY="$BROWSER_PATH/minibrowser-gtk/pw_run.sh"
+            ;;
+        esac
+
+        if [ -f "$BINARY" ]; then
+          echo "✅ Binary verified: $BINARY"
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "✅ Browser recovery successful"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        else
+          echo "❌ Binary not found: $BINARY"
+          echo "::endgroup::"
+          exit 1
+        fi
+
+        echo "::endgroup::"
+
+branding:
+  icon: 'check-circle'
+  color: 'green'

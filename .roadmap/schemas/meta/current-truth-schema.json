@@ -1,0 +1,583 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ectropy.ai/schemas/current-truth-v1.0.0.json",
+  "title": "Current Truth Documentation Schema",
+  "description": "JSON schema for Ectropy platform current truth documentation - living state and recent changes",
+  "type": "object",
+  "required": ["schemaVersion", "lastUpdated", "metadata", "policies", "platformState", "nodes", "index"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of this schema"
+    },
+    "lastUpdated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of last update"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["documentId", "purpose", "maintainer", "humanViewUrl"],
+      "properties": {
+        "documentId": {
+          "type": "string",
+          "const": "current-truth"
+        },
+        "purpose": {
+          "type": "string",
+          "description": "Purpose of this document"
+        },
+        "maintainer": {
+          "type": "string",
+          "description": "Primary maintainer (human or ai-agents)"
+        },
+        "humanViewUrl": {
+          "type": "string",
+          "description": "Path to generated markdown view"
+        }
+      }
+    },
+    "policies": {
+      "type": "object",
+      "required": ["retention", "archiving"],
+      "properties": {
+        "retention": {
+          "type": "object",
+          "required": ["defaultDays", "extendedDays", "archiveSchedule"],
+          "properties": {
+            "defaultDays": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Default retention period in days"
+            },
+            "extendedDays": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Extended retention for critical nodes"
+            },
+            "archiveSchedule": {
+              "type": "string",
+              "enum": ["weekly", "monthly", "quarterly"],
+              "description": "Automatic archive schedule"
+            }
+          }
+        },
+        "archiving": {
+          "type": "object",
+          "required": ["enabled", "location", "nextArchiveDate"],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "location": {
+              "type": "string",
+              "description": "Archive directory path"
+            },
+            "nextArchiveDate": {
+              "type": "string",
+              "format": "date",
+              "description": "Next scheduled archive date"
+            }
+          }
+        }
+      }
+    },
+    "platformState": {
+      "type": "object",
+      "required": ["health", "phase", "progress"],
+      "properties": {
+        "health": {
+          "type": "string",
+          "enum": ["healthy", "degraded", "critical", "unknown"],
+          "description": "Overall platform health status"
+        },
+        "phase": {
+          "type": "string",
+          "pattern": "^phase-[0-9]+[a-z]?$",
+          "description": "Current development phase"
+        },
+        "progress": {
+          "type": "object",
+          "properties": {
+            "completedDeliverables": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "totalDeliverables": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "activeWorkstreams": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "description": "Array of all truth nodes",
+      "items": {
+        "$ref": "#/definitions/node"
+      }
+    },
+    "index": {
+      "type": "object",
+      "description": "Indexes for efficient node lookup",
+      "required": ["byNodeType", "byStatus", "byTag", "byPhase", "byDate"],
+      "properties": {
+        "byNodeType": {
+          "type": "object",
+          "description": "Nodes indexed by type",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "byStatus": {
+          "type": "object",
+          "description": "Nodes indexed by status",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "byTag": {
+          "type": "object",
+          "description": "Nodes indexed by tags",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "byPhase": {
+          "type": "object",
+          "description": "Nodes indexed by phase",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "byDate": {
+          "type": "object",
+          "description": "Nodes indexed by date (YYYY-MM format)",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "node": {
+      "type": "object",
+      "required": ["nodeId", "nodeType", "timestamp", "title", "status", "priority", "content", "relationships", "metadata"],
+      "properties": {
+        "nodeId": {
+          "type": "string",
+          "pattern": "^node-[a-z0-9-]+$",
+          "description": "Unique node identifier"
+        },
+        "nodeType": {
+          "type": "string",
+          "enum": [
+            "infrastructure",
+            "platform",
+            "integration",
+            "data",
+            "workflow",
+            "deployment",
+            "configuration",
+            "pattern",
+            "investigation",
+            "decision",
+            "policy",
+            "deliverable",
+            "requirement",
+            "refactor",
+            "monitoring",
+            "incident"
+          ],
+          "description": "Type of node (21 approved types - 16 currently defined, 5 reserved)"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of node creation"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Node title (max 200 chars)"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "in-progress", "blocked", "planned", "archived"],
+          "description": "Current status of the node"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"],
+          "description": "Priority level"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of label strings"
+        },
+        "content": {
+          "type": "object",
+          "required": ["context", "approach", "outcome", "evidence"],
+          "properties": {
+            "context": {
+              "type": "string",
+              "maxLength": 500,
+              "description": "Why - context and motivation (max 500 chars)"
+            },
+            "approach": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "How - array of steps taken"
+            },
+            "outcome": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Results - array of outcomes"
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Validation - array of proof/evidence"
+            },
+            "filesModified": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["path", "description"],
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              },
+              "description": "Files modified by this change"
+            },
+            "typeSpecific": {
+              "type": "object",
+              "description": "Type-specific content fields",
+              "properties": {
+                "rootCause": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Root causes (for investigation nodes)"
+                },
+                "diagnosis": {
+                  "type": "string",
+                  "description": "Analysis method (for investigation nodes)"
+                },
+                "decisionFactors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Factors considered (for decision nodes)"
+                },
+                "alternatives": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Alternative options (for decision nodes)"
+                },
+                "requirements": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Requirements list (for deliverable nodes)"
+                },
+                "acceptance": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Acceptance criteria (for deliverable nodes)"
+                }
+              }
+            }
+          }
+        },
+        "relationships": {
+          "type": "object",
+          "description": "Relationships to other nodes (28 approved types)",
+          "properties": {
+            "dependsOn": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Dependency relationships"
+            },
+            "enables": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Enablement relationships"
+            },
+            "consumes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Resource consumption relationships"
+            },
+            "produces": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Resource production relationships"
+            },
+            "governs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Governance relationships"
+            },
+            "guides": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Guidance relationships"
+            },
+            "validates": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Validation relationships"
+            },
+            "enforces": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Enforcement relationships"
+            },
+            "supports": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Support relationships"
+            },
+            "motivates": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Motivation relationships"
+            },
+            "documents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Documentation relationships"
+            },
+            "supersedes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Supersession relationships"
+            },
+            "replaces": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Replacement relationships"
+            },
+            "extends": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Extension relationships"
+            },
+            "relates": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "General relationship"
+            },
+            "diagnoses": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Diagnostic relationships"
+            },
+            "resolves": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Resolution relationships"
+            },
+            "mitigates": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Mitigation relationships"
+            },
+            "prevents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Prevention relationships"
+            },
+            "conflicts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Conflict relationships"
+            },
+            "implements": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Implementation relationships"
+            },
+            "deploys": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Deployment relationships"
+            },
+            "triggers": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Trigger relationships"
+            },
+            "archives": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Archive relationships"
+            },
+            "contains": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Containment relationships"
+            },
+            "partOf": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Part-of relationships"
+            },
+            "shares": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Sharing relationships"
+            }
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "required": ["author", "retentionDays", "archiveDate"],
+          "properties": {
+            "author": {
+              "type": "string",
+              "description": "Author of this node (human username or ai-agent)"
+            },
+            "retentionDays": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Days to retain this node before archiving"
+            },
+            "archiveDate": {
+              "type": "string",
+              "format": "date",
+              "description": "ISO 8601 date when node should be archived"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Additional tags for categorization"
+            },
+            "phase": {
+              "type": "string",
+              "pattern": "^phase-[0-9]+[a-z]?$",
+              "description": "Associated development phase"
+            },
+            "relatedIssues": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^#\\d+$"
+              },
+              "description": "Array of related GitHub issue numbers"
+            },
+            "relatedPRs": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^#\\d+$"
+              },
+              "description": "Array of related GitHub PR numbers"
+            }
+          }
+        }
+      }
+    }
+  }
+}

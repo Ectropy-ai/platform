@@ -1,0 +1,611 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:seed:validation",
+  "title": "Seed Validation Criteria Schema",
+  "description": "Enterprise validation gates for database seeding operations. Defines validation criteria, assertion types, threshold configurations, and failure handling for ensuring seed data integrity and completeness.",
+  "type": "object",
+  "required": [
+    "$schema",
+    "$id",
+    "schemaVersion",
+    "meta",
+    "validationType",
+    "criteria"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "urn:luhtech:ectropy:schema:seed:validation",
+      "description": "Schema identifier for seed validation criteria"
+    },
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:ectropy:seed:validation:",
+      "description": "Unique identifier for this validation configuration (URN pattern)"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of validation schema (e.g., 1.0.0)"
+    },
+    "meta": {
+      "type": "object",
+      "required": ["name", "description", "environment"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable validation name"
+        },
+        "description": {
+          "type": "string",
+          "description": "What this validation verifies"
+        },
+        "environment": {
+          "type": "string",
+          "enum": ["development", "staging", "production", "test"],
+          "description": "Target environment for this validation"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"],
+          "default": "high",
+          "description": "Severity level of validation failure"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Classification tags (e.g., 'tenant-isolation', 'referential-integrity')"
+        }
+      }
+    },
+    "validationType": {
+      "type": "string",
+      "enum": [
+        "record_count",
+        "data_integrity",
+        "referential_integrity",
+        "uniqueness_constraint",
+        "foreign_key_constraint",
+        "tenant_isolation",
+        "custom_query",
+        "schema_validation",
+        "idempotency_check"
+      ],
+      "description": "Type of validation to perform"
+    },
+    "criteria": {
+      "type": "object",
+      "description": "Validation-specific criteria",
+      "oneOf": [
+        {
+          "$ref": "#/definitions/recordCountCriteria"
+        },
+        {
+          "$ref": "#/definitions/dataIntegrityCriteria"
+        },
+        {
+          "$ref": "#/definitions/referentialIntegrityCriteria"
+        },
+        {
+          "$ref": "#/definitions/uniquenessCriteria"
+        },
+        {
+          "$ref": "#/definitions/foreignKeyCriteria"
+        },
+        {
+          "$ref": "#/definitions/tenantIsolationCriteria"
+        },
+        {
+          "$ref": "#/definitions/customQueryCriteria"
+        },
+        {
+          "$ref": "#/definitions/schemaValidationCriteria"
+        },
+        {
+          "$ref": "#/definitions/idempotencyCriteria"
+        }
+      ]
+    },
+    "thresholds": {
+      "type": "object",
+      "description": "Validation threshold configuration",
+      "properties": {
+        "expectedValue": {
+          "type": ["integer", "string", "boolean", "number"],
+          "description": "Expected exact value (strict equality)"
+        },
+        "minValue": {
+          "type": "number",
+          "description": "Minimum acceptable value (inclusive)"
+        },
+        "maxValue": {
+          "type": "number",
+          "description": "Maximum acceptable value (inclusive)"
+        },
+        "tolerance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Acceptable variance as decimal (0.1 = 10% tolerance)"
+        },
+        "comparisonOperator": {
+          "type": "string",
+          "enum": ["eq", "ne", "gt", "gte", "lt", "lte", "between"],
+          "default": "eq",
+          "description": "Comparison operator for threshold validation"
+        }
+      }
+    },
+    "failureHandling": {
+      "type": "object",
+      "description": "Behavior when validation fails",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["fail", "warn", "log"],
+          "default": "fail",
+          "description": "Action to take on validation failure"
+        },
+        "rollback": {
+          "type": "boolean",
+          "default": false,
+          "description": "Rollback seed operation on failure"
+        },
+        "continueOrchestration": {
+          "type": "boolean",
+          "default": false,
+          "description": "Continue orchestration despite validation failure"
+        },
+        "notifyOnFailure": {
+          "type": "boolean",
+          "default": false,
+          "description": "Send notification on validation failure"
+        },
+        "errorMessage": {
+          "type": "string",
+          "description": "Custom error message template (supports placeholders)"
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "description": "Validation execution configuration",
+      "properties": {
+        "runAfter": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^seed-[a-z0-9-]+$"
+          },
+          "description": "Seed IDs that must complete before running this validation"
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 5000,
+          "description": "Validation timeout in milliseconds"
+        },
+        "retryOnFailure": {
+          "type": "boolean",
+          "default": false,
+          "description": "Retry validation if it fails (useful for eventual consistency)"
+        },
+        "maxRetries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "default": 3,
+          "description": "Maximum retry attempts"
+        },
+        "retryDelay": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1000,
+          "description": "Delay between retries in milliseconds"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "recordCountCriteria": {
+      "type": "object",
+      "required": ["table"],
+      "properties": {
+        "table": {
+          "type": "string",
+          "description": "Target table name"
+        },
+        "where": {
+          "type": "object",
+          "description": "WHERE clause conditions (Prisma-style object)",
+          "additionalProperties": true
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Expected exact count (overrides thresholds.expectedValue)"
+        }
+      }
+    },
+    "dataIntegrityCriteria": {
+      "type": "object",
+      "required": ["table", "checks"],
+      "properties": {
+        "table": {
+          "type": "string",
+          "description": "Target table name"
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Data integrity checks to perform",
+          "items": {
+            "type": "object",
+            "required": ["field", "condition"],
+            "properties": {
+              "field": {
+                "type": "string",
+                "description": "Field name to validate"
+              },
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "not_null",
+                  "unique",
+                  "min_length",
+                  "max_length",
+                  "regex",
+                  "enum"
+                ],
+                "description": "Integrity condition"
+              },
+              "value": {
+                "type": ["string", "integer", "array"],
+                "description": "Condition-specific value (e.g., min_length: 5, enum: ['active', 'inactive'])"
+              },
+              "allowNull": {
+                "type": "boolean",
+                "default": false,
+                "description": "Allow null values for this check"
+              }
+            }
+          }
+        }
+      }
+    },
+    "referentialIntegrityCriteria": {
+      "type": "object",
+      "required": ["table", "foreignKeys"],
+      "properties": {
+        "table": {
+          "type": "string",
+          "description": "Table with foreign key references"
+        },
+        "foreignKeys": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Foreign key relationships to validate",
+          "items": {
+            "type": "object",
+            "required": ["column", "referencedTable", "referencedColumn"],
+            "properties": {
+              "column": {
+                "type": "string",
+                "description": "Foreign key column in this table"
+              },
+              "referencedTable": {
+                "type": "string",
+                "description": "Referenced parent table"
+              },
+              "referencedColumn": {
+                "type": "string",
+                "description": "Referenced column in parent table"
+              },
+              "allowOrphans": {
+                "type": "boolean",
+                "default": false,
+                "description": "Allow orphaned records (foreign key points to non-existent record)"
+              }
+            }
+          }
+        }
+      }
+    },
+    "uniquenessCriteria": {
+      "type": "object",
+      "required": ["table", "columns"],
+      "properties": {
+        "table": {
+          "type": "string",
+          "description": "Table to check for uniqueness"
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "Columns that must have unique values (composite uniqueness if multiple)"
+        },
+        "scope": {
+          "type": "object",
+          "description": "Scope uniqueness to specific conditions (e.g., per tenant)",
+          "additionalProperties": true
+        }
+      }
+    },
+    "foreignKeyCriteria": {
+      "type": "object",
+      "required": ["table", "column", "referencedTable"],
+      "properties": {
+        "table": {
+          "type": "string",
+          "description": "Table with foreign key"
+        },
+        "column": {
+          "type": "string",
+          "description": "Foreign key column"
+        },
+        "referencedTable": {
+          "type": "string",
+          "description": "Referenced table"
+        },
+        "referencedColumn": {
+          "type": "string",
+          "default": "id",
+          "description": "Referenced column (defaults to 'id')"
+        }
+      }
+    },
+    "tenantIsolationCriteria": {
+      "type": "object",
+      "required": ["table", "tenantColumn"],
+      "properties": {
+        "table": {
+          "type": "string",
+          "description": "Table to validate tenant isolation"
+        },
+        "tenantColumn": {
+          "type": "string",
+          "default": "tenant_id",
+          "description": "Column that scopes data to tenant"
+        },
+        "expectedTenant": {
+          "type": "string",
+          "description": "Expected tenant ID/slug (validates all records belong to this tenant)"
+        },
+        "allowNull": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow null tenant_id (platform-wide data)"
+        },
+        "enforceNoLeakage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ensure no records from other tenants exist"
+        }
+      }
+    },
+    "customQueryCriteria": {
+      "type": "object",
+      "required": ["query", "expectedResult"],
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "SQL query to execute (must return single value)"
+        },
+        "expectedResult": {
+          "type": ["string", "integer", "boolean", "number"],
+          "description": "Expected query result"
+        },
+        "resultColumn": {
+          "type": "string",
+          "description": "Column name to extract from query result (if multiple columns returned)"
+        }
+      }
+    },
+    "schemaValidationCriteria": {
+      "type": "object",
+      "required": ["table", "expectedSchema"],
+      "properties": {
+        "table": {
+          "type": "string",
+          "description": "Table to validate schema"
+        },
+        "expectedSchema": {
+          "type": "object",
+          "description": "Expected schema definition",
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "type"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Column name"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Column data type"
+                  },
+                  "nullable": {
+                    "type": "boolean",
+                    "description": "Column allows null values"
+                  },
+                  "defaultValue": {
+                    "type": ["string", "integer", "boolean", "null"],
+                    "description": "Column default value"
+                  }
+                }
+              }
+            },
+            "indexes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "columns"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Index name"
+                  },
+                  "columns": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Indexed columns"
+                  },
+                  "unique": {
+                    "type": "boolean",
+                    "description": "Index enforces uniqueness"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "idempotencyCriteria": {
+      "type": "object",
+      "required": ["table", "uniqueKeys"],
+      "properties": {
+        "table": {
+          "type": "string",
+          "description": "Table to validate idempotency"
+        },
+        "uniqueKeys": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "Columns that define uniqueness for upsert operations"
+        },
+        "expectedCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Expected record count after idempotent seed (should match first run)"
+        },
+        "validateNoduplicates": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ensure no duplicate records created on re-run"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "$schema": "urn:luhtech:ectropy:schema:seed:validation",
+      "$id": "urn:luhtech:ectropy:seed:validation:authority-levels-count",
+      "schemaVersion": "1.0.0",
+      "meta": {
+        "name": "Authority Levels Record Count Validation",
+        "description": "Validates 7 authority levels seeded correctly",
+        "environment": "staging",
+        "severity": "critical",
+        "tags": ["decision-lifecycle", "authority", "foundation"]
+      },
+      "validationType": "record_count",
+      "criteria": {
+        "table": "authority_levels",
+        "count": 7
+      },
+      "thresholds": {
+        "expectedValue": 7,
+        "minValue": 7,
+        "maxValue": 7,
+        "comparisonOperator": "eq"
+      },
+      "failureHandling": {
+        "action": "fail",
+        "rollback": true,
+        "continueOrchestration": false,
+        "notifyOnFailure": true,
+        "errorMessage": "Authority levels seed failed: expected 7 records, got {actual}"
+      },
+      "execution": {
+        "runAfter": ["seed-decision-lifecycle"],
+        "timeout": 5000,
+        "retryOnFailure": false
+      }
+    },
+    {
+      "$schema": "urn:luhtech:ectropy:schema:seed:validation",
+      "$id": "urn:luhtech:ectropy:seed:validation:demo-tenant-isolation",
+      "schemaVersion": "1.0.0",
+      "meta": {
+        "name": "Demo Tenant Data Isolation Validation",
+        "description": "Validates all demo tenant data properly scoped",
+        "environment": "staging",
+        "severity": "critical",
+        "tags": ["multi-tenant", "isolation", "security"]
+      },
+      "validationType": "tenant_isolation",
+      "criteria": {
+        "table": "projects",
+        "tenantColumn": "tenant_id",
+        "expectedTenant": "ectropy-demo",
+        "allowNull": false,
+        "enforceNoLeakage": true
+      },
+      "thresholds": {
+        "minValue": 1,
+        "comparisonOperator": "gte"
+      },
+      "failureHandling": {
+        "action": "fail",
+        "rollback": true,
+        "continueOrchestration": false,
+        "notifyOnFailure": true,
+        "errorMessage": "Tenant isolation violation: projects table has cross-tenant data leakage"
+      },
+      "execution": {
+        "runAfter": ["seed-demo-tenant", "seed-ros-mro-demo"],
+        "timeout": 10000,
+        "retryOnFailure": false
+      }
+    },
+    {
+      "$schema": "urn:luhtech:ectropy:schema:seed:validation",
+      "$id": "urn:luhtech:ectropy:seed:validation:idempotent-rerun",
+      "schemaVersion": "1.0.0",
+      "meta": {
+        "name": "Idempotent Seed Validation",
+        "description": "Validates seed can run multiple times without creating duplicates",
+        "environment": "staging",
+        "severity": "high",
+        "tags": ["idempotency", "upsert", "reliability"]
+      },
+      "validationType": "idempotency_check",
+      "criteria": {
+        "table": "authority_levels",
+        "uniqueKeys": ["level", "name"],
+        "expectedCount": 7,
+        "validateNoDuplicates": true
+      },
+      "thresholds": {
+        "expectedValue": 7,
+        "comparisonOperator": "eq"
+      },
+      "failureHandling": {
+        "action": "fail",
+        "rollback": false,
+        "continueOrchestration": false,
+        "notifyOnFailure": false,
+        "errorMessage": "Idempotency violation: duplicate authority levels created on re-run"
+      },
+      "execution": {
+        "runAfter": ["seed-decision-lifecycle"],
+        "timeout": 5000,
+        "retryOnFailure": false
+      }
+    }
+  ]
+}

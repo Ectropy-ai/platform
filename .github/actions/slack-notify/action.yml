@@ -1,0 +1,151 @@
+name: 'Slack Notification'
+description: 'Send workflow status notifications to Slack channel'
+branding:
+  icon: 'message-circle'
+  color: 'blue'
+
+inputs:
+  webhook-url:
+    description: 'Slack webhook URL (from secrets)'
+    required: true
+  status:
+    description: 'Workflow status (success, failure, cancelled)'
+    required: true
+    default: ${{ job.status }}
+  workflow-name:
+    description: 'Name of the workflow'
+    required: true
+  channel:
+    description: 'Slack channel to post to (optional, webhook default)'
+    required: false
+  include-logs:
+    description: 'Include link to logs (true/false)'
+    required: false
+    default: 'true'
+  custom-message:
+    description: 'Optional custom message to prepend'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Send Slack Notification
+      shell: bash
+      env:
+        SLACK_WEBHOOK: ${{ inputs.webhook-url }}
+        STATUS: ${{ inputs.status }}
+        WORKFLOW: ${{ inputs.workflow-name }}
+        CHANNEL: ${{ inputs.channel }}
+        CUSTOM_MESSAGE: ${{ inputs.custom-message }}
+      run: |
+        # Determine status emoji and color
+        case "$STATUS" in
+          success)
+            EMOJI="✅"
+            COLOR="good"
+            STATUS_TEXT="Success"
+            ;;
+          failure)
+            EMOJI="❌"
+            COLOR="danger"
+            STATUS_TEXT="Failed"
+            ;;
+          cancelled)
+            EMOJI="⏸️"
+            COLOR="warning"
+            STATUS_TEXT="Cancelled"
+            ;;
+          *)
+            EMOJI="ℹ️"
+            COLOR="#808080"
+            STATUS_TEXT="$STATUS"
+            ;;
+        esac
+
+        # Build commit info
+        COMMIT_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+        COMMIT_URL="https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+        RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+        # Get actor info
+        ACTOR="${{ github.actor }}"
+
+        # Get branch/tag
+        REF="${{ github.ref }}"
+        REF_NAME=$(echo "$REF" | sed 's/refs\/heads\///' | sed 's/refs\/tags\///')
+
+        # Build custom message block
+        CUSTOM_BLOCK=""
+        if [ -n "$CUSTOM_MESSAGE" ]; then
+          CUSTOM_BLOCK=",{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"$CUSTOM_MESSAGE\"}}"
+        fi
+
+        # Build logs link
+        LOGS_BLOCK=""
+        if [ "${{ inputs.include-logs }}" = "true" ]; then
+          LOGS_BLOCK=",{\"type\":\"actions\",\"elements\":[{\"type\":\"button\",\"text\":{\"type\":\"plain_text\",\"text\":\"View Logs\"},\"url\":\"$RUN_URL\"}]}"
+        fi
+
+        # Build Slack message payload
+        PAYLOAD=$(cat <<EOF
+        {
+          "username": "GitHub Actions",
+          "icon_emoji": ":github:",
+          "attachments": [
+            {
+              "color": "$COLOR",
+              "fallback": "$EMOJI $WORKFLOW - $STATUS_TEXT",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "$EMOJI $WORKFLOW - $STATUS_TEXT"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n${{ github.repository }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n$REF_NAME"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n<$COMMIT_URL|$COMMIT_SHORT>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Triggered by:*\n$ACTOR"
+                    }
+                  ]
+                }$CUSTOM_BLOCK$LOGS_BLOCK
+              ]
+            }
+          ]
+        }
+        EOF
+        )
+
+        # Send to Slack
+        RESPONSE=$(curl -X POST \
+          -H 'Content-type: application/json' \
+          --data "$PAYLOAD" \
+          "$SLACK_WEBHOOK" \
+          -s -w "\n%{http_code}")
+
+        HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+
+        if [ "$HTTP_CODE" = "200" ]; then
+          echo "✅ Slack notification sent successfully"
+        else
+          echo "⚠️ Slack notification failed with HTTP $HTTP_CODE"
+          echo "Response: $RESPONSE"
+          # Don't fail the workflow on notification failure
+          exit 0
+        fi

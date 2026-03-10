@@ -1,0 +1,449 @@
+name: Documentation Review & Compaction
+
+# ENTERPRISE DOCUMENTATION PATTERN (2025-12-15):
+# Repo-first source of truth → Quality enforcement via automated audits
+#
+# This workflow VALIDATES documentation quality (policy enforcement)
+# Complementary workflow: documentation.yml (publishes to GitHub Pages)
+#
+# Separation Rationale:
+#   - documentation-review.yml: AUDIT workflow (weekly, policy enforcement)
+#   - documentation.yml: PUBLISH workflow (main branch, builds + deploys)
+#   - Different triggers, different purposes, intentionally separate
+#
+# Enforcement Strategy:
+#   1. Weekly automated audits (Sunday 2 AM UTC)
+#   2. Auto-fix violations when possible (creates PR)
+#   3. Manual review required for complex issues
+#   4. Evidence trail (90-day retention)
+#
+# Policy Enforcement:
+#   - 15-file documentation limit (CURRENT_TRUTH.md + 14 operational files)
+#   - File size limits (prevent documentation bloat)
+#   - Unauthorized file archival (automatic cleanup)
+#   - Consolidation recommendations (CURRENT_TRUTH.md compaction)
+#
+# Enterprise Pattern: Proactive Quality Control
+#   - Prevent documentation sprawl before it becomes technical debt
+#   - Automated compliance (not manual nagging)
+#   - Self-healing (auto-fix violations)
+#   - Audit trail for SOC2/compliance
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly Sunday 2 AM UTC
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Review mode'
+        required: true
+        default: 'auto-fix'
+        type: choice
+        options:
+          - auto-fix   # Automatically fix violations and create PR
+          - audit      # Report only, no changes
+          - compact    # Show compaction recommendations
+          - archive    # Archive unauthorized files (dry-run)
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  audit-documentation:
+    name: Audit Documentation Files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git operations
+
+      - name: Setup environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Run documentation audit
+        id: audit
+        run: |
+          echo "Running documentation audit..."
+          
+          # Run audit script and capture exit code, allow it to fail
+          set +e
+          OUTPUT_FILE=/tmp/doc-audit-results.json \
+            scripts/documentation/audit-docs.sh
+          EXIT_CODE=$?
+          # Keep set +e active - do NOT re-enable set -e
+
+          echo "Audit script exit code: $EXIT_CODE"
+
+          # Store audit results for later steps
+          echo "AUDIT_FILE=/tmp/doc-audit-results.json" >> $GITHUB_ENV
+
+          # Check if violations exist
+          if [ -f /tmp/doc-audit-results.json ]; then
+            VIOLATIONS=$(jq -r '.violations_count' /tmp/doc-audit-results.json)
+            echo "VIOLATIONS_COUNT=$VIOLATIONS" >> $GITHUB_ENV
+            echo "violations_count=$VIOLATIONS" >> $GITHUB_OUTPUT
+            
+            if [ "$EXIT_CODE" -eq 0 ]; then
+              echo "✅ Audit completed successfully with no violations"
+            else
+              echo "⚠️  Audit found violations (exit code: $EXIT_CODE)"
+            fi
+          else
+            echo "❌ Error: Audit results file not found"
+            echo "VIOLATIONS_COUNT=0" >> $GITHUB_ENV
+            echo "violations_count=0" >> $GITHUB_OUTPUT
+          fi
+
+          # Exit 0 to continue workflow even if violations found
+          exit 0
+
+      - name: Generate audit report
+        if: always()
+        run: |
+          REPORT_DATE=$(date +%Y-%m-%d)
+          REPORT_FILE="evidence/documentation-audits/audit-$REPORT_DATE.md"
+
+          # Create directory if it doesn't exist
+          mkdir -p evidence/documentation-audits
+
+          # Generate report
+          scripts/documentation/generate-audit-report.sh \
+            /tmp/doc-audit-results.json > "$REPORT_FILE"
+
+          echo "REPORT_FILE=$REPORT_FILE" >> $GITHUB_ENV
+
+          # Display report summary
+          echo "📊 Audit Report Summary:"
+          head -30 "$REPORT_FILE"
+
+      - name: Save audit report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-audit-report
+          path: |
+            /tmp/doc-audit-results.json
+            evidence/documentation-audits/*.md
+          retention-days: 90
+
+      - name: Check for critical violations
+        id: check_violations
+        if: always()
+        run: |
+          VIOLATIONS=${VIOLATIONS_COUNT:-0}
+
+          if [ "$VIOLATIONS" -gt 0 ]; then
+            echo "⚠️ Found $VIOLATIONS documentation policy violation(s)"
+            echo "has_violations=true" >> $GITHUB_OUTPUT
+
+            # Get counts for issue
+            UNAUTHORIZED=$(jq -r '.unauthorized_files_count' \
+              /tmp/doc-audit-results.json)
+            OVERSIZED=$(jq -r '.oversized_files_count' \
+              /tmp/doc-audit-results.json)
+
+            echo "UNAUTHORIZED_COUNT=$UNAUTHORIZED" >> $GITHUB_ENV
+            echo "OVERSIZED_COUNT=$OVERSIZED" >> $GITHUB_ENV
+          else
+            echo "✅ No violations found"
+            echo "has_violations=false" >> $GITHUB_OUTPUT
+            # Set counts to 0 when no violations
+            echo "UNAUTHORIZED_COUNT=0" >> $GITHUB_ENV
+            echo "OVERSIZED_COUNT=0" >> $GITHUB_ENV
+          fi
+
+      - name: Setup Python for auto-fix
+        if: steps.check_violations.outputs.has_violations == 'true' && (inputs.mode == 'auto-fix' || github.event_name == 'schedule')
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Auto-fix unauthorized files
+        id: auto_fix_unauthorized
+        if: steps.check_violations.outputs.has_violations == 'true' && (inputs.mode == 'auto-fix' || github.event_name == 'schedule')
+        run: |
+          echo "🔧 Attempting to auto-fix unauthorized files..."
+          
+          UNAUTHORIZED=${UNAUTHORIZED_COUNT:-0}
+          
+          if [ "$UNAUTHORIZED" -gt 0 ]; then
+            python3 scripts/documentation/auto-archive-unauthorized.py \
+              --json-output /tmp/archive-results.json
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ Unauthorized files archived successfully"
+              echo "fixed_unauthorized=true" >> $GITHUB_OUTPUT
+            else
+              echo "⚠️ Failed to archive some files"
+              echo "fixed_unauthorized=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "ℹ️ No unauthorized files to fix"
+            echo "fixed_unauthorized=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Auto-fix oversized files
+        id: auto_fix_oversized
+        if: steps.check_violations.outputs.has_violations == 'true' && (inputs.mode == 'auto-fix' || github.event_name == 'schedule')
+        run: |
+          echo "🔧 Attempting to auto-fix oversized files..."
+          
+          OVERSIZED=${OVERSIZED_COUNT:-0}
+          
+          if [ "$OVERSIZED" -gt 0 ]; then
+            # Check if CURRENT_TRUTH.md is oversized
+            CURRENT_TRUTH_OVERSIZED=$(jq -r '.oversized_files[] | select(.basename == "CURRENT_TRUTH.md") | .basename' /tmp/doc-audit-results.json)
+            
+            if [ -n "$CURRENT_TRUTH_OVERSIZED" ]; then
+              echo "📦 Consolidating CURRENT_TRUTH.md..."
+              python3 scripts/documentation/auto-consolidate.py \
+                --json-output /tmp/consolidate-results.json
+              
+              if [ $? -eq 0 ]; then
+                echo "✅ CURRENT_TRUTH.md consolidated successfully"
+                echo "fixed_oversized=true" >> $GITHUB_OUTPUT
+              else
+                echo "⚠️ Failed to consolidate CURRENT_TRUTH.md"
+                echo "fixed_oversized=false" >> $GITHUB_OUTPUT
+              fi
+            else
+              echo "ℹ️ CURRENT_TRUTH.md not oversized"
+              echo "⚠️ Other oversized files require manual intervention"
+              echo "fixed_oversized=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "ℹ️ No oversized files to fix"
+            echo "fixed_oversized=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Re-audit after auto-fix
+        id: re_audit
+        if: steps.auto_fix_unauthorized.outcome == 'success' || steps.auto_fix_oversized.outcome == 'success'
+        run: |
+          echo "🔍 Re-auditing after auto-fix..."
+          
+          set +e
+          OUTPUT_FILE=/tmp/doc-audit-results-after.json \
+            scripts/documentation/audit-docs.sh
+          EXIT_CODE=$?
+          # Keep set +e active - do NOT re-enable set -e
+          
+          if [ "$EXIT_CODE" -eq 0 ]; then
+            echo "✅ Documentation is now compliant!"
+            echo "auto_fix_successful=true" >> $GITHUB_OUTPUT
+            echo "AUTO_FIX_SUCCESSFUL=true" >> $GITHUB_ENV
+          else
+            VIOLATIONS=$(jq -r '.violations_count' /tmp/doc-audit-results-after.json)
+            echo "⚠️ Still have $VIOLATIONS violation(s) after auto-fix"
+            echo "auto_fix_successful=false" >> $GITHUB_OUTPUT
+            echo "AUTO_FIX_SUCCESSFUL=false" >> $GITHUB_ENV
+          fi
+
+      - name: Commit auto-fixes
+        if: steps.re_audit.outputs.auto_fix_successful == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Add all changed files
+          git add docs/ evidence/
+          
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: auto-fix documentation policy violations" \
+                       -m "Archived unauthorized files" \
+                       -m "Consolidated oversized files" \
+                       -m "All files now comply with documentation policy" \
+                       -m "" \
+                       -m "Generated by: Documentation Review workflow"
+            
+            # Create new branch and push
+            BRANCH_NAME="auto-fix-docs-$(date +%Y%m%d-%H%M%S)"
+            git checkout -b "$BRANCH_NAME"
+            git push -u origin "$BRANCH_NAME"
+            
+            echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+            echo "✅ Changes committed to branch: $BRANCH_NAME"
+          else
+            echo "ℹ️ No changes to commit"
+          fi
+
+      - name: Create PR with auto-fixes
+        if: steps.re_audit.outputs.auto_fix_successful == 'true' && env.BRANCH_NAME != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branchName = process.env.BRANCH_NAME;
+            const baseBranch = 'main';
+            
+            // Create PR
+            const pr = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🤖 Auto-fix documentation policy violations',
+              body: `## Automated Documentation Fixes
+            
+            This PR was automatically created by the Documentation Review workflow to fix policy violations.
+            
+            ### Changes Made
+            
+            ${process.env.UNAUTHORIZED_COUNT > 0 ? `- ✅ Archived ${process.env.UNAUTHORIZED_COUNT} unauthorized file(s)` : ''}
+            ${process.env.OVERSIZED_COUNT > 0 ? `- ✅ Consolidated oversized files` : ''}
+            
+            ### Verification
+            
+            - ✅ All documentation files now comply with policy
+            - ✅ Automated audit passed after fixes
+            
+            ### Review Notes
+            
+            - Check that archived files are in appropriate directories
+            - Verify CURRENT_TRUTH.md consolidation preserved critical information
+            - Ensure no data loss occurred during automated fixes
+            
+            **Workflow Run**: [#${context.runNumber}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+              head: branchName,
+              base: baseBranch
+            });
+            
+            console.log(`✅ Created PR #${pr.data.number}`);
+            
+            // Add labels
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.data.number,
+              labels: ['documentation', 'automated', 'auto-fix']
+            });
+
+
+      - name: Create GitHub Issue for violations
+        if: steps.check_violations.outputs.has_violations == 'true' && inputs.mode != 'auto-fix' && github.event_name != 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportFile = process.env.REPORT_FILE;
+            const reportContent = fs.readFileSync(reportFile, 'utf8');
+            const unauthorized = process.env.UNAUTHORIZED_COUNT || 0;
+            const oversized = process.env.OVERSIZED_COUNT || 0;
+
+            // Check if an open issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'documentation,automated-audit',
+              per_page: 1
+            });
+
+            const issueTitle = `📋 Documentation Policy Violations Detected - ${new Date().toISOString().split('T')[0]}`;
+            const issueBody = `
+            # Documentation Audit - Policy Violations Detected
+
+            **Audit Date**: ${new Date().toISOString()}
+            **Violations Found**: ${process.env.VIOLATIONS_COUNT}
+
+            ## Summary
+
+            - **Unauthorized Files**: ${unauthorized}
+            - **Oversized Files**: ${oversized}
+
+            ## Detailed Report
+
+            ${reportContent}
+
+            ## Action Required
+
+            1. Review the audit report above
+            2. Archive unauthorized files: \`DRY_RUN=false scripts/documentation/archive-unauthorized.sh\`
+            3. Compact oversized files: \`scripts/documentation/compact-docs.sh safe\`
+            4. Re-run audit to verify: \`scripts/documentation/audit-docs.sh\`
+
+            ## Automation
+
+            This issue was automatically created by the [Documentation Review workflow](.github/workflows/documentation-review.yml).
+
+            ---
+
+            **Labels**: documentation, automated-audit, needs-triage
+            `;
+
+            if (issues.data.length === 0) {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+                body: issueBody,
+                labels: ['documentation', 'automated-audit', 'needs-triage']
+              });
+              console.log('✅ Created new issue for documentation violations');
+            } else {
+              // Update existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues.data[0].number,
+                body: `## Updated Audit Results\n\n${issueBody}`
+              });
+              console.log('✅ Updated existing issue with new audit results');
+            }
+
+      - name: Run compaction analysis
+        if: inputs.mode == 'compact' || inputs.mode == 'archive'
+        run: |
+          echo "Running compaction analysis..."
+          scripts/documentation/compact-docs.sh preview /tmp/doc-audit-results.json
+
+      - name: Run archive analysis (dry-run)
+        if: inputs.mode == 'archive'
+        run: |
+          echo "Running archive analysis (dry-run)..."
+          DRY_RUN=true scripts/documentation/archive-unauthorized.sh /tmp/doc-audit-results.json
+
+      - name: Commit audit report
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add evidence/documentation-audits/ || true
+
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: automated documentation audit report $(date +%Y-%m-%d)"
+            git push
+            echo "✅ Audit report committed and pushed"
+          else
+            echo "ℹ️  No changes to commit"
+          fi
+
+      - name: Set workflow status
+        if: always()
+        run: |
+          VIOLATIONS=${VIOLATIONS_COUNT:-0}
+          AUTO_FIX=${AUTO_FIX_SUCCESSFUL:-false}
+          MODE="${{ inputs.mode || 'auto-fix' }}"
+
+          if [ "$VIOLATIONS" -eq 0 ]; then
+            echo "✅ Documentation audit passed - no violations"
+            exit 0
+          elif [ "$AUTO_FIX" = "true" ]; then
+            echo "✅ Documentation violations auto-fixed successfully"
+            echo "   PR created with fixes for review"
+            exit 0
+          elif [ "$MODE" = "audit" ] || [ "$MODE" = "compact" ] || [ "$MODE" = "archive" ]; then
+            echo "ℹ️ Audit mode: violations reported but not fixed"
+            echo "❌ Found $VIOLATIONS violation(s) - manual intervention required"
+            exit 1
+          else
+            echo "❌ Documentation audit failed with $VIOLATIONS violation(s)"
+            echo "⚠️ Auto-fix did not resolve all issues"
+            exit 1
+          fi

@@ -1,0 +1,799 @@
+/**
+ * AI Codebase Agent - Code Standards and Alignment Guidance
+ *
+ * This agent provides guidance for developers and AI agents on:
+ * - Code standards alignment
+ * - Architecture best practices
+ * - Dependency management
+ * - Testing strategies
+ * - Documentation requirements
+ */
+
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { execSync } from 'node:child_process';
+
+export interface CodebaseAnalysis {
+  files: string[];
+  patterns: {
+    imports: string[];
+    exports: string[];
+    types: string[];
+    functions: string[];
+  };
+  violations: CodeViolation[];
+  suggestions: CodeSuggestion[];
+}
+
+export interface CodeViolation {
+  file: string;
+  line: number;
+  type:
+    | 'architecture'
+    | 'standards'
+    | 'dependency'
+    | 'testing'
+    | 'documentation';
+  severity: 'error' | 'warning' | 'info';
+  message: string;
+  suggestedFix?: string;
+}
+
+export interface CodeSuggestion {
+  category: 'architecture' | 'performance' | 'maintainability' | 'testing';
+  priority: 'high' | 'medium' | 'low';
+  description: string;
+  implementation: string[];
+  examples?: string[];
+}
+
+export interface AlignmentReport {
+  score: number; // 0-100
+  categories: {
+    architecture: number;
+    standards: number;
+    testing: number;
+    documentation: number;
+    dependencies: number;
+  };
+  violations: CodeViolation[];
+  suggestions: CodeSuggestion[];
+  summary: string;
+}
+
+export class CodeStandardsAgent {
+  private readonly rootPath: string;
+  private readonly standards: CodeStandards;
+
+  constructor(rootPath: string = process.cwd()) {
+    this.rootPath = rootPath;
+    this.standards = this.loadCodeStandards();
+  }
+
+  /**
+   * Analyze code alignment with project standards
+   */
+  async analyzeCodeAlignment(files: string[]): Promise<AlignmentReport> {
+    const violations: CodeViolation[] = [];
+    const suggestions: CodeSuggestion[] = [];
+
+    for (const file of files) {
+      const filePath = path.resolve(this.rootPath, file);
+      if (await this.fileExists(filePath)) {
+        const content = await fs.readFile(filePath, 'utf-8');
+        const fileViolations = await this.analyzeFile(filePath, content);
+        violations.push(...fileViolations);
+      }
+    }
+
+    // Generate suggestions based on violations
+    suggestions.push(...this.generateSuggestions(violations));
+
+    // Calculate scores
+    const categories = this.calculateCategoryScores(violations);
+    const score = this.calculateOverallScore(categories);
+
+    return {
+      score,
+      categories,
+      violations,
+      suggestions,
+      summary: this.generateSummary(score, violations, suggestions),
+    };
+  }
+
+  /**
+   * Suggest architecture improvements for a component
+   */
+  async suggestArchitectureImprovements(
+    component: string
+  ): Promise<CodeSuggestion[]> {
+    const suggestions: CodeSuggestion[] = [];
+
+    // Analyze component structure
+    const componentPath = this.findComponentPath(component);
+    if (!componentPath) {
+      return [
+        {
+          category: 'architecture',
+          priority: 'high',
+          description: `Component '${component}' not found`,
+          implementation: ['Verify component name and location'],
+          examples: ['apps/web-dashboard/src/components/', 'libs/shared/src/'],
+        },
+      ];
+    }
+
+    // Check for common architecture patterns
+    if (componentPath.includes('apps/')) {
+      suggestions.push(...(await this.analyzeAppArchitecture(componentPath)));
+    } else if (componentPath.includes('libs/')) {
+      suggestions.push(...(await this.analyzeLibArchitecture(componentPath)));
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * Validate coding standards for code snippet
+   */
+  validateCodingStandards(code: string): ValidationResult {
+    const violations: CodeViolation[] = [];
+
+    // Check TypeScript strict mode compliance
+    if (!this.hasStrictTypeScript(code)) {
+      violations.push({
+        file: 'inline',
+        line: 1,
+        type: 'standards',
+        severity: 'warning',
+        message: 'Code should use strict TypeScript types',
+        suggestedFix: 'Add explicit type annotations and enable strict mode',
+      });
+    }
+
+    // Check import organization
+    if (!this.hasOrganizedImports(code)) {
+      violations.push({
+        file: 'inline',
+        line: 1,
+        type: 'standards',
+        severity: 'info',
+        message:
+          'Imports should be organized: external libs, internal libs, relative imports',
+        suggestedFix: 'Organize imports according to project standards',
+      });
+    }
+
+    // Check ESLint compliance
+    const lintViolations = this.checkESLintCompliance(code);
+    violations.push(...lintViolations);
+
+    return {
+      isValid: violations.filter((v) => v.severity === 'error').length === 0,
+      violations,
+      suggestions: this.generateFixSuggestions(violations),
+    };
+  }
+
+  /**
+   * Recommend dependencies based on requirements
+   */
+  recommendDependencies(requirements: string): DependencyAdvice {
+    const recommendations: StandardsDependencyRecommendation[] = [];
+
+    // Analyze requirements text for common patterns
+    if (requirements.toLowerCase().includes('testing')) {
+      recommendations.push({
+        name: '@testing-library/react',
+        version: '^16.3.0',
+        type: 'devDependencies',
+        reason: 'Standard React testing utilities already in use',
+        conflictsWith: [],
+      });
+    }
+
+    if (
+      requirements.toLowerCase().includes('api') ||
+      requirements.toLowerCase().includes('http')
+    ) {
+      recommendations.push({
+        name: 'axios',
+        version: '^1.7.7',
+        type: 'dependencies',
+        reason: 'HTTP client for API calls - already used in project',
+        conflictsWith: [],
+      });
+    }
+
+    if (
+      requirements.toLowerCase().includes('ui') ||
+      requirements.toLowerCase().includes('component')
+    ) {
+      recommendations.push({
+        name: '@mui/material',
+        version: '^6.1.8',
+        type: 'dependencies',
+        reason: 'Material-UI components already integrated in web-dashboard',
+        conflictsWith: [],
+      });
+    }
+
+    return {
+      recommendations,
+      existing: this.getExistingDependencies(),
+      conflicts: this.checkDependencyConflicts(recommendations),
+      totalSize: this.estimatePackageSize(recommendations),
+    };
+  }
+
+  /**
+   * Generate test guidance for a component
+   */
+  generateTestGuidance(component: string): StandardsTestingStrategy {
+    const componentPath = this.findComponentPath(component);
+    const testStrategies: TestStrategy[] = [];
+
+    if (componentPath?.includes('apps/web-dashboard')) {
+      testStrategies.push({
+        type: 'unit',
+        framework: 'Jest + React Testing Library',
+        patterns: [
+          'Test component rendering',
+          'Test user interactions',
+          'Test props handling',
+          'Test state management',
+        ],
+        examples: [
+          'render(<Component />)',
+          'fireEvent.click(getByRole("button"))',
+          'expect(getByText("Expected Text")).toBeInTheDocument()',
+        ],
+      });
+
+      testStrategies.push({
+        type: 'integration',
+        framework: 'Playwright',
+        patterns: [
+          'Test user workflows',
+          'Test API integration',
+          'Test navigation flows',
+        ],
+        examples: [
+          'await page.goto("/dashboard")',
+          'await page.click("[data-testid=submit]")',
+          'await expect(page).toHaveTitle("Dashboard")',
+        ],
+      });
+    }
+
+    if (
+      componentPath?.includes('apps/api-gateway') ||
+      componentPath?.includes('apps/mcp-server')
+    ) {
+      testStrategies.push({
+        type: 'unit',
+        framework: 'Jest + Supertest',
+        patterns: [
+          'Test API endpoints',
+          'Test middleware functions',
+          'Test error handling',
+          'Test authentication',
+        ],
+        examples: [
+          'request(app).get("/api/health").expect(200)',
+          'expect(middleware).toBeDefined()',
+          'expect(response.body.error).toBeDefined()',
+        ],
+      });
+    }
+
+    return {
+      component,
+      strategies: testStrategies,
+      coverage: {
+        target: 80,
+        current: this.getCurrentCoverage(component),
+        critical: ['error handling', 'authentication', 'data validation'],
+      },
+      recommendations: [
+        'Write tests before implementation (TDD)',
+        'production external dependencies',
+        'Test edge cases and error conditions',
+        'Use descriptive test names',
+      ],
+    };
+  }
+
+  /**
+   * Check documentation completeness for a module
+   */
+  checkDocumentationCompleteness(module: string): DocGaps[] {
+    const gaps: DocGaps[] = [];
+    const modulePath = this.findModulePath(module);
+
+    if (!modulePath) {
+      gaps.push({
+        type: 'missing_module',
+        severity: 'error',
+        description: `Module '${module}' not found`,
+        suggestion: 'Verify module name and location',
+      });
+      return gaps;
+    }
+
+    // Check for README
+    if (!this.hasReadme(modulePath)) {
+      gaps.push({
+        type: 'missing_readme',
+        severity: 'warning',
+        description: 'Module missing README.md',
+        suggestion: 'Add README.md with usage examples and API documentation',
+      });
+    }
+
+    // Check for API documentation
+    if (!this.hasApiDocs(modulePath)) {
+      gaps.push({
+        type: 'missing_api_docs',
+        severity: 'info',
+        description: 'Missing comprehensive API documentation',
+        suggestion: 'Add JSDoc comments to all public functions and classes',
+      });
+    }
+
+    // Check for examples
+    if (!this.hasExamples(modulePath)) {
+      gaps.push({
+        type: 'missing_examples',
+        severity: 'info',
+        description: 'Missing usage examples',
+        suggestion: 'Add examples/ directory with common use cases',
+      });
+    }
+
+    return gaps;
+  }
+
+  // Private helper methods
+  private loadCodeStandards(): CodeStandards {
+    return {
+      typescript: {
+        strict: true,
+        noImplicitAny: true,
+        noImplicitReturns: true,
+      },
+      imports: {
+        order: ['external', 'internal', 'relative'],
+        grouping: true,
+      },
+      naming: {
+        files: 'kebab-case',
+        variables: 'camelCase',
+        constants: 'SCREAMING_SNAKE_CASE',
+        types: 'PascalCase',
+      },
+      testing: {
+        coverage: 80,
+        frameworks: ['Jest', 'React Testing Library', 'Playwright'],
+      },
+    };
+  }
+
+  private async analyzeFile(
+    filePath: string,
+    content: string
+  ): Promise<CodeViolation[]> {
+    const violations: CodeViolation[] = [];
+    const lines = content.split('\n');
+
+    // Check each line for violations
+    lines.forEach((line, index) => {
+        violations.push({
+          file: filePath,
+          line: index + 1,
+          type: 'standards',
+          severity: 'warning',
+          suggestedFix: 'Replace with logger.info() or remove in production',
+        });
+      }
+
+      // Check for TODO comments (should be tracked)
+      if (line.includes('TODO') && !line.includes('tracked')) {
+        violations.push({
+          file: filePath,
+          line: index + 1,
+          type: 'documentation',
+          severity: 'info',
+          message: 'TODO should be tracked in issue system',
+          suggestedFix: 'Create GitHub issue and reference it',
+        });
+      }
+    });
+
+    return violations;
+  }
+
+  private generateSuggestions(violations: CodeViolation[]): CodeSuggestion[] {
+    const suggestions: CodeSuggestion[] = [];
+
+    // Group violations by type
+    const violationsByType = violations.reduce(
+      (acc, violation) => {
+        acc[violation.type] = (acc[violation.type] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    // Generate suggestions based on violation patterns
+    if (violationsByType.standards > 5) {
+      suggestions.push({
+        category: 'maintainability',
+        priority: 'high',
+        description: 'Multiple coding standard violations detected',
+        implementation: [
+          'Run ESLint with --fix flag',
+          'Set up pre-commit hooks',
+          'Review and update ESLint configuration',
+        ],
+        examples: [
+          'pnpm lint --fix',
+          'husky add .husky/pre-commit "pnpm lint"',
+        ],
+      });
+    }
+
+    if (violationsByType.documentation > 3) {
+      suggestions.push({
+        category: 'maintainability',
+        priority: 'medium',
+        description: 'Improve code documentation',
+        implementation: [
+          'Add JSDoc comments to public functions',
+          'Create README for modules',
+          'Add inline comments for complex logic',
+        ],
+        examples: [
+          '/** @description Function purpose */',
+          '# Module Name\n\nDescription...',
+        ],
+      });
+    }
+
+    return suggestions;
+  }
+
+  private calculateCategoryScores(
+    violations: CodeViolation[]
+  ): AlignmentReport['categories'] {
+    const baseScore = 100;
+    const weights = {
+      architecture: 0,
+      standards: 0,
+      testing: 0,
+      documentation: 0,
+      dependencies: 0,
+    };
+
+    // Count violations by category
+    violations.forEach((violation) => {
+      const penalty =
+        violation.severity === 'error'
+          ? 10
+          : violation.severity === 'warning'
+            ? 5
+            : 2;
+      weights[violation.type] += penalty;
+    });
+
+    return {
+      architecture: Math.max(0, baseScore - weights.architecture),
+      standards: Math.max(0, baseScore - weights.standards),
+      testing: Math.max(0, baseScore - weights.testing),
+      documentation: Math.max(0, baseScore - weights.documentation),
+      dependencies: Math.max(0, baseScore - weights.dependencies),
+    };
+  }
+
+  private calculateOverallScore(
+    categories: AlignmentReport['categories']
+  ): number {
+    const scores = Object.values(categories);
+    return Math.round(
+      scores.reduce((sum, score) => sum + score, 0) / scores.length
+    );
+  }
+
+  private generateSummary(
+    score: number,
+    violations: CodeViolation[],
+    suggestions: CodeSuggestion[]
+  ): string {
+    if (score >= 90) {
+      return `Excellent code alignment (${score}/100). Minor improvements suggested.`;
+    } else if (score >= 75) {
+      return `Good code alignment (${score}/100). ${violations.length} violations found, ${suggestions.length} improvements suggested.`;
+    } else if (score >= 60) {
+      return `Moderate code alignment (${score}/100). Significant improvements needed.`;
+    } else {
+      return `Poor code alignment (${score}/100). Major refactoring recommended.`;
+    }
+  }
+
+  private async fileExists(filePath: string): Promise<boolean> {
+    try {
+      await fs.access(filePath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private findComponentPath(component: string): string | null {
+    const possiblePaths = [
+      `apps/web-dashboard/src/components/${component}`,
+      `apps/web-dashboard/src/pages/${component}`,
+      `libs/shared/src/components/${component}`,
+      `apps/api-gateway/src/routes/${component}`,
+      `apps/mcp-server/src/agents/${component}`,
+    ];
+
+    for (const possiblePath of possiblePaths) {
+      const fullPath = path.join(this.rootPath, possiblePath);
+      try {
+        if (require('fs').existsSync(fullPath)) {
+          return fullPath;
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  private async analyzeAppArchitecture(
+    componentPath: string
+  ): Promise<CodeSuggestion[]> {
+    // Placeholder for app architecture analysis
+    return [
+      {
+        category: 'architecture',
+        priority: 'medium',
+        description: 'Consider implementing feature-based architecture',
+        implementation: [
+          'Group related components by feature',
+          'Use barrel exports for clean imports',
+          'Separate business logic from UI components',
+        ],
+        examples: [
+          'features/dashboard/{components,hooks,utils}',
+          'export * from "./components"',
+          'Custom hooks for business logic',
+        ],
+      },
+    ];
+  }
+
+  private async analyzeLibArchitecture(
+    componentPath: string
+  ): Promise<CodeSuggestion[]> {
+    // Placeholder for library architecture analysis
+    return [
+      {
+        category: 'architecture',
+        priority: 'medium',
+        description: 'Ensure proper library encapsulation',
+        implementation: [
+          'Export only public APIs through index.ts',
+          'Keep internal implementation private',
+          'Use TypeScript strict mode',
+        ],
+        examples: [
+          'export { PublicClass } from "./internal/impl"',
+          'private methods and properties',
+          'strict: true in tsconfig.json',
+        ],
+      },
+    ];
+  }
+
+  private hasStrictTypeScript(code: string): boolean {
+    // Simple check for explicit types
+    return code.includes(': ') && !code.includes(': any');
+  }
+
+  private hasOrganizedImports(code: string): boolean {
+    const importLines = code
+      .split('\n')
+      .filter((line) => line.trim().startsWith('import'));
+    if (importLines.length < 2) return true;
+
+    // Check if external imports come before internal
+    let foundInternal = false;
+    for (const line of importLines) {
+      if (line.includes('./') || line.includes('../')) {
+        foundInternal = true;
+      } else if (
+        foundInternal &&
+        !line.includes('./') &&
+        !line.includes('../')
+      ) {
+        return false; // External import after internal
+      }
+    }
+    return true;
+  }
+
+  private checkESLintCompliance(code: string): CodeViolation[] {
+    // Simplified ESLint checks
+    const violations: CodeViolation[] = [];
+
+    if (code.includes('var ')) {
+      violations.push({
+        file: 'inline',
+        line: 1,
+        type: 'standards',
+        severity: 'error',
+        message: 'Use const or let instead of var',
+        suggestedFix: 'Replace var with const or let',
+      });
+    }
+
+    return violations;
+  }
+
+  private generateFixSuggestions(violations: CodeViolation[]): string[] {
+    return violations
+      .filter((v) => v.suggestedFix)
+      .map((v) => v.suggestedFix!)
+      .filter((fix, index, array) => array.indexOf(fix) === index); // Remove duplicates
+  }
+
+  private getExistingDependencies(): string[] {
+    try {
+      const packageJson = require(path.join(this.rootPath, 'package.json'));
+      return Object.keys({
+        ...packageJson.dependencies,
+        ...packageJson.devDependencies,
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  private checkDependencyConflicts(
+    recommendations: StandardsDependencyRecommendation[]
+  ): string[] {
+    // Simplified conflict detection
+    const conflicts: string[] = [];
+    const existing = this.getExistingDependencies();
+
+    recommendations.forEach((rec) => {
+      if (existing.includes(rec.name)) {
+        conflicts.push(
+          `${rec.name} already exists - check version compatibility`
+        );
+      }
+    });
+
+    return conflicts;
+  }
+
+  private estimatePackageSize(
+    recommendations: StandardsDependencyRecommendation[]
+  ): string {
+    // Rough estimation
+    const sizeEstimate = recommendations.length * 1.5; // MB
+    return `~${sizeEstimate.toFixed(1)}MB`;
+  }
+
+  private findModulePath(module: string): string | null {
+    return this.findComponentPath(module); // Reuse component finder
+  }
+
+  private hasReadme(modulePath: string): boolean {
+    return require('fs').existsSync(path.join(modulePath, 'README.md'));
+  }
+
+  private hasApiDocs(modulePath: string): boolean {
+    // Check for JSDoc comments in main files
+    try {
+      const files = require('fs').readdirSync(modulePath);
+      return files.some((file) => {
+        if (file.endsWith('.ts') || file.endsWith('.js')) {
+          const content = require('fs').readFileSync(
+            path.join(modulePath, file),
+            'utf-8'
+          );
+          return content.includes('/**') && content.includes('@');
+        }
+        return false;
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  private hasExamples(modulePath: string): boolean {
+    return require('fs').existsSync(path.join(modulePath, 'examples'));
+  }
+
+  private getCurrentCoverage(component: string): number {
+    // Would integrate with actual coverage tools
+    return 0; // Placeholder
+  }
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  violations: CodeViolation[];
+  suggestions: string[];
+}
+
+export interface DependencyAdvice {
+  recommendations: StandardsDependencyRecommendation[];
+  existing: string[];
+  conflicts: string[];
+  totalSize: string;
+}
+
+export interface StandardsDependencyRecommendation {
+  name: string;
+  version: string;
+  type: 'dependencies' | 'devDependencies';
+  reason: string;
+  conflictsWith: string[];
+}
+
+export interface StandardsTestingStrategy {
+  component: string;
+  strategies: TestStrategy[];
+  coverage: {
+    target: number;
+    current: number;
+    critical: string[];
+  };
+  recommendations: string[];
+}
+
+export interface TestStrategy {
+  type: 'unit' | 'integration' | 'e2e';
+  framework: string;
+  patterns: string[];
+  examples: string[];
+}
+
+export interface DocGaps {
+  type:
+    | 'missing_readme'
+    | 'missing_api_docs'
+    | 'missing_examples'
+    | 'missing_module';
+  severity: 'error' | 'warning' | 'info';
+  description: string;
+  suggestion: string;
+}
+
+interface CodeStandards {
+  typescript: {
+    strict: boolean;
+    noImplicitAny: boolean;
+    noImplicitReturns: boolean;
+  };
+  imports: {
+    order: string[];
+    grouping: boolean;
+  };
+  naming: {
+    files: string;
+    variables: string;
+    constants: string;
+    types: string;
+  };
+  testing: {
+    coverage: number;
+    frameworks: string[];
+  };
+}

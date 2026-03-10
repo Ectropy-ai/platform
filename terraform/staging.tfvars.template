@@ -1,0 +1,149 @@
+# ============================================================================
+# Ectropy Staging Environment - Terraform Variables Template
+# ============================================================================
+# INSTRUCTIONS:
+# 1. Copy this file to staging.tfvars (NOT tracked in git)
+# 2. Replace ALL placeholder values with actual values
+# 3. NEVER commit staging.tfvars with real secrets to version control
+# 4. For CI/CD: Configure these as GitHub Environment Secrets
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Environment Configuration
+# ----------------------------------------------------------------------------
+environment  = "staging"
+region       = "sfo3"
+project_name = "ectropy"
+
+# ----------------------------------------------------------------------------
+# Network Configuration
+# ----------------------------------------------------------------------------
+vpc_cidr     = "10.20.0.0/20"
+enable_ipv6  = true
+
+# ----------------------------------------------------------------------------
+# Compute Configuration
+# ----------------------------------------------------------------------------
+droplet_size   = "s-2vcpu-4gb"
+droplet_image  = "ubuntu-22-04-x64"
+droplet_count  = 1
+enable_backups = false
+enable_monitoring = true
+
+# ----------------------------------------------------------------------------
+# Domain Configuration
+# ----------------------------------------------------------------------------
+staging_domain = "staging.ectropy.ai"
+api_url        = "https://staging.ectropy.ai"
+frontend_url   = "https://staging.ectropy.ai"
+
+# ----------------------------------------------------------------------------
+# Database Configuration
+# ----------------------------------------------------------------------------
+create_database    = true
+database_version   = "16"
+database_size      = "db-s-1vcpu-1gb"
+database_node_count = 1
+
+# ----------------------------------------------------------------------------
+# Container Registry
+# ----------------------------------------------------------------------------
+create_container_registry = false  # Created once, shared across environments
+docker_registry          = "registry.digitalocean.com/ectropy-registry"
+
+# ----------------------------------------------------------------------------
+# DigitalOcean Project
+# ----------------------------------------------------------------------------
+create_project = false  # Managed separately
+project_id     = "57d9a21d-f4e4-48a0-868b-9dcec83e21cb"
+
+# ============================================================================
+# SECRETS - Pass via -var-file or TF_VAR_* environment variables
+# ============================================================================
+# NEVER hardcode secrets in this file when committing to version control
+# Use one of these methods:
+#
+# Method 1: Environment variables (recommended for CI/CD)
+#   export TF_VAR_google_client_id="your-client-id"
+#   export TF_VAR_google_client_secret="your-client-secret"
+#
+# Method 2: Separate secrets file (for local development)
+#   terraform apply -var-file="staging.tfvars" -var-file="secrets.tfvars"
+#
+# Method 3: Command-line (for testing)
+#   terraform apply -var="google_client_id=xxx" -var="google_client_secret=xxx"
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# OAuth 2.0 Configuration
+# ----------------------------------------------------------------------------
+# Get from: https://console.cloud.google.com/apis/credentials
+# OAuth 2.0 Client: "Ectropy Staging (staging.ectropy.ai)"
+google_client_id     = ""  # Set via TF_VAR_google_client_id or GitHub secret
+google_client_secret = ""  # Set via TF_VAR_google_client_secret or GitHub secret
+
+# ----------------------------------------------------------------------------
+# JWT & Session Secrets
+# ----------------------------------------------------------------------------
+# Generate with: openssl rand -hex 32 (for JWT secrets)
+# Generate with: openssl rand -hex 16 (for session secret)
+jwt_secret         = ""  # Set via TF_VAR_jwt_secret (min 64 chars)
+jwt_refresh_secret = ""  # Set via TF_VAR_jwt_refresh_secret (min 64 chars)
+session_secret     = ""  # Set via TF_VAR_session_secret (min 32 chars)
+
+# ----------------------------------------------------------------------------
+# Container Registry & Watchtower
+# ----------------------------------------------------------------------------
+# Get DOCR token: doctl registry docker-config --read-write
+docr_token           = ""  # Set via TF_VAR_docr_token
+watchtower_api_token = ""  # Set via TF_VAR_watchtower_api_token
+
+# ============================================================================
+# GITHUB ENVIRONMENT SECRETS CONFIGURATION
+# ============================================================================
+# Configure these secrets in GitHub repository settings:
+# Settings > Secrets and variables > Actions > Environment secrets (staging)
+#
+# Required secrets:
+# - GOOGLE_CLIENT_ID_STAGING
+# - GOOGLE_CLIENT_SECRET_STAGING
+# - JWT_SECRET_STAGING
+# - JWT_REFRESH_SECRET_STAGING
+# - SESSION_SECRET_STAGING
+# - DIGITALOCEAN_ACCESS_TOKEN
+# - DOCR_TOKEN
+# - WATCHTOWER_API_TOKEN
+#
+# Then reference in GitHub Actions workflow:
+# ```yaml
+# - name: Terraform Apply
+#   env:
+#     TF_VAR_google_client_id: ${{ secrets.GOOGLE_CLIENT_ID_STAGING }}
+#     TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET_STAGING }}
+#     TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET_STAGING }}
+#     TF_VAR_jwt_refresh_secret: ${{ secrets.JWT_REFRESH_SECRET_STAGING }}
+#     TF_VAR_session_secret: ${{ secrets.SESSION_SECRET_STAGING }}
+#   run: terraform apply -var-file="staging.tfvars" -auto-approve
+# ```
+# ============================================================================
+
+# ============================================================================
+# SECRET GENERATION COMMANDS
+# ============================================================================
+# Use these commands to generate secure secrets:
+#
+# JWT secrets (64+ characters):
+#   openssl rand -hex 32
+#
+# Session secret (32+ characters):
+#   openssl rand -hex 16
+#
+# Watchtower API token:
+#   openssl rand -hex 16
+#
+# Then set as GitHub secrets:
+#   gh secret set JWT_SECRET_STAGING --body "$(openssl rand -hex 32)"
+#   gh secret set JWT_REFRESH_SECRET_STAGING --body "$(openssl rand -hex 32)"
+#   gh secret set SESSION_SECRET_STAGING --body "$(openssl rand -hex 16)"
+#   gh secret set WATCHTOWER_API_TOKEN --body "$(openssl rand -hex 16)"
+# ============================================================================

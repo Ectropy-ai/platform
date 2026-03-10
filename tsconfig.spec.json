@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.enterprise-standard.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "isolatedModules": false,
+    "types": [],
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "node"
+  },
+  "include": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/__tests__/**/*.ts",
+    "libs/**/*.test.ts",
+    "libs/**/*.spec.ts",
+    "jest.setup.js",
+    "global.d.ts",
+    "types/jest-globals.d.ts"
+  ],
+  "exclude": ["node_modules", "dist", "build", "coverage"]
+}

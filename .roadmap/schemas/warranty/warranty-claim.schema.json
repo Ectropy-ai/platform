@@ -1,0 +1,162 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:warranty-claim",
+  "title": "Warranty Claim Schema",
+  "description": "Warranty claim filed by facility manager or owner",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "claimId",
+    "warrantyRef",
+    "projectRef",
+    "description",
+    "status",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:warranty-claim:WCL-[0-9]{4}-[0-9]{4}$"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:warranty-claim"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "claimId": {
+      "type": "string",
+      "pattern": "^WCL-[0-9]{4}-[0-9]{4}$"
+    },
+    "warrantyRef": { "$ref": "#/$defs/urn" },
+    "projectRef": { "$ref": "#/$defs/urn" },
+    "voxelRef": { "$ref": "#/$defs/urn" },
+    "description": { "type": "string" },
+    "category": {
+      "type": "string",
+      "enum": [
+        "EQUIPMENT_FAILURE",
+        "PREMATURE_WEAR",
+        "INSTALLATION_DEFECT",
+        "MATERIAL_DEFECT",
+        "PERFORMANCE_ISSUE",
+        "OTHER"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "SUBMITTED",
+        "UNDER_REVIEW",
+        "APPROVED",
+        "DENIED",
+        "IN_PROGRESS",
+        "RESOLVED",
+        "DISPUTED"
+      ]
+    },
+    "reportedBy": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" }
+      }
+    },
+    "relatedDecisions": {
+      "type": "array",
+      "description": "Construction decisions that may relate to this claim",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "buildingHistorySearch": {
+      "type": "object",
+      "description": "Results from SEPPA decision archive search",
+      "properties": {
+        "searchPerformed": { "type": "boolean" },
+        "searchQuery": { "type": "string" },
+        "relevantDecisions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "decisionRef": { "$ref": "#/$defs/urn" },
+              "relevanceScore": { "type": "number" },
+              "summary": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["PHOTO", "VIDEO", "DOCUMENT", "INVOICE"]
+          },
+          "storageUri": { "type": "string", "format": "uri" },
+          "description": { "type": "string" },
+          "uploadedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "resolution": {
+      "type": "object",
+      "properties": {
+        "responsibleParty": { "type": "string" },
+        "resolutionType": {
+          "type": "string",
+          "enum": ["REPAIR", "REPLACE", "CREDIT", "NO_ACTION"]
+        },
+        "resolutionDescription": { "type": "string" },
+        "laborCost": { "type": "number" },
+        "partsCost": { "type": "number" },
+        "coveredByWarranty": { "type": "boolean" },
+        "resolvedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "denial": {
+      "type": "object",
+      "properties": {
+        "reason": { "type": "string" },
+        "deniedAt": { "type": "string", "format": "date-time" },
+        "appealDeadline": { "type": "string", "format": "date" }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "reportedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    }
+  }
+}

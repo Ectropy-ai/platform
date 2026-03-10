@@ -1,0 +1,209 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:voting-session",
+  "title": "IPD Voting Session Schema",
+  "description": "PMT or PET voting session for IPD project decisions",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "sessionId",
+    "sessionType",
+    "decisionRef",
+    "projectRef",
+    "status",
+    "votes",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:voting-session:VOT-[0-9]{4}-[0-9]{4}$",
+      "description": "URN identifier for this voting session"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:voting-session"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "sessionId": {
+      "type": "string",
+      "pattern": "^VOT-[0-9]{4}-[0-9]{4}$"
+    },
+    "sessionType": {
+      "type": "string",
+      "enum": ["PMT", "PET"],
+      "description": "Project Management Team or Project Executive Team"
+    },
+    "decisionRef": {
+      "$ref": "#/$defs/urn",
+      "description": "URN of the decision being voted on"
+    },
+    "projectRef": {
+      "$ref": "#/$defs/urn",
+      "description": "URN of the project"
+    },
+    "contractRef": {
+      "$ref": "#/$defs/urn",
+      "description": "URN of the source IPD contract"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PENDING",
+        "IN_PROGRESS",
+        "PASSED",
+        "FAILED",
+        "ESCALATED",
+        "EXPIRED",
+        "WITHDRAWN"
+      ],
+      "description": "Current voting session status"
+    },
+    "votingRules": {
+      "type": "object",
+      "properties": {
+        "quorumRequirement": {
+          "type": "string",
+          "enum": ["majority", "unanimous", "supermajority", "simple-majority"]
+        },
+        "passThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Fraction of votes needed to pass (e.g., 0.75 for 3/4)"
+        },
+        "votingWindowHours": {
+          "type": "integer",
+          "description": "Hours allowed for voting"
+        },
+        "allowAbstain": { "type": "boolean" },
+        "requireRationale": { "type": "boolean" }
+      }
+    },
+    "eligibleVoters": {
+      "type": "array",
+      "description": "Participants eligible to vote",
+      "items": {
+        "type": "object",
+        "properties": {
+          "participantRef": { "$ref": "#/$defs/urn" },
+          "partyRef": { "$ref": "#/$defs/urn" },
+          "votingWeight": { "type": "number", "default": 1 }
+        }
+      }
+    },
+    "votes": {
+      "type": "array",
+      "description": "Recorded votes",
+      "items": {
+        "$ref": "#/$defs/vote"
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string",
+          "enum": ["APPROVED", "REJECTED", "ESCALATED", "NO_QUORUM"]
+        },
+        "votesFor": { "type": "integer" },
+        "votesAgainst": { "type": "integer" },
+        "abstentions": { "type": "integer" },
+        "weightedFor": { "type": "number" },
+        "weightedAgainst": { "type": "number" },
+        "quorumMet": { "type": "boolean" },
+        "decidedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "escalation": {
+      "type": "object",
+      "description": "Escalation details if escalated to PET",
+      "properties": {
+        "escalatedFrom": {
+          "type": "string",
+          "enum": ["PMT", "timeout", "deadlock"]
+        },
+        "escalatedAt": { "type": "string", "format": "date-time" },
+        "escalationReason": { "type": "string" },
+        "petSessionRef": { "$ref": "#/$defs/urn" }
+      }
+    },
+    "notifications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "vote-requested",
+              "vote-cast",
+              "deadline-approaching",
+              "session-complete",
+              "escalated"
+            ]
+          },
+          "recipientRef": { "$ref": "#/$defs/urn" },
+          "sentAt": { "type": "string", "format": "date-time" },
+          "channel": {
+            "type": "string",
+            "enum": ["email", "sms", "push", "in-app"]
+          }
+        }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "openedAt": { "type": "string", "format": "date-time" },
+        "deadline": { "type": "string", "format": "date-time" },
+        "closedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    },
+    "vote": {
+      "type": "object",
+      "required": ["voterRef", "vote", "castAt"],
+      "properties": {
+        "voterRef": { "$ref": "#/$defs/urn" },
+        "partyRef": { "$ref": "#/$defs/urn" },
+        "vote": { "type": "string", "enum": ["FOR", "AGAINST", "ABSTAIN"] },
+        "weight": { "type": "number", "default": 1 },
+        "rationale": { "type": "string" },
+        "conditions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Conditions attached to FOR vote"
+        },
+        "castAt": { "type": "string", "format": "date-time" },
+        "ipAddress": { "type": "string" },
+        "signatureHash": { "type": "string" }
+      }
+    }
+  }
+}

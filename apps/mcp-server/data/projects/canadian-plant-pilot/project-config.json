@@ -1,0 +1,87 @@
+{
+  "$id": "urn:luhtech:canadian-plant-pilot:project:config",
+  "$schema": "https://luhtech.dev/schemas/pm/project-config.schema.json",
+  "schemaVersion": "3.0.0",
+  "projectId": "canadian-plant-pilot",
+  "name": "Maple Ridge Industrial Facility",
+  "description": "150,000 sq ft manufacturing plant with office space",
+  "location": {
+    "address": "1250 Industrial Parkway",
+    "city": "Maple Ridge",
+    "province": "British Columbia",
+    "country": "Canada",
+    "coordinates": {
+      "lat": 49.2194,
+      "lng": -122.5984
+    },
+    "timezone": "America/Vancouver"
+  },
+  "budget": {
+    "total": 25000000,
+    "currency": "CAD"
+  },
+  "schedule": {
+    "startDate": "2026-01-06",
+    "targetCompletion": "2026-12-31",
+    "currentPhase": "CONSTRUCTION"
+  },
+  "zones": [
+    {
+      "id": "ZONE-A",
+      "name": "Manufacturing Hall"
+    },
+    {
+      "id": "ZONE-B",
+      "name": "Office Block"
+    },
+    {
+      "id": "ZONE-C",
+      "name": "Loading/Receiving"
+    },
+    {
+      "id": "ZONE-D",
+      "name": "MEP Core"
+    },
+    {
+      "id": "ZONE-E",
+      "name": "Site/Exterior"
+    }
+  ],
+  "authorityLevels": [
+    {
+      "level": 0,
+      "name": "FIELD",
+      "budgetThreshold": 0
+    },
+    {
+      "level": 1,
+      "name": "FOREMAN",
+      "budgetThreshold": 2500
+    },
+    {
+      "level": 2,
+      "name": "SUPERINTENDENT",
+      "budgetThreshold": 7500
+    },
+    {
+      "level": 3,
+      "name": "PM",
+      "budgetThreshold": 37500
+    },
+    {
+      "level": 4,
+      "name": "ARCHITECT_ENGINEER",
+      "budgetThreshold": 75000
+    },
+    {
+      "level": 5,
+      "name": "OWNER",
+      "budgetThreshold": 150000
+    },
+    {
+      "level": 6,
+      "name": "REGULATORY",
+      "budgetThreshold": null
+    }
+  ]
+}

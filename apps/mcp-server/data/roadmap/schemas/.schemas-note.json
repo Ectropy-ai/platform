@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": ".Schemas Note",
+  "version": "1.0.0",
+  "lastUpdated": "2026-01-15",
+  "metadata": {
+    "originalPath": "C:\\Users\\luhte\\Source\\Repos\\luhtech\\Ectropy\\.roadmap\\schemas\\.schemas-note.md",
+    "fileSize": 122,
+    "lineCount": 3,
+    "lastModified": "2026-01-07T15:38:10.645633",
+    "title": ".Schemas Note"
+  },
+  "content": {
+    "raw": "See commit af8ca6c468a204a4d497b3def09f2baf121ef6c2 for the main schemas.\n\nRemaining schemas pushed in subsequent commits.",
+    "sections": {
+      "introduction": "See commit af8ca6c468a204a4d497b3def09f2baf121ef6c2 for the main schemas.\n\nRemaining schemas pushed in subsequent commits."
+    }
+  }
+}

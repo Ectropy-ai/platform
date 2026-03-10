@@ -1,0 +1,42 @@
+{
+  "name": "agent-task-manager",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/ai-agents/task-manager/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/ai-agents/task-manager",
+        "main": "libs/ai-agents/task-manager/src/index.ts",
+        "tsConfig": "libs/ai-agents/task-manager/tsconfig.lib.json",
+        "assets": []
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/ai-agents/task-manager/**/*.js"]
+      }
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "outputs": ["{workspaceRoot}/coverage/libs/ai-agents/task-manager"],
+      "options": {
+        "config": "libs/ai-agents/vitest.config.ts",
+        "passWithNoTests": true,
+        "reportsDirectory": "{workspaceRoot}/coverage/libs/ai-agents/task-manager"
+      }
+    },
+    "type-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx tsc --noEmit -p libs/ai-agents/task-manager/tsconfig.lib.json"
+      }
+    }
+  },
+  "tags": ["scope:ai", "type:lib"],
+  "implicitDependencies": ["@ectropy/ai-agents-shared"]
+}

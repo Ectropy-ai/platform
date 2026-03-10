@@ -1,0 +1,44 @@
+{
+  "name": "@ectropy/speckle-integration",
+  "version": "1.0.0",
+  "description": "Speckle integration service for BIM collaboration",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "dependencies": {
+    "axios": "^1.10.0",
+    "pg": "^8.16.3",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/pg": "^8.15.4",
+    "@types/uuid": "^10.0.0",
+    "eslint": "^8.57.1",
+    "jest": "^30.0.4",
+    "prettier": "^3.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "keywords": [
+    "speckle",
+    "bim",
+    "collaboration",
+    "construction"
+  ],
+  "author": "Ectropy Team",
+  "license": "MIT"
+}

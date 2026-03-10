@@ -1,0 +1,184 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://luhtech.dev/schemas/eil/sms-conversation.schema.json",
+  "title": "SMS Conversation Schema",
+  "description": "Multi-turn SMS conversation state tracking for Phone Agent Service",
+  "type": "object",
+  "definitions": {
+    "SMSMessage": {
+      "type": "object",
+      "required": ["messageId", "direction", "phoneNumber", "body", "timestamp"],
+      "properties": {
+        "messageId": { "type": "string", "description": "Twilio MessageSid or internal ID" },
+        "sessionId": { "type": "string", "description": "Parent conversation session" },
+        "direction": { "type": "string", "enum": ["inbound", "outbound"] },
+        "phoneNumber": { "type": "string", "description": "E.164 phone number" },
+        "body": { "type": "string", "maxLength": 1600 },
+        "mediaUrls": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["queued", "sent", "delivered", "failed", "received", "read"] },
+        "parsedIntent": { "type": "object" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "required": ["sessionId", "phoneNumber", "state", "createdAt"],
+  "properties": {
+    "sessionId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique session identifier"
+    },
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:sms-session:.+$",
+      "description": "URN identifier for graph integration"
+    },
+    "phoneNumber": {
+      "type": "string",
+      "pattern": "^\\+[1-9]\\d{1,14}$",
+      "description": "User's phone number (E.164)"
+    },
+    "twilioNumber": {
+      "type": "string",
+      "pattern": "^\\+[1-9]\\d{1,14}$",
+      "description": "Project's Twilio number"
+    },
+    "userId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Resolved user ID"
+    },
+    "projectId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Associated project"
+    },
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Tenant (organization)"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "IDLE",
+        "IDENTIFY_USER",
+        "CLASSIFY_INTENT",
+        "EXTRACT_ENTITIES",
+        "COLLECT_DATA",
+        "VALIDATE",
+        "CONFIRM",
+        "EXECUTE",
+        "RESPOND",
+        "ERROR",
+        "ESCALATE"
+      ],
+      "description": "Current state in conversation state machine"
+    },
+    "previousStates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "state": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "transitionReason": { "type": "string" }
+        }
+      },
+      "description": "State transition history"
+    },
+    "intent": {
+      "type": "string",
+      "enum": [
+        "report_completion",
+        "request_decision",
+        "query_status",
+        "approve_decision",
+        "escalate_decision",
+        "capture_evidence",
+        "schedule_inspection",
+        "unknown"
+      ],
+      "description": "Classified user intent"
+    },
+    "entities": {
+      "type": "object",
+      "description": "Extracted entities from conversation",
+      "properties": {
+        "voxelId": { "type": "string" },
+        "zone": { "type": "string" },
+        "trade": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date" },
+        "decisionId": { "type": "string" },
+        "status": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "missingEntities": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Entities still needed to complete action"
+    },
+    "authorityLevel": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 6,
+      "description": "User's authority level"
+    },
+    "ragContext": {
+      "type": "object",
+      "description": "RAG context for this conversation",
+      "properties": {
+        "recentDecisions": { "type": "array", "items": { "type": "string" } },
+        "activeZone": { "type": "string" },
+        "todaysTasks": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "pendingAction": {
+      "type": "object",
+      "description": "Action awaiting confirmation",
+      "properties": {
+        "tool": { "type": "string" },
+        "input": { "type": "object" },
+        "description": { "type": "string" }
+      }
+    },
+    "result": {
+      "type": "object",
+      "description": "Result of executed action",
+      "properties": {
+        "success": { "type": "boolean" },
+        "createdUrns": { "type": "array", "items": { "type": "string" } },
+        "error": { "type": "string" }
+      }
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SMSMessage"
+      },
+      "description": "Message history for this session"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Session timeout (default 30 min)"
+    },
+    "graphMetadata": {
+      "type": "object",
+      "properties": {
+        "inEdges": { "type": "array", "items": { "type": "string" } },
+        "outEdges": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

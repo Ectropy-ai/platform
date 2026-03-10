@@ -1,0 +1,20 @@
+{
+  "name": "@ectropy/ai-agents-shared",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/ai-agents/shared",
+  "projectType": "library",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/ai-agents/shared",
+        "tsConfig": "libs/ai-agents/shared/tsconfig.lib.json",
+        "packageJson": "libs/ai-agents/shared/package.json",
+        "main": "libs/ai-agents/shared/index.ts",
+        "assets": ["libs/ai-agents/shared/*.md"]
+      }
+    }
+  }
+}

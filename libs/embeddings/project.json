@@ -1,0 +1,28 @@
+{
+  "name": "embeddings",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "tags": ["scope:libs", "type:feature", "domain:ai"],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "libs/embeddings/dist",
+        "main": "libs/embeddings/src/index.ts",
+        "tsConfig": "libs/embeddings/tsconfig.lib.json",
+        "packageJson": "libs/embeddings/package.json"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --passWithNoTests libs/embeddings/src",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

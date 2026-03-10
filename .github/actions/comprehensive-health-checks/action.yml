@@ -1,0 +1,429 @@
+name: 'Comprehensive Health Checks'
+description: 'Enterprise-grade health verification for all Ectropy services'
+author: 'Ectropy Engineering'
+
+inputs:
+  environment:
+    description: 'Target environment (development, staging, production)'
+    required: true
+  services:
+    description: 'Comma-separated list of services to check (api,web,mcp,postgres,redis)'
+    required: false
+    default: 'api,web,mcp,postgres,redis'
+  timeout_seconds:
+    description: 'Maximum time to wait for all services to become healthy'
+    required: false
+    default: '300'
+  retry_interval:
+    description: 'Seconds to wait between health check attempts'
+    required: false
+    default: '10'
+  fail_fast:
+    description: 'Abort immediately on first failure'
+    required: false
+    default: 'false'
+  deployment_type:
+    description: 'Deployment type for environment-specific checks (docker, native, blue-green)'
+    required: false
+    default: 'docker'
+
+outputs:
+  all_healthy:
+    description: 'Whether all services are healthy (true/false)'
+    value: ${{ steps.aggregate.outputs.all_healthy }}
+  api_status:
+    description: 'API Gateway health status'
+    value: ${{ steps.check-api.outputs.status }}
+  web_status:
+    description: 'Web Dashboard health status'
+    value: ${{ steps.check-web.outputs.status }}
+  mcp_status:
+    description: 'MCP Server health status'
+    value: ${{ steps.check-mcp.outputs.status }}
+  postgres_status:
+    description: 'PostgreSQL health status'
+    value: ${{ steps.check-postgres.outputs.status }}
+  redis_status:
+    description: 'Redis health status'
+    value: ${{ steps.check-redis.outputs.status }}
+  health_report:
+    description: 'JSON health report for all services'
+    value: ${{ steps.aggregate.outputs.report }}
+
+runs:
+  using: 'composite'
+  steps:
+    # =========================================================================
+    # INITIALIZATION
+    # =========================================================================
+    - name: 🏥 Initialize Health Checks
+      shell: bash
+      run: |
+        echo "========================================="
+        echo "🏥 COMPREHENSIVE HEALTH CHECKS"
+        echo "========================================="
+        echo "Environment:       ${{ inputs.environment }}"
+        echo "Services:          ${{ inputs.services }}"
+        echo "Timeout:           ${{ inputs.timeout_seconds }}s"
+        echo "Retry Interval:    ${{ inputs.retry_interval }}s"
+        echo "Deployment Type:   ${{ inputs.deployment_type }}"
+        echo "========================================="
+        echo ""
+
+        # Create temporary directory for health check results
+        mkdir -p /tmp/health-checks
+        echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" > /tmp/health-checks/start_time
+
+    # =========================================================================
+    # API GATEWAY HEALTH CHECK
+    # =========================================================================
+    - name: 🔌 Check API Gateway Health
+      id: check-api
+      if: contains(inputs.services, 'api')
+      shell: bash
+      run: |
+        echo "Checking API Gateway..."
+
+        # Determine API endpoint based on environment and deployment type
+        case "${{ inputs.environment }}" in
+          production)
+            if [ "${{ inputs.deployment_type }}" = "blue-green" ]; then
+              API_URL="http://localhost:4001/health"  # Blue instance during deployment
+            else
+              API_URL="http://localhost:4000/health"
+            fi
+            ;;
+          staging)
+            API_URL="http://localhost:4000/health"
+            ;;
+          development)
+            API_URL="http://localhost:4000/health"
+            ;;
+        esac
+
+        echo "API URL: $API_URL"
+
+        # Health check with retry logic
+        MAX_ATTEMPTS=$(( ${{ inputs.timeout_seconds }} / ${{ inputs.retry_interval }} ))
+        ATTEMPT=1
+        SUCCESS=false
+
+        while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS..."
+
+          if curl -f -s -m 5 "$API_URL" > /tmp/health-checks/api.json 2>/dev/null; then
+            echo "✅ API Gateway is HEALTHY"
+            cat /tmp/health-checks/api.json
+            echo "status=healthy" >> $GITHUB_OUTPUT
+            SUCCESS=true
+            break
+          else
+            echo "⚠️  API not responding, waiting ${{ inputs.retry_interval }}s..."
+            sleep ${{ inputs.retry_interval }}
+            ATTEMPT=$((ATTEMPT + 1))
+          fi
+        done
+
+        if [ "$SUCCESS" = "false" ]; then
+          echo "❌ API Gateway FAILED health check after $MAX_ATTEMPTS attempts"
+          echo "status=unhealthy" >> $GITHUB_OUTPUT
+
+          if [ "${{ inputs.fail_fast }}" = "true" ]; then
+            echo "Fail-fast enabled, aborting..."
+            exit 1
+          fi
+        fi
+        echo ""
+
+    # =========================================================================
+    # WEB DASHBOARD HEALTH CHECK
+    # =========================================================================
+    - name: 🌐 Check Web Dashboard Health
+      id: check-web
+      if: contains(inputs.services, 'web')
+      shell: bash
+      run: |
+        echo "Checking Web Dashboard..."
+
+        # Determine web endpoint based on environment
+        case "${{ inputs.environment }}" in
+          production)
+            WEB_URL="http://localhost:3000"
+            ;;
+          staging)
+            WEB_URL="http://localhost:3002"  # Mapped to internal 3000
+            ;;
+          development)
+            WEB_URL="http://localhost:3000"
+            ;;
+        esac
+
+        echo "Web URL: $WEB_URL"
+
+        # Health check with retry logic
+        MAX_ATTEMPTS=$(( ${{ inputs.timeout_seconds }} / ${{ inputs.retry_interval }} ))
+        ATTEMPT=1
+        SUCCESS=false
+
+        while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS..."
+
+          # Check if web dashboard returns 200
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 5 "$WEB_URL" 2>/dev/null || echo "000")
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Web Dashboard is HEALTHY (HTTP $HTTP_CODE)"
+            echo "status=healthy" >> $GITHUB_OUTPUT
+            SUCCESS=true
+            break
+          else
+            echo "⚠️  Web Dashboard not ready (HTTP $HTTP_CODE), waiting ${{ inputs.retry_interval }}s..."
+            sleep ${{ inputs.retry_interval }}
+            ATTEMPT=$((ATTEMPT + 1))
+          fi
+        done
+
+        if [ "$SUCCESS" = "false" ]; then
+          echo "❌ Web Dashboard FAILED health check after $MAX_ATTEMPTS attempts"
+          echo "status=unhealthy" >> $GITHUB_OUTPUT
+
+          if [ "${{ inputs.fail_fast }}" = "true" ]; then
+            exit 1
+          fi
+        fi
+        echo ""
+
+    # =========================================================================
+    # MCP SERVER HEALTH CHECK
+    # =========================================================================
+    - name: 🔧 Check MCP Server Health
+      id: check-mcp
+      if: contains(inputs.services, 'mcp')
+      shell: bash
+      run: |
+        echo "Checking MCP Server..."
+
+        MCP_URL="http://localhost:3001/health"
+        echo "MCP URL: $MCP_URL"
+
+        # Health check with retry logic
+        MAX_ATTEMPTS=$(( ${{ inputs.timeout_seconds }} / ${{ inputs.retry_interval }} ))
+        ATTEMPT=1
+        SUCCESS=false
+
+        while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS..."
+
+          if curl -f -s -m 5 "$MCP_URL" > /tmp/health-checks/mcp.json 2>/dev/null; then
+            echo "✅ MCP Server is HEALTHY"
+            cat /tmp/health-checks/mcp.json
+            echo "status=healthy" >> $GITHUB_OUTPUT
+            SUCCESS=true
+            break
+          else
+            echo "⚠️  MCP not responding, waiting ${{ inputs.retry_interval }}s..."
+            sleep ${{ inputs.retry_interval }}
+            ATTEMPT=$((ATTEMPT + 1))
+          fi
+        done
+
+        if [ "$SUCCESS" = "false" ]; then
+          echo "❌ MCP Server FAILED health check after $MAX_ATTEMPTS attempts"
+          echo "status=unhealthy" >> $GITHUB_OUTPUT
+
+          if [ "${{ inputs.fail_fast }}" = "true" ]; then
+            exit 1
+          fi
+        fi
+        echo ""
+
+    # =========================================================================
+    # POSTGRESQL HEALTH CHECK
+    # =========================================================================
+    - name: 🐘 Check PostgreSQL Health
+      id: check-postgres
+      if: contains(inputs.services, 'postgres')
+      shell: bash
+      run: |
+        echo "Checking PostgreSQL..."
+
+        if [ "${{ inputs.deployment_type }}" = "docker" ]; then
+          # Docker deployment - check container health
+          CONTAINER_NAME="ectropy-postgres-${{ inputs.environment }}"
+
+          MAX_ATTEMPTS=$(( ${{ inputs.timeout_seconds }} / ${{ inputs.retry_interval }} ))
+          ATTEMPT=1
+          SUCCESS=false
+
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS..."
+
+            HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER_NAME" 2>/dev/null || echo "unknown")
+
+            if [ "$HEALTH_STATUS" = "healthy" ]; then
+              echo "✅ PostgreSQL is HEALTHY"
+              echo "status=healthy" >> $GITHUB_OUTPUT
+              SUCCESS=true
+              break
+            else
+              echo "⚠️  PostgreSQL status: $HEALTH_STATUS, waiting ${{ inputs.retry_interval }}s..."
+              sleep ${{ inputs.retry_interval }}
+              ATTEMPT=$((ATTEMPT + 1))
+            fi
+          done
+
+          if [ "$SUCCESS" = "false" ]; then
+            echo "❌ PostgreSQL FAILED health check"
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+
+            if [ "${{ inputs.fail_fast }}" = "true" ]; then
+              exit 1
+            fi
+          fi
+        else
+          # Native deployment - check pg_isready
+          if pg_isready -h localhost -p 5432 > /dev/null 2>&1; then
+            echo "✅ PostgreSQL is HEALTHY"
+            echo "status=healthy" >> $GITHUB_OUTPUT
+          else
+            echo "❌ PostgreSQL is UNHEALTHY"
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+
+            if [ "${{ inputs.fail_fast }}" = "true" ]; then
+              exit 1
+            fi
+          fi
+        fi
+        echo ""
+
+    # =========================================================================
+    # REDIS HEALTH CHECK
+    # =========================================================================
+    - name: 🔴 Check Redis Health
+      id: check-redis
+      if: contains(inputs.services, 'redis')
+      shell: bash
+      run: |
+        echo "Checking Redis..."
+
+        if [ "${{ inputs.deployment_type }}" = "docker" ]; then
+          # Docker deployment - check container health
+          CONTAINER_NAME="ectropy-redis-${{ inputs.environment }}"
+
+          MAX_ATTEMPTS=$(( ${{ inputs.timeout_seconds }} / ${{ inputs.retry_interval }} ))
+          ATTEMPT=1
+          SUCCESS=false
+
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS..."
+
+            HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER_NAME" 2>/dev/null || echo "unknown")
+
+            if [ "$HEALTH_STATUS" = "healthy" ]; then
+              echo "✅ Redis is HEALTHY"
+              echo "status=healthy" >> $GITHUB_OUTPUT
+              SUCCESS=true
+              break
+            else
+              echo "⚠️  Redis status: $HEALTH_STATUS, waiting ${{ inputs.retry_interval }}s..."
+              sleep ${{ inputs.retry_interval }}
+              ATTEMPT=$((ATTEMPT + 1))
+            fi
+          done
+
+          if [ "$SUCCESS" = "false" ]; then
+            echo "❌ Redis FAILED health check"
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+
+            if [ "${{ inputs.fail_fast }}" = "true" ]; then
+              exit 1
+            fi
+          fi
+        else
+          # Native deployment - check redis-cli ping
+          if redis-cli -h localhost -p 6379 ping > /dev/null 2>&1; then
+            echo "✅ Redis is HEALTHY"
+            echo "status=healthy" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Redis is UNHEALTHY"
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+
+            if [ "${{ inputs.fail_fast }}" = "true" ]; then
+              exit 1
+            fi
+          fi
+        fi
+        echo ""
+
+    # =========================================================================
+    # AGGREGATE RESULTS
+    # =========================================================================
+    - name: 📊 Aggregate Health Results
+      id: aggregate
+      shell: bash
+      run: |
+        echo "========================================="
+        echo "📊 HEALTH CHECK SUMMARY"
+        echo "========================================="
+
+        ALL_HEALTHY=true
+        REPORT="{"
+        REPORT+="\"timestamp\":\"$(date -u '+%Y-%m-%d %H:%M:%S UTC')\","
+        REPORT+="\"environment\":\"${{ inputs.environment }}\","
+        REPORT+="\"services\":{"
+
+        # Check each service status
+        if echo "${{ inputs.services }}" | grep -q "api"; then
+          API_STATUS="${{ steps.check-api.outputs.status || 'skipped' }}"
+          echo "API Gateway:       $API_STATUS"
+          REPORT+="\"api\":\"$API_STATUS\","
+          [ "$API_STATUS" != "healthy" ] && [ "$API_STATUS" != "skipped" ] && ALL_HEALTHY=false
+        fi
+
+        if echo "${{ inputs.services }}" | grep -q "web"; then
+          WEB_STATUS="${{ steps.check-web.outputs.status || 'skipped' }}"
+          echo "Web Dashboard:     $WEB_STATUS"
+          REPORT+="\"web\":\"$WEB_STATUS\","
+          [ "$WEB_STATUS" != "healthy" ] && [ "$WEB_STATUS" != "skipped" ] && ALL_HEALTHY=false
+        fi
+
+        if echo "${{ inputs.services }}" | grep -q "mcp"; then
+          MCP_STATUS="${{ steps.check-mcp.outputs.status || 'skipped' }}"
+          echo "MCP Server:        $MCP_STATUS"
+          REPORT+="\"mcp\":\"$MCP_STATUS\","
+          [ "$MCP_STATUS" != "healthy" ] && [ "$MCP_STATUS" != "skipped" ] && ALL_HEALTHY=false
+        fi
+
+        if echo "${{ inputs.services }}" | grep -q "postgres"; then
+          POSTGRES_STATUS="${{ steps.check-postgres.outputs.status || 'skipped' }}"
+          echo "PostgreSQL:        $POSTGRES_STATUS"
+          REPORT+="\"postgres\":\"$POSTGRES_STATUS\","
+          [ "$POSTGRES_STATUS" != "healthy" ] && [ "$POSTGRES_STATUS" != "skipped" ] && ALL_HEALTHY=false
+        fi
+
+        if echo "${{ inputs.services }}" | grep -q "redis"; then
+          REDIS_STATUS="${{ steps.check-redis.outputs.status || 'skipped' }}"
+          echo "Redis:             $REDIS_STATUS"
+          REPORT+="\"redis\":\"$REDIS_STATUS\","
+          [ "$REDIS_STATUS" != "healthy" ] && [ "$REDIS_STATUS" != "skipped" ] && ALL_HEALTHY=false
+        fi
+
+        # Remove trailing comma and close JSON
+        REPORT="${REPORT%,}},\"all_healthy\":$ALL_HEALTHY}"
+
+        echo "========================================="
+
+        if [ "$ALL_HEALTHY" = "true" ]; then
+          echo "✅ ALL SERVICES HEALTHY"
+          echo "all_healthy=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ SOME SERVICES UNHEALTHY"
+          echo "all_healthy=false" >> $GITHUB_OUTPUT
+        fi
+
+        echo "report=$REPORT" >> $GITHUB_OUTPUT
+        echo ""
+
+branding:
+  icon: 'heart'
+  color: 'green'

@@ -1,0 +1,599 @@
+# 🤖 MULTI-AGENT SYSTEM DEPLOYMENT
+# Comprehensive Kubernetes deployment for all AI agents in the Ectropy platform
+# Includes JWT authentication, RBAC, and secure communication between agents
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ectropy-agents
+  labels:
+    app.kubernetes.io/name: ectropy-agents
+    app.kubernetes.io/version: '1.0.0'
+    security.ectropy.io/level: 'enhanced'
+
+---
+# Service Account for Agent Pods
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ectropy-agent-service-account
+  namespace: ectropy-agents
+  labels:
+    app.kubernetes.io/name: ectropy-agent-service-account
+
+---
+# RBAC Configuration for Multi-Agent System
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: ectropy-agents
+  name: ectropy-agent-role
+rules:
+  - apiGroups: ['']
+    resources: ['pods', 'services', 'configmaps', 'secrets']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['']
+    resources: ['events']
+    verbs: ['create']
+  - apiGroups: ['apps']
+    resources: ['deployments']
+    verbs: ['get', 'list', 'watch']
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ectropy-agent-role-binding
+  namespace: ectropy-agents
+subjects:
+  - kind: ServiceAccount
+    name: ectropy-agent-service-account
+    namespace: ectropy-agents
+roleRef:
+  kind: Role
+  name: ectropy-agent-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ConfigMap for Agent Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ectropy-agent-config
+  namespace: ectropy-agents
+  labels:
+    app.kubernetes.io/name: ectropy-agent-config
+data:
+  NODE_ENV: 'production'
+  LOG_LEVEL: 'info'
+  AGENT_POLLING_INTERVAL: '5000'
+  AGENT_BATCH_SIZE: '10'
+  AGENT_MAX_CONCURRENT_TASKS: '5'
+
+  # Database configuration
+  DB_HOST: 'ectropy-postgres-service.ectropy-production.svc.cluster.local'
+  DB_PORT: '5432'
+  DB_NAME: 'ectropy'
+
+  # Redis configuration for inter-agent communication
+  REDIS_HOST: 'ectropy-redis-service.ectropy-production.svc.cluster.local'
+  REDIS_PORT: '6379'
+
+  # API Gateway endpoint for authentication
+  API_GATEWAY_URL: 'http://ectropy-api-gateway-service.ectropy-production.svc.cluster.local:4000'
+
+  # Agent-specific configurations
+  COMPLIANCE_AGENT_ENABLED: 'true'
+  PERFORMANCE_AGENT_ENABLED: 'true'
+  PROCUREMENT_AGENT_ENABLED: 'true'
+  TASK_MANAGER_ENABLED: 'true'
+
+  # Security settings
+  ENABLE_JWT_AUTH: 'true'
+  REQUIRE_AGENT_AUTHENTICATION: 'true'
+  AGENT_COMMUNICATION_ENCRYPTION: 'true'
+
+---
+# Secret for Agent System (references main secrets)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ectropy-agent-secrets
+  namespace: ectropy-agents
+  labels:
+    app.kubernetes.io/name: ectropy-agent-secrets
+type: Opaque
+stringData:
+  # Database credentials
+  DB_USER: 'ectropy_agent'
+  DB_PASSWORD: 'PLACEHOLDER_FOR_SECURE_AGENT_DB_PASSWORD'
+
+  # JWT secrets for agent authentication
+  JWT_SECRET: 'PLACEHOLDER_FOR_SECURE_JWT_SECRET'
+  JWT_REFRESH_SECRET: 'PLACEHOLDER_FOR_SECURE_JWT_REFRESH_SECRET'
+
+  # Redis authentication
+  REDIS_PASSWORD: 'PLACEHOLDER_FOR_SECURE_REDIS_PASSWORD'
+
+  # Inter-agent communication key
+  AGENT_COMMUNICATION_KEY: 'PLACEHOLDER_FOR_SECURE_AGENT_COMM_KEY'
+
+  # External API keys for agents
+  OPENAI_API_KEY: 'PLACEHOLDER_FOR_SECURE_OPENAI_API_KEY'
+  ANTHROPIC_API_KEY: 'PLACEHOLDER_FOR_SECURE_ANTHROPIC_API_KEY'
+
+---
+# Task Manager Agent Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ectropy-task-manager-agent
+  namespace: ectropy-agents
+  labels:
+    app: ectropy-task-manager-agent
+    agent-type: task-manager
+    tier: agents
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ectropy-task-manager-agent
+  template:
+    metadata:
+      labels:
+        app: ectropy-task-manager-agent
+        agent-type: task-manager
+      annotations:
+        security.ectropy.io/auth-required: 'true'
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '3001'
+        prometheus.io/path: '/metrics'
+    spec:
+      serviceAccountName: ectropy-agent-service-account
+      securityContext:
+        runAsUser: 2000
+        runAsGroup: 2000
+        runAsNonRoot: true
+        fsGroup: 2000
+      containers:
+        - name: task-manager-agent
+          image: ectropy/task-manager-agent:latest
+          ports:
+            - containerPort: 3001
+              name: http
+          envFrom:
+            - configMapRef:
+                name: ectropy-agent-config
+            - secretRef:
+                name: ectropy-agent-secrets
+          env:
+            - name: AGENT_TYPE
+              value: 'task-manager'
+            - name: AGENT_ID
+              value: 'task-manager-001'
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            requests:
+              memory: '512Mi'
+              cpu: '250m'
+            limits:
+              memory: '1Gi'
+              cpu: '500m'
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+
+---
+# Compliance Agent Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ectropy-compliance-agent
+  namespace: ectropy-agents
+  labels:
+    app: ectropy-compliance-agent
+    agent-type: compliance
+    tier: agents
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ectropy-compliance-agent
+  template:
+    metadata:
+      labels:
+        app: ectropy-compliance-agent
+        agent-type: compliance
+      annotations:
+        security.ectropy.io/auth-required: 'true'
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '3002'
+        prometheus.io/path: '/metrics'
+    spec:
+      serviceAccountName: ectropy-agent-service-account
+      securityContext:
+        runAsUser: 2000
+        runAsGroup: 2000
+        runAsNonRoot: true
+        fsGroup: 2000
+      containers:
+        - name: compliance-agent
+          image: ectropy/compliance-agent:latest
+          ports:
+            - containerPort: 3002
+              name: http
+          envFrom:
+            - configMapRef:
+                name: ectropy-agent-config
+            - secretRef:
+                name: ectropy-agent-secrets
+          env:
+            - name: AGENT_TYPE
+              value: 'compliance'
+            - name: AGENT_ID
+              value: 'compliance-001'
+            - name: SPECIALIZATION
+              value: 'building-codes,safety-standards,environmental-compliance'
+          resources:
+            requests:
+              memory: '1Gi'
+              cpu: '500m'
+            limits:
+              memory: '2Gi'
+              cpu: '1'
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3002
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+
+---
+# Performance Agent Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ectropy-performance-agent
+  namespace: ectropy-agents
+  labels:
+    app: ectropy-performance-agent
+    agent-type: performance
+    tier: agents
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ectropy-performance-agent
+  template:
+    metadata:
+      labels:
+        app: ectropy-performance-agent
+        agent-type: performance
+      annotations:
+        security.ectropy.io/auth-required: 'true'
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '3003'
+        prometheus.io/path: '/metrics'
+    spec:
+      serviceAccountName: ectropy-agent-service-account
+      securityContext:
+        runAsUser: 2000
+        runAsGroup: 2000
+        runAsNonRoot: true
+        fsGroup: 2000
+      containers:
+        - name: performance-agent
+          image: ectropy/performance-agent:latest
+          ports:
+            - containerPort: 3003
+              name: http
+          envFrom:
+            - configMapRef:
+                name: ectropy-agent-config
+            - secretRef:
+                name: ectropy-agent-secrets
+          env:
+            - name: AGENT_TYPE
+              value: 'performance'
+            - name: AGENT_ID
+              value: 'performance-001'
+            - name: SPECIALIZATION
+              value: 'energy-efficiency,structural-analysis,thermal-performance'
+          resources:
+            requests:
+              memory: '1Gi'
+              cpu: '500m'
+            limits:
+              memory: '2Gi'
+              cpu: '1'
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3003
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3003
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+
+---
+# Procurement Agent Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ectropy-procurement-agent
+  namespace: ectropy-agents
+  labels:
+    app: ectropy-procurement-agent
+    agent-type: procurement
+    tier: agents
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ectropy-procurement-agent
+  template:
+    metadata:
+      labels:
+        app: ectropy-procurement-agent
+        agent-type: procurement
+      annotations:
+        security.ectropy.io/auth-required: 'true'
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '3004'
+        prometheus.io/path: '/metrics'
+    spec:
+      serviceAccountName: ectropy-agent-service-account
+      securityContext:
+        runAsUser: 2000
+        runAsGroup: 2000
+        runAsNonRoot: true
+        fsGroup: 2000
+      containers:
+        - name: procurement-agent
+          image: ectropy/procurement-agent:latest
+          ports:
+            - containerPort: 3004
+              name: http
+          envFrom:
+            - configMapRef:
+                name: ectropy-agent-config
+            - secretRef:
+                name: ectropy-agent-secrets
+          env:
+            - name: AGENT_TYPE
+              value: 'procurement'
+            - name: AGENT_ID
+              value: 'procurement-001'
+            - name: SPECIALIZATION
+              value: 'material-sourcing,cost-optimization,supplier-management'
+          resources:
+            requests:
+              memory: '512Mi'
+              cpu: '250m'
+            limits:
+              memory: '1Gi'
+              cpu: '500m'
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3004
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3004
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+
+---
+# Services for Agent Communication
+apiVersion: v1
+kind: Service
+metadata:
+  name: ectropy-task-manager-service
+  namespace: ectropy-agents
+  labels:
+    app: ectropy-task-manager-agent
+spec:
+  selector:
+    app: ectropy-task-manager-agent
+  ports:
+    - port: 3001
+      targetPort: 3001
+      name: http
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ectropy-compliance-service
+  namespace: ectropy-agents
+  labels:
+    app: ectropy-compliance-agent
+spec:
+  selector:
+    app: ectropy-compliance-agent
+  ports:
+    - port: 3002
+      targetPort: 3002
+      name: http
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ectropy-performance-service
+  namespace: ectropy-agents
+  labels:
+    app: ectropy-performance-agent
+  ports:
+    - port: 3003
+      targetPort: 3003
+      name: http
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ectropy-procurement-service
+  namespace: ectropy-agents
+  labels:
+    app: ectropy-procurement-agent
+  ports:
+    - port: 3004
+      targetPort: 3004
+      name: http
+  type: ClusterIP
+
+---
+# Network Policy for Secure Agent Communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ectropy-agent-network-policy
+  namespace: ectropy-agents
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ectropy-production
+        - podSelector:
+            matchLabels:
+              tier: agents
+      ports:
+        - protocol: TCP
+          port: 3001
+        - protocol: TCP
+          port: 3002
+        - protocol: TCP
+          port: 3003
+        - protocol: TCP
+          port: 3004
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: ectropy-production
+      ports:
+        - protocol: TCP
+          port: 4000 # API Gateway
+        - protocol: TCP
+          port: 5432 # PostgreSQL
+        - protocol: TCP
+          port: 6379 # Redis
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 53 # DNS
+        - protocol: UDP
+          port: 53 # DNS
+        - protocol: TCP
+          port: 443 # HTTPS for external APIs
+
+---
+# Horizontal Pod Autoscaler for Agents
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ectropy-compliance-agent-hpa
+  namespace: ectropy-agents
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ectropy-compliance-agent
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ectropy-performance-agent-hpa
+  namespace: ectropy-agents
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ectropy-performance-agent
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

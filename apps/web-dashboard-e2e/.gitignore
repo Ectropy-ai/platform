@@ -1,0 +1,13 @@
+# Playwright authentication state (contains sensitive cookies/tokens)
+playwright/.auth/
+
+# Playwright test results
+dist/
+playwright-report/
+test-results/
+
+# Playwright trace files
+trace.zip
+
+# Auth debug screenshots (may contain sensitive info)
+auth-debug/

@@ -1,0 +1,4 @@
+# Exclude mobile app from default builds due to Node version conflict
+# Mobile requires Node >=20.19.4, platform uses 20.18.1  
+# Mobile requires React Native dependencies not installed by default
+# Build separately: pnpm nx build mobile-app --skip-nx-cache

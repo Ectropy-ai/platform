@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:siltana:robot",
+  "title": "Robot (RaaS/HaaS)",
+  "description": "Robot or heavy equipment asset for building operations (Siltana platform)",
+  "type": "object",
+  "required": ["id", "type", "buildingId", "status"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^ROBOT-[0-9]{4}-[0-9]{4,}$",
+      "description": "Unique robot identifier"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "CLEANING",
+        "DELIVERY",
+        "INSPECTION",
+        "SECURITY",
+        "HVAC_MAINTENANCE",
+        "ELEVATOR"
+      ],
+      "description": "Robot type/purpose"
+    },
+    "buildingId": {
+      "type": "string",
+      "description": "Building where robot operates"
+    },
+    "manufacturer": { "type": "string" },
+    "model": { "type": "string" },
+    "serialNumber": { "type": "string" },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Robot capabilities (vacuum, navigation, payload delivery, etc.)"
+    },
+    "position": {
+      "$ref": "#/definitions/RobotPosition",
+      "description": "Current 3D position in building"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["OPERATIONAL", "CHARGING", "MAINTENANCE", "ERROR", "OFFLINE"],
+      "description": "Current operational status"
+    },
+    "battery": {
+      "type": "object",
+      "properties": {
+        "level": { "type": "number", "minimum": 0, "maximum": 100 },
+        "charging": { "type": "boolean" },
+        "chargingStationId": { "type": "string" }
+      }
+    },
+    "schedule": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "taskId": { "type": "string" },
+          "taskType": { "type": "string" },
+          "startTime": { "type": "string", "format": "date-time" },
+          "endTime": { "type": "string", "format": "date-time" },
+          "assignedZones": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "maintenanceLog": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string", "format": "date-time" },
+          "type": {
+            "type": "string",
+            "enum": ["SCHEDULED", "REPAIR", "CALIBRATION"]
+          },
+          "description": { "type": "string" },
+          "technician": { "type": "string" }
+        }
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "properties": {
+        "lastUpdate": { "type": "string", "format": "date-time" },
+        "diagnostics": { "type": "object", "additionalProperties": true },
+        "operatingHours": { "type": "number" }
+      }
+    }
+  },
+  "definitions": {
+    "RobotPosition": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" },
+        "level": { "type": "string" },
+        "room": { "type": "string" },
+        "heading": { "type": "number", "description": "Degrees from north" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["x", "y", "z", "timestamp"]
+    }
+  }
+}

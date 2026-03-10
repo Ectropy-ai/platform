@@ -1,0 +1,143 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:savings-distribution",
+  "title": "IPD Savings Distribution Schema",
+  "description": "Final accounting and savings distribution for IPD project closeout",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "distributionId",
+    "projectRef",
+    "targetCostRef",
+    "savingsOrOverrun",
+    "distributions",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:savings-distribution:SD-[0-9]{4}-[0-9]{4}$"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:savings-distribution"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "distributionId": {
+      "type": "string",
+      "pattern": "^SD-[0-9]{4}-[0-9]{4}$"
+    },
+    "projectRef": { "$ref": "#/$defs/urn" },
+    "targetCostRef": { "$ref": "#/$defs/urn" },
+    "contractRef": { "$ref": "#/$defs/urn" },
+    "currency": { "type": "string", "default": "USD" },
+    "status": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "PENDING_APPROVAL",
+        "APPROVED",
+        "DISTRIBUTED",
+        "DISPUTED"
+      ]
+    },
+    "financialSummary": {
+      "type": "object",
+      "properties": {
+        "adjustedTargetCost": { "type": "number" },
+        "finalActualCost": { "type": "number" },
+        "contingencyUsed": { "type": "number" },
+        "contingencyReturned": { "type": "number" }
+      }
+    },
+    "savingsOrOverrun": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["SAVINGS", "OVERRUN", "BREAK_EVEN"]
+        },
+        "amount": { "type": "number" },
+        "percentage": { "type": "number" }
+      }
+    },
+    "distributions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "partyRef": { "$ref": "#/$defs/urn" },
+          "partyName": { "type": "string" },
+          "role": { "type": "string" },
+          "sharePercentage": { "type": "number" },
+          "amount": { "type": "number" },
+          "atRiskDeduction": { "type": "number" },
+          "goalAchievementBonus": { "type": "number" },
+          "netAmount": { "type": "number" },
+          "paymentStatus": {
+            "type": "string",
+            "enum": ["PENDING", "ISSUED", "RECEIVED"]
+          }
+        }
+      }
+    },
+    "goalAchievementSummary": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "goalId": { "type": "string" },
+          "description": { "type": "string" },
+          "achieved": { "type": "boolean" },
+          "compensationAmount": { "type": "number" }
+        }
+      }
+    },
+    "approvals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "partyRef": { "$ref": "#/$defs/urn" },
+          "approvedBy": { "type": "string" },
+          "approvedAt": { "type": "string", "format": "date-time" },
+          "signature": { "type": "string" }
+        }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "distributedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    }
+  }
+}

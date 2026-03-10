@@ -1,0 +1,383 @@
+# 🏛️ DAO GOVERNANCE INTEGRATION - BLOCKCHAIN-POWERED BIM ACCESS CONTROL
+# Integrates your DAO governance system with Speckle BIM collaboration
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dao-governance-service
+  namespace: ectropy-production
+  labels:
+    app: dao-governance
+    tier: governance
+    component: blockchain
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dao-governance
+  template:
+    metadata:
+      labels:
+        app: dao-governance
+      annotations:
+        security.ectropy.io/governance-tier: 'enhanced'
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '3001'
+        prometheus.io/path: '/metrics'
+    spec:
+      serviceAccountName: ectropy-service-account
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      containers:
+        - name: dao-governance
+          image: ectropy/dao-governance-service:latest
+          ports:
+            - containerPort: 3001
+              name: http
+          env:
+            # Database configuration (shared with API Gateway)
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: DB_NAME
+            - name: DB_USER
+              value: 'ectropy'
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: DB_PASSWORD
+
+            # Blockchain configuration
+            - name: BLOCKCHAIN_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: BLOCKCHAIN_PRIVATE_KEY
+            - name: BLOCKCHAIN_NETWORK
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: BLOCKCHAIN_NETWORK
+
+            # Integration with Speckle
+            - name: SPECKLE_SERVER_URL
+              value: 'http://speckle-server-service:3000'
+            - name: BIM_ACCESS_CONTROL_ENABLED
+              value: 'true'
+
+            # Security configuration
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: JWT_SECRET
+
+            # Redis for caching governance decisions
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: REDIS_HOST
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: REDIS_PASSWORD
+
+          resources:
+            requests:
+              memory: '1Gi'
+              cpu: '500m'
+            limits:
+              memory: '2Gi'
+              cpu: '1'
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dao-governance-service
+  namespace: ectropy-production
+  labels:
+    app: dao-governance
+    tier: governance
+spec:
+  selector:
+    app: dao-governance
+  ports:
+    - port: 3001
+      targetPort: 3001
+      name: http
+  type: ClusterIP
+
+---
+# 🏭 MANUFACTURER API SERVICE - EXTERNAL INTEGRATIONS
+# Deploys your manufacturer API integration service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: manufacturer-api-service
+  namespace: ectropy-production
+  labels:
+    app: manufacturer-api
+    tier: integration
+    component: external-apis
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: manufacturer-api
+  template:
+    metadata:
+      labels:
+        app: manufacturer-api
+      annotations:
+        security.ectropy.io/api-integration: 'secured'
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '3002'
+        prometheus.io/path: '/metrics'
+    spec:
+      serviceAccountName: ectropy-service-account
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      containers:
+        - name: manufacturer-api
+          image: ectropy/manufacturer-api-service:latest
+          ports:
+            - containerPort: 3002
+              name: http
+          env:
+            # Database configuration
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: DB_NAME
+            - name: DB_USER
+              value: 'ectropy'
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: DB_PASSWORD
+
+            # External API credentials
+            - name: MANUFACTURER_API_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: MANUFACTURER_API_KEYS
+
+            # Rate limiting configuration
+            - name: MANUFACTURER_RATE_LIMIT
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: MANUFACTURER_RATE_LIMIT
+
+            # Cache configuration
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: REDIS_HOST
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: REDIS_PASSWORD
+
+            # Security configuration
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: JWT_SECRET
+
+            # Integration with Speckle for BIM data
+            - name: SPECKLE_SERVER_URL
+              value: 'http://speckle-server-service:3000'
+
+          resources:
+            requests:
+              memory: '1Gi'
+              cpu: '500m'
+            limits:
+              memory: '2Gi'
+              cpu: '1'
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: manufacturer-api-service
+  namespace: ectropy-production
+  labels:
+    app: manufacturer-api
+    tier: integration
+spec:
+  selector:
+    app: manufacturer-api
+  ports:
+    - port: 3002
+      targetPort: 3002
+      name: http
+  type: ClusterIP
+
+---
+# 🤖 AI AGENTS DEPLOYMENT - AUTOMATED CONSTRUCTION INTELLIGENCE
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-agents-service
+  namespace: ectropy-production
+  labels:
+    app: ai-agents
+    tier: intelligence
+    component: automation
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ai-agents
+  template:
+    metadata:
+      labels:
+        app: ai-agents
+      annotations:
+        security.ectropy.io/ai-tier: 'enhanced'
+    spec:
+      serviceAccountName: ectropy-service-account
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      containers:
+        - name: ai-agents
+          image: ectropy/ai-agents-service:latest
+          ports:
+            - containerPort: 3003
+          env:
+            # AI API keys
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: OPENAI_API_KEY
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: ANTHROPIC_API_KEY
+
+            # Database access
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: ectropy-config
+                  key: DB_HOST
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: DB_PASSWORD
+
+            # Integration endpoints
+            - name: SPECKLE_SERVER_URL
+              value: 'http://speckle-server-service:3000'
+            - name: DAO_GOVERNANCE_URL
+              value: 'http://dao-governance-service:3001'
+            - name: MANUFACTURER_API_URL
+              value: 'http://manufacturer-api-service:3002'
+
+          resources:
+            requests:
+              memory: '2Gi'
+              cpu: '1'
+            limits:
+              memory: '4Gi'
+              cpu: '2'
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-agents-service
+  namespace: ectropy-production
+  labels:
+    app: ai-agents
+spec:
+  selector:
+    app: ai-agents
+  ports:
+    - port: 3003
+      targetPort: 3003
+      name: http
+  type: ClusterIP

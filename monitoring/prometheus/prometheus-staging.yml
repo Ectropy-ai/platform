@@ -1,0 +1,128 @@
+# =============================================================================
+# PROMETHEUS CONFIGURATION - ECTROPY STAGING ENVIRONMENT
+# =============================================================================
+#
+# PURPOSE: Enterprise-grade staging monitoring with comprehensive coverage
+# COVERAGE:
+# - API Gateway performance and health
+# - Database query statistics and connection monitoring
+# - BIM processing metrics and performance
+# - System resource utilization and alerting
+# - Container metrics and health status
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'ectropy-staging'
+    environment: 'staging'
+
+rule_files:
+  - 'alerts-staging.yml'
+
+# Enterprise alerting configuration for staging
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  # =============================================================================
+  # ECTROPY API GATEWAY - CORE APPLICATION METRICS
+  # =============================================================================
+  - job_name: 'ectropy-api-gateway-staging'
+    static_configs:
+      - targets: ['ectropy_api_gateway_staging:4000']
+    metrics_path: '/health'
+    scrape_interval: 15s  # More frequent for staging
+    scrape_timeout: 10s
+    honor_labels: true
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'api-gateway-staging'
+
+  # =============================================================================
+  # WEB DASHBOARD - FRONTEND PERFORMANCE
+  # =============================================================================
+  - job_name: 'web-dashboard-staging'
+    static_configs:
+      - targets: ['ectropy_web_dashboard_staging:3002']
+    metrics_path: '/health'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'web-dashboard-staging'
+
+  # =============================================================================
+  # POSTGRESQL DATABASE - ENTERPRISE MONITORING
+  # =============================================================================
+  - job_name: 'postgresql-staging'
+    static_configs:
+      - targets: ['ectropy_postgres_staging:5432']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: '/metrics'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'postgres-staging'
+
+  # =============================================================================
+  # REDIS CACHE - PERFORMANCE MONITORING
+  # =============================================================================
+  - job_name: 'redis-staging'
+    static_configs:
+      - targets: ['ectropy_redis_staging:6379']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: '/metrics'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'redis-staging'
+
+  # =============================================================================
+  # SPECKLE BIM SERVER - 3D MODEL PROCESSING (OPTIONAL)
+  # =============================================================================
+  - job_name: 'speckle-server-staging'
+    static_configs:
+      - targets: ['ectropy_speckle_server_staging:3000']
+    metrics_path: '/health'
+    scrape_interval: 45s
+    scrape_timeout: 15s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'speckle-staging'
+
+  # =============================================================================
+  # PROMETHEUS SELF-MONITORING
+  # =============================================================================
+  - job_name: 'prometheus-staging'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+
+  # =============================================================================
+  # GRAFANA MONITORING
+  # =============================================================================
+  - job_name: 'grafana-staging'
+    static_configs:
+      - targets: ['ectropy_grafana_staging:3000']
+    scrape_interval: 60s
+    metrics_path: '/metrics'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'grafana-staging'
+
+# =============================================================================
+# ENTERPRISE RECORDING RULES FOR STAGING
+# =============================================================================
+# rule_files already defined at line 24

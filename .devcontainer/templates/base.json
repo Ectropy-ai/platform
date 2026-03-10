@@ -1,0 +1,48 @@
+{
+  "name": "Ectropy Development Environment",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "ectropy-dev",
+  "workspaceFolder": "/workspace",
+  "forwardPorts": [3000, 3001, 3002, 4000, 5432, 6379, 8080, 9001],
+  "portsAttributes": {
+    "3000": { "label": "API Gateway", "onAutoForward": "notify" },
+    "3001": { "label": "Speckle Server", "onAutoForward": "notify" },
+    "3002": { "label": "Web Dashboard", "onAutoForward": "notify" },
+    "4000": { "label": "BIM Interface", "onAutoForward": "silent" },
+    "5432": { "label": "PostgreSQL", "onAutoForward": "silent" },
+    "6379": { "label": "Redis", "onAutoForward": "silent" }
+  },
+  "postCreateCommand": "/workspace/.devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-eslint",
+        "ms-playwright.playwright",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "typescript.preferences.includePackageJsonAutoImports": "auto",
+        "typescript.updateImportsOnFileMove.enabled": "always",
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "always"
+        }
+      }
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18",
+      "nodeGypDependencies": true,
+      "installYarnUsingApt": false
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  }
+}

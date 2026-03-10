@@ -1,0 +1,159 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:ros-mro:voxel-filter",
+  "title": "Voxel Filter Schema",
+  "description": "Query parameters for filtering and sorting voxels in ROS MRO views",
+  "type": "object",
+  "definitions": {
+    "VoxelFilter": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "description": "Filter by project ID (required)"
+        },
+        "systems": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["STRUCT", "MECH", "ELEC", "PLUMB", "HVAC", "FIRE"]
+          },
+          "description": "Filter by building systems"
+        },
+        "statuses": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["PLANNED", "IN_PROGRESS", "COMPLETE", "BLOCKED", "ON_HOLD", "INSPECTION_REQUIRED"]
+          },
+          "description": "Filter by voxel statuses"
+        },
+        "healthStatuses": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["HEALTHY", "AT_RISK", "CRITICAL"]
+          },
+          "description": "Filter by health status"
+        },
+        "levels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Filter by building levels"
+        },
+        "assignedCrew": {
+          "type": "string",
+          "description": "Filter by assigned crew/team"
+        },
+        "hasDecisions": {
+          "type": "boolean",
+          "description": "Filter by presence of linked decisions"
+        },
+        "hasAlerts": {
+          "type": "boolean",
+          "description": "Filter by presence of active alerts"
+        },
+        "progressRange": {
+          "type": "object",
+          "properties": {
+            "min": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "max": { "type": "integer", "minimum": 0, "maximum": 100 }
+          },
+          "description": "Filter by completion percentage range"
+        },
+        "boundingBox": {
+          "type": "object",
+          "properties": {
+            "minX": { "type": "number" },
+            "maxX": { "type": "number" },
+            "minY": { "type": "number" },
+            "maxY": { "type": "number" },
+            "minZ": { "type": "number" },
+            "maxZ": { "type": "number" }
+          },
+          "description": "Spatial bounding box filter (millimeters)"
+        },
+        "updatedAfter": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Filter by update time"
+        },
+        "createdAfter": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Filter by creation time"
+        }
+      },
+      "required": ["projectId"]
+    },
+    "VoxelSort": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string",
+          "enum": ["voxelId", "status", "system", "level", "percentComplete", "healthStatus", "decisionCount", "updatedAt", "createdAt"],
+          "default": "voxelId"
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["asc", "desc"],
+          "default": "asc"
+        }
+      }
+    },
+    "VoxelPagination": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "default": 1000,
+          "description": "Maximum voxels to return"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of voxels to skip"
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Cursor for cursor-based pagination"
+        }
+      }
+    },
+    "VoxelQueryParams": {
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/definitions/VoxelFilter" },
+        {
+          "type": "object",
+          "properties": {
+            "sort": { "$ref": "#/definitions/VoxelSort" },
+            "pagination": { "$ref": "#/definitions/VoxelPagination" },
+            "include": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["decisions", "alerts", "history", "crew"]
+              },
+              "description": "Related entities to include"
+            },
+            "aggregateBy": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["level", "system", "status", "healthStatus", "crew"]
+              },
+              "description": "Fields to aggregate results by"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "properties": {
+    "query": { "$ref": "#/definitions/VoxelQueryParams" }
+  }
+}

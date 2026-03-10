@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:caas:takt-wagon",
+  "title": "Takt Wagon",
+  "description": "Work train representing sequence of trades moving through takt zones",
+  "type": "object",
+  "required": ["id", "name", "trainId", "trades"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^WAGON-[0-9]{4}-[0-9]{4,}$",
+      "description": "Unique wagon identifier"
+    },
+    "name": {
+      "type": "string",
+      "description": "Wagon name (e.g., MEP Rough-In, Drywall Package)"
+    },
+    "trainId": {
+      "type": "string",
+      "description": "Parent train reference"
+    },
+    "trades": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tradeId": { "type": "string" },
+          "tradeName": { "type": "string" },
+          "contractor": { "type": "string" },
+          "crewSize": { "type": "number" },
+          "workPackage": { "type": "string" }
+        },
+        "required": ["tradeId", "tradeName"]
+      },
+      "description": "Trades included in this wagon"
+    },
+    "sequence": {
+      "type": "number",
+      "description": "Order within parent train"
+    },
+    "currentZone": {
+      "type": "string",
+      "description": "Zone ID where wagon is currently working"
+    },
+    "plannedRoute": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "zoneId": { "type": "string" },
+          "startDate": { "type": "string", "format": "date-time" },
+          "endDate": { "type": "string", "format": "date-time" },
+          "status": {
+            "type": "string",
+            "enum": ["PLANNED", "IN_PROGRESS", "COMPLETE", "DELAYED"]
+          }
+        },
+        "required": ["zoneId", "startDate", "endDate"]
+      },
+      "description": "Planned progression through zones"
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "PREDECESSOR",
+              "RESOURCE",
+              "MATERIAL",
+              "APPROVAL",
+              "WEATHER"
+            ]
+          },
+          "description": { "type": "string" },
+          "resolved": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

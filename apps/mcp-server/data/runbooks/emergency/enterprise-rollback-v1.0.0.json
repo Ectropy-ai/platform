@@ -1,0 +1,1309 @@
+{
+  "version": "1.0.0",
+  "environment": "production",
+  "runbookType": "emergency",
+  "metadata": {
+    "catalogId": "emergency-runbook-v1-0-0-rollback",
+    "name": "Enterprise Rollback Procedure",
+    "type": "emergency",
+    "purpose": "Automated rollback and recovery system for failed deployments with snapshot management, health verification, and emergency recovery capabilities",
+    "maintainer": "infrastructure-team",
+    "author": "DevOps Team",
+    "created": "2025-11-16T20:00:00Z",
+    "lastUpdated": "2025-11-16T20:00:00Z",
+    "estimatedDuration": "10 minutes",
+    "complexity": "critical",
+    "priority": "critical",
+    "relatedDocuments": [
+      "scripts/core/enterprise-rollback.sh",
+      "apps/mcp-server/data/routing-architecture.json",
+      "docker-compose.staging.yml",
+      "docker-compose.production.yml"
+    ],
+    "sourceFile": "scripts/core/enterprise-rollback.sh",
+    "conversionDate": "2025-11-16T20:00:00Z",
+    "schemaVersion": "1.0.0"
+  },
+  "executiveSummary": {
+    "description": "Enterprise-grade rollback and recovery system providing automated snapshot management, deployment state preservation, Docker orchestration rollback, health verification, and emergency recovery procedures. Supports both planned rollback to specific snapshots and emergency rollback to latest known-good state.",
+    "status": "READY_FOR_PRODUCTION",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "MEDIUM",
+    "keyChanges": [
+      "Automated deployment snapshot creation with metadata tracking",
+      "Snapshot integrity validation before rollback",
+      "Environment and Docker Compose configuration restoration",
+      "Docker image verification and restoration",
+      "Infrastructure-first service startup strategy",
+      "Multi-level health verification (containers, API, database)",
+      "Emergency rollback to latest snapshot",
+      "Pre-rollback safety snapshots"
+    ],
+    "prerequisites": [
+      "Docker daemon running and accessible",
+      "Docker Compose available (legacy or plugin)",
+      "curl available for health checks",
+      "jq installed for JSON processing",
+      "Valid snapshot exists in backups/rollback directory",
+      "Sufficient disk space for snapshots",
+      "Appropriate environment files (.env) present",
+      "Network connectivity to container registry (if pulling images)"
+    ],
+    "impact": {
+      "systems": [
+        "api-gateway",
+        "mcp-server",
+        "web-dashboard",
+        "postgres",
+        "redis",
+        "qdrant",
+        "minio",
+        "speckle-services"
+      ],
+      "downtime": "5-10 minutes during rollback operation",
+      "rollbackTime": "Not applicable - this IS the rollback procedure. Re-rollback to newer state: 10 minutes"
+    }
+  },
+  "preFlightChecks": [
+    {
+      "id": "check-docker-daemon",
+      "order": 1,
+      "category": "infrastructure",
+      "name": "Validate Docker daemon running",
+      "description": "Ensure Docker daemon is operational and accessible",
+      "command": "docker info",
+      "expectedResult": "Docker system information output",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates Docker daemon is running",
+      "onFailure": {
+        "action": "abort",
+        "message": "Docker daemon is not running. Start Docker daemon before proceeding with rollback."
+      }
+    },
+    {
+      "id": "check-docker-compose",
+      "order": 2,
+      "category": "infrastructure",
+      "name": "Validate Docker Compose available",
+      "description": "Check for docker-compose legacy command or docker compose plugin",
+      "command": "command -v docker-compose || docker compose version",
+      "expectedResult": "Docker Compose version output",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Either legacy docker-compose or docker compose plugin must be available",
+      "onFailure": {
+        "action": "abort",
+        "message": "Docker Compose is not available. Install Docker Compose before proceeding."
+      }
+    },
+    {
+      "id": "check-curl",
+      "order": 3,
+      "category": "infrastructure",
+      "name": "Validate curl available",
+      "description": "Ensure curl is available for health checks",
+      "command": "command -v curl",
+      "expectedResult": "Path to curl binary",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates curl is available",
+      "onFailure": {
+        "action": "abort",
+        "message": "curl is not installed. Install curl before proceeding."
+      }
+    },
+    {
+      "id": "check-jq",
+      "order": 4,
+      "category": "infrastructure",
+      "name": "Validate jq available",
+      "description": "Ensure jq is available for JSON processing",
+      "command": "command -v jq",
+      "expectedResult": "Path to jq binary",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates jq is available",
+      "onFailure": {
+        "action": "abort",
+        "message": "jq is not installed. Install jq for JSON processing before proceeding."
+      }
+    },
+    {
+      "id": "check-backup-directory",
+      "order": 5,
+      "category": "configuration",
+      "name": "Validate backup directory exists",
+      "description": "Ensure backups/rollback directory exists and is accessible",
+      "command": "test -d backups/rollback",
+      "expectedResult": "Directory exists",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates directory exists",
+      "onFailure": {
+        "action": "abort",
+        "message": "Backup directory not found. Cannot proceed with rollback without snapshots."
+      }
+    },
+    {
+      "id": "check-snapshot-availability",
+      "order": 6,
+      "category": "configuration",
+      "name": "Validate snapshots available",
+      "description": "Ensure at least one snapshot exists for rollback",
+      "command": "ls -A backups/rollback 2>/dev/null | grep -q .",
+      "expectedResult": "Snapshots found",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates snapshots exist",
+      "onFailure": {
+        "action": "abort",
+        "message": "No snapshots available for rollback. Cannot proceed."
+      }
+    },
+    {
+      "id": "check-compose-file",
+      "order": 7,
+      "category": "configuration",
+      "name": "Validate Docker Compose file exists",
+      "description": "Ensure compose file for environment exists",
+      "command": "test -f ${COMPOSE_FILE:-docker-compose.staging.yml}",
+      "expectedResult": "Compose file exists",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates file exists",
+      "onFailure": {
+        "action": "abort",
+        "message": "Docker Compose file not found. Cannot proceed with rollback."
+      }
+    },
+    {
+      "id": "check-disk-space",
+      "order": 8,
+      "category": "infrastructure",
+      "name": "Validate sufficient disk space",
+      "description": "Ensure sufficient disk space for rollback operations",
+      "command": "df -h . | awk 'NR==2 {print $5}' | sed 's/%//' | awk '{if($1 < 90) exit 0; else exit 1}'",
+      "expectedResult": "Disk usage below 90%",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "validationLogic": "Disk usage should be below 90% for safe operations",
+      "onFailure": {
+        "action": "skip",
+        "message": "Disk space is low. Rollback may fail if space runs out."
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Rollback Environment Setup",
+      "description": "Prepare rollback environment and validate prerequisites",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Create rollback environment directories",
+          "description": "Create backup and log directories if they don't exist",
+          "commands": [
+            "mkdir -p backups/rollback",
+            "mkdir -p logs/rollback"
+          ],
+          "purpose": "Ensure required directories exist for rollback operations",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": "Directories must be created successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to create rollback directories. Check permissions."
+          }
+        },
+        {
+          "step": "1.2",
+          "name": "Validate rollback prerequisites",
+          "description": "Check that all required tools are available",
+          "command": "for tool in docker curl jq; do command -v $tool || exit 1; done",
+          "purpose": "Ensure all required CLI tools are installed",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "All tools must be available"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Required tools missing. Install docker, curl, and jq before proceeding."
+          }
+        },
+        {
+          "step": "1.3",
+          "name": "Set environment variables",
+          "description": "Configure environment for rollback operation",
+          "commands": [
+            "export ENVIRONMENT=${ENVIRONMENT:-staging}",
+            "export COMPOSE_FILE=${COMPOSE_FILE:-docker-compose.staging.yml}",
+            "export BACKUP_DIR=backups/rollback",
+            "export ROLLBACK_TIMEOUT=${ROLLBACK_TIMEOUT:-300}"
+          ],
+          "purpose": "Set required environment variables for rollback",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Variables exported successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to set environment variables."
+          }
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Snapshot Selection and Validation",
+      "description": "Identify and validate target snapshot for rollback",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "List available snapshots",
+          "description": "Display all available rollback snapshots with metadata",
+          "command": "for snapshot_dir in backups/rollback/*; do if [ -d \"$snapshot_dir\" ] && [ -f \"$snapshot_dir/metadata.json\" ]; then echo \"$(basename $snapshot_dir): $(jq -r '.timestamp' $snapshot_dir/metadata.json), commit: $(jq -r '.git_commit' $snapshot_dir/metadata.json | cut -c1-8)\"; fi; done",
+          "purpose": "Show available snapshots for operator selection",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Should list one or more snapshots"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "No valid snapshots found for rollback."
+          }
+        },
+        {
+          "step": "2.2",
+          "name": "Validate target snapshot integrity",
+          "description": "Verify snapshot has all required files and valid JSON",
+          "commands": [
+            "test -f backups/rollback/${SNAPSHOT_NAME}/metadata.json",
+            "test -f backups/rollback/${SNAPSHOT_NAME}/container_states.json",
+            "test -f backups/rollback/${SNAPSHOT_NAME}/current_images.json",
+            "jq empty backups/rollback/${SNAPSHOT_NAME}/metadata.json"
+          ],
+          "purpose": "Ensure snapshot is complete and valid before rollback",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "All required files exist and JSON is valid"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Snapshot validation failed. Snapshot is corrupted or incomplete."
+          }
+        },
+        {
+          "step": "2.3",
+          "name": "Display snapshot metadata",
+          "description": "Show snapshot details before proceeding",
+          "command": "jq '.' backups/rollback/${SNAPSHOT_NAME}/metadata.json",
+          "purpose": "Provide operator with snapshot information for confirmation",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Metadata displayed successfully"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not display snapshot metadata, but rollback can continue."
+          }
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Pre-Rollback Safety Snapshot",
+      "description": "Create snapshot of current state before rollback for safety",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Create pre-rollback snapshot name",
+          "description": "Generate timestamped snapshot name",
+          "command": "export PRE_ROLLBACK_SNAPSHOT=\"pre-rollback-$(date +%Y%m%d-%H%M%S)\"",
+          "purpose": "Create unique snapshot identifier",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Variable set successfully"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not create snapshot name, but rollback can continue."
+          }
+        },
+        {
+          "step": "3.2",
+          "name": "Capture current container states",
+          "description": "Save current Docker container states to snapshot",
+          "commands": [
+            "mkdir -p backups/rollback/${PRE_ROLLBACK_SNAPSHOT}",
+            "docker compose -f ${COMPOSE_FILE} ps --format json > backups/rollback/${PRE_ROLLBACK_SNAPSHOT}/container_states.json 2>/dev/null || echo '[]' > backups/rollback/${PRE_ROLLBACK_SNAPSHOT}/container_states.json"
+          ],
+          "purpose": "Preserve current state for potential re-rollback",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": "Container states captured"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not capture container states, but rollback can continue."
+          }
+        },
+        {
+          "step": "3.3",
+          "name": "Capture current Docker images",
+          "description": "Save current Ectropy Docker images to snapshot",
+          "command": "docker images --format json | jq 'select(.Repository | contains(\"ectropy\"))' > backups/rollback/${PRE_ROLLBACK_SNAPSHOT}/current_images.json 2>/dev/null || echo '[]' > backups/rollback/${PRE_ROLLBACK_SNAPSHOT}/current_images.json",
+          "purpose": "Preserve image information for potential recovery",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": "Image information captured"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not capture image information, but rollback can continue."
+          }
+        },
+        {
+          "step": "3.4",
+          "name": "Backup current configuration files",
+          "description": "Save .env and compose file to snapshot",
+          "commands": [
+            "[ -f .env ] && cp .env backups/rollback/${PRE_ROLLBACK_SNAPSHOT}/env_backup || true",
+            "[ -f ${COMPOSE_FILE} ] && cp ${COMPOSE_FILE} backups/rollback/${PRE_ROLLBACK_SNAPSHOT}/compose_backup.yml || true"
+          ],
+          "purpose": "Preserve configuration for potential re-rollback",
+          "required": false,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Configuration files backed up"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Configuration backup skipped, but rollback can continue."
+          }
+        },
+        {
+          "step": "3.5",
+          "name": "Create snapshot metadata",
+          "description": "Generate metadata.json for pre-rollback snapshot",
+          "command": "cat > backups/rollback/${PRE_ROLLBACK_SNAPSHOT}/metadata.json <<EOF\n{\n  \"timestamp\": \"$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")\",\n  \"environment\": \"${ENVIRONMENT}\",\n  \"git_commit\": \"$(git rev-parse HEAD 2>/dev/null || echo 'unknown')\",\n  \"git_branch\": \"$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')\",\n  \"snapshot_name\": \"${PRE_ROLLBACK_SNAPSHOT}\",\n  \"compose_file\": \"${COMPOSE_FILE}\",\n  \"snapshot_type\": \"pre-rollback\",\n  \"rollback_target\": \"${SNAPSHOT_NAME}\"\n}\nEOF",
+          "purpose": "Document pre-rollback state with metadata",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": "Metadata file created"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not create snapshot metadata, but rollback can continue."
+          }
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Stop Current Deployment",
+      "description": "Gracefully stop all running containers",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Graceful shutdown of all services",
+          "description": "Stop all containers using Docker Compose down",
+          "command": "timeout ${ROLLBACK_TIMEOUT} docker compose -f ${COMPOSE_FILE} down --remove-orphans 2>&1 | tee logs/rollback/stop_current.log",
+          "purpose": "Stop current deployment cleanly",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "All containers stopped successfully"
+          },
+          "onFailure": {
+            "action": "retry",
+            "message": "Graceful shutdown failed. Attempting force stop."
+          }
+        },
+        {
+          "step": "4.2",
+          "name": "Force stop if graceful shutdown fails",
+          "description": "Kill and remove containers forcefully",
+          "commands": [
+            "docker compose -f ${COMPOSE_FILE} kill || true",
+            "docker compose -f ${COMPOSE_FILE} down --remove-orphans --volumes || true"
+          ],
+          "purpose": "Ensure all containers are stopped even if graceful shutdown fails",
+          "required": false,
+          "automatable": true,
+          "timeout": "120s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Force stop completes"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Could not stop containers. Manual intervention required."
+          }
+        },
+        {
+          "step": "4.3",
+          "name": "Verify containers are stopped",
+          "description": "Confirm no Ectropy containers are running",
+          "command": "! docker ps --filter 'name=ectropy' --format '{{.Names}}' | grep -q .",
+          "purpose": "Validate complete shutdown before proceeding",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "No containers should be running"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Containers still running. Cannot proceed with rollback."
+          }
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Restore from Snapshot",
+      "description": "Restore configuration and state from target snapshot",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "5.1",
+          "name": "Restore environment configuration",
+          "description": "Restore .env file from snapshot",
+          "command": "if [ -f backups/rollback/${SNAPSHOT_NAME}/env_backup ]; then cp backups/rollback/${SNAPSHOT_NAME}/env_backup .env; fi",
+          "purpose": "Restore environment variables to previous state",
+          "required": false,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Environment file restored or skipped if not in snapshot"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not restore environment file. Using existing .env."
+          }
+        },
+        {
+          "step": "5.2",
+          "name": "Restore Docker Compose configuration",
+          "description": "Restore compose file from snapshot",
+          "command": "if [ -f backups/rollback/${SNAPSHOT_NAME}/compose_backup.yml ]; then cp backups/rollback/${SNAPSHOT_NAME}/compose_backup.yml ${COMPOSE_FILE}; fi",
+          "purpose": "Restore Docker Compose configuration to previous state",
+          "required": false,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Compose file restored or skipped if not in snapshot"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not restore compose file. Using existing configuration."
+          }
+        },
+        {
+          "step": "5.3",
+          "name": "Verify Docker images availability",
+          "description": "Check if required Docker images are available locally",
+          "command": "jq -r '.[] | select(.Repository | contains(\"ectropy\")) | \"\\(.Repository):\\(.Tag)\"' backups/rollback/${SNAPSHOT_NAME}/current_images.json 2>/dev/null | while read -r image; do if [ -n \"$image\" ] && [ \"$image\" != \"null\" ]; then if docker images \"$image\" --format '{{.Repository}}:{{.Tag}}' | grep -q \"$image\"; then echo \"Image available: $image\"; else echo \"WARNING: Image not available: $image\"; fi; fi; done",
+          "purpose": "Validate required images are available for rollback",
+          "required": false,
+          "automatable": true,
+          "timeout": "120s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Images checked for availability"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Some images may not be available. Deployment may pull from registry."
+          }
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Start Restored Deployment",
+      "description": "Deploy services using restored configuration",
+      "estimatedDuration": "3 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "6.1",
+          "name": "Start infrastructure services",
+          "description": "Deploy postgres, redis, and Speckle databases first",
+          "command": "timeout ${ROLLBACK_TIMEOUT} docker compose -f ${COMPOSE_FILE} up -d postgres redis speckle-postgres speckle-redis 2>&1 | tee logs/rollback/start_infrastructure.log",
+          "purpose": "Ensure databases are ready before application services",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "Infrastructure services start successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Infrastructure services failed to start. Rollback cannot continue."
+          }
+        },
+        {
+          "step": "6.2",
+          "name": "Wait for infrastructure initialization",
+          "description": "Allow 30 seconds for databases to initialize",
+          "command": "sleep 30",
+          "purpose": "Ensure databases are fully ready before starting apps",
+          "required": true,
+          "automatable": true,
+          "timeout": "35s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Wait completes"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Wait interrupted, but deployment continues."
+          }
+        },
+        {
+          "step": "6.3",
+          "name": "Start all application services",
+          "description": "Deploy all remaining services",
+          "command": "timeout ${ROLLBACK_TIMEOUT} docker compose -f ${COMPOSE_FILE} up -d 2>&1 | tee logs/rollback/start_application.log",
+          "purpose": "Bring up complete application stack",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "All services start successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Application services failed to start. Rollback failed."
+          }
+        }
+      ]
+    },
+    {
+      "phase": 7,
+      "name": "Rollback Verification",
+      "description": "Verify rollback success with comprehensive health checks",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "7.1",
+          "name": "Check container health status",
+          "description": "Verify all containers are in running state",
+          "command": "docker compose -f ${COMPOSE_FILE} ps --format json | jq -r '.[] | select(.State != \"running\") | .Name' 2>/dev/null",
+          "purpose": "Identify any unhealthy containers",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedOutput": "",
+          "validation": {
+            "type": "output",
+            "criteria": "Empty output means all containers are running"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Some containers are not running. Check logs for details."
+          }
+        },
+        {
+          "step": "7.2",
+          "name": "Check API Gateway health",
+          "description": "Verify API Gateway health endpoint is accessible",
+          "command": "curl -f -s http://localhost:4000/health",
+          "purpose": "Validate API Gateway is healthy",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 10,
+          "expectedStatus": [200],
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "Health endpoint returns 200 OK"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "API Gateway health check failed. Service may still be starting."
+          }
+        },
+        {
+          "step": "7.3",
+          "name": "Check database connectivity",
+          "description": "Verify PostgreSQL is accessible",
+          "command": "docker compose -f ${COMPOSE_FILE} exec -T postgres pg_isready -U postgres",
+          "purpose": "Validate database connectivity",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "pg_isready returns success"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Database connectivity check failed. Database may still be initializing."
+          }
+        },
+        {
+          "step": "7.4",
+          "name": "Generate verification report",
+          "description": "Display rollback verification summary",
+          "command": "echo \"Rollback verification completed. Check logs for any warnings.\"",
+          "purpose": "Provide operator with verification summary",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Report generated"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not generate report, but rollback completed."
+          }
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "healthChecks": [
+      {
+        "service": "api-gateway",
+        "endpoint": "http://localhost:4000/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "postgres",
+        "endpoint": "http://localhost:5432",
+        "method": "GET",
+        "expectedStatus": 0,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "redis",
+        "endpoint": "http://localhost:6379",
+        "method": "GET",
+        "expectedStatus": 0,
+        "timeout": "10s",
+        "critical": false
+      }
+    ],
+    "smokeTests": [
+      {
+        "test": "All containers running",
+        "endpoint": "docker compose ps",
+        "expectedBehavior": "All services show 'Up' or 'running' status",
+        "priority": "P0"
+      },
+      {
+        "test": "API Gateway health check responds",
+        "endpoint": "http://localhost:4000/health",
+        "expectedBehavior": "Returns 200 OK with health status",
+        "priority": "P0"
+      },
+      {
+        "test": "Database accepts connections",
+        "endpoint": "pg_isready",
+        "expectedBehavior": "PostgreSQL responds to connection check",
+        "priority": "P0"
+      },
+      {
+        "test": "No error logs in containers",
+        "endpoint": "docker compose logs",
+        "expectedBehavior": "No FATAL or ERROR level messages in recent logs",
+        "priority": "P1"
+      }
+    ],
+    "performanceThresholds": [
+      {
+        "metric": "Container startup time",
+        "threshold": "< 90s",
+        "measurement": "Time from docker up to running state"
+      },
+      {
+        "metric": "Health check response time",
+        "threshold": "< 1000ms",
+        "measurement": "curl response time to /health"
+      },
+      {
+        "metric": "Database connection time",
+        "threshold": "< 5s",
+        "measurement": "pg_isready response time"
+      }
+    ],
+    "dataIntegrity": [
+      {
+        "check": "Database data preserved",
+        "validation": "Volumes not deleted during rollback",
+        "expected": "All existing data intact unless --volumes flag used"
+      },
+      {
+        "check": "Configuration restored correctly",
+        "validation": "Environment and compose files match snapshot",
+        "expected": "Configuration matches snapshot state"
+      }
+    ]
+  },
+  "rollback": {
+    "supported": true,
+    "estimatedTime": "10 minutes",
+    "dataLossRisk": "minimal",
+    "triggerConditions": [
+      "Rollback verification fails - containers not running",
+      "Rollback verification fails - API health check timeout",
+      "Rollback verification fails - database connectivity issues",
+      "Infrastructure services fail to start",
+      "Application services fail to start",
+      "Incorrect snapshot restored (operator error)"
+    ],
+    "decisionMaker": "DevOps Lead or On-Call Engineer",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Stop current (failed rollback) deployment",
+        "command": "docker compose -f ${COMPOSE_FILE} down --remove-orphans",
+        "purpose": "Stop the deployment that resulted from failed rollback",
+        "required": true
+      },
+      {
+        "step": 2,
+        "name": "Identify alternative snapshot",
+        "command": "ls -lt backups/rollback | head -10",
+        "purpose": "List recent snapshots to select alternative target",
+        "required": true
+      },
+      {
+        "step": 3,
+        "name": "Re-execute rollback to different snapshot",
+        "command": "SNAPSHOT_NAME=<alternative-snapshot> ./scripts/core/enterprise-rollback.sh rollback <alternative-snapshot>",
+        "purpose": "Attempt rollback to different known-good state",
+        "required": true
+      },
+      {
+        "step": 4,
+        "name": "If all snapshots fail, perform emergency rollback",
+        "command": "./scripts/core/enterprise-rollback.sh emergency",
+        "purpose": "Use emergency rollback to latest available snapshot",
+        "required": true
+      },
+      {
+        "step": 5,
+        "name": "Verify re-rollback success",
+        "command": "curl -f http://localhost:4000/health && docker compose -f ${COMPOSE_FILE} ps",
+        "purpose": "Confirm system is healthy after re-rollback",
+        "required": true
+      }
+    ],
+    "verification": {
+      "healthCheck": "http://localhost:4000/health",
+      "expectedStatus": 200,
+      "successCriteria": "All containers healthy, health endpoint returns 200, database accessible"
+    }
+  },
+  "monitoring": {
+    "duration": "First 30 minutes critical, then 24 hours monitoring",
+    "keyMetrics": [
+      {
+        "metric": "Container health status",
+        "threshold": "All containers 'Up'",
+        "alertOn": "Any container restart or exit",
+        "severity": "critical"
+      },
+      {
+        "metric": "API response time",
+        "threshold": "< 1000ms",
+        "alertOn": "> 2000ms for 5 minutes",
+        "severity": "warning"
+      },
+      {
+        "metric": "Error rate in logs",
+        "threshold": "< 1%",
+        "alertOn": "> 5% error rate",
+        "severity": "critical"
+      },
+      {
+        "metric": "Database query time",
+        "threshold": "< 100ms",
+        "alertOn": "> 500ms for 5 minutes",
+        "severity": "warning"
+      },
+      {
+        "metric": "Memory usage",
+        "threshold": "< 80%",
+        "alertOn": "> 90% for 5 minutes",
+        "severity": "warning"
+      }
+    ],
+    "alertThresholds": [
+      {
+        "condition": "Health check fails 5 consecutive times",
+        "severity": "critical",
+        "action": "Escalate immediately, consider re-rollback to different snapshot",
+        "escalation": "Page on-call engineer and DevOps lead"
+      },
+      {
+        "condition": "Container restarts detected",
+        "severity": "critical",
+        "action": "Investigate container logs immediately",
+        "escalation": "Alert DevOps team"
+      },
+      {
+        "condition": "Database connection failures",
+        "severity": "critical",
+        "action": "Check database logs and connectivity",
+        "escalation": "Alert database administrator"
+      },
+      {
+        "condition": "High error rate in logs",
+        "severity": "warning",
+        "action": "Review application logs for patterns",
+        "escalation": "Notify development team"
+      }
+    ],
+    "dashboards": [
+      "docker compose -f ${COMPOSE_FILE} ps - container status",
+      "docker compose -f ${COMPOSE_FILE} logs -f - live logs",
+      "docker stats - resource usage",
+      "curl http://localhost:4000/health - health status"
+    ]
+  },
+  "successCriteria": [
+    {
+      "criterion": "All required tools available (docker, curl, jq)",
+      "status": "REQUIRED",
+      "validation": "Pre-flight checks pass for all tools"
+    },
+    {
+      "criterion": "Valid snapshot exists and passes integrity check",
+      "status": "REQUIRED",
+      "validation": "Snapshot has all required files and valid JSON"
+    },
+    {
+      "criterion": "Pre-rollback safety snapshot created",
+      "status": "REQUIRED",
+      "validation": "Current state captured before rollback"
+    },
+    {
+      "criterion": "Current deployment stopped cleanly",
+      "status": "REQUIRED",
+      "validation": "All containers stopped with no orphans remaining"
+    },
+    {
+      "criterion": "Configuration files restored from snapshot",
+      "status": "REQUIRED",
+      "validation": ".env and compose files match snapshot"
+    },
+    {
+      "criterion": "Infrastructure services start successfully",
+      "status": "REQUIRED",
+      "validation": "postgres, redis, and Speckle databases running"
+    },
+    {
+      "criterion": "All application services start successfully",
+      "status": "REQUIRED",
+      "validation": "docker compose ps shows all services 'Up'"
+    },
+    {
+      "criterion": "API Gateway health endpoint returns 200",
+      "status": "REQUIRED",
+      "validation": "curl http://localhost:4000/health returns 200"
+    },
+    {
+      "criterion": "Database connectivity verified",
+      "status": "REQUIRED",
+      "validation": "pg_isready returns success"
+    },
+    {
+      "criterion": "No critical errors in container logs",
+      "status": "REQUIRED",
+      "validation": "docker logs shows no FATAL messages"
+    },
+    {
+      "criterion": "Rollback completes within estimated time",
+      "status": "RECOMMENDED",
+      "validation": "Total time < 15 minutes"
+    },
+    {
+      "criterion": "All Docker images available locally",
+      "status": "OPTIONAL",
+      "validation": "No image pulls required during rollback"
+    }
+  ],
+  "mcpIntegration": {
+    "queryableFields": [
+      "phases",
+      "preFlightChecks",
+      "healthChecks",
+      "rollback",
+      "snapshotManagement",
+      "emergencyProcedures",
+      "successCriteria",
+      "monitoring"
+    ],
+    "supportedQueries": [
+      {
+        "query": "getRollbackPhases",
+        "returns": "Array of rollback phases with steps",
+        "purpose": "Retrieve ordered rollback steps for execution"
+      },
+      {
+        "query": "listAvailableSnapshots",
+        "returns": "Array of available snapshots with metadata",
+        "purpose": "Display snapshots for operator selection"
+      },
+      {
+        "query": "validateSnapshot",
+        "args": ["snapshotName"],
+        "returns": "Boolean indicating snapshot integrity",
+        "purpose": "Verify snapshot is valid before rollback"
+      },
+      {
+        "query": "getEmergencyRollbackProcedure",
+        "returns": "Emergency rollback steps",
+        "purpose": "Execute emergency rollback to latest snapshot"
+      },
+      {
+        "query": "getHealthChecks",
+        "returns": "Array of health check endpoints and criteria",
+        "purpose": "Validate service health after rollback"
+      },
+      {
+        "query": "getPreFlightChecks",
+        "returns": "Array of prerequisite validation checks",
+        "purpose": "Validate environment before rollback"
+      },
+      {
+        "query": "getSnapshotMetadata",
+        "args": ["snapshotName"],
+        "returns": "Snapshot metadata including timestamp, commit, environment",
+        "purpose": "Display snapshot details for confirmation"
+      },
+      {
+        "query": "getRollbackVerification",
+        "returns": "Array of verification steps and criteria",
+        "purpose": "Verify rollback success"
+      }
+    ],
+    "decisionSupport": [
+      "Recommend snapshot based on timestamp and git commit",
+      "Suggest emergency rollback if all targeted rollbacks fail",
+      "Validate snapshot integrity before proceeding",
+      "Determine infrastructure-first startup order",
+      "Calculate estimated rollback time based on phases",
+      "Recommend re-rollback to alternative snapshot if verification fails"
+    ],
+    "architectureAlignment": {
+      "routingConfig": "apps/mcp-server/data/routing-architecture.json",
+      "portAllocation": "routing-architecture.json#/portAllocationMatrix/staging",
+      "oauthConfig": "routing-architecture.json#/oauthConfiguration"
+    }
+  },
+  "knownIssues": [
+    {
+      "id": "issue-1",
+      "title": "Docker images may need to be pulled if not cached",
+      "severity": "Low",
+      "impact": "Rollback may take longer if images need to be downloaded",
+      "mitigation": "Script checks image availability and warns if pulls required",
+      "action": "Ensure container registry is accessible",
+      "priority": "P2"
+    },
+    {
+      "id": "issue-2",
+      "title": "Health checks may timeout on slow systems",
+      "severity": "Low",
+      "impact": "False negative in verification phase",
+      "mitigation": "Script retries health checks up to 10 times",
+      "action": "Manually verify service status if health check fails",
+      "priority": "P2"
+    },
+    {
+      "id": "issue-3",
+      "title": "Snapshot storage can fill disk if not managed",
+      "severity": "Medium",
+      "impact": "Disk space exhaustion may prevent new snapshots",
+      "mitigation": "Pre-flight check warns if disk usage > 90%",
+      "action": "Implement snapshot retention policy and cleanup",
+      "priority": "P1"
+    },
+    {
+      "id": "issue-4",
+      "title": "Database data loss if --volumes flag used",
+      "severity": "High",
+      "impact": "All database data lost if volumes removed",
+      "mitigation": "Script uses --remove-orphans not --volumes by default",
+      "action": "Never use --volumes flag unless data loss is acceptable",
+      "priority": "P0"
+    },
+    {
+      "id": "issue-5",
+      "title": "Concurrent rollback operations not supported",
+      "severity": "Medium",
+      "impact": "Multiple simultaneous rollbacks may corrupt state",
+      "mitigation": "No automatic lock mechanism in current version",
+      "action": "Coordinate with team to ensure only one rollback at a time",
+      "priority": "P1"
+    }
+  ],
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "ENVIRONMENT",
+        "description": "Target environment for rollback (staging, production)",
+        "example": "staging",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "COMPOSE_FILE",
+        "description": "Docker Compose file to use for rollback",
+        "example": "docker-compose.staging.yml",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "SNAPSHOT_NAME",
+        "description": "Name of snapshot to rollback to (for targeted rollback)",
+        "example": "pre-deployment-20251116-143000",
+        "required": false,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "ROLLBACK_TIMEOUT",
+        "description": "Timeout in seconds for Docker operations",
+        "example": "300",
+        "required": false,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "BACKUP_DIR",
+        "description": "Directory for rollback snapshots",
+        "example": "backups/rollback",
+        "required": false,
+        "environment": "all",
+        "secret": false
+      }
+    ]
+  },
+  "snapshotManagement": {
+    "create": {
+      "description": "Create new deployment snapshot",
+      "command": "./scripts/core/enterprise-rollback.sh snapshot <snapshot-name>",
+      "purpose": "Capture current deployment state for future rollback",
+      "automatable": true
+    },
+    "list": {
+      "description": "List all available snapshots",
+      "command": "./scripts/core/enterprise-rollback.sh list",
+      "purpose": "Display snapshots with timestamps and metadata",
+      "automatable": true
+    },
+    "validate": {
+      "description": "Validate snapshot integrity",
+      "command": "test -f backups/rollback/<snapshot>/metadata.json && jq empty backups/rollback/<snapshot>/metadata.json",
+      "purpose": "Verify snapshot has all required files",
+      "automatable": true
+    },
+    "autoSnapshot": {
+      "description": "Create automatic pre-deployment snapshot",
+      "command": "./scripts/core/enterprise-rollback.sh auto-snapshot deployment",
+      "purpose": "Ensure rollback capability before deployment",
+      "automatable": true
+    },
+    "retentionPolicy": {
+      "description": "Recommended snapshot retention policy",
+      "policy": "Keep last 10 snapshots, or all snapshots from last 7 days",
+      "implementation": "Manual cleanup currently - automated cleanup to be implemented"
+    }
+  },
+  "emergencyProcedures": {
+    "emergencyRollback": {
+      "description": "Rapid rollback to latest snapshot",
+      "command": "./scripts/core/enterprise-rollback.sh emergency",
+      "trigger": "Critical system failure, no time to select specific snapshot",
+      "steps": [
+        "Find most recent snapshot automatically",
+        "Execute rapid rollback without manual intervention",
+        "Verify system health",
+        "Alert on-call team"
+      ]
+    },
+    "manualRecovery": {
+      "description": "Manual recovery if all automated rollbacks fail",
+      "steps": [
+        "Stop all containers: docker compose down --remove-orphans",
+        "Manually restore .env from known-good backup",
+        "Manually restore docker-compose file",
+        "Start infrastructure: docker compose up -d postgres redis",
+        "Wait 30 seconds",
+        "Start applications: docker compose up -d",
+        "Verify health manually"
+      ]
+    },
+    "dataRecovery": {
+      "description": "Database recovery if volumes were accidentally deleted",
+      "steps": [
+        "Check if database backups exist in backups/database/",
+        "Stop all services",
+        "Restore database dump: psql < backups/database/latest.sql",
+        "Restart services",
+        "Verify data integrity"
+      ]
+    }
+  },
+  "operationalActions": {
+    "list": {
+      "action": "list",
+      "description": "List available rollback snapshots",
+      "command": "./scripts/core/enterprise-rollback.sh list"
+    },
+    "snapshot": {
+      "action": "snapshot",
+      "description": "Create new deployment snapshot",
+      "command": "./scripts/core/enterprise-rollback.sh snapshot <name>"
+    },
+    "rollback": {
+      "action": "rollback",
+      "description": "Rollback to specific snapshot",
+      "command": "./scripts/core/enterprise-rollback.sh rollback <snapshot-name>"
+    },
+    "emergency": {
+      "action": "emergency",
+      "description": "Emergency rollback to latest snapshot",
+      "command": "./scripts/core/enterprise-rollback.sh emergency"
+    },
+    "verify": {
+      "action": "verify",
+      "description": "Verify current deployment health",
+      "command": "./scripts/core/enterprise-rollback.sh verify"
+    },
+    "autoSnapshot": {
+      "action": "auto-snapshot",
+      "description": "Create pre-deployment safety snapshot",
+      "command": "./scripts/core/enterprise-rollback.sh auto-snapshot deployment"
+    }
+  }
+}

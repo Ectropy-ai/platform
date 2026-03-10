@@ -1,0 +1,30 @@
+{
+  "name": "ectropy-integration-tests",
+  "version": "1.0.0",
+  "description": "Integration tests for Ectropy platform",
+  "scripts": {
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:ci": "vitest --run --coverage"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "form-data": "^4.0.0",
+    "jest": "^30.0.5",
+    "@types/jest": "^30.0.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testTimeout": 30000,
+    "globals": {
+      "ts-jest": {
+        "useESM": true,
+        "tsconfig": "../tsconfig.json"
+      }
+    },
+    "moduleNameMapper": {
+      "^ioredis$": "<rootDir>/../__mocks__/ioredis.js"
+    }
+  }
+}

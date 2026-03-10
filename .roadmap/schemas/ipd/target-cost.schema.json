@@ -1,0 +1,228 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:target-cost",
+  "title": "IPD Target Cost Schema",
+  "description": "IPD Target Cost tracking with amendments, actuals, and savings projection",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "targetCostId",
+    "projectRef",
+    "contractRef",
+    "originalTargetCost",
+    "currentTargetCost",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:target-cost:TC-[0-9]{4}-[0-9]{4}$",
+      "description": "URN identifier for this target cost record"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:target-cost"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "targetCostId": {
+      "type": "string",
+      "pattern": "^TC-[0-9]{4}-[0-9]{4}$"
+    },
+    "projectRef": {
+      "$ref": "#/$defs/urn"
+    },
+    "contractRef": {
+      "$ref": "#/$defs/urn"
+    },
+    "currency": {
+      "type": "string",
+      "default": "USD"
+    },
+    "originalTargetCost": {
+      "type": "number",
+      "description": "Original Target Cost at contract execution"
+    },
+    "currentTargetCost": {
+      "type": "number",
+      "description": "Current Target Cost after amendments"
+    },
+    "contingency": {
+      "type": "object",
+      "properties": {
+        "original": { "type": "number" },
+        "current": { "type": "number" },
+        "used": { "type": "number" },
+        "remaining": { "type": "number" }
+      }
+    },
+    "amendments": {
+      "type": "array",
+      "description": "Target Cost amendments (scope changes)",
+      "items": {
+        "$ref": "#/$defs/amendment"
+      }
+    },
+    "actualCost": {
+      "type": "object",
+      "description": "Current actual cost tracking",
+      "properties": {
+        "totalCommitted": { "type": "number" },
+        "totalSpent": { "type": "number" },
+        "percentComplete": { "type": "number", "minimum": 0, "maximum": 100 },
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "byCategory": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "category": { "type": "string" },
+              "budgeted": { "type": "number" },
+              "committed": { "type": "number" },
+              "spent": { "type": "number" },
+              "variance": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "savingsProjection": {
+      "type": "object",
+      "description": "Projected savings/overrun",
+      "properties": {
+        "projectedFinalCost": { "type": "number" },
+        "projectedSavings": { "type": "number" },
+        "projectedOverrun": { "type": "number" },
+        "confidenceLevel": { "type": "number", "minimum": 0, "maximum": 1 },
+        "lastCalculated": { "type": "string", "format": "date-time" },
+        "projectedDistribution": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "partyRef": { "$ref": "#/$defs/urn" },
+              "partyName": { "type": "string" },
+              "sharePercentage": { "type": "number" },
+              "projectedAmount": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "distributionRules": {
+      "type": "object",
+      "description": "How savings/overruns are distributed per contract",
+      "properties": {
+        "savingsDistribution": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "partyRef": { "$ref": "#/$defs/urn" },
+              "sharePercentage": { "type": "number" }
+            }
+          }
+        },
+        "overrunDistribution": {
+          "type": "object",
+          "properties": {
+            "atRiskPoolTotal": { "type": "number" },
+            "byParty": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "partyRef": { "$ref": "#/$defs/urn" },
+                  "atRiskAmount": { "type": "number" }
+                }
+              }
+            },
+            "ownerResponsibilityBeyondAtRisk": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "goalAchievement": {
+      "type": "object",
+      "description": "Goal Achievement Compensation tracking",
+      "properties": {
+        "goals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "goalId": { "type": "string" },
+              "description": { "type": "string" },
+              "metric": { "type": "string" },
+              "target": { "type": "number" },
+              "current": { "type": "number" },
+              "status": {
+                "type": "string",
+                "enum": ["ON_TRACK", "AT_RISK", "ACHIEVED", "MISSED"]
+              },
+              "compensationPool": { "type": "number" },
+              "verifiedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "totalCompensationPool": { "type": "number" }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    },
+    "amendment": {
+      "type": "object",
+      "required": ["amendmentId", "amount", "reason", "approvedAt"],
+      "properties": {
+        "amendmentId": { "type": "string" },
+        "amount": {
+          "type": "number",
+          "description": "Change amount (positive or negative)"
+        },
+        "reason": { "type": "string" },
+        "category": {
+          "type": "string",
+          "enum": [
+            "SCOPE_CHANGE",
+            "UNFORESEEN_CONDITION",
+            "OWNER_REQUEST",
+            "CODE_CHANGE",
+            "VALUE_ENGINEERING"
+          ]
+        },
+        "votingSessionRef": { "$ref": "#/$defs/urn" },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "approvedBy": { "type": "string", "enum": ["PMT", "PET", "OWNER"] }
+      }
+    }
+  }
+}

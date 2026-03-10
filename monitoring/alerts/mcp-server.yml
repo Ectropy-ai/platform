@@ -1,0 +1,173 @@
+# MCP Server Performance Alerts
+# Configured for 1000+ queries/day monitoring and performance optimization
+
+groups:
+  - name: mcp_server_performance
+    rules:
+      # High-level performance alerts
+      - alert: MCPServerHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=~"mcp-server.*"}[5m])) > 1
+        for: 2m
+        labels:
+          severity: warning
+          service: mcp-server
+        annotations:
+          summary: "MCP Server high latency detected"
+          description: "95th percentile latency is {{ $value }}s for {{ $labels.instance }}"
+
+      - alert: MCPServerHighErrorRate
+        expr: rate(http_requests_total{job=~"mcp-server.*",status=~"5.."}[5m]) / rate(http_requests_total{job=~"mcp-server.*"}[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+          service: mcp-server
+        annotations:
+          summary: "MCP Server high error rate"
+          description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.instance }}"
+
+      # Query volume monitoring (targeting 1000+ queries/day)
+      - alert: MCPServerLowQueryVolume
+        expr: rate(http_requests_total{job=~"mcp-server.*"}[1h]) * 3600 * 24 < 1000
+        for: 30m
+        labels:
+          severity: info
+          service: mcp-server
+        annotations:
+          summary: "MCP Server query volume below target"
+          description: "Daily query projection is {{ $value }} queries/day for {{ $labels.instance }} (target: 1000+)"
+
+      - alert: MCPServerQueryVolumeSpike
+        expr: rate(http_requests_total{job=~"mcp-server.*"}[5m]) > rate(http_requests_total{job=~"mcp-server.*"}[1h]) * 5
+        for: 2m
+        labels:
+          severity: warning
+          service: mcp-server
+        annotations:
+          summary: "MCP Server query volume spike detected"
+          description: "Current query rate is 5x the hourly average for {{ $labels.instance }}"
+
+  - name: mcp_server_availability
+    rules:
+      # Service availability
+      - alert: MCPServerDown
+        expr: up{job=~"mcp-server.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: mcp-server
+        annotations:
+          summary: "MCP Server is down"
+          description: "{{ $labels.instance }} has been down for more than 1 minute"
+
+      - alert: MCPServerHealthCheckFailing
+        expr: mcp_server_health_check_status != 1
+        for: 2m
+        labels:
+          severity: warning
+          service: mcp-server
+        annotations:
+          summary: "MCP Server health check failing"
+          description: "Health check failing for {{ $labels.instance }}"
+
+  - name: mcp_database_performance
+    rules:
+      # Database performance
+      - alert: PostgreSQLConnectionPoolExhausted
+        expr: mcp_database_pool_active_connections / mcp_database_pool_max_connections > 0.9
+        for: 2m
+        labels:
+          severity: warning
+          service: mcp-database
+        annotations:
+          summary: "PostgreSQL connection pool nearly exhausted"
+          description: "Connection pool usage is {{ $value | humanizePercentage }} for {{ $labels.instance }}"
+
+      - alert: RedisHighMemoryUsage
+        expr: mcp_redis_memory_used_bytes / mcp_redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: mcp-database
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis memory usage is {{ $value | humanizePercentage }} for {{ $labels.instance }}"
+
+      - alert: DatabaseQueryLatencyHigh
+        expr: histogram_quantile(0.95, rate(mcp_database_query_duration_seconds_bucket[5m])) > 0.5
+        for: 3m
+        labels:
+          severity: warning
+          service: mcp-database
+        annotations:
+          summary: "Database query latency high"
+          description: "95th percentile query latency is {{ $value }}s for {{ $labels.instance }}"
+
+  - name: mcp_system_resources
+    rules:
+      # System resource monitoring
+      - alert: MCPServerHighCPUUsage
+        expr: rate(process_cpu_seconds_total{job=~"mcp-server.*"}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: mcp-server
+        annotations:
+          summary: "MCP Server high CPU usage"
+          description: "CPU usage is {{ $value | humanizePercentage }} for {{ $labels.instance }}"
+
+      - alert: MCPServerHighMemoryUsage
+        expr: process_resident_memory_bytes{job=~"mcp-server.*"} / node_memory_MemTotal_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: mcp-server
+        annotations:
+          summary: "MCP Server high memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} for {{ $labels.instance }}"
+
+      - alert: MCPServerFileDescriptorUsage
+        expr: process_open_fds{job=~"mcp-server.*"} / process_max_fds > 0.8
+        for: 3m
+        labels:
+          severity: warning
+          service: mcp-server
+        annotations:
+          summary: "MCP Server high file descriptor usage"
+          description: "File descriptor usage is {{ $value | humanizePercentage }} for {{ $labels.instance }}"
+
+  - name: mcp_business_metrics
+    rules:
+      # Business/operational metrics
+      - alert: MCPServerAgentFailureRate
+        expr: rate(mcp_agent_operations_total{status="failed"}[5m]) / rate(mcp_agent_operations_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: mcp-agents
+        annotations:
+          summary: "High agent operation failure rate"
+          description: "Agent failure rate is {{ $value | humanizePercentage }} for {{ $labels.agent_type }}"
+
+      - alert: MCPServerToolExecutionLatency
+        expr: histogram_quantile(0.95, rate(mcp_tool_execution_duration_seconds_bucket[5m])) > 5
+        for: 3m
+        labels:
+          severity: warning
+          service: mcp-tools
+        annotations:
+          summary: "High tool execution latency"
+          description: "95th percentile tool execution time is {{ $value }}s for {{ $labels.tool_name }}"
+
+      - alert: MCPServerDailyQueryTarget
+        expr: |
+          (
+            increase(http_requests_total{job=~"mcp-server.*"}[24h]) 
+            and 
+            (time() % 86400) > 82800  # Only alert after 11 PM
+          ) < 1000
+        labels:
+          severity: info
+          service: mcp-server
+        annotations:
+          summary: "Daily query target not met"
+          description: "Total queries today: {{ $value }} (target: 1000+) for {{ $labels.instance }}"

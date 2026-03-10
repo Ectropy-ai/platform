@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../../dist/out-tsc",
+    "declaration": true,
+    "types": ["node", "vitest/globals"],
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "incremental": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*", "../shared/**/*.ts"],
+  "exclude": [
+    "jest.config.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts",
+    "src/**/usage-example.ts",
+    "../shared/**/*.spec.ts",
+    "../shared/**/*.test.ts"
+  ]
+}

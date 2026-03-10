@@ -1,0 +1,23 @@
+{
+  "mcp_server": {
+    "endpoint": "http://localhost:3020",
+    "features": {
+      "semantic_search": true,
+      "document_analysis": true,
+      "code_analysis": true,
+      "health_monitoring": true
+    }
+  },
+  "github_integration": {
+    "auto_issue_analysis": true,
+    "automated_fixes": true,
+    "ci_monitoring": true,
+    "pull_request_assistance": true
+  },
+  "ai_capabilities": {
+    "natural_language_processing": true,
+    "code_understanding": true,
+    "automated_debugging": true,
+    "performance_analysis": true
+  }
+}

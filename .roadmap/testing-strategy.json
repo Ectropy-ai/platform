@@ -1,0 +1,397 @@
+{
+  "$schema": "https://luhtech.dev/schemas/testing-strategy.schema.json",
+  "$id": "urn:luhtech:ectropy:file:testing-strategy",
+  "schemaVersion": "1.0.0",
+  "ventureId": "ectropy",
+  "lastUpdated": "2026-01-22T22:00:00Z",
+
+  "meta": {
+    "sourceOfTruth": ".roadmap/testing-strategy.json",
+    "description": "Schema-first testing strategy for Ectropy platform - defines test patterns, coverage requirements, and validation approaches aligned with industry best practices"
+  },
+
+  "philosophy": {
+    "approach": "Schema-First Test-Driven Development",
+    "principles": [
+      "Schema defines structure, tests validate behavior",
+      "Every schema domain has corresponding test suite",
+      "Integration tests validate cross-service contracts",
+      "Evidence chain maintains test result immutability"
+    ],
+    "coverage": {
+      "unit": "80% minimum for services",
+      "integration": "Critical paths 100%",
+      "e2e": "Key user journeys"
+    }
+  },
+
+  "testingLayers": {
+    "layer1_schema": {
+      "name": "Schema Validation",
+      "description": "Validate JSON documents against JSON Schema definitions",
+      "tools": ["ajv-cli", "ajv-formats"],
+      "location": "CI/CD workflow",
+      "frequency": "Every PR",
+      "blocking": true,
+      "patterns": [
+        {
+          "name": "Roadmap File Validation",
+          "target": ".roadmap/*.json",
+          "schemas": "luh-tech/luh-tech-roadmap-template/schemas/",
+          "examples": [
+            "ajv validate -s roadmap.schema.v2.json -d .roadmap/roadmap.json"
+          ]
+        },
+        {
+          "name": "Domain Schema Meta-Validation",
+          "target": ".roadmap/schemas/**/*.json",
+          "schemas": "JSON Schema Draft 7",
+          "examples": [
+            "ajv compile -s schema.json --spec=draft7"
+          ]
+        }
+      ]
+    },
+
+    "layer2_unit": {
+      "name": "Unit Tests",
+      "description": "Test individual functions and service methods in isolation",
+      "tools": ["vitest", "jest"],
+      "location": "**/__tests__/*.spec.ts, **/*.test.ts",
+      "frequency": "Every PR",
+      "blocking": true,
+      "patterns": [
+        {
+          "name": "Service Function Tests",
+          "description": "Test pure functions with mock data",
+          "template": {
+            "file": "{service}.spec.ts",
+            "structure": [
+              "describe('{ServiceName}', () => {",
+              "  describe('{functionName}', () => {",
+              "    it('should {expected behavior}', () => {",
+              "      // Arrange: Set up test data",
+              "      // Act: Call function",
+              "      // Assert: Verify results",
+              "    });",
+              "  });",
+              "});"
+            ]
+          },
+          "examples": [
+            "apps/mcp-server/src/services/__tests__/usf-decision-lifecycle.spec.ts"
+          ]
+        },
+        {
+          "name": "MCP Tool Tests",
+          "description": "Test MCP tool handlers with mock context",
+          "template": {
+            "file": "{tool-category}-tools.spec.ts",
+            "structure": [
+              "describe('MCP Tools - {Category}', () => {",
+              "  describe('{tool_name}', () => {",
+              "    it('should validate input schema', () => {});",
+              "    it('should return expected output format', () => {});",
+              "    it('should handle error cases gracefully', () => {});",
+              "  });",
+              "});"
+            ]
+          }
+        }
+      ],
+      "coverageRequirements": {
+        "statements": 80,
+        "branches": 75,
+        "functions": 80,
+        "lines": 80
+      }
+    },
+
+    "layer3_integration": {
+      "name": "Integration Tests",
+      "description": "Test service interactions and API contracts",
+      "tools": ["vitest", "supertest"],
+      "location": "**/__tests__/*.integration.spec.ts",
+      "frequency": "Every PR",
+      "blocking": true,
+      "patterns": [
+        {
+          "name": "Service Integration",
+          "description": "Test cross-service data flow",
+          "template": {
+            "file": "{feature}-integration.spec.ts",
+            "structure": [
+              "describe('{Feature} Integration', () => {",
+              "  describe('Service A → Service B', () => {",
+              "    it('should propagate data correctly', () => {});",
+              "    it('should handle service B failures gracefully', () => {});",
+              "  });",
+              "});"
+            ]
+          },
+          "examples": [
+            "apps/mcp-server/src/services/__tests__/usf-voxel-integration.spec.ts"
+          ]
+        },
+        {
+          "name": "API Contract Tests",
+          "description": "Validate REST/GraphQL API responses match schema",
+          "template": {
+            "file": "{api}-contract.spec.ts",
+            "structure": [
+              "describe('API Contract - {Endpoint}', () => {",
+              "  it('should return schema-compliant response', async () => {",
+              "    const response = await request(app).get('/api/v1/{endpoint}');",
+              "    expect(ajv.validate(schema, response.body)).toBe(true);",
+              "  });",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+
+    "layer4_e2e": {
+      "name": "End-to-End Tests",
+      "description": "Test complete user journeys through the system",
+      "tools": ["playwright"],
+      "location": "apps/web-dashboard-e2e/",
+      "frequency": "Pre-release, nightly",
+      "blocking": false,
+      "patterns": [
+        {
+          "name": "User Journey Tests",
+          "description": "Test complete workflows from UI to database",
+          "template": {
+            "file": "{journey}.spec.ts",
+            "structure": [
+              "test.describe('{User Journey}', () => {",
+              "  test('should complete {action} successfully', async ({ page }) => {",
+              "    // Navigate to feature",
+              "    // Perform user actions",
+              "    // Verify outcomes",
+              "  });",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  },
+
+  "domainTestPatterns": {
+    "description": "Test patterns specific to each schema domain",
+    "domains": [
+      {
+        "domain": "usf",
+        "schemas": ["usf-profile.schema.json", "usf-work-packet.schema.json"],
+        "testFiles": [
+          "apps/mcp-server/src/services/__tests__/usf-decision-lifecycle.spec.ts",
+          "apps/mcp-server/src/services/__tests__/usf-voxel-integration.spec.ts"
+        ],
+        "testCount": 62,
+        "coverage": "Complete",
+        "patterns": [
+          "Composite score calculation",
+          "Provider matching algorithms",
+          "Billing calculations",
+          "Event handling"
+        ]
+      },
+      {
+        "domain": "decision",
+        "schemas": ["decision.schema.json", "pm-decision.schema.json"],
+        "testFiles": [
+          "apps/mcp-server/src/services/__tests__/pm-decision-tools.spec.ts"
+        ],
+        "coverage": "Partial",
+        "patterns": [
+          "Authority cascade validation",
+          "Decision state transitions",
+          "Escalation rules"
+        ]
+      },
+      {
+        "domain": "voxel",
+        "schemas": ["voxel.schema.json", "voxel-v3.schema.json"],
+        "testFiles": [],
+        "coverage": "Pending",
+        "patterns": [
+          "Spatial coordinate validation",
+          "Decision attachment",
+          "IFC element linking"
+        ]
+      },
+      {
+        "domain": "contract",
+        "schemas": ["contract.schema.json", "contract-party.schema.json", "contract-template.schema.json"],
+        "testFiles": [],
+        "coverage": "Pending",
+        "patterns": [
+          "Contract parsing validation",
+          "Party relationship management",
+          "Template instantiation"
+        ]
+      },
+      {
+        "domain": "billing",
+        "schemas": ["pay-application.schema.json"],
+        "testFiles": [],
+        "coverage": "Service tests exist",
+        "patterns": [
+          "AIA G702/G703 format",
+          "Retainage calculations",
+          "Invoice generation"
+        ]
+      }
+    ]
+  },
+
+  "testDataManagement": {
+    "fixtures": {
+      "location": "**/__fixtures__/",
+      "patterns": [
+        "{domain}-fixtures.json - Domain-specific test data",
+        "mock-{entity}.ts - TypeScript factory functions"
+      ],
+      "guidelines": [
+        "Use factory functions for dynamic test data",
+        "Store static fixtures in JSON files",
+        "Never use production data in tests",
+        "Fixtures should match schema exactly"
+      ]
+    },
+    "mocking": {
+      "tools": ["vitest mock", "msw"],
+      "patterns": [
+        "Mock external services at network boundary",
+        "Use dependency injection for service mocks",
+        "Prefer real implementations over mocks when fast"
+      ]
+    }
+  },
+
+  "ciIntegration": {
+    "workflow": ".github/workflows/test.yml",
+    "stages": [
+      {
+        "name": "lint",
+        "blocking": true,
+        "command": "pnpm lint"
+      },
+      {
+        "name": "typecheck",
+        "blocking": true,
+        "command": "pnpm typecheck"
+      },
+      {
+        "name": "schema-validation",
+        "blocking": true,
+        "command": "pnpm validate:schemas"
+      },
+      {
+        "name": "unit-tests",
+        "blocking": true,
+        "command": "pnpm test:unit"
+      },
+      {
+        "name": "integration-tests",
+        "blocking": true,
+        "command": "pnpm test:integration"
+      },
+      {
+        "name": "e2e-tests",
+        "blocking": false,
+        "command": "pnpm test:e2e",
+        "conditions": ["staging deploy", "release branch"]
+      }
+    ],
+    "parallelization": {
+      "enabled": true,
+      "shards": 4,
+      "strategy": "Test file distribution"
+    }
+  },
+
+  "performanceBaselines": {
+    "targets": {
+      "unitTest": {
+        "maxDuration": "200ms per test",
+        "totalSuite": "60 seconds"
+      },
+      "integrationTest": {
+        "maxDuration": "2 seconds per test",
+        "totalSuite": "5 minutes"
+      },
+      "e2eTest": {
+        "maxDuration": "30 seconds per test",
+        "totalSuite": "15 minutes"
+      },
+      "apiResponse": {
+        "p50": "50ms",
+        "p95": "200ms",
+        "p99": "500ms"
+      }
+    }
+  },
+
+  "evidenceTracking": {
+    "testResults": {
+      "format": "JSON",
+      "retention": "90 days",
+      "location": "CI artifacts",
+      "fields": ["timestamp", "commit", "branch", "passed", "failed", "duration"]
+    },
+    "coverageReports": {
+      "format": "lcov, json",
+      "retention": "30 days",
+      "thresholds": {
+        "global": 80,
+        "perFile": 70
+      }
+    }
+  },
+
+  "testTemplates": {
+    "unitTest": "import { describe, it, expect, beforeEach } from 'vitest';\nimport { {FunctionUnderTest} } from '../{module}';\n\ndescribe('{FunctionUnderTest}', () => {\n  beforeEach(() => {\n    // Setup\n  });\n\n  it('should {expected behavior} when {condition}', () => {\n    // Arrange\n    const input = {};\n    \n    // Act\n    const result = {FunctionUnderTest}(input);\n    \n    // Assert\n    expect(result).toEqual({});\n  });\n\n  it('should throw error when {invalid condition}', () => {\n    expect(() => {FunctionUnderTest}(null)).toThrow();\n  });\n});",
+
+    "integrationTest": "import { describe, it, expect, beforeAll, afterAll } from 'vitest';\nimport { setupTestServer, teardownTestServer } from '../test-utils';\n\ndescribe('{Feature} Integration', () => {\n  let server;\n\n  beforeAll(async () => {\n    server = await setupTestServer();\n  });\n\n  afterAll(async () => {\n    await teardownTestServer(server);\n  });\n\n  it('should {expected behavior} across services', async () => {\n    // Arrange: Setup initial state\n    \n    // Act: Trigger cross-service operation\n    \n    // Assert: Verify end state\n  });\n});",
+
+    "schemaValidation": "import Ajv from 'ajv';\nimport addFormats from 'ajv-formats';\nimport schema from '../schemas/{domain}/{schema}.schema.json';\n\nconst ajv = new Ajv({ allErrors: true });\naddFormats(ajv);\nconst validate = ajv.compile(schema);\n\ndescribe('{Schema} Validation', () => {\n  it('should validate correct document', () => {\n    const validDoc = { /* valid data */ };\n    expect(validate(validDoc)).toBe(true);\n  });\n\n  it('should reject document missing required fields', () => {\n    const invalidDoc = {};\n    expect(validate(invalidDoc)).toBe(false);\n  });\n});"
+  },
+
+  "roadmap": {
+    "current": {
+      "phase": "5b",
+      "testCoverage": "68%",
+      "passingTests": 691,
+      "totalTests": 735
+    },
+    "milestones": [
+      {
+        "milestone": "M1",
+        "name": "Schema Validation Complete",
+        "target": "100% schema validation in CI",
+        "status": "in-progress"
+      },
+      {
+        "milestone": "M2",
+        "name": "Domain Test Coverage",
+        "target": "All domain schemas have test suites",
+        "status": "partial"
+      },
+      {
+        "milestone": "M3",
+        "name": "Integration Test Suite",
+        "target": "Cross-service contract tests",
+        "status": "planned"
+      },
+      {
+        "milestone": "M4",
+        "name": "E2E Coverage",
+        "target": "Key user journeys automated",
+        "status": "planned"
+      }
+    ]
+  }
+}

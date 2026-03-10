@@ -1,0 +1,49 @@
+{
+  "name": "@ectropy/ifc-processing",
+  "version": "1.0.0",
+  "description": "IFC file processing and BIM integration service",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "types": "./src/index.ts"
+    }
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "dependencies": {
+    "axios": "^1.10.0",
+    "mime-types": "^2.1.35",
+    "multer": "^2.0.1",
+    "pg": "^8.16.3",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/mime-types": "^2.1.4",
+    "@types/multer": "^2.0.0",
+    "@types/pg": "^8.15.4",
+    "@types/uuid": "^10.0.0",
+    "eslint": "^8.57.1",
+    "jest": "^30.0.4",
+    "prettier": "^3.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "keywords": [
+    "ifc",
+    "bim",
+    "construction",
+    "speckle",
+    "federated"
+  ],
+  "author": "Ectropy Team",
+  "license": "MIT"
+}

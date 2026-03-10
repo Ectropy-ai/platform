@@ -1,0 +1,143 @@
+#!/bin/bash
+set -euo pipefail
+
+# ROOT CAUSE FIX: Suppress interactive apt prompts (openssh-server config dialog)
+export DEBIAN_FRONTEND=noninteractive
+
+# Log all output for cloud-init debugging
+exec > >(tee /var/log/user-data.log)
+exec 2>&1
+
+echo "=== Starting cloud-init provisioning: $(date) ==="
+
+# System updates (security patches only)
+# NOTE: Removed 'apt-get upgrade -y' - caused OOM kill on s-2vcpu-4gb droplet
+# ROOT CAUSE: Line 6 killed by OOM during full system upgrade
+apt-get update
+
+# Install Docker
+echo "Installing Docker..."
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+systemctl enable docker
+systemctl start docker
+
+# Install Docker Compose
+echo "Installing Docker Compose..."
+curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+
+# Configure Docker daemon with production-like settings
+echo "Configuring Docker daemon..."
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<DOCKER_CONFIG
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  },
+  "live-restore": true
+}
+DOCKER_CONFIG
+systemctl restart docker
+
+# Create application directory
+mkdir -p /opt/ectropy
+
+# Configure automated Docker cleanup (weekly)
+cat > /etc/cron.weekly/docker-cleanup <<CLEANUP
+#!/bin/bash
+docker system prune -af --filter 'until=168h'
+docker builder prune -af
+CLEANUP
+chmod +x /etc/cron.weekly/docker-cleanup
+
+# Install monitoring tools (noninteractive mode)
+echo "Installing monitoring tools..."
+apt-get install -y htop iotop nethogs sysstat curl wget git jq netcat-openbsd
+
+# ============================================================================
+# PHASE P3.8: Zero-SSH Config Sync Service (Fortune 500 Compliance)
+# ============================================================================
+# Purpose: Deploy systemd service for S3-based config synchronization
+# Pattern: Pull-based deployment (droplet pulls from S3 every 60 seconds)
+# Eliminates: SSH from Terraform infrastructure deployment
+
+echo "=== PHASE P3.8: Installing Zero-SSH Config Sync Service ==="
+
+# Install AWS CLI for DigitalOcean Spaces access
+echo "Installing AWS CLI..."
+apt-get install -y awscli
+
+# Create scripts directory
+mkdir -p /opt/ectropy/scripts
+
+# ============================================================================
+# Deploy config-sync files using base64 encoding (Zero-SSH Bootstrap Fix)
+# ============================================================================
+# ROOT CAUSE FIX: Heredoc embedding of complex bash scripts causes shell
+# escaping failures during cloud-init execution. Base64 encoding bypasses
+# this issue entirely by avoiding shell interpretation of special characters.
+# Reference: .roadmap/FIVE_WHY_P3_ZERO_SSH_BOOTSTRAP_FAILURE_2026-02-16.json
+# Confidence: 95% (recommended solution from Five Why analysis)
+# ============================================================================
+
+# Deploy config-sync shell script (325 lines, base64-encoded)
+echo "Deploying config-sync.sh (base64-encoded to avoid shell escaping)..."
+echo "${config_sync_script_base64}" | base64 -d > /opt/ectropy/scripts/config-sync.sh
+chmod +x /opt/ectropy/scripts/config-sync.sh
+
+# Deploy systemd service file (base64-encoded)
+echo "Deploying config-sync.service (base64-encoded)..."
+echo "${config_sync_service_base64}" | base64 -d > /etc/systemd/system/config-sync.service
+
+# Deploy systemd timer file (base64-encoded)
+echo "Deploying config-sync.timer (base64-encoded)..."
+echo "${config_sync_timer_base64}" | base64 -d > /etc/systemd/system/config-sync.timer
+
+# ============================================================================
+# Create AWS credentials file for DigitalOcean Spaces
+# ============================================================================
+# ENTERPRISE PATTERN: Terraform templatefile() for guaranteed variable substitution
+# ROOT CAUSE FIX (Option B): No bash heredoc interpretation, pure Terraform rendering
+# Pattern: Same credentials used by Terraform config-upload modules
+# Reference: PHASE_P3_ZERO_SSH_ROOT_CAUSE_FIX_2026-02-17.md
+# ============================================================================
+echo "Creating AWS credentials for Spaces access..."
+cat > /etc/default/config-sync <<SPACES_CREDENTIALS
+# DigitalOcean Spaces credentials (S3-compatible API)
+# Bucket: ectropy-staging-configs
+# Region: sfo3
+# Pattern: Pull-based config deployment (Zero-SSH)
+AWS_ACCESS_KEY_ID=${spaces_access_key}
+AWS_SECRET_ACCESS_KEY=${spaces_secret_key}
+AWS_ENDPOINT_URL=https://sfo3.digitaloceanspaces.com
+DOCR_CONFIG_JSON=${docr_config_json}
+SPACES_CREDENTIALS
+
+# Reload systemd to recognize new service files
+echo "Reloading systemd daemon..."
+systemctl daemon-reload
+
+# Enable and start config-sync timer
+echo "Enabling config-sync.timer..."
+systemctl enable config-sync.timer
+
+echo "Starting config-sync.timer..."
+systemctl start config-sync.timer
+
+# Verify timer is active
+systemctl status config-sync.timer --no-pager || true
+
+echo "=== PHASE P3.8 COMPLETE: Zero-SSH Config Sync Service Active ==="
+echo "Config sync will poll S3 every 60 seconds for configuration changes"
+
+# Verify installations
+echo "Verifying Docker installation..."
+docker --version
+docker-compose --version
+echo "Verifying AWS CLI installation..."
+aws --version
+
+echo "=== Staging server provisioned successfully: $(date) ===" | tee /opt/ectropy/provisioned.txt

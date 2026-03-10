@@ -1,0 +1,16 @@
+packages:
+  - 'apps/*'
+  - 'libs/*'
+  - 'packages/*'
+
+# Why pnpm for enterprise:
+# - 70% faster installations via hard links
+# - Strict dependency isolation (security++)
+# - Monorepo-first design
+# - Used by: Microsoft, Bytedance, Discord
+
+# Allow auto-installation of peer dependencies
+autoInstallPeers: true
+
+# Be less strict about peer dependencies for now since many Speckle deps are optional
+strictPeerDependencies: false

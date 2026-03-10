@@ -1,0 +1,175 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ectropy.ai/schemas/vote-v1.0.0.json",
+  "title": "Vote Schema",
+  "description": "JSON schema for Ectropy voting system - decision approval and governance tracking",
+  "type": "object",
+  "required": [
+    "voteId",
+    "decisionId",
+    "votingPeriod",
+    "voters",
+    "votes",
+    "result",
+    "status"
+  ],
+  "properties": {
+    "voteId": {
+      "type": "string",
+      "pattern": "^v-\\d{4}-\\d{2}-\\d{2}-\\d{3}$",
+      "description": "Unique vote identifier (v-YYYY-MM-DD-NNN)"
+    },
+    "decisionId": {
+      "type": "string",
+      "pattern": "^d-\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$",
+      "description": "Decision ID this vote is for"
+    },
+    "title": {
+      "type": "string",
+      "description": "Brief title of what is being voted on"
+    },
+    "votingPeriod": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When voting period starts"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When voting period ends"
+        }
+      }
+    },
+    "voters": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "List of eligible voters (usernames or roles)"
+    },
+    "voteType": {
+      "type": "string",
+      "enum": [
+        "simple-majority",
+        "two-thirds-majority",
+        "unanimous",
+        "approval",
+        "ranked-choice"
+      ],
+      "default": "simple-majority",
+      "description": "Type of vote required for approval"
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 2,
+      "description": "Available voting options (e.g., ['approve', 'reject', 'abstain'])"
+    },
+    "votes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["voter", "vote", "timestamp"],
+        "properties": {
+          "voter": {
+            "type": "string",
+            "description": "Username or role of the voter"
+          },
+          "vote": {
+            "type": "string",
+            "description": "The vote cast (must match one of the options)"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the vote was cast"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Optional comment explaining the vote"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "default": 1,
+            "description": "Vote weight (for weighted voting systems)"
+          }
+        }
+      }
+    },
+    "result": {
+      "type": "string",
+      "description": "The outcome of the vote"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "open",
+        "closed",
+        "approved",
+        "rejected",
+        "cancelled"
+      ],
+      "description": "Current status of the vote"
+    },
+    "tallies": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      },
+      "description": "Vote counts for each option"
+    },
+    "quorum": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Percentage of voters required for valid vote (0-1)"
+    },
+    "quorumMet": {
+      "type": "boolean",
+      "description": "Whether quorum was met"
+    },
+    "closedDate": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the vote was closed"
+    },
+    "closedBy": {
+      "type": "string",
+      "description": "Who closed the vote"
+    },
+    "finalNotes": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Final notes or summary after vote closes"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "createdBy": {
+          "type": "string",
+          "description": "Who created this vote"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this vote was created"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      }
+    }
+  }
+}

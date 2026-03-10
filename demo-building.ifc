@@ -1,0 +1,15 @@
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('ViewDefinition [CoordinationView_V2.0]'), '2;1');
+FILE_NAME('demo-building.ifc', '2025-07-09T10:00:00', ('Ectropy Demo'), ('Federated Construction Platform'), 'IFC4', 'Demo Building', 'Generated for testing');
+FILE_SCHEMA(('IFC4'));
+ENDSEC;
+DATA;
+#20= IFCPROJECT('0kN9FmF8D1F8NQFu7T3SiG','Demo Office Building','5-story modern office complex');
+#60= IFCWALL('4mN9FmF8D1F8NQFu7T3SiG','Wall-001','Exterior wall north');
+#70= IFCCOLUMN('5mN9FmF8D1F8NQFu7T3SiG','Column-001','Structural column A1');
+#80= IFCBEAM('6mN9FmF8D1F8NQFu7T3SiG','Beam-001','Main structural beam');
+#90= IFCSLAB('7mN9FmF8D1F8NQFu7T3SiG','Slab-001','Floor slab ground');
+#100= IFCDOOR('8mN9FmF8D1F8NQFu7T3SiG','Door-001','Main entrance');
+ENDSEC;
+END-ISO-10303-21;

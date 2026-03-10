@@ -1,0 +1,578 @@
+{
+  "version": "1.0.0",
+  "environment": "production",
+  "runbookType": "deployment",
+  "metadata": {
+    "catalogId": "deployment-runbook-v1-0-0",
+    "name": "Blue-Green Deployment - MCP Server",
+    "type": "deployment",
+    "purpose": "Provides zero-downtime deployment of MCP Server with automatic rollback capabilities using blue-green deployment strategy",
+    "maintainer": "DevOps Team",
+    "author": "Ectropy Engineering",
+    "created": "2025-11-16T00:00:00Z",
+    "lastUpdated": "2025-11-16T00:00:00Z",
+    "estimatedDuration": "15 minutes",
+    "complexity": "medium",
+    "priority": "high",
+    "relatedDocuments": [
+      "docker-compose.mcp-production.yml",
+      ".env.production"
+    ],
+    "sourceFile": "scripts/deployment/blue-green-deploy.sh",
+    "conversionDate": "2025-11-16T00:00:00Z",
+    "schemaVersion": "1.0.0"
+  },
+  "executiveSummary": {
+    "description": "Blue-green deployment strategy for MCP Server that enables zero-downtime deployments by running two identical production environments (blue and green). Traffic is switched between environments after successful health checks, with automatic rollback on failure.",
+    "status": "READY_FOR_PRODUCTION",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "LOW",
+    "keyChanges": [
+      "Deploy new version to inactive slot (blue or green)",
+      "Health check validation before traffic switch",
+      "Automatic rollback on deployment failure",
+      "Zero-downtime traffic cutover"
+    ],
+    "prerequisites": [
+      "Docker and Docker Compose installed",
+      "Valid .env.production file with required variables",
+      "Existing docker-compose.mcp-production.yml configuration",
+      "At least one running deployment slot (or first deployment)"
+    ],
+    "impact": {
+      "systems": [
+        "MCP Server",
+        "Load Balancer",
+        "Docker Containers"
+      ],
+      "downtime": "Zero - seamless cutover",
+      "rollbackTime": "1-2 minutes"
+    }
+  },
+  "preFlightChecks": [
+    {
+      "id": "check-env-file",
+      "order": 1,
+      "category": "configuration",
+      "name": "Validate environment file",
+      "description": "Check if .env.production exists",
+      "command": "test -f .env.production",
+      "expectedResult": "File exists",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "File existence check",
+      "onFailure": {
+        "action": "abort",
+        "message": "Environment file not found: .env.production. Please create .env.production with required variables"
+      }
+    },
+    {
+      "id": "check-required-vars",
+      "order": 2,
+      "category": "configuration",
+      "name": "Validate required environment variables",
+      "description": "Check all required environment variables are set",
+      "commands": [],
+      "expectedResult": "All variables present and non-empty",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Check DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, JWT_SECRET, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET",
+      "onFailure": {
+        "action": "abort",
+        "message": "Required environment variables are missing or empty"
+      }
+    },
+    {
+      "id": "check-docker-compose",
+      "order": 3,
+      "category": "infrastructure",
+      "name": "Validate Docker Compose file",
+      "description": "Check if docker-compose.mcp-production.yml exists",
+      "command": "test -f docker-compose.mcp-production.yml",
+      "expectedResult": "File exists",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "File existence check",
+      "onFailure": {
+        "action": "abort",
+        "message": "Docker Compose file not found"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Environment Validation",
+      "description": "Validate deployment environment and configuration",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Check environment file exists",
+          "command": "test -f .env.production",
+          "purpose": "Ensure environment configuration file is present",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code must be 0"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Environment file not found: .env.production"
+          }
+        },
+        {
+          "step": "1.2",
+          "name": "Source environment variables",
+          "command": "source .env.production",
+          "purpose": "Load environment variables for validation",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "1.3",
+          "name": "Validate required variables",
+          "description": "Check that all required environment variables are set",
+          "commands": [],
+          "purpose": "Ensure critical configuration is present",
+          "required": true,
+          "automatable": true,
+          "validation": {
+            "type": "output",
+            "criteria": "All required variables must be non-empty: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, JWT_SECRET, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Required environment variables are missing"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Determine Deployment Target",
+      "description": "Identify current active slot and target deployment slot",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Get current active slot",
+          "command": "docker compose -f docker-compose.mcp-production.yml ps",
+          "purpose": "Determine which slot (blue or green) is currently active",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedOutput": "Container status listing",
+          "expectedStatus": 0
+        },
+        {
+          "step": "2.2",
+          "name": "Calculate target slot",
+          "description": "If blue is active, deploy to green. If green is active, deploy to blue. If neither, deploy to blue.",
+          "commands": [],
+          "purpose": "Determine target deployment slot for zero-downtime deployment",
+          "required": true,
+          "automatable": true
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Deploy to Target Slot",
+      "description": "Build and start the new deployment in the inactive slot",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Build target slot containers",
+          "command": "docker compose -f docker-compose.mcp-production.yml --profile ${target_slot}-deployment build mcp-server-${target_slot}",
+          "purpose": "Build Docker images for the target deployment slot",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to build target slot containers"
+          }
+        },
+        {
+          "step": "3.2",
+          "name": "Start target slot containers",
+          "command": "docker compose -f docker-compose.mcp-production.yml --profile ${target_slot}-deployment up -d mcp-server-${target_slot}",
+          "purpose": "Start the new deployment in detached mode",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "rollback",
+            "rollbackStep": "6.1",
+            "message": "Failed to start target slot containers"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Health Check Validation",
+      "description": "Verify new deployment is healthy before switching traffic",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Wait for service readiness",
+          "description": "Poll health endpoint with up to 30 attempts at 10-second intervals",
+          "command": "curl -f -s http://localhost:${service_port}/health",
+          "purpose": "Ensure new deployment is responding to health checks",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": true,
+          "maxRetries": 10,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "HTTP 200 response from health endpoint"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "rollbackStep": "6.1",
+            "message": "New deployment health check failed after 30 attempts"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Traffic Cutover",
+      "description": "Switch production traffic to the new deployment",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "5.1",
+          "name": "Enable new slot in load balancer",
+          "command": "docker compose -f docker-compose.mcp-production.yml exec traefik sh -c \"echo 'Enabling ${target_slot} slot routing'\"",
+          "purpose": "Update load balancer to route traffic to new slot",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "5.2",
+          "name": "Disable old slot",
+          "command": "docker compose -f docker-compose.mcp-production.yml stop mcp-server-${old_slot}",
+          "purpose": "Stop the previous deployment to complete cutover",
+          "required": false,
+          "automatable": true,
+          "timeout": "60s",
+          "expectedStatus": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Post-Deployment Verification",
+      "description": "Verify deployment success and system health",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "6.1",
+          "name": "Final health check",
+          "command": "curl -f -s http://localhost:${service_port}/health",
+          "purpose": "Confirm new deployment is serving traffic successfully",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "HTTP 200 response from health endpoint"
+          }
+        },
+        {
+          "step": "6.2",
+          "name": "Display deployment status",
+          "command": "docker compose -f docker-compose.mcp-production.yml ps",
+          "purpose": "Show final container status",
+          "required": false,
+          "automatable": true,
+          "timeout": "30s"
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "healthChecks": [
+      {
+        "service": "MCP Server - Blue Slot",
+        "endpoint": "http://localhost:3020/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "MCP Server - Green Slot",
+        "endpoint": "http://localhost:3021/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      }
+    ]
+  },
+  "rollback": {
+    "supported": true,
+    "estimatedTime": "2 minutes",
+    "dataLossRisk": "none",
+    "triggerConditions": [
+      "Health check failure during deployment",
+      "Container startup failure",
+      "Post-deployment health check failure"
+    ],
+    "decisionMaker": "Automated (with manual override available)",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Determine previous slot",
+        "command": "Calculate previous active slot based on current failed deployment",
+        "purpose": "Identify which slot to rollback to",
+        "required": true
+      },
+      {
+        "step": 2,
+        "name": "Start previous version",
+        "command": "docker compose -f docker-compose.mcp-production.yml --profile ${previous_slot}-deployment up -d mcp-server-${previous_slot}",
+        "purpose": "Restart the previous stable deployment",
+        "required": true
+      },
+      {
+        "step": 3,
+        "name": "Health check previous version",
+        "command": "curl -f -s http://localhost:${service_port}/health",
+        "purpose": "Verify previous version is healthy",
+        "required": true
+      },
+      {
+        "step": 4,
+        "name": "Switch traffic back",
+        "command": "Update load balancer to route to previous slot",
+        "purpose": "Restore traffic to stable version",
+        "required": true
+      },
+      {
+        "step": 5,
+        "name": "Stop failed deployment",
+        "command": "docker compose -f docker-compose.mcp-production.yml stop mcp-server-${failed_slot}",
+        "purpose": "Clean up failed deployment",
+        "required": true
+      }
+    ],
+    "verification": {
+      "healthCheck": "http://localhost:${service_port}/health",
+      "expectedStatus": 200,
+      "successCriteria": "Previous version responding with healthy status"
+    }
+  },
+  "monitoring": {
+    "duration": "30 minutes post-deployment",
+    "keyMetrics": [
+      {
+        "metric": "HTTP Response Time",
+        "threshold": "< 500ms",
+        "alertOn": "> 1000ms",
+        "severity": "warning"
+      },
+      {
+        "metric": "Error Rate",
+        "threshold": "< 0.1%",
+        "alertOn": "> 1%",
+        "severity": "critical"
+      },
+      {
+        "metric": "Container Health",
+        "threshold": "healthy",
+        "alertOn": "unhealthy",
+        "severity": "critical"
+      }
+    ]
+  },
+  "successCriteria": [
+    {
+      "criterion": "New deployment health check passes",
+      "status": "REQUIRED",
+      "validation": "HTTP 200 from /health endpoint"
+    },
+    {
+      "criterion": "Traffic successfully switched to new slot",
+      "status": "REQUIRED",
+      "validation": "Load balancer routing updated"
+    },
+    {
+      "criterion": "Old slot stopped or in standby",
+      "status": "RECOMMENDED",
+      "validation": "Container status check"
+    },
+    {
+      "criterion": "Zero errors during cutover",
+      "status": "REQUIRED",
+      "validation": "Error logs empty during traffic switch"
+    }
+  ],
+  "mcpIntegration": {
+    "queryableFields": [
+      "environment",
+      "runbookType",
+      "metadata.catalogId",
+      "metadata.complexity",
+      "metadata.estimatedDuration",
+      "executiveSummary.riskAssessment",
+      "phases[].name",
+      "rollback.supported"
+    ],
+    "supportedQueries": [
+      {
+        "query": "What is the deployment strategy for MCP Server?",
+        "returns": "Blue-green deployment with zero-downtime cutover",
+        "purpose": "Explain deployment approach"
+      },
+      {
+        "query": "How long does a blue-green deployment take?",
+        "returns": "Approximately 15 minutes including health checks",
+        "purpose": "Time estimation for planning"
+      },
+      {
+        "query": "What happens if deployment fails?",
+        "returns": "Automatic rollback to previous stable version within 2 minutes",
+        "purpose": "Risk mitigation explanation"
+      },
+      {
+        "query": "Which ports are used for blue and green slots?",
+        "returns": "Blue: 3020, Green: 3021",
+        "purpose": "Infrastructure configuration details"
+      },
+      {
+        "query": "Can I manually trigger a rollback?",
+        "returns": "Yes, run the rollback command: ./blue-green-deploy.sh rollback",
+        "purpose": "Manual intervention capability"
+      }
+    ],
+    "decisionSupport": [
+      "Automatically determines target slot based on current active deployment",
+      "Provides automatic rollback on health check failure",
+      "Supports manual slot selection for forced deployments",
+      "Enables instant rollback capability by keeping previous version available"
+    ]
+  },
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "DB_HOST",
+        "description": "PostgreSQL database host",
+        "required": true,
+        "environment": "production",
+        "secret": false
+      },
+      {
+        "name": "DB_PORT",
+        "description": "PostgreSQL database port",
+        "required": true,
+        "environment": "production",
+        "secret": false
+      },
+      {
+        "name": "DB_NAME",
+        "description": "PostgreSQL database name",
+        "required": true,
+        "environment": "production",
+        "secret": false
+      },
+      {
+        "name": "DB_USER",
+        "description": "PostgreSQL database user",
+        "required": true,
+        "environment": "production",
+        "secret": false
+      },
+      {
+        "name": "DB_PASSWORD",
+        "description": "PostgreSQL database password",
+        "required": true,
+        "environment": "production",
+        "secret": true,
+        "minimumLength": 16
+      },
+      {
+        "name": "REDIS_HOST",
+        "description": "Redis cache host",
+        "required": true,
+        "environment": "production",
+        "secret": false
+      },
+      {
+        "name": "REDIS_PORT",
+        "description": "Redis cache port",
+        "required": true,
+        "environment": "production",
+        "secret": false
+      },
+      {
+        "name": "REDIS_PASSWORD",
+        "description": "Redis authentication password",
+        "required": true,
+        "environment": "production",
+        "secret": true,
+        "minimumLength": 16
+      },
+      {
+        "name": "JWT_SECRET",
+        "description": "Secret key for JWT token signing",
+        "required": true,
+        "environment": "production",
+        "secret": true,
+        "minimumLength": 32
+      },
+      {
+        "name": "GITHUB_CLIENT_ID",
+        "description": "GitHub OAuth application client ID",
+        "required": true,
+        "environment": "production",
+        "secret": false
+      },
+      {
+        "name": "GITHUB_CLIENT_SECRET",
+        "description": "GitHub OAuth application client secret",
+        "required": true,
+        "environment": "production",
+        "secret": true,
+        "minimumLength": 20
+      }
+    ]
+  }
+}

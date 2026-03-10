@@ -1,0 +1,42 @@
+{
+  "name": "compliance-agent",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/ai-agents/compliance/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/ai-agents/compliance",
+        "main": "libs/ai-agents/compliance/src/index.ts",
+        "tsConfig": "libs/ai-agents/compliance/tsconfig.lib.json",
+        "assets": []
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/ai-agents/compliance/**/*.js"]
+      }
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "outputs": ["{workspaceRoot}/coverage/libs/ai-agents/compliance"],
+      "options": {
+        "config": "libs/ai-agents/vitest.config.ts",
+        "passWithNoTests": true,
+        "reportsDirectory": "{workspaceRoot}/coverage/libs/ai-agents/compliance"
+      }
+    },
+    "type-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx tsc --noEmit -p libs/ai-agents/compliance/tsconfig.lib.json"
+      }
+    }
+  },
+  "tags": ["scope:ai", "type:lib"],
+  "implicitDependencies": ["@ectropy/ai-agents-shared"]
+}

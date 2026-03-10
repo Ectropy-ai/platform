@@ -1,0 +1,128 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:cx-issue",
+  "title": "Commissioning Issue Schema",
+  "description": "Issue identified during commissioning with decision linkage",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "issueId",
+    "systemRef",
+    "description",
+    "status",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:cx-issue:CXI-[0-9]{4}-[0-9]{4}$"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:cx-issue"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "issueId": {
+      "type": "string",
+      "pattern": "^CXI-[0-9]{4}-[0-9]{4}$"
+    },
+    "systemRef": { "$ref": "#/$defs/urn" },
+    "projectRef": { "$ref": "#/$defs/urn" },
+    "functionalTestRef": { "$ref": "#/$defs/urn" },
+    "voxelRef": { "$ref": "#/$defs/urn" },
+    "description": { "type": "string" },
+    "category": {
+      "type": "string",
+      "enum": [
+        "PERFORMANCE",
+        "INSTALLATION",
+        "CONTROL_SEQUENCE",
+        "DOCUMENTATION",
+        "TRAINING",
+        "DESIGN",
+        "COORDINATION"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["CRITICAL", "MAJOR", "MINOR", "OBSERVATION"]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "OPEN",
+        "ASSIGNED",
+        "IN_PROGRESS",
+        "RESOLVED",
+        "VERIFIED",
+        "DEFERRED",
+        "CLOSED"
+      ]
+    },
+    "rootCauseAnalysis": {
+      "type": "object",
+      "description": "Links to construction decisions that may have caused this issue",
+      "properties": {
+        "relatedDecisionRefs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" }
+        },
+        "rootCauseDescription": { "type": "string" },
+        "traceComplete": { "type": "boolean" },
+        "aiAssisted": { "type": "boolean" }
+      }
+    },
+    "resolution": {
+      "type": "object",
+      "properties": {
+        "responsibleParty": { "$ref": "#/$defs/urn" },
+        "resolutionPlan": { "type": "string" },
+        "targetDate": { "type": "string", "format": "date" },
+        "actualResolution": { "type": "string" },
+        "resolvedAt": { "type": "string", "format": "date-time" },
+        "verifiedBy": { "$ref": "#/$defs/urn" },
+        "verifiedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "costImpact": {
+      "type": "object",
+      "properties": {
+        "estimatedCost": { "type": "number" },
+        "actualCost": { "type": "number" },
+        "responsibleParty": { "type": "string" }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    }
+  }
+}

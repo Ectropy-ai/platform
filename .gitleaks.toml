@@ -1,0 +1,116 @@
+title = "Ectropy Platform - GitLeaks Configuration"
+
+[extend]
+# Extend default GitLeaks rules
+useDefault = true
+
+[[rules]]
+description = "Ectropy specific secrets"
+id = "ectropy-api-key"
+regex = '''(?i)(ectropy[_-]?api[_-]?key)[\s=:'"]{1,3}([a-zA-Z0-9]{32,})'''
+tags = ["secret", "api-key", "ectropy"]
+
+[[rules]]
+description = "Database connection strings"
+id = "database-url"
+regex = '''(?i)(database[_-]?url|db[_-]?url)[\s=:'"]{1,3}(postgresql://[^${][^\s'"${]{10,})'''
+tags = ["secret", "database"]
+
+[[rules]]
+description = "JWT secrets"
+id = "jwt-secret"
+regex = '''(?i)(jwt[_-]?secret|token[_-]?secret)[\s=:'"]{1,3}([a-zA-Z0-9+/]{32,})'''
+tags = ["secret", "jwt"]
+
+[[rules]]
+description = "Development environment exclusions"
+id = "dev-env-safe"
+regex = '''(?i)(dev_secure_|development_|local_dev_)[a-zA-Z0-9_]*[\s=:'"]{1,3}[a-zA-Z0-9+/]{8,}'''
+tags = ["dev", "safe"]
+
+[allowlist]
+description = "Allow template and example files"
+files = [
+    '''.env.template''',
+    '''.env.example''',
+    '''.env.staging.example''',
+    '''.env.production.template''',
+    '''.env.ci''',
+    '''.devcontainer/.env.dev''',
+    '''.devcontainer/.env.template''',
+    '''.devcontainer/docker-compose.yml''',
+    '''docs/.*''',
+    '''README.md''',
+    '''archive/.*''',
+    '''docs/DEPLOYMENT_SECRETS.md''',
+    '''docs/deployment/GITHUB_SECRETS_SETUP_GUIDE.md''',
+    '''docs/security/.*''',
+    '''environments/.*\.template''',
+    '''environments/.*\.example''',
+    '''.env.ci''',
+    '''(.*)?\.env\.template''',
+    '''(.*)?\.env\.example''',
+    '''(.*)?example.*''',
+    '''(.*)?template.*''',
+    '''.devcontainer/.*''',
+    '''docs/.*''',
+    '''archive/.*''',
+    '''.security-remediation-backup/.*''',
+    '''logs/.*''',
+    '''test-data/.*''',
+    '''.*\.md$''',  # All Markdown files
+    '''.*README.*''',
+    '''apps/.*/README.md''',
+    '''scripts/seed-users.sh''',  # Development seed script
+    '''scripts/provision-test-database.sh''',  # Test database script
+    '''scripts/security/setup-secure-config.sh''',  # Setup script with templates
+    '''scripts/security-audit-and-fix.sh''',  # Audit script with examples
+    '''scripts/configure-sharp-enterprise.ts''',  # TypeScript configuration script
+    '''scripts/security/secrets-scanner.sh''',  # This secrets scanner script itself
+    '''tools/dev-setup/.*''',  # Development setup scripts
+    '''validate-deployment-fixes.sh''',  # Validation script with patterns
+    '''.nx/.*''',  # Nx workspace data
+    '''nx-graph.json''',  # Nx graph file
+]
+
+regexes = [
+    '''DATABASE_URL=postgresql://test:\$\{POSTGRES_TEST_PASSWORD:-test_password_for_ci_only\}@localhost:5432/test''',
+    '''dev_secure_.*''',
+    '''CHANGE_ME_.*''',
+    '''your_secure_.*''',
+    '''PLACEHOLDER_.*''',
+    '''<.*>''',
+    '''dev_secure_postgres_2024''',
+    '''dev_secure_redis_2024''',
+    '''secure_postgres_password_here''',
+    '''secure_speckle_password_here''',
+    '''password@localhost:5432''',
+    '''password@postgres:5432''',
+    '''user:pass@localhost''',
+    '''postgres:password@''',
+    '''postgres:postgres@''',
+    '''your-secure-jwt-secret''',
+    '''test-jwt-secret''',
+    '''speckle-session-secret''',
+    '''grafana-admin-password-here''',
+    '''p4Z2K4QqHFXMaeG6QkagAxDTXjhT95Ta''',  # Example passwords from docs
+    '''Y1cT2kFgHjLzP0sX9vBnM5qQ8rTwR4eU''',
+    '''k9LmN3pQrT6vWxY1zAbCdEfGhJkL0MnO''',
+    '''HBpdduDmXYFbRssqL6PWnjDTNGvXkpEF''',
+    '''Z6FmXjrLIwMoI82pkYpEaRoYz3VDJc0z''',
+    '''B8FnYpQzPfMoS72nvYpEaRoYz4VDJc1a''',
+    '''ectropy_dev_password''',  # Development password pattern
+    '''ectropy_app_user:.*@your-database-host''',  # Template database URL
+    '''postgresql://\${[^}]+}:.*@.*''',  # Environment variable patterns
+    '''DATABASE_URL=postgresql://\${[^}]+}''',  # Environment variable database URLs
+    '''development_headers''',  # Development configuration
+    '''DATABASE_URL=postgresql://\${DATABASE_USER}:\${DB_PASSWORD}@.*''',  # Environment variable database URLs
+    '''REDIS_URL=redis://:\${REDIS_PASSWORD}@.*''',  # Environment variable Redis URLs
+    '''JWT_SECRET=\${JWT_SECRET}''',  # Environment variable JWT secrets
+    '''SESSION_SECRET=\${SESSION_SECRET}''',  # Environment variable session secrets
+    '''SPECKLE_CLIENT_ID=\${SPECKLE_CLIENT_ID}''',  # Environment variable Speckle client ID
+    '''SPECKLE_CLIENT_SECRET=\${SPECKLE_CLIENT_SECRET}''',  # Environment variable Speckle client secret
+    '''echo "DATABASE_URL=postgresql://\\\${DATABASE_USER}:\\\${DB_PASSWORD}@.*''',  # Echo commands with environment variables
+    '''\${DATABASE_USER}:\${DB_PASSWORD}''',  # Environment variable username:password patterns
+    '''\${DATABASE_HOST}:\${DATABASE_PORT}''',  # Environment variable host:port patterns
+]

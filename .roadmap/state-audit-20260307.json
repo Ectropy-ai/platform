@@ -1,0 +1,346 @@
+{
+  "$schema": "urn:luhtech:schema:state-audit:v1",
+  "title": "Ectropy Current State Report",
+  "date": "2026-03-07",
+  "auditTimestamp": "2026-03-07T14:50:00Z",
+  "generatedBy": "Claude Code agent (luhtech/Ectropy)",
+  "methodology": "Direct filesystem reads + live endpoint checks + gh run list + doctl API",
+  "priorVerifiedState": {
+    "date": "2026-02-27",
+    "cicdHealth": "all passing",
+    "lastWorkflowRun": "2026-02-27"
+  },
+  "platformHealth": {
+    "workflows": {
+      "deploy-production": {
+        "status": "IN_PROGRESS",
+        "lastVerified": "2026-03-07T14:21Z",
+        "runId": 22800719990,
+        "notes": "Blue+Green+Monitor PASS, Post-Deploy FAIL (521 on /health)"
+      },
+      "deploy-staging": {
+        "status": "IN_PROGRESS",
+        "lastVerified": "2026-03-07T14:21Z",
+        "runId": 22800720361,
+        "notes": "All 4 builds PASS, health PASS, seed FAIL (jq parse), E2E skipped"
+      },
+      "build-production-images": {
+        "status": "FAIL",
+        "failStreak": 1,
+        "lastSuccess": "2026-03-07T05:24Z",
+        "runId": 22793132652,
+        "notes": "Failed (DOCR 195GB overflow). Fixed — GC freed to 5.1GB"
+      },
+      "terraform-utilities": {
+        "status": "PASS",
+        "lastVerified": "2026-03-07T12:15Z",
+        "notes": "2 consecutive successes"
+      },
+      "mcp-server-validation": {
+        "status": "STALE",
+        "lastRun": "2025-09-03",
+        "notes": "Not running — 6 months stale"
+      }
+    },
+    "endpoints": {
+      "ectropy.ai/api/health": {
+        "status": 521,
+        "lastChecked": "2026-03-07T14:50Z",
+        "notes": "P0: Origin server down post-deploy"
+      },
+      "ectropy.ai/health": {
+        "status": 521,
+        "lastChecked": "2026-03-07T14:50Z",
+        "notes": "nginx or app containers not responding to LB"
+      },
+      "ectropy.ai/lb-health": {
+        "status": 521,
+        "lastChecked": "2026-03-07T14:50Z",
+        "notes": "Even static nginx response failing"
+      },
+      "staging.ectropy.ai/api/health": {
+        "status": 200,
+        "lastChecked": "2026-03-07T14:50Z",
+        "notes": "Healthy. Score 90. BuildSha 1586a13b. Uptime 18m."
+      },
+      "mcp.ectropy.ai/health": {
+        "status": 200,
+        "lastChecked": "2026-03-07T14:50Z"
+      },
+      "n8n.luh.tech/healthz": {
+        "status": 200,
+        "lastChecked": "2026-03-07T14:50Z"
+      },
+      "n8n-canary-lead-capture": {
+        "status": 200,
+        "lastChecked": "2026-03-07T14:50Z",
+        "notes": "Canadian pilot pipeline operational"
+      },
+      "dash.luh.tech/api/health": {
+        "status": 200,
+        "lastChecked": "2026-03-07T14:50Z"
+      },
+      "invest.luh.tech/api/health": {
+        "status": 200,
+        "lastChecked": "2026-03-07T14:50Z"
+      },
+      "crm.luh.tech/api/health": {
+        "status": 200,
+        "lastChecked": "2026-03-07T14:50Z"
+      }
+    },
+    "infrastructure": {
+      "docrStorage": {
+        "usedGB": 5.1,
+        "limitGB": 100,
+        "lastChecked": "2026-03-07T14:16Z",
+        "notes": "Fixed from 195GB. 888 old tags deleted + 2 GC runs."
+      },
+      "productionLB": {
+        "status": "active",
+        "dropletCount": 2,
+        "dropletIds": [548830664, 548830665]
+      },
+      "stagingLB": {
+        "status": "active",
+        "dropletCount": 1,
+        "dropletIds": [553975378]
+      }
+    },
+    "p0Blocker": {
+      "title": "Production 521 post-deploy",
+      "description": "Blue and green servers passed health validation during deploy workflow (SSH-based checks). Post-deploy, all public endpoints return 521 via the load balancer.",
+      "possibleCauses": [
+        "nginx container crashed after health validation passed",
+        "LB health check /lb-health port 80 failing — LB marks both backends as down",
+        "Firewall rule blocking LB to backend traffic on port 80"
+      ]
+    }
+  },
+  "reportingPipelineHealth": {
+    "gaps": [
+      {
+        "path": "deploy-production → .roadmap/roadmap.json",
+        "status": "MISSING",
+        "priority": "P1"
+      },
+      {
+        "path": "update-cicd-metrics.yml",
+        "status": "STALE",
+        "lastRun": "2026-02-27T02:55Z",
+        "priority": "P1"
+      },
+      {
+        "path": "cache-roadmaps.yml",
+        "status": "NOT_FOUND",
+        "notes": "Does not exist in this repo",
+        "priority": "P2"
+      },
+      {
+        "path": "dashboard-sync-v4.yml",
+        "status": "NOT_FOUND",
+        "notes": "Does not exist in this repo",
+        "priority": "P2"
+      },
+      {
+        "path": "POST /api/data/ingest",
+        "status": "EXISTS_BUT_UNUSED",
+        "notes": "401 — requires auth, no workflow POSTs to it",
+        "priority": "P1"
+      },
+      {
+        "path": "roadmap-sync.yml",
+        "status": "DEPRECATED",
+        "notes": "Archived at .github/workflows/archive/"
+      }
+    ],
+    "currentPath": "update-cicd-metrics.yml (manual/scheduled) → .roadmap/roadmap.json → git commit → ??? → dash.luh.tech",
+    "targetPath": "deploy-production.yml → on:success → POST to dash.luh.tech/api/data/ingest OR trigger dashboard-sync via repository_dispatch"
+  },
+  "staleDataInventory": [
+    {
+      "field": "cicdHealth.lastWorkflowRun",
+      "staleValue": "2026-02-27T00:00:00Z",
+      "correctValue": "2026-03-07T14:21:25Z"
+    },
+    {
+      "field": "cicdHealth.workflowRunId",
+      "staleValue": "22509762893",
+      "correctValue": "22800719990"
+    },
+    {
+      "field": "cicdHealth.foundationHealth",
+      "staleValue": "passing",
+      "correctValue": "failing"
+    },
+    {
+      "field": "cicdHealth.e2eStaging",
+      "staleValue": "passing",
+      "correctValue": "unknown"
+    },
+    {
+      "field": "metricsReporting.lastUpdated",
+      "staleValue": "2026-01-05T20:30:00Z",
+      "correctValue": "2026-03-07T14:50:00Z"
+    },
+    {
+      "field": "metricsReporting.testCoverage.e2eTestStatus.total",
+      "staleValue": 62,
+      "correctValue": 68
+    },
+    {
+      "field": "metricsReporting.testCoverage.e2eTestStatus.passing",
+      "staleValue": 35,
+      "correctValue": 68
+    },
+    {
+      "field": "metricsReporting.testCoverage.e2eTestStatus.failing",
+      "staleValue": 27,
+      "correctValue": 0
+    },
+    {
+      "field": "metricsReporting.productionReadiness.deploymentStatus",
+      "staleValue": "staging-operational",
+      "correctValue": "production-deploying"
+    },
+    {
+      "field": "meta.lastUpdated",
+      "staleValue": "2026-02-27T00:00:00Z",
+      "correctValue": "2026-03-07T14:50:00Z"
+    }
+  ],
+  "gapRegister": [
+    {
+      "id": "RPT-001",
+      "description": "Production 521 post-deploy — LB returns origin-down on all endpoints",
+      "blocks": "Production availability, Canadian pilot demo",
+      "effort": "S",
+      "priority": "P0"
+    },
+    {
+      "id": "RPT-002",
+      "description": "No deploy → dashboard pipeline — deploy workflows don't notify dash.luh.tech",
+      "blocks": "Real-time reporting, investor dashboard currency",
+      "effort": "M",
+      "priority": "P1"
+    },
+    {
+      "id": "RPT-003",
+      "description": "update-cicd-metrics.yml not triggered by deploys",
+      "blocks": "cicdHealth in roadmap.json stale",
+      "effort": "S",
+      "priority": "P1"
+    },
+    {
+      "id": "RPT-004",
+      "description": "metricsReporting block 61 days stale",
+      "blocks": "Dashboard shows Jan 5 test counts (35/62) vs actual (68/68)",
+      "effort": "S",
+      "priority": "P1"
+    },
+    {
+      "id": "RPT-005",
+      "description": "mcp-server-validation.yml 6 months stale",
+      "blocks": "No scheduled MCP tool validation",
+      "effort": "M",
+      "priority": "P2"
+    },
+    {
+      "id": "RPT-006",
+      "description": "Staging seed-demo-data jq parse error",
+      "blocks": "E2E tests skipped, seed data incomplete",
+      "effort": "S",
+      "priority": "P1"
+    },
+    {
+      "id": "RPT-007",
+      "description": "DOCR garbage collection not automated",
+      "blocks": "195GB overflow recurrence",
+      "effort": "S",
+      "priority": "P2"
+    },
+    {
+      "id": "RPT-008",
+      "description": "dash.luh.tech/api/data/ingest exists (401) but no workflow uses it",
+      "blocks": "Dashboard receives no automated data",
+      "effort": "M",
+      "priority": "P1"
+    }
+  ],
+  "recommendedActions": [
+    {
+      "priority": 1,
+      "title": "Investigate and fix production 521 (P0)",
+      "gapId": "RPT-001"
+    },
+    {
+      "priority": 2,
+      "title": "Wire update-cicd-metrics.yml to deploy triggers",
+      "gapId": "RPT-003"
+    },
+    {
+      "priority": 3,
+      "title": "Update stale metricsReporting block",
+      "gapId": "RPT-004",
+      "status": "DONE"
+    },
+    {
+      "priority": 4,
+      "title": "Fix staging seed-demo-data jq error",
+      "gapId": "RPT-006"
+    },
+    {
+      "priority": 5,
+      "title": "Add DOCR GC cron to prevent storage overflow",
+      "gapId": "RPT-007"
+    }
+  ],
+  "appendix": {
+    "dropletInventory": [
+      {
+        "name": "luhtech-enterprise",
+        "status": "active",
+        "ip": "159.223.203.231",
+        "region": "sfo3"
+      },
+      {
+        "name": "ectropy-development",
+        "status": "active",
+        "ip": "64.23.157.16",
+        "region": "sfo3"
+      },
+      {
+        "name": "ectropy-production-blue-isolated",
+        "status": "active",
+        "ip": "143.198.48.156",
+        "region": "sfo3"
+      },
+      {
+        "name": "ectropy-production-green-isolated",
+        "status": "active",
+        "ip": "64.227.105.120",
+        "region": "sfo3"
+      },
+      {
+        "name": "ectropy-staging",
+        "status": "active",
+        "ip": "137.184.46.32",
+        "region": "sfo3"
+      }
+    ],
+    "docrTagCounts": {
+      "api-gateway": 6,
+      "mcp-server": 6,
+      "web-dashboard": 6,
+      "ectropy-console": 6
+    },
+    "workflowRunHistory": {
+      "deploy-production": "5 consecutive failures (all 2026-03-07, iterative fixes)",
+      "deploy-staging": "4 consecutive failures (DOCR overflow), current run recovering",
+      "build-production-images": "1 failure (DOCR overflow), 4 prior successes",
+      "terraform-utilities": "2 consecutive successes",
+      "update-cicd-metrics": "Last run 2026-02-27 (success)",
+      "mcp-server-validation": "Last run 2025-09-03 (6 months stale)"
+    }
+  }
+}

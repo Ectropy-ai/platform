@@ -1,0 +1,72 @@
+version: 2
+updates:
+  # Enable security updates for npm packages
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'daily'
+      time: '02:00'
+      timezone: 'UTC'
+    open-pull-requests-limit: 5
+    reviewers:
+      - 'luhtech'
+    assignees:
+      - 'luhtech'
+    labels:
+      - 'dependencies'
+      - 'security'
+      - 'automated'
+    commit-message:
+      prefix: 'fix'
+      prefix-development: 'chore'
+      include: 'scope'
+    # Only security updates for now, other updates handled by workflow
+    versioning-strategy: 'lockfile-only'
+    groups:
+      security-updates:
+        patterns:
+          - '*'
+        update-types:
+          - 'security'
+
+  # Monitor GitHub Actions updates
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '02:00'
+      timezone: 'UTC'
+    open-pull-requests-limit: 3
+    reviewers:
+      - 'luhtech'
+    assignees:
+      - 'luhtech'
+    labels:
+      - 'github-actions'
+      - 'dependencies'
+      - 'automated'
+    commit-message:
+      prefix: 'ci'
+      include: 'scope'
+
+  # Monitor Docker updates if any Dockerfiles are using specific base images
+  - package-ecosystem: 'docker'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '03:00'
+      timezone: 'UTC'
+    open-pull-requests-limit: 2
+    reviewers:
+      - 'luhtech'
+    assignees:
+      - 'luhtech'
+    labels:
+      - 'docker'
+      - 'dependencies'
+      - 'automated'
+    commit-message:
+      prefix: 'build'
+      include: 'scope'

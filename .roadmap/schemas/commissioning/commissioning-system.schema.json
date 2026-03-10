@@ -1,0 +1,149 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:commissioning-system",
+  "title": "Commissioning System Schema",
+  "description": "Building system being commissioned with functional test tracking",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "systemId",
+    "projectRef",
+    "systemType",
+    "status",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:commissioning-system:CXS-[0-9]{4}-[0-9]{4}$"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:commissioning-system"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "systemId": {
+      "type": "string",
+      "pattern": "^CXS-[0-9]{4}-[0-9]{4}$"
+    },
+    "projectRef": { "$ref": "#/$defs/urn" },
+    "closeoutRef": { "$ref": "#/$defs/urn" },
+    "systemType": {
+      "type": "string",
+      "enum": [
+        "HVAC",
+        "PLUMBING",
+        "ELECTRICAL",
+        "FIRE_PROTECTION",
+        "CONTROLS",
+        "SECURITY",
+        "ELEVATOR",
+        "SPECIALTY",
+        "ENVELOPE"
+      ]
+    },
+    "systemName": { "type": "string" },
+    "description": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": [
+        "NOT_STARTED",
+        "PREFUNCTIONAL_COMPLETE",
+        "FPT_IN_PROGRESS",
+        "FPT_COMPLETE",
+        "ISSUES_OUTSTANDING",
+        "COMPLETE"
+      ]
+    },
+    "specification": {
+      "type": "object",
+      "properties": {
+        "specSection": { "type": "string" },
+        "manufacturer": { "type": "string" },
+        "model": { "type": "string" },
+        "serialNumber": { "type": "string" }
+      }
+    },
+    "voxelRefs": {
+      "type": "array",
+      "description": "Voxels where this system is located",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "prefunctionalChecks": {
+      "type": "object",
+      "properties": {
+        "complete": { "type": "boolean" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "completedBy": { "$ref": "#/$defs/urn" },
+        "checklistItems": { "type": "integer" },
+        "checklistPassed": { "type": "integer" }
+      }
+    },
+    "functionalTests": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "issues": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "seasonalCommissioning": {
+      "type": "object",
+      "properties": {
+        "required": { "type": "boolean" },
+        "seasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["HEATING", "COOLING", "SHOULDER"]
+          }
+        },
+        "scheduledDates": {
+          "type": "array",
+          "items": { "type": "string", "format": "date" }
+        }
+      }
+    },
+    "documentation": {
+      "type": "object",
+      "properties": {
+        "oprCompliance": { "type": "boolean" },
+        "bodCompliance": { "type": "boolean" },
+        "trainingComplete": { "type": "boolean" },
+        "oAndMDelivered": { "type": "boolean" }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    }
+  }
+}

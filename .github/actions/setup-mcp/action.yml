@@ -1,0 +1,23 @@
+name: 'Setup MCP Server'
+description: 'Installs and starts lightweight MCP server for agent workflows'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install MCP
+      shell: bash
+      continue-on-error: true
+      run: |
+        export REPO_DIR="${GITHUB_WORKSPACE}"
+        bash ${GITHUB_WORKSPACE}/.devcontainer/install-mcp.sh
+
+    - name: Start MCP
+      shell: bash
+      continue-on-error: true
+      run: |
+        if command -v start-mcp &> /dev/null; then
+          start-mcp
+        else
+          echo "⚠️ start-mcp command not found, MCP installation may have failed"
+          exit 1
+        fi

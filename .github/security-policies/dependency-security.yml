@@ -1,0 +1,36 @@
+# Enterprise Dependency Security Policy
+# Automated security governance for Phase 2
+
+security:
+  advisories:
+    # Block high and critical vulnerabilities
+    severity_threshold: 'high'
+
+    # Auto-fix low and medium vulnerabilities
+    auto_fix:
+      - 'low'
+      - 'medium'
+
+    # Dependency update policies
+    updates:
+      schedule: 'weekly'
+      auto_merge: 'patch_only'
+
+  compliance:
+    # Enterprise compliance requirements
+    required_headers:
+      - 'x-content-type-options'
+      - 'x-frame-options'
+      - 'x-xss-protection'
+      - 'strict-transport-security'
+
+    # Dependency age limits
+    max_dependency_age: '365d'
+
+    # License compliance
+    allowed_licenses:
+      - 'MIT'
+      - 'Apache-2.0'
+      - 'BSD-2-Clause'
+      - 'BSD-3-Clause'
+      - 'ISC'

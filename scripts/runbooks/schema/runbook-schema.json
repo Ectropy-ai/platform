@@ -1,0 +1,856 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ectropy.ai/schemas/runbook-v1.0.0.json",
+  "title": "Ectropy Enterprise Runbook Schema v1.0.0",
+  "description": "JSON Schema for operational runbooks with MCP integration",
+  "type": "object",
+  "required": [
+    "version",
+    "environment",
+    "metadata",
+    "executiveSummary"
+  ],
+  "anyOf": [
+    { "required": ["phases"] },
+    { "required": ["deploymentSteps"] }
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the runbook"
+    },
+    "environment": {
+      "type": "string",
+      "enum": ["development", "staging", "production", "all"],
+      "description": "Target deployment environment"
+    },
+    "runbookType": {
+      "type": "string",
+      "enum": ["deployment", "migration", "operational", "emergency", "validation"],
+      "description": "Classification of runbook purpose"
+    },
+    "deploymentDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Deployment execution date (ISO 8601)"
+    },
+    "deploymentType": {
+      "type": "string",
+      "description": "Description of deployment type"
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "catalogId",
+        "purpose",
+        "maintainer",
+        "lastUpdated"
+      ],
+      "properties": {
+        "catalogId": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Unique identifier in kebab-case"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable runbook name"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["deployment", "migration", "operational", "emergency", "validation"]
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 10,
+          "description": "Clear description of runbook purpose"
+        },
+        "maintainer": {
+          "type": "string",
+          "description": "Team responsible for runbook"
+        },
+        "author": {
+          "type": "string",
+          "description": "Individual or team name"
+        },
+        "created": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp (ISO 8601)"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp (ISO 8601)"
+        },
+        "estimatedDuration": {
+          "type": "string",
+          "pattern": "^\\d+\\s+(minutes?|hours?)$",
+          "description": "Estimated execution time"
+        },
+        "complexity": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"]
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"]
+        },
+        "relatedDocuments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Paths to related documentation"
+        },
+        "sourceFile": {
+          "type": "string",
+          "description": "Original source file path"
+        },
+        "conversionDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "JSON conversion timestamp"
+        },
+        "schemaVersion": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Schema version used"
+        }
+      }
+    },
+    "executiveSummary": {
+      "type": "object",
+      "required": ["description"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "description": "Concise summary of runbook"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["READY", "DRAFT", "DEPRECATED", "ARCHIVED", "READY_FOR_STAGING", "READY_FOR_PRODUCTION"]
+        },
+        "deploymentStatus": {
+          "type": "string",
+          "description": "Status of deployment readiness"
+        },
+        "confidenceLevel": {
+          "type": "string",
+          "enum": ["LOW", "MEDIUM", "HIGH"]
+        },
+        "riskAssessment": {
+          "type": "string",
+          "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        },
+        "keyChanges": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "prerequisites": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "impact": {
+          "type": "object",
+          "properties": {
+            "systems": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "downtime": {
+              "type": "string"
+            },
+            "rollbackTime": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "preFlightChecks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "severity", "required"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "category": {
+            "type": "string",
+            "enum": ["infrastructure", "security", "configuration", "dependencies"]
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "expectedResult": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["info", "warning", "error", "critical"]
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "automatable": {
+            "type": "boolean"
+          },
+          "validationLogic": {
+            "type": "string"
+          },
+          "onFailure": {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": ["abort", "warn", "skip"]
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "phases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["phase", "name", "steps"],
+        "properties": {
+          "phase": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "estimatedDuration": {
+            "type": "string",
+            "pattern": "^\\d+\\s+(minutes?|hours?)$"
+          },
+          "parallel": {
+            "type": "boolean",
+            "default": false
+          },
+          "criticalPath": {
+            "type": "boolean",
+            "default": true
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["step", "name", "required"],
+              "properties": {
+                "step": {
+                  "type": "string",
+                  "pattern": "^\\d+\\.\\d+$"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": {
+                  "type": "string"
+                },
+                "command": {
+                  "type": "string"
+                },
+                "commands": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "purpose": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "automatable": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "timeout": {
+                  "type": "string",
+                  "pattern": "^\\d+s$",
+                  "default": "300s"
+                },
+                "retryable": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "maxRetries": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10,
+                  "default": 3
+                },
+                "expectedOutput": {
+                  "type": "string"
+                },
+                "expectedStatus": {
+                  "oneOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  ]
+                },
+                "validation": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": ["exitCode", "output", "fileExists", "serviceHealth"]
+                    },
+                    "criteria": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "onFailure": {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "enum": ["abort", "retry", "skip", "rollback"]
+                    },
+                    "rollbackStep": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "relatedFiles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "documentation": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              },
+              "oneOf": [
+                {
+                  "required": ["command"]
+                },
+                {
+                  "required": ["commands"]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "deploymentSteps": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Alias for phases - for backward compatibility",
+      "items": {
+        "type": "object",
+        "required": ["phase", "name", "steps"],
+        "properties": {
+          "phase": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "estimatedDuration": {
+            "type": "string",
+            "pattern": "^\\d+\\s+(minutes?|hours?)$"
+          },
+          "parallel": {
+            "type": "boolean",
+            "default": false
+          },
+          "criticalPath": {
+            "type": "boolean",
+            "default": true
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["step", "name"],
+              "properties": {
+                "step": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": {
+                  "type": "string"
+                },
+                "command": {
+                  "type": "string"
+                },
+                "commands": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "purpose": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "expectedOutput": {
+                  "type": "string"
+                },
+                "expectedStatus": {
+                  "oneOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  ]
+                }
+              },
+              "oneOf": [
+                {
+                  "required": ["command"]
+                },
+                {
+                  "required": ["commands"]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "properties": {
+        "healthChecks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["service", "endpoint", "expectedStatus"],
+            "properties": {
+              "service": {
+                "type": "string"
+              },
+              "endpoint": {
+                "type": "string",
+                "format": "uri"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"],
+                "default": "GET"
+              },
+              "expectedStatus": {
+                "oneOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                ]
+              },
+              "expectedBody": {
+                "type": "object"
+              },
+              "timeout": {
+                "type": "string",
+                "pattern": "^\\d+s$",
+                "default": "10s"
+              },
+              "critical": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          }
+        },
+        "smokeTests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "test": {
+                "type": "string"
+              },
+              "endpoint": {
+                "type": "string"
+              },
+              "expectedBehavior": {
+                "type": "string"
+              },
+              "priority": {
+                "type": "string",
+                "pattern": "^P[0-3]$"
+              }
+            }
+          }
+        },
+        "performanceThresholds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "metric": {
+                "type": "string"
+              },
+              "threshold": {
+                "type": "string"
+              },
+              "measurement": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "dataIntegrity": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "check": {
+                "type": "string"
+              },
+              "validation": {
+                "type": "string"
+              },
+              "expected": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "required": ["supported", "steps"],
+      "properties": {
+        "supported": {
+          "type": "boolean"
+        },
+        "estimatedTime": {
+          "type": "string",
+          "pattern": "^\\d+\\s+(minutes?|hours?)$"
+        },
+        "dataLossRisk": {
+          "type": "string",
+          "enum": ["none", "minimal", "moderate", "high"]
+        },
+        "triggerConditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "decisionMaker": {
+          "type": "string"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["step", "name", "command", "required"],
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "name": {
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "verification": {
+          "type": "object",
+          "properties": {
+            "healthCheck": {
+              "type": "string"
+            },
+            "expectedStatus": {
+              "type": "integer"
+            },
+            "successCriteria": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "properties": {
+        "duration": {
+          "type": "string"
+        },
+        "keyMetrics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "metric": {
+                "type": "string"
+              },
+              "threshold": {
+                "type": "string"
+              },
+              "alertOn": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["info", "warning", "critical"]
+              }
+            }
+          }
+        },
+        "alertThresholds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "condition": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["warning", "critical"]
+              },
+              "action": {
+                "type": "string"
+              },
+              "escalation": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "dashboards": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "successCriteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["criterion", "status"],
+        "properties": {
+          "criterion": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["REQUIRED", "RECOMMENDED", "OPTIONAL"]
+          },
+          "validation": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "mcpIntegration": {
+      "type": "object",
+      "description": "MCP integration metadata for queryability and decision support",
+      "properties": {
+        "queryableFields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "supportedQueries": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["query", "returns", "purpose"],
+            "properties": {
+              "query": {
+                "type": "string"
+              },
+              "returns": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "decisionSupport": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "architectureAlignment": {
+          "type": "object",
+          "properties": {
+            "routingConfig": {
+              "type": "string"
+            },
+            "portAllocation": {
+              "type": "string"
+            },
+            "oauthConfig": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "knownIssues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "impact": {
+            "type": "string"
+          },
+          "mitigation": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string",
+            "pattern": "^P[0-3]$"
+          }
+        }
+      }
+    },
+    "environmentVariables": {
+      "type": "object",
+      "properties": {
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "description", "required"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "example": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "environment": {
+                "type": "string",
+                "enum": ["development", "staging", "production", "all"]
+              },
+              "secret": {
+                "type": "boolean",
+                "default": false
+              },
+              "minimumLength": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

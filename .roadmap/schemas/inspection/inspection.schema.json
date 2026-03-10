@@ -1,0 +1,240 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://luhtech.dev/schemas/pm/inspection.schema.json",
+  "title": "Inspection Schema",
+  "description": "Field inspection record with decision validation and regulatory integration",
+  "type": "object",
+  "required": ["$id", "$schema", "schemaVersion", "inspectionId", "inspectionType", "status", "voxelRefs", "graphMetadata"],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:inspection:INSP-[0-9]{4}-[0-9]{4}$",
+      "description": "URN identifier for this inspection"
+    },
+    "$schema": {
+      "const": "https://luhtech.dev/schemas/pm/inspection.schema.json"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string" },
+        "sourceOfTruth": { "type": "string" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      }
+    },
+    "inspectionId": {
+      "type": "string",
+      "pattern": "^INSP-[0-9]{4}-[0-9]{4}$"
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 5000
+    },
+    "inspectionType": {
+      "type": "string",
+      "enum": ["ROUGH_IN", "COVER_UP", "FINAL", "SAFETY", "QUALITY", "SPECIAL", "REGULATORY"],
+      "description": "Type of inspection"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["SCHEDULED", "IN_PROGRESS", "PASSED", "FAILED", "CONDITIONAL", "CANCELLED"],
+      "description": "Inspection lifecycle status"
+    },
+    "voxelRefs": {
+      "type": "array",
+      "description": "URNs of voxels being inspected",
+      "items": { "$ref": "#/$defs/urn" },
+      "minItems": 1
+    },
+    "inspectorRef": {
+      "$ref": "#/$defs/urn",
+      "description": "URN of the inspector"
+    },
+    "inspectorInfo": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "organization": { "type": "string" },
+        "certificationId": { "type": "string" },
+        "authorityLevel": {
+          "type": "string",
+          "enum": ["FIELD", "FOREMAN", "SUPERINTENDENT", "PM", "ARCHITECT", "OWNER", "REGULATORY"]
+        }
+      }
+    },
+    "regulatory": {
+      "type": "object",
+      "description": "Regulatory/AHJ information if applicable",
+      "properties": {
+        "regulatoryBody": { "type": "string" },
+        "permitNumber": { "type": "string" },
+        "codeReference": { "type": "string" },
+        "jurisdictionCode": { "type": "string" }
+      }
+    },
+    "scheduledDate": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "actualDate": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "duration": {
+      "type": "integer",
+      "description": "Inspection duration in minutes"
+    },
+    "decisionsReviewed": {
+      "type": "array",
+      "description": "PM decision URNs reviewed during inspection",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "decisionsValidated": {
+      "type": "array",
+      "description": "PM decision URNs validated/approved by inspection",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "decisionsFailed": {
+      "type": "array",
+      "description": "PM decision URNs that failed inspection",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "findings": {
+      "type": "array",
+      "description": "Inspection findings and observations",
+      "items": {
+        "type": "object",
+        "required": ["id", "category", "description"],
+        "properties": {
+          "id": { "type": "string" },
+          "category": {
+            "type": "string",
+            "enum": ["PASS", "FAIL", "WARNING", "NOTE", "CORRECTION_REQUIRED"]
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["MINOR", "MODERATE", "MAJOR", "CRITICAL"]
+          },
+          "description": { "type": "string" },
+          "location": { "type": "string" },
+          "voxelRef": { "$ref": "#/$defs/urn" },
+          "relatedDecisionRef": { "$ref": "#/$defs/urn" },
+          "codeReference": { "type": "string" },
+          "correctionRequired": { "type": "boolean" },
+          "correctionDeadline": { "type": "string", "format": "date" }
+        }
+      }
+    },
+    "punchList": {
+      "type": "array",
+      "description": "Items requiring correction",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "description": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["OPEN", "IN_PROGRESS", "COMPLETE", "VERIFIED"]
+          },
+          "assignedTrade": { "type": "string" },
+          "deadline": { "type": "string", "format": "date" },
+          "completedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "timestamp"],
+        "properties": {
+          "type": { "type": "string", "enum": ["photo", "document", "video", "measurement", "signature"] },
+          "uri": { "type": "string", "format": "uri" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": ["PASSED", "FAILED", "CONDITIONAL"]
+        },
+        "conditions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "reinspectionRequired": { "type": "boolean" },
+        "reinspectionDate": { "type": "string", "format": "date" },
+        "notes": { "type": "string" }
+      }
+    },
+    "consequencesCreated": {
+      "type": "array",
+      "description": "Consequence URNs created from failed items",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "decisionsTriggered": {
+      "type": "array",
+      "description": "PM decision URNs triggered by inspection results",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "scheduledAt": { "type": "string", "format": "date-time" },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to", "type"],
+            "properties": {
+              "from": { "$ref": "#/$defs/urn" },
+              "to": { "$ref": "#/$defs/urn" },
+              "type": { "type": "string", "enum": ["validates", "inspects", "triggers", "authored-by"] },
+              "weight": { "type": "number", "minimum": 0, "maximum": 1 },
+              "label": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    }
+  }
+}

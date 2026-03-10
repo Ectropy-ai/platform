@@ -1,0 +1,292 @@
+# 📈 GRAFANA DASHBOARD - ENTERPRISE VISUALIZATION
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: ectropy-production
+data:
+  ectropy-platform.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Ectropy Federated Construction Platform",
+        "tags": ["ectropy", "construction", "bim", "dao"],
+        "timezone": "UTC",
+        "refresh": "30s",
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "panels": [
+          {
+            "id": 1,
+            "title": "API Gateway Performance",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total{job=\"ectropy-api-gateway\"}[5m])",
+                "legendFormat": "Requests/sec - {{method}} {{status}}"
+              },
+              {
+                "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"ectropy-api-gateway\"}[5m]))",
+                "legendFormat": "95th percentile latency"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "yAxes": [
+              {"label": "Requests/sec", "min": 0},
+              {"label": "Latency (s)", "min": 0}
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Active BIM Collaboration Sessions",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "speckle_active_sessions",
+                "legendFormat": "Active Sessions"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "fieldConfig": {
+              "defaults": {
+                "color": {"mode": "thresholds"},
+                "thresholds": {
+                  "steps": [
+                    {"color": "green", "value": null},
+                    {"color": "yellow", "value": 50},
+                    {"color": "red", "value": 100}
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 3,
+            "title": "DAO Governance Activity",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(dao_proposals_total[5m])",
+                "legendFormat": "Proposals/min"
+              },
+              {
+                "expr": "rate(dao_votes_total[5m])",
+                "legendFormat": "Votes/min"
+              },
+              {
+                "expr": "dao_active_members",
+                "legendFormat": "Active Members"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Manufacturer API Integration Status",
+            "type": "table",
+            "targets": [
+              {
+                "expr": "manufacturer_api_status",
+                "legendFormat": "{{manufacturer}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "transformations": [
+              {
+                "id": "organize",
+                "options": {
+                  "excludeByName": {},
+                  "indexByName": {},
+                  "renameByName": {
+                    "manufacturer": "Manufacturer",
+                    "Value": "Status"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "id": 5,
+            "title": "BIM File Processing Volume",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(speckle_file_uploads_total[5m])",
+                "legendFormat": "Uploads/min"
+              },
+              {
+                "expr": "rate(speckle_file_processing_duration_seconds_sum[5m])",
+                "legendFormat": "Processing time/min"
+              },
+              {
+                "expr": "speckle_file_size_bytes",
+                "legendFormat": "Average file size"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+          },
+          {
+            "id": 6,
+            "title": "Database Performance",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(pg_stat_database_tup_inserted{datname=\"ectropy_federated_platform\"}[5m])",
+                "legendFormat": "Inserts/sec"
+              },
+              {
+                "expr": "rate(pg_stat_database_tup_updated{datname=\"ectropy_federated_platform\"}[5m])",
+                "legendFormat": "Updates/sec"
+              },
+              {
+                "expr": "pg_stat_database_numbackends{datname=\"ectropy_federated_platform\"}",
+                "legendFormat": "Active connections"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+          },
+          {
+            "id": 7,
+            "title": "Security Events",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(security_violations_total[5m])",
+                "legendFormat": "Security violations/min"
+              },
+              {
+                "expr": "rate(sql_injection_attempts_total[5m])",
+                "legendFormat": "SQL injection attempts/min"
+              },
+              {
+                "expr": "rate(rate_limit_exceeded_total[5m])",
+                "legendFormat": "Rate limit violations/min"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+          },
+          {
+            "id": 8,
+            "title": "Kubernetes Resource Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"ectropy-production\"}[5m])) by (pod)",
+                "legendFormat": "CPU Usage - {{pod}}"
+              },
+              {
+                "expr": "sum(container_memory_working_set_bytes{namespace=\"ectropy-production\"}) by (pod) / 1024 / 1024 / 1024",
+                "legendFormat": "Memory Usage GB - {{pod}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32}
+          }
+        ]
+      }
+    }
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: ectropy-production
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: ectropy-production
+  labels:
+    app: grafana
+    component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      serviceAccountName: ectropy-service-account
+      securityContext:
+        runAsUser: 472
+        runAsGroup: 472
+        runAsNonRoot: true
+      containers:
+        - name: grafana
+          image: grafana/grafana:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: GRAFANA_ADMIN_PASSWORD
+            - name: GF_DATABASE_TYPE
+              value: postgres
+            - name: GF_DATABASE_HOST
+              value: postgresql-service:5432
+            - name: GF_DATABASE_NAME
+              value: grafana
+            - name: GF_DATABASE_USER
+              value: grafana
+            - name: GF_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ectropy-secrets
+                  key: GRAFANA_DB_PASSWORD
+          volumeMounts:
+            - name: grafana-storage
+              mountPath: /var/lib/grafana
+            - name: grafana-dashboards
+              mountPath: /var/lib/grafana/dashboards
+          resources:
+            requests:
+              memory: '1Gi'
+              cpu: '500m'
+            limits:
+              memory: '2Gi'
+              cpu: '1'
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: grafana-storage
+          persistentVolumeClaim:
+            claimName: grafana-pvc
+        - name: grafana-dashboards
+          configMap:
+            name: grafana-dashboards
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: ectropy-production
+  labels:
+    app: grafana
+spec:
+  selector:
+    app: grafana
+  ports:
+    - port: 3000
+      targetPort: 3000
+      name: web
+  type: ClusterIP

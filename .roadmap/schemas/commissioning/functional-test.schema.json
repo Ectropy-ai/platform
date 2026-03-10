@@ -1,0 +1,165 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:functional-test",
+  "title": "Functional Performance Test Schema",
+  "description": "Individual functional performance test (FPT) with results",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "testId",
+    "systemRef",
+    "testName",
+    "status",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:functional-test:FPT-[0-9]{4}-[0-9]{4}$"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:functional-test"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "testId": {
+      "type": "string",
+      "pattern": "^FPT-[0-9]{4}-[0-9]{4}$"
+    },
+    "systemRef": { "$ref": "#/$defs/urn" },
+    "projectRef": { "$ref": "#/$defs/urn" },
+    "testName": { "type": "string" },
+    "testProcedure": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": [
+        "SCHEDULED",
+        "IN_PROGRESS",
+        "PASSED",
+        "FAILED",
+        "CONDITIONAL",
+        "DEFERRED"
+      ]
+    },
+    "schedule": {
+      "type": "object",
+      "properties": {
+        "scheduledDate": { "type": "string", "format": "date-time" },
+        "actualDate": { "type": "string", "format": "date-time" },
+        "duration": { "type": "integer", "description": "Minutes" }
+      }
+    },
+    "participants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "CX_AGENT",
+              "CONTRACTOR",
+              "OWNER_REP",
+              "DESIGN_ENGINEER",
+              "BALANCER"
+            ]
+          },
+          "participantRef": { "$ref": "#/$defs/urn" },
+          "name": { "type": "string" },
+          "present": { "type": "boolean" }
+        }
+      }
+    },
+    "testPoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pointId": { "type": "string" },
+          "description": { "type": "string" },
+          "expectedValue": { "type": "string" },
+          "actualValue": { "type": "string" },
+          "tolerance": { "type": "string" },
+          "passed": { "type": "boolean" },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "enum": ["PASS", "FAIL", "CONDITIONAL"]
+        },
+        "conditions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "failureReasons": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "retestRequired": { "type": "boolean" },
+        "retestDate": { "type": "string", "format": "date" }
+      }
+    },
+    "relatedDecisionRefs": {
+      "type": "array",
+      "description": "Construction decisions that may have caused test results",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "linkedIssueRefs": {
+      "type": "array",
+      "description": "Cx issues created from failed tests",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["PHOTO", "VIDEO", "DATA_LOG", "REPORT"]
+          },
+          "storageUri": { "type": "string", "format": "uri" },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    }
+  }
+}

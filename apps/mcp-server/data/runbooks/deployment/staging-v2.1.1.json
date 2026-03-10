@@ -1,0 +1,933 @@
+{
+  "version": "2.1.1",
+  "environment": "staging",
+  "deploymentDate": "2025-11-16",
+  "deploymentType": "Feature Release + Enterprise TypeScript Consolidation",
+  "metadata": {
+    "catalogId": "deployment-runbook-v2-1-1",
+    "purpose": "Machine-readable deployment runbook for MCP integration and architecture alignment",
+    "maintainer": "infrastructure-team",
+    "lastUpdated": "2025-11-16T16:30:00Z",
+    "relatedDocuments": [
+      "docs/DEPLOYMENT_RUNBOOK_v2.1.1.md",
+      "evidence/final-deployment-validation-2025-11-16.json",
+      "evidence/type-consolidation-enterprise-2025-11-16.json",
+      "apps/mcp-server/data/routing-architecture.json"
+    ]
+  },
+  "executiveSummary": {
+    "description": "Enterprise-grade TypeScript type consolidation, Speckle BIM integration enhancements, and critical infrastructure improvements",
+    "deploymentStatus": "READY_FOR_STAGING",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "LOW",
+    "keyChanges": [
+      "Enterprise TypeScript type consolidation (Single source of truth pattern)",
+      "Enhanced Speckle BIM OAuth routing",
+      "Role-based access control improvements",
+      "API Gateway security middleware enhancements",
+      "Database schema updates for project members"
+    ]
+  },
+  "preDeploymentValidation": {
+    "status": "PASSED",
+    "build": {
+      "typescriptCompilation": "PASSED - 0 errors",
+      "fullMonorepoBuild": "SUCCESS - exit code 0",
+      "sharedLibraryBuild": "SUCCESS",
+      "dockerImages": "Built and validated"
+    },
+    "infrastructureHealth": {
+      "apiGateway": {
+        "status": "HEALTHY",
+        "healthScore": 80,
+        "uptime": "10h 46m 48s"
+      },
+      "mcpServer": {
+        "status": "HEALTHY",
+        "uptime": "11+ hours"
+      },
+      "webDashboard": {
+        "status": "HEALTHY",
+        "uptime": "11+ hours"
+      },
+      "postgres": {
+        "status": "HEALTHY",
+        "latency": "54ms"
+      },
+      "redis": {
+        "status": "HEALTHY"
+      },
+      "qdrant": {
+        "status": "RUNNING"
+      },
+      "speckleServices": {
+        "status": "RUNNING"
+      }
+    },
+    "codeQuality": {
+      "typeErrorsResolved": "3/3",
+      "securityVulnerabilities": "9 (acceptable for staging)",
+      "backwardsCompatibility": "MAINTAINED",
+      "evidenceFiles": 1072
+    }
+  },
+  "deploymentSteps": [
+    {
+      "phase": 1,
+      "name": "Pre-Deployment Checklist",
+      "estimatedDuration": "15 minutes",
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Verify staging server access",
+          "command": "ssh staging-server",
+          "purpose": "Ensure SSH access to staging environment",
+          "required": true
+        },
+        {
+          "step": "1.2",
+          "name": "Navigate to application directory",
+          "command": "cd /opt/ectropy",
+          "purpose": "Set working directory",
+          "required": true
+        },
+        {
+          "step": "1.3",
+          "name": "Create backup",
+          "commands": [
+            "docker compose -f docker-compose.staging.yml down",
+            "tar -czf backups/pre-deployment-$(date +%Y%m%d-%H%M%S).tar.gz data/"
+          ],
+          "purpose": "Backup current state for rollback capability",
+          "required": true,
+          "rollbackRelevant": true
+        },
+        {
+          "step": "1.4",
+          "name": "Verify environment variables",
+          "command": "cat .env.staging | grep -E \"DATABASE_URL|REDIS_URL|JWT_SECRET|SPECKLE_\"",
+          "purpose": "Confirm critical environment variables are set",
+          "required": true,
+          "validation": [
+            "DATABASE_URL must be set",
+            "REDIS_URL must be set",
+            "JWT_SECRET must be minimum 32 characters",
+            "SPECKLE_CLIENT_ID must be set",
+            "SPECKLE_CLIENT_SECRET must be set",
+            "SPECKLE_REDIRECT_URI must match staging URL"
+          ]
+        },
+        {
+          "step": "1.5",
+          "name": "Pull latest code",
+          "commands": [
+            "git fetch origin",
+            "git checkout develop",
+            "git pull origin develop"
+          ],
+          "purpose": "Update to v2.1.1 with TypeScript fixes",
+          "required": true,
+          "expectedCommit": "4055896d"
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Build Production Images",
+      "estimatedDuration": "20 minutes",
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Build with staging configuration",
+          "command": "docker compose -f docker-compose.staging.yml build --no-cache",
+          "purpose": "Build fresh images without cache",
+          "required": true,
+          "timeout": "1200s"
+        },
+        {
+          "step": "2.2",
+          "name": "Verify image sizes",
+          "command": "docker images | grep ectropy",
+          "purpose": "Ensure images built successfully",
+          "required": true,
+          "expectedImages": [
+            "ectropy-api-gateway",
+            "ectropy-mcp-server",
+            "ectropy-web-dashboard"
+          ]
+        },
+        {
+          "step": "2.3",
+          "name": "Tag images for staging",
+          "commands": [
+            "docker tag ectropy-api-gateway:latest ectropy-api-gateway:v2.1.1",
+            "docker tag ectropy-mcp-server:latest ectropy-mcp-server:v2.1.1",
+            "docker tag ectropy-web-dashboard:latest ectropy-web-dashboard:v2.1.1"
+          ],
+          "purpose": "Version tracking and rollback capability",
+          "required": true
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Database Migration",
+      "estimatedDuration": "10 minutes",
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Check current migration status",
+          "command": "docker compose -f docker-compose.staging.yml exec postgres psql -U postgres -d ectropy -c \"SELECT * FROM _prisma_migrations ORDER BY finished_at DESC LIMIT 5;\"",
+          "purpose": "Verify migration history",
+          "required": true
+        },
+        {
+          "step": "3.2",
+          "name": "Apply new migrations",
+          "commands": [
+            "cd libs/database",
+            "npx prisma migrate deploy --schema=./schema.prisma"
+          ],
+          "purpose": "Apply project_members table migration",
+          "required": true,
+          "rollbackRelevant": true,
+          "migrations": ["004_project_members.sql"]
+        },
+        {
+          "step": "3.3",
+          "name": "Verify project_members table",
+          "command": "docker compose -f docker-compose.staging.yml exec postgres psql -U postgres -d ectropy -c \"\\d project_members\"",
+          "purpose": "Confirm new table exists",
+          "required": true,
+          "expectedColumns": [
+            "id",
+            "project_id",
+            "user_id",
+            "role",
+            "created_at",
+            "updated_at"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Deploy Services",
+      "estimatedDuration": "15 minutes",
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Start infrastructure services",
+          "command": "docker compose -f docker-compose.staging.yml up -d postgres redis qdrant minio",
+          "purpose": "Boot databases before applications",
+          "required": true,
+          "serviceOrder": "infrastructure-first"
+        },
+        {
+          "step": "4.2",
+          "name": "Wait for databases",
+          "command": "sleep 30",
+          "purpose": "Allow databases to initialize",
+          "required": true,
+          "waitDuration": "30s"
+        },
+        {
+          "step": "4.3",
+          "name": "Deploy application services",
+          "command": "docker compose -f docker-compose.staging.yml up -d api-gateway mcp-server web-dashboard",
+          "purpose": "Start Ectropy core services",
+          "required": true,
+          "services": [
+            "api-gateway (port 4000)",
+            "mcp-server (ports 3001-3002)",
+            "web-dashboard (port 3000)"
+          ]
+        },
+        {
+          "step": "4.4",
+          "name": "Deploy Speckle services",
+          "command": "docker compose -f docker-compose.staging.yml up -d speckle-server speckle-frontend speckle-preview speckle-fileimport speckle-webhook",
+          "purpose": "Start BIM integration services",
+          "required": true,
+          "services": [
+            "speckle-server",
+            "speckle-frontend",
+            "speckle-preview",
+            "speckle-fileimport",
+            "speckle-webhook"
+          ]
+        },
+        {
+          "step": "4.5",
+          "name": "Start nginx reverse proxy",
+          "command": "docker compose -f docker-compose.staging.yml up -d nginx",
+          "purpose": "Enable external access via HTTPS",
+          "required": true,
+          "routingConfig": "infrastructure/nginx/staging.conf"
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Health Check Validation",
+      "estimatedDuration": "10 minutes",
+      "steps": [
+        {
+          "step": "5.1",
+          "name": "Wait for services to start",
+          "command": "sleep 60",
+          "purpose": "Allow containers to initialize",
+          "required": true,
+          "waitDuration": "60s"
+        },
+        {
+          "step": "5.2",
+          "name": "Check container status",
+          "command": "docker compose -f docker-compose.staging.yml ps",
+          "purpose": "Verify all containers are running",
+          "required": true,
+          "expectedState": "Up"
+        },
+        {
+          "step": "5.3",
+          "name": "Validate API Gateway health",
+          "command": "curl -s https://staging.ectropy.com/api/health | jq .",
+          "purpose": "Check API Gateway health endpoint",
+          "required": true,
+          "expectedStatus": 200,
+          "expectedHealthScore": ">= 70",
+          "healthCheckUrl": "https://staging.ectropy.com/api/health"
+        },
+        {
+          "step": "5.4",
+          "name": "Validate MCP Server health",
+          "command": "curl -s https://staging.ectropy.com/mcp/health | jq .",
+          "purpose": "Check MCP Server health endpoint",
+          "required": true,
+          "expectedStatus": 200,
+          "healthCheckUrl": "https://staging.ectropy.com/mcp/health"
+        },
+        {
+          "step": "5.5",
+          "name": "Check container logs for errors",
+          "commands": [
+            "docker compose -f docker-compose.staging.yml logs --tail=50 api-gateway",
+            "docker compose -f docker-compose.staging.yml logs --tail=50 mcp-server",
+            "docker compose -f docker-compose.staging.yml logs --tail=50 web-dashboard"
+          ],
+          "purpose": "Identify startup errors",
+          "required": true,
+          "errorPatterns": [
+            "Error",
+            "FATAL",
+            "Connection refused",
+            "ECONNREFUSED"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Smoke Tests",
+      "estimatedDuration": "15 minutes",
+      "steps": [
+        {
+          "step": "6.1",
+          "name": "Test authentication endpoint",
+          "command": "curl -X POST https://staging.ectropy.com/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"test@example.com\",\"password\":\"test123\"}'",
+          "purpose": "Verify authentication flow",
+          "required": true,
+          "expectedStatus": [200, 401],
+          "endpoint": "/api/auth/login"
+        },
+        {
+          "step": "6.2",
+          "name": "Test Speckle OAuth redirect",
+          "command": "curl -I https://staging.ectropy.com/api/speckle/auth",
+          "purpose": "Verify Speckle OAuth routing",
+          "required": true,
+          "expectedStatus": [302, 200],
+          "endpoint": "/api/speckle/auth",
+          "relatedFiles": [
+            "apps/api-gateway/src/routes/speckle.routes.enterprise.ts"
+          ]
+        },
+        {
+          "step": "6.3",
+          "name": "Test web dashboard availability",
+          "command": "curl -I https://staging.ectropy.com/",
+          "purpose": "Verify frontend is serving",
+          "required": true,
+          "expectedStatus": 200,
+          "endpoint": "/"
+        },
+        {
+          "step": "6.4",
+          "name": "Test database connectivity",
+          "command": "curl -s https://staging.ectropy.com/api/health | jq '.database.status'",
+          "purpose": "Verify database connection",
+          "required": true,
+          "expectedValue": "connected",
+          "expectedLatency": "< 100ms"
+        },
+        {
+          "step": "6.5",
+          "name": "Test Redis caching",
+          "command": "curl -s https://staging.ectropy.com/api/health | jq '.services.redis'",
+          "purpose": "Verify Redis is operational",
+          "required": true,
+          "expectedValue": "connected"
+        }
+      ]
+    }
+  ],
+  "postDeploymentValidation": {
+    "functionalTests": [
+      {
+        "test": "User authentication flow",
+        "endpoint": "/api/auth/google",
+        "expectedBehavior": "OAuth redirect to Google, callback, session creation",
+        "priority": "P0"
+      },
+      {
+        "test": "Speckle OAuth integration",
+        "endpoint": "/api/speckle/auth",
+        "expectedBehavior": "OAuth redirect to Speckle, token exchange",
+        "priority": "P0"
+      },
+      {
+        "test": "BIM viewer loading",
+        "component": "SpeckleBIMViewer",
+        "expectedBehavior": "3D model renders in viewer component",
+        "priority": "P1"
+      },
+      {
+        "test": "Project creation/retrieval",
+        "endpoint": "/api/projects",
+        "expectedBehavior": "CRUD operations on projects",
+        "priority": "P1"
+      },
+      {
+        "test": "Role-based authorization",
+        "middleware": "authorize(...roles)",
+        "expectedBehavior": "403 for insufficient permissions, 200 for authorized",
+        "priority": "P0"
+      },
+      {
+        "test": "Database queries performance",
+        "expectedLatency": "< 100ms",
+        "priority": "P1"
+      },
+      {
+        "test": "Redis caching behavior",
+        "expectedBehavior": "Session storage and retrieval",
+        "priority": "P1"
+      }
+    ],
+    "performanceTests": [
+      {
+        "metric": "API response times",
+        "threshold": "< 200ms",
+        "measurement": "Average response time for /api/health"
+      },
+      {
+        "metric": "Database query latency",
+        "threshold": "< 100ms",
+        "measurement": "Database field in health check response"
+      },
+      {
+        "metric": "Page load time",
+        "threshold": "< 3s",
+        "measurement": "Time to interactive for dashboard"
+      },
+      {
+        "metric": "Memory usage",
+        "threshold": "stable",
+        "measurement": "Container memory stats over 1 hour"
+      },
+      {
+        "metric": "CPU usage",
+        "threshold": "< 50%",
+        "measurement": "Container CPU stats over 1 hour"
+      }
+    ],
+    "integrationTests": [
+      {
+        "integration": "Speckle API connectivity",
+        "endpoint": "https://staging.ectropy.com/speckle",
+        "expectedBehavior": "Speckle server accessible"
+      },
+      {
+        "integration": "External service integrations",
+        "services": ["Google OAuth", "Speckle OAuth"],
+        "expectedBehavior": "OAuth flows complete successfully"
+      },
+      {
+        "integration": "WebSocket connections",
+        "protocol": "ws://",
+        "expectedBehavior": "Real-time updates work"
+      },
+      {
+        "integration": "File upload/download",
+        "service": "MinIO",
+        "expectedBehavior": "BIM files upload and retrieve"
+      },
+      {
+        "integration": "Email notifications",
+        "service": "Email service",
+        "expectedBehavior": "Notification emails send"
+      }
+    ]
+  },
+  "rollbackProcedure": {
+    "triggerConditions": [
+      "Critical errors in logs (30+ errors/minute)",
+      "Health check failures (> 3 consecutive)",
+      "Database migration failure",
+      "User-facing errors (> 5% error rate)",
+      "Performance degradation (> 50% slower)",
+      "Security vulnerability discovered"
+    ],
+    "steps": [
+      {
+        "step": 1,
+        "name": "Stop current services",
+        "command": "docker compose -f docker-compose.staging.yml down",
+        "purpose": "Halt v2.1.1 deployment"
+      },
+      {
+        "step": 2,
+        "name": "Restore from backup",
+        "command": "tar -xzf backups/pre-deployment-YYYYMMDD-HHMMSS.tar.gz -C data/",
+        "purpose": "Restore previous data state",
+        "note": "Replace YYYYMMDD-HHMMSS with actual backup timestamp"
+      },
+      {
+        "step": 3,
+        "name": "Start previous version",
+        "command": "docker compose -f docker-compose.staging.yml up -d",
+        "purpose": "Revert to previous stable deployment"
+      },
+      {
+        "step": 4,
+        "name": "Verify rollback",
+        "command": "curl -s https://staging.ectropy.com/api/health",
+        "purpose": "Confirm system is operational",
+        "expectedStatus": 200
+      }
+    ],
+    "estimatedRollbackTime": "10 minutes",
+    "dataLossRisk": "Minimal - backup created before deployment",
+    "decisionMaker": "Technical Lead or DevOps Lead"
+  },
+  "monitoringAndAlerts": {
+    "keyMetrics": {
+      "first24Hours": [
+        {
+          "metric": "API Gateway health score",
+          "threshold": "> 70",
+          "alertOn": "< 70 for 5 minutes"
+        },
+        {
+          "metric": "Container restart count",
+          "threshold": "= 0",
+          "alertOn": "Any restart"
+        },
+        {
+          "metric": "Error rate",
+          "threshold": "< 1%",
+          "alertOn": "> 5% for 1 minute"
+        },
+        {
+          "metric": "Query latency",
+          "threshold": "< 100ms",
+          "alertOn": "> 200ms for 5 minutes"
+        },
+        {
+          "metric": "Connection pool usage",
+          "threshold": "< 80%",
+          "alertOn": "> 90% for 5 minutes"
+        },
+        {
+          "metric": "Page load time",
+          "threshold": "< 3s",
+          "alertOn": "> 5s for 3 consecutive loads"
+        },
+        {
+          "metric": "API response time",
+          "threshold": "< 200ms",
+          "alertOn": "> 500ms for 5 minutes"
+        },
+        {
+          "metric": "Authentication failures",
+          "threshold": "0",
+          "alertOn": "Any failure"
+        }
+      ]
+    },
+    "alertThresholds": [
+      {
+        "threshold": "CPU usage > 80% for 5 minutes",
+        "severity": "WARNING",
+        "action": "Investigate resource usage"
+      },
+      {
+        "threshold": "Memory usage > 90% for 5 minutes",
+        "severity": "CRITICAL",
+        "action": "Consider scaling or optimization"
+      },
+      {
+        "threshold": "Error rate > 5% for 1 minute",
+        "severity": "CRITICAL",
+        "action": "Investigate errors, consider rollback"
+      },
+      {
+        "threshold": "Database connections > 90% of pool",
+        "severity": "WARNING",
+        "action": "Check for connection leaks"
+      },
+      {
+        "threshold": "Any container restart",
+        "severity": "WARNING",
+        "action": "Check container logs for crash reason"
+      }
+    ],
+    "monitoringDashboards": [
+      "Container metrics (docker stats)",
+      "API Gateway health endpoint",
+      "Application logs (docker logs)",
+      "Database performance metrics"
+    ]
+  },
+  "knownIssues": [
+    {
+      "id": "issue-1",
+      "title": "Security Vulnerabilities (9 total)",
+      "severity": "Low to Medium",
+      "impact": "Acceptable for staging",
+      "mitigation": "Documented in security audit",
+      "action": "Track for production deployment",
+      "priority": "P2"
+    },
+    {
+      "id": "issue-2",
+      "title": "Playwright Browser Dependencies",
+      "severity": "Low",
+      "impact": "E2E tests require browser installation",
+      "mitigation": "Run 'pnpm exec playwright install'",
+      "action": "None required for staging",
+      "priority": "P3"
+    }
+  ],
+  "technicalChanges": {
+    "typescriptTypeConsolidation": {
+      "pattern": "Single source of truth for User type",
+      "filesModified": [
+        {
+          "file": "libs/shared/middleware/src/index.ts",
+          "change": "Import User type instead of inline definition",
+          "lineNumbers": [9, 22, 23, 89, 90]
+        },
+        {
+          "file": "libs/shared/src/middleware/index.ts",
+          "change": "Import User type instead of inline definition",
+          "lineNumbers": [9, 22, 23, 89, 90]
+        },
+        {
+          "file": "libs/shared/src/middleware/auth.middleware.ts",
+          "change": "Add role property with fallback logic",
+          "lineNumbers": [64]
+        }
+      ],
+      "benefits": [
+        "Eliminated 3 TypeScript compilation errors",
+        "Implemented enterprise single source of truth pattern",
+        "Backwards compatible with multi-role support",
+        "Type-safe with optional chaining"
+      ]
+    },
+    "speckleIntegration": {
+      "filesModified": [
+        {
+          "file": "apps/api-gateway/src/routes/speckle.routes.enterprise.ts",
+          "change": "New enterprise OAuth routing",
+          "status": "New file"
+        },
+        {
+          "file": "apps/web-dashboard/src/components/BIMViewer/SpeckleBIMViewer.tsx",
+          "change": "Enhanced viewer component",
+          "features": [
+            "OAuth token integration",
+            "3D model loading",
+            "Viewer controls"
+          ]
+        }
+      ]
+    },
+    "databaseSchema": {
+      "migrations": [
+        {
+          "file": "libs/database/migrations/004_project_members.sql",
+          "purpose": "Project member management",
+          "tables": ["project_members"],
+          "columns": [
+            "id",
+            "project_id",
+            "user_id",
+            "role",
+            "created_at",
+            "updated_at"
+          ]
+        }
+      ]
+    }
+  },
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "SPECKLE_CLIENT_ID",
+        "description": "Speckle OAuth client ID",
+        "example": "your_client_id",
+        "required": true,
+        "environment": "staging"
+      },
+      {
+        "name": "SPECKLE_CLIENT_SECRET",
+        "description": "Speckle OAuth client secret",
+        "example": "your_client_secret",
+        "required": true,
+        "environment": "staging",
+        "secret": true
+      },
+      {
+        "name": "SPECKLE_REDIRECT_URI",
+        "description": "Speckle OAuth redirect URI",
+        "example": "https://staging.ectropy.com/api/speckle/callback",
+        "required": true,
+        "environment": "staging"
+      },
+      {
+        "name": "JWT_SECRET",
+        "description": "JWT signing secret",
+        "example": "your_jwt_secret_minimum_32_characters",
+        "required": true,
+        "environment": "all",
+        "secret": true,
+        "minimumLength": 32
+      },
+      {
+        "name": "DATABASE_URL",
+        "description": "PostgreSQL connection string",
+        "example": "postgresql://user:password@postgres:5432/ectropy",
+        "required": true,
+        "environment": "all",
+        "secret": true
+      },
+      {
+        "name": "REDIS_URL",
+        "description": "Redis connection string",
+        "example": "redis://redis:6379",
+        "required": true,
+        "environment": "all"
+      }
+    ]
+  },
+  "successCriteria": [
+    {
+      "criterion": "All containers are healthy",
+      "status": "REQUIRED",
+      "validation": "docker compose ps shows 'healthy' status"
+    },
+    {
+      "criterion": "API Gateway health score > 70",
+      "status": "REQUIRED",
+      "validation": "curl https://staging.ectropy.com/api/health"
+    },
+    {
+      "criterion": "Database migrations applied successfully",
+      "status": "REQUIRED",
+      "validation": "project_members table exists"
+    },
+    {
+      "criterion": "All smoke tests pass",
+      "status": "REQUIRED",
+      "validation": "6 smoke tests return expected status codes"
+    },
+    {
+      "criterion": "No critical errors in logs (first 30 minutes)",
+      "status": "REQUIRED",
+      "validation": "docker logs show no ERROR or FATAL messages"
+    },
+    {
+      "criterion": "Speckle OAuth flow works end-to-end",
+      "status": "REQUIRED",
+      "validation": "Manual test of Speckle authentication"
+    },
+    {
+      "criterion": "User authentication succeeds",
+      "status": "REQUIRED",
+      "validation": "Google OAuth flow completes"
+    },
+    {
+      "criterion": "BIM viewer loads correctly",
+      "status": "REQUIRED",
+      "validation": "SpeckleBIMViewer component renders 3D model"
+    }
+  ],
+  "supportAndEscalation": {
+    "onCallTeam": {
+      "devOps": "[Contact]",
+      "backend": "[Contact]",
+      "frontend": "[Contact]"
+    },
+    "communicationChannels": {
+      "slack": "#ectropy-deployments",
+      "email": "team@ectropy.com",
+      "issueTracker": "GitHub Issues"
+    },
+    "rollbackDecisionMaker": {
+      "primary": "Technical Lead",
+      "secondary": "DevOps Lead"
+    }
+  },
+  "evidenceAndDocumentation": {
+    "deploymentEvidence": [
+      {
+        "file": "evidence/typescript-build-validation.log",
+        "purpose": "TypeScript compilation validation"
+      },
+      {
+        "file": "evidence/type-consolidation-enterprise-2025-11-16.json",
+        "purpose": "Enterprise type consolidation documentation"
+      },
+      {
+        "file": "evidence/final-deployment-validation-2025-11-16.json",
+        "purpose": "Final deployment validation report"
+      },
+      {
+        "file": "evidence/playwright-results.json",
+        "purpose": "E2E test results"
+      }
+    ],
+    "totalEvidenceFiles": 1072,
+    "relatedDocumentation": [
+      {
+        "file": "docs/DEPLOYMENT_RUNBOOK_v2.1.1.md",
+        "purpose": "Human-readable deployment runbook"
+      },
+      {
+        "file": "apps/mcp-server/data/routing-architecture.json",
+        "purpose": "Complete routing and architecture reference"
+      },
+      {
+        "file": "docs/MULTI_TENANCY_ARCHITECTURE.md",
+        "purpose": "Multi-tenancy architecture documentation"
+      }
+    ]
+  },
+  "architectureAlignment": {
+    "routingConfiguration": {
+      "staging": {
+        "externalUrl": "https://staging.ectropy.ai",
+        "apiGateway": "/api/*",
+        "mcpServer": "/mcp/*",
+        "speckleServer": "/speckle/api/*",
+        "speckleFrontend": "/speckle/*",
+        "webDashboard": "/"
+      },
+      "nginxConfig": "infrastructure/nginx/staging.conf",
+      "portAllocation": "apps/mcp-server/data/routing-architecture.json#portAllocationMatrix.staging"
+    },
+    "oauthConfiguration": {
+      "google": {
+        "authorizedJavaScriptOrigins": ["https://staging.ectropy.ai"],
+        "authorizedRedirectUris": [
+          "https://staging.ectropy.ai/api/auth/google/callback"
+        ]
+      },
+      "speckle": {
+        "authorizedRedirectUris": [
+          "https://staging.ectropy.ai/api/speckle/callback"
+        ]
+      },
+      "sessionCookies": {
+        "cookieName": "oauth_session",
+        "secure": true,
+        "sameSite": "none",
+        "domain": ".ectropy.ai",
+        "httpOnly": true
+      }
+    },
+    "securityConfiguration": {
+      "csp": {
+        "connectSrc": [
+          "'self'",
+          "https://staging.ectropy.ai",
+          "https://accounts.google.com",
+          "https://oauth2.googleapis.com"
+        ]
+      },
+      "corsOrigins": [
+        "https://staging.ectropy.ai",
+        "https://staging.ectropy.ai/speckle"
+      ]
+    }
+  },
+  "mcpIntegration": {
+    "queryableEndpoints": [
+      {
+        "query": "getDeploymentSteps",
+        "returns": "deploymentSteps array",
+        "purpose": "MCP can retrieve step-by-step deployment instructions"
+      },
+      {
+        "query": "getHealthCheckValidation",
+        "returns": "healthCheckValidation object",
+        "purpose": "MCP can verify expected health check behavior"
+      },
+      {
+        "query": "getRollbackProcedure",
+        "returns": "rollbackProcedure object",
+        "purpose": "MCP can guide through rollback if needed"
+      },
+      {
+        "query": "getEnvironmentVariables",
+        "returns": "environmentVariables array",
+        "purpose": "MCP can validate environment configuration"
+      },
+      {
+        "query": "getArchitectureAlignment",
+        "returns": "architectureAlignment object",
+        "purpose": "MCP can cross-reference with routing-architecture.json"
+      }
+    ],
+    "decisionSupport": [
+      "Deployment readiness assessment",
+      "Rollback decision criteria",
+      "Health check interpretation",
+      "Error pattern recognition",
+      "Performance threshold validation"
+    ]
+  },
+  "signOff": {
+    "codeReview": {
+      "required": true,
+      "completed": false
+    },
+    "qaTesting": {
+      "required": true,
+      "completed": false
+    },
+    "securityReview": {
+      "required": true,
+      "completed": false
+    },
+    "deploymentLead": {
+      "required": true,
+      "completed": false
+    }
+  },
+  "deploymentStatus": "READY_FOR_STAGING",
+  "confidenceLevel": "HIGH",
+  "riskAssessment": "LOW - All critical systems validated and healthy"
+}

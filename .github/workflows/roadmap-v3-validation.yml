@@ -1,0 +1,327 @@
+name: Roadmap V3 Schema Validation
+
+# ENTERPRISE REPO-FIRST ARCHITECTURE (2025-12-15):
+# The .roadmap/ folder is the AUTHORITATIVE SOURCE OF TRUTH for all roadmap data
+#
+# Data Flow Pattern:
+#   Repository (.roadmap/) -> External Systems (Notion, etc.) [read-only]
+#
+# Validation Strategy:
+#   - JSON syntax validation
+#   - Schema validation against luh-tech/luh-tech-roadmap-template
+#   - Enforces data quality at source (repo) before external sync
+#
+# Why Repo-First:
+#   1. Single source of truth (eliminates sync conflicts)
+#   2. Version control for roadmap changes (Git history)
+#   3. PR-based review process for roadmap updates
+#   4. Supports post-demo repo split strategy
+#   5. Aligns with luh-tech/ cross-repo roadmap alignment
+#
+# Replaced Workflow:
+#   - roadmap-sync.yml (GitHub Projects bi-directional sync) -> ARCHIVED
+#   - Reason: Repo is source of truth, external systems are read-only consumers
+#
+# Related Workflows:
+#   - None (this is the ONLY roadmap validation workflow)
+#   - External sync to Notion/etc. will be separate push-out workflows
+
+on:
+  push:
+    paths:
+      - '.roadmap/**'
+  pull_request:
+    paths:
+      - '.roadmap/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-v3-schemas:
+    name: Validate V3 .roadmap/ Files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install ajv-cli
+        run: npm install -g ajv-cli ajv-formats
+
+      - name: Clone Schema Repository
+        run: |
+          git clone --depth 1 https://github.com/luh-tech/luh-tech-roadmap-template.git /tmp/schemas
+
+      # ENTERPRISE VALIDATION STRATEGY (2026-01-22):
+      # ✅ JSON syntax validation is REQUIRED (fails workflow if invalid)
+      # ✅ Schema validation is REQUIRED (fails workflow if schema invalid)
+      #
+      # Upgraded from ADVISORY to REQUIRED per ALIGNMENT_ANALYSIS.json GAP-001
+      #
+      # Rationale:
+      #   - .roadmap/ files have achieved schema alignment
+      #   - ADVISORY validation provided false confidence
+      #   - REQUIRED validation catches issues at PR time
+      #   - Aligns with luh-tech-roadmap-template best practices
+      #
+      # Technical Implementation:
+      #   - All validations use --strict=false to suppress format warnings
+      #   - All validations include -r flags for luhtech-enums.schema.json
+      #   - All validations include -r flags for definitions.schema.json
+      #   - continue-on-error: false (validation failures block PR)
+
+      - name: Validate JSON Syntax
+        run: |
+          echo "### Validating JSON Syntax" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          for file in .roadmap/*.json; do
+            filename=$(basename "$file")
+            if python3 -m json.tool "$file" > /dev/null 2>&1; then
+              echo "✅ $filename - Valid JSON syntax" | tee -a $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ $filename - Invalid JSON syntax" | tee -a $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          done
+
+      - name: Validate venture-summary.json
+        if: hashFiles('.roadmap/venture-summary.json') != ''
+        run: |
+          ajv validate \
+            -s /tmp/schemas/schemas/venture-summary.schema.json \
+            -r /tmp/schemas/schemas/_enums/luhtech-enums.schema.json \
+            -r /tmp/schemas/schemas/_definitions/definitions.schema.json \
+            -d .roadmap/venture-summary.json \
+            --all-errors \
+            --strict=false
+          echo "✅ venture-summary.json - Schema valid" >> $GITHUB_STEP_SUMMARY
+
+      - name: Validate roadmap.json
+        if: hashFiles('.roadmap/roadmap.json') != ''
+        run: |
+          ajv validate \
+            -s /tmp/schemas/schemas/roadmap.schema.v2.json \
+            -r /tmp/schemas/schemas/_enums/luhtech-enums.schema.json \
+            -r /tmp/schemas/schemas/_definitions/definitions.schema.json \
+            -d .roadmap/roadmap.json \
+            --all-errors \
+            --strict=false
+          echo "✅ roadmap.json - Schema valid" >> $GITHUB_STEP_SUMMARY
+
+      - name: Validate decision-log.json
+        if: hashFiles('.roadmap/decision-log.json') != ''
+        run: |
+          ajv validate \
+            -s /tmp/schemas/schemas/decision-log.schema.v2.json \
+            -r /tmp/schemas/schemas/_enums/luhtech-enums.schema.json \
+            -r /tmp/schemas/schemas/_definitions/definitions.schema.json \
+            -d .roadmap/decision-log.json \
+            --all-errors \
+            --strict=false
+          echo "✅ decision-log.json - Schema valid" >> $GITHUB_STEP_SUMMARY
+
+      - name: Validate architecture.json
+        if: hashFiles('.roadmap/architecture.json') != ''
+        run: |
+          ajv validate \
+            -s /tmp/schemas/schemas/architecture-roadmap.schema.v1.json \
+            -r /tmp/schemas/schemas/_enums/luhtech-enums.schema.json \
+            -r /tmp/schemas/schemas/_definitions/definitions.schema.json \
+            -d .roadmap/architecture.json \
+            --all-errors \
+            --strict=false
+          echo "✅ architecture.json - Schema valid" >> $GITHUB_STEP_SUMMARY
+
+      - name: Validate boundaries.json
+        if: hashFiles('.roadmap/boundaries.json') != ''
+        run: |
+          ajv validate \
+            -s /tmp/schemas/schemas/boundaries.schema.json \
+            -r /tmp/schemas/schemas/_enums/luhtech-enums.schema.json \
+            -r /tmp/schemas/schemas/_definitions/definitions.schema.json \
+            -d .roadmap/boundaries.json \
+            --all-errors \
+            --strict=false
+          echo "✅ boundaries.json - Schema valid" >> $GITHUB_STEP_SUMMARY
+
+      - name: Validate dependencies.json
+        if: hashFiles('.roadmap/dependencies.json') != ''
+        run: |
+          ajv validate \
+            -s /tmp/schemas/schemas/dependencies.schema.json \
+            -r /tmp/schemas/schemas/_enums/luhtech-enums.schema.json \
+            -r /tmp/schemas/schemas/_definitions/definitions.schema.json \
+            -d .roadmap/dependencies.json \
+            --all-errors \
+            --strict=false
+          echo "✅ dependencies.json - Schema valid" >> $GITHUB_STEP_SUMMARY
+
+      - name: Validate infrastructure-catalog.json
+        if: hashFiles('.roadmap/infrastructure-catalog.json') != ''
+        run: |
+          ajv validate \
+            -s /tmp/schemas/schemas/infrastructure-catalog.schema.json \
+            -r /tmp/schemas/schemas/_enums/luhtech-enums.schema.json \
+            -r /tmp/schemas/schemas/_definitions/definitions.schema.json \
+            -d .roadmap/infrastructure-catalog.json \
+            --all-errors \
+            --strict=false
+          echo "✅ infrastructure-catalog.json - Schema valid" >> $GITHUB_STEP_SUMMARY
+
+      - name: Validate tech-stack.json
+        if: hashFiles('.roadmap/tech-stack.json') != ''
+        run: |
+          ajv validate \
+            -s /tmp/schemas/schemas/tech-stack.schema.json \
+            -r /tmp/schemas/schemas/_enums/luhtech-enums.schema.json \
+            -r /tmp/schemas/schemas/_definitions/definitions.schema.json \
+            -d .roadmap/tech-stack.json \
+            --all-errors \
+            --strict=false
+          echo "✅ tech-stack.json - Schema valid" >> $GITHUB_STEP_SUMMARY
+
+      - name: Validate extensions.json
+        if: hashFiles('.roadmap/extensions.json') != ''
+        run: |
+          ajv validate \
+            -s /tmp/schemas/schemas/extensions.schema.v1.json \
+            -r /tmp/schemas/schemas/_enums/luhtech-enums.schema.json \
+            -r /tmp/schemas/schemas/_definitions/definitions.schema.json \
+            -d .roadmap/extensions.json \
+            --all-errors \
+            --strict=false
+          echo "✅ extensions.json - Schema valid" >> $GITHUB_STEP_SUMMARY
+
+      # ==========================================================================
+      # LOCAL SCHEMA VALIDATION (Ectropy-specific files)
+      # ==========================================================================
+      # These files use local schemas in .roadmap/schemas/ rather than
+      # luh-tech-roadmap-template schemas. Validated against their local $schema.
+      # ==========================================================================
+
+      - name: Validate workflow-registry.json (Local Schema)
+        if: hashFiles('.roadmap/workflow-registry.json') != ''
+        run: |
+          ajv validate \
+            -s .roadmap/schemas/workflow-registry.schema.json \
+            -d .roadmap/workflow-registry.json \
+            --all-errors \
+            --strict=false
+          echo "✅ workflow-registry.json - Schema valid (local)" >> $GITHUB_STEP_SUMMARY
+
+      # ENTERPRISE FIX (2026-01-30): Removed --spec=draft2020 flag
+      # All local schemas converted to draft-07 per PR #2328
+      # ajv-cli defaults to draft-07 when no --spec flag is provided
+      - name: Validate metrics-pipeline.json (Local Schema)
+        if: hashFiles('.roadmap/metrics-pipeline.json') != ''
+        run: |
+          ajv validate \
+            -s .roadmap/schemas/metrics-pipeline.schema.json \
+            -d .roadmap/metrics-pipeline.json \
+            --all-errors \
+            --strict=false
+          echo "✅ metrics-pipeline.json - Schema valid (local)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Validate schema-index.json (Meta-Schema)
+        if: hashFiles('.roadmap/schemas/schema-index.json') != ''
+        run: |
+          # Validates that schema-index.json is well-formed JSON with expected structure
+          python3 -c "
+          import json
+          with open('.roadmap/schemas/schema-index.json') as f:
+              data = json.load(f)
+              assert 'categories' in data, 'Missing categories'
+              assert 'totalSchemas' in data, 'Missing totalSchemas'
+              print(f'schema-index.json - {data[\"totalSchemas\"]} schemas indexed')
+          "
+          echo "✅ schema-index.json validated" >> $GITHUB_STEP_SUMMARY
+
+      # NOTE: evidence-session.json validation skipped
+      # Ectropy uses apps/mcp-server/data/evidence/ for evidence tracking
+      # per decisions d-2025-11-15-evidence-automation and d-2025-11-15-evidence-json-structure
+      # This is more granular than template's single-file approach
+
+      - name: Validate Domain Schemas (Meta-Validation)
+        run: |
+          echo "### Domain Schema Meta-Validation" >> $GITHUB_STEP_SUMMARY
+          SCHEMA_COUNT=0
+          VALID_COUNT=0
+          FAILED_SCHEMAS=""
+
+          # Validate top-level schemas (workflow-registry, metrics-pipeline, etc.)
+          # ENTERPRISE FIX (2026-01-30): All local schemas use draft-07 per PR #2328
+          # ENTERPRISE FIX (2026-01-30): Add --strict=false to allow standard formats (date-time, date, uri)
+          for schema in .roadmap/schemas/*.json; do
+            if [ -f "$schema" ] && [[ "$schema" == *.schema.json ]]; then
+              SCHEMA_COUNT=$((SCHEMA_COUNT + 1))
+              filename=$(basename "$schema")
+              if ajv compile -s "$schema" --spec=draft7 --strict=false 2>/dev/null; then
+                VALID_COUNT=$((VALID_COUNT + 1))
+                echo "✅ $filename - Valid JSON Schema" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "❌ $filename - Invalid JSON Schema" >> $GITHUB_STEP_SUMMARY
+                FAILED_SCHEMAS="$FAILED_SCHEMAS $filename"
+              fi
+            fi
+          done
+
+          # Validate domain subdirectory schemas
+          # Skip schema-index.json which is not a schema file
+          for schema in .roadmap/schemas/**/*.json; do
+            if [ -f "$schema" ] && [[ "$schema" == *.schema.json ]]; then
+              SCHEMA_COUNT=$((SCHEMA_COUNT + 1))
+              filename=$(basename "$schema")
+              if ajv compile -s "$schema" --spec=draft7 --strict=false 2>/dev/null; then
+                VALID_COUNT=$((VALID_COUNT + 1))
+                echo "✅ $filename - Valid JSON Schema" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "❌ $filename - Invalid JSON Schema" >> $GITHUB_STEP_SUMMARY
+                FAILED_SCHEMAS="$FAILED_SCHEMAS $filename"
+              fi
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Domain Schemas Validated:** $VALID_COUNT / $SCHEMA_COUNT" >> $GITHUB_STEP_SUMMARY
+
+          # Fail if any schemas are invalid
+          if [ -n "$FAILED_SCHEMAS" ]; then
+            echo "❌ Failed schemas:$FAILED_SCHEMAS" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: Create Validation Summary
+        if: success()
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ All V3 Schema Validations Passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "**Schema Source:** luh-tech/luh-tech-roadmap-template" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Files validated:" >> $GITHUB_STEP_SUMMARY
+          ls -la .roadmap/*.json | awk '{print "- " $NF}' >> $GITHUB_STEP_SUMMARY
+
+      - name: Create Failure Summary
+        if: failure()
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ❌ V3 Schema Validation Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Please check workflow logs for detailed validation errors." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Common fixes:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Ensure \$schema field references correct schema URL" >> $GITHUB_STEP_SUMMARY
+          echo "- Check for missing required fields" >> $GITHUB_STEP_SUMMARY
+          echo "- Validate date formats (ISO 8601)" >> $GITHUB_STEP_SUMMARY
+          echo "- Ensure enum values match allowed options" >> $GITHUB_STEP_SUMMARY

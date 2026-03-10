@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020", "ES2017"],
+    "declaration": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "skipLibCheck": false,
+    "noEmitOnError": true,
+    "sourceMap": true,
+    "paths": {
+      "@ectropy/ifc-processing": ["../../libs/ifc-processing/src"],
+      "@ectropy/speckle-integration": ["../../libs/speckle-integration/src"],
+      "@ectropy/database": ["../../libs/database/src"],
+      "@ectropy/shared": ["../../libs/shared/src"]
+    }
+  },
+  "include": ["src/**/*", "*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -1,0 +1,207 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ectropy-postgres-test
+    env_file:
+      - .env.ci
+    environment:
+      # ENTERPRISE: NO hardcoded defaults - ALL values from environment
+      # CI must explicitly set DATABASE_PASSWORD, DATABASE_NAME, DATABASE_USER
+      # Anti-pattern removed: test_password_for_ci_only, ectropy_test
+      POSTGRES_DB: ${DATABASE_NAME:?DATABASE_NAME required}
+      POSTGRES_USER: ${DATABASE_USER:?DATABASE_USER required}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD required}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DATABASE_USER:-postgres}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ectropy-redis-test
+    env_file:
+      - .env.ci
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_test_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  web-dashboard:
+    image: ectropy-web-dashboard-test:latest
+    build:
+      context: .
+      dockerfile: apps/web-dashboard/Dockerfile
+    container_name: ectropy-web-dashboard-test
+    env_file:
+      - .env.ci
+    ports:
+      - '3000:3002'
+    environment:
+      - NODE_ENV=test
+      - PORT=3002
+      # ENTERPRISE: NO hardcoded localhost URLs - use environment variables
+      # These should come from workflow env vars or .env.ci
+      - REACT_APP_API_URL=${REACT_APP_API_URL:?REACT_APP_API_URL required}
+      - REACT_APP_MCP_URL=${REACT_APP_MCP_URL:?REACT_APP_MCP_URL required}
+    # ENTERPRISE P0 FIX (2025-12-22): Add proper dependency chain
+    # Web dashboard makes API calls during initialization
+    # Wait for api-gateway to be healthy before starting
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    # ENTERPRISE P0 FIX (2025-12-22): Optimized health checks for faster startup
+    # Static React app starts quickly, doesn't need excessive retry period
+    # OLD: 30s start + 12×10s = 150s max | NEW: 15s start + 5×10s = 65s max (57% faster)
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3002/']
+      interval: 10s # Reasonable check frequency
+      timeout: 5s # Keep timeout short for static content
+      retries: 5 # Reduced from 12 (static app starts fast)
+      start_period: 15s # Reduced from 30s (profiled actual startup: ~10s)
+    restart: unless-stopped
+
+  api-gateway:
+    image: ectropy-api-gateway-test:latest
+    build:
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
+    container_name: ectropy-api-gateway-test
+    env_file:
+      - .env.ci
+    ports:
+      - '4000:4000'
+    environment:
+      - NODE_ENV=test
+      - PORT=4000
+      - API_PORT=4000
+      # ENTERPRISE: Database configuration - NO hardcoded defaults
+      # Service names can have defaults (postgres, redis) as they're internal Docker network names
+      # Ports can have defaults as they're standard service ports
+      # BUT credentials and database names MUST come from environment
+      - DATABASE_HOST=${DATABASE_HOST:-postgres}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - DATABASE_NAME=${DATABASE_NAME:?DATABASE_NAME required}
+      - DATABASE_USER=${DATABASE_USER:?DATABASE_USER required}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:?DATABASE_PASSWORD required}
+      - DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${DATABASE_NAME}
+      # Redis configuration
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_URL=redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
+      # ENTERPRISE: Authentication secrets - NO hardcoded defaults
+      # Security-sensitive secrets MUST come from GitHub Secrets or environment
+      # Anti-pattern removed: test-jwt-secret-key-for-ci-testing and similar
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET required}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET required}
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET required}
+      - TRUST_PROXY=false
+      - COOKIE_SECURE=false
+      # ENTERPRISE: OAuth Configuration - NO hardcoded defaults
+      # OAuth credentials and URLs MUST come from environment (staging-specific secrets)
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID required}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET required}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:?GOOGLE_CALLBACK_URL required}
+      # Test Credentials (for automated E2E tests)
+      - TEST_GOOGLE_EMAIL=${TEST_GOOGLE_EMAIL}
+      - TEST_GOOGLE_PASSWORD=${TEST_GOOGLE_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # ENTERPRISE P0 FIX (2025-12-22): Optimized health checks for faster startup
+    # NestJS + Prisma cold start profiled at ~25-30s, doesn't need 210s max
+    # OLD: 60s start + 15×10s = 210s max | NEW: 30s start + 6×10s = 90s max (60% faster)
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:4000/health']
+      interval: 10s
+      timeout: 10s
+      retries: 6 # Reduced from 15 (profiled startup: 25-30s)
+      start_period: 30s # Reduced from 60s (actual cold start is ~25-30s)
+    # Fail fast on config errors (max 3 restart attempts)
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0' # Increased from 1.0 for faster Prisma generation and NestJS startup
+          memory: 2G # Increased from 1G for build processes
+        reservations:
+          cpus: '1.0' # Increased from 0.5
+          memory: 1G # Increased from 512M
+
+  mcp-server:
+    image: ectropy-mcp-server-test:latest
+    build:
+      context: .
+      dockerfile: apps/mcp-server/Dockerfile
+    container_name: ectropy-mcp-server-test
+    env_file:
+      - .env.ci
+    ports:
+      - '3001:3001'
+      - '3002:3002'
+    environment:
+      - NODE_ENV=test
+      - MCP_PORT=3001
+      - PORT=3001
+      # ENTERPRISE: Database configuration - NO hardcoded defaults
+      # Service names can have defaults (postgres, redis) as they're internal Docker network names
+      # Ports can have defaults as they're standard service ports
+      # BUT credentials and database names MUST come from environment
+      - DATABASE_HOST=${DATABASE_HOST:-postgres}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - DATABASE_NAME=${DATABASE_NAME:?DATABASE_NAME required}
+      - DATABASE_USER=${DATABASE_USER:?DATABASE_USER required}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:?DATABASE_PASSWORD required}
+      - DATABASE_URL=postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${DATABASE_NAME}
+      # Redis configuration - CRITICAL for Docker network connectivity
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_URL=redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
+      # ENTERPRISE: OAuth Configuration - NO hardcoded defaults
+      # Security-sensitive secrets MUST come from GitHub Secrets or environment
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID required}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET required}
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # ENTERPRISE P0 FIX (2025-12-22): Optimized health checks for faster startup
+    # Express + Prisma cold start profiled at ~20-25s, doesn't need 210s max
+    # OLD: 60s start + 15×10s = 210s max | NEW: 30s start + 6×10s = 90s max (60% faster)
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3001/health']
+      interval: 10s
+      timeout: 10s
+      retries: 6 # Reduced from 15 (profiled startup: 20-25s)
+      start_period: 30s # Reduced from 60s (actual cold start is ~20-25s)
+    # Fail fast on config errors (max 3 restart attempts)
+    restart: on-failure:3
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0' # MCP needs more resources
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+
+volumes:
+  postgres_test_data:
+  redis_test_data:

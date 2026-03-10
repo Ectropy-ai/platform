@@ -1,0 +1,170 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:closeout",
+  "title": "Project Closeout Schema",
+  "description": "Project closeout workflow tracking from pre-substantial through final completion",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "closeoutId",
+    "projectRef",
+    "status",
+    "phases",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:closeout:CLO-[0-9]{4}-[0-9]{4}$"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:closeout"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "closeoutId": {
+      "type": "string",
+      "pattern": "^CLO-[0-9]{4}-[0-9]{4}$"
+    },
+    "projectRef": { "$ref": "#/$defs/urn" },
+    "contractRef": { "$ref": "#/$defs/urn" },
+    "status": {
+      "type": "string",
+      "enum": [
+        "NOT_STARTED",
+        "PRE_SUBSTANTIAL",
+        "SUBSTANTIAL_COMPLETE",
+        "PUNCH_LIST_ACTIVE",
+        "PUNCH_LIST_COMPLETE",
+        "FINAL_ACCOUNTING",
+        "FINAL_COMPLETE",
+        "WARRANTY_PERIOD"
+      ]
+    },
+    "phases": {
+      "type": "object",
+      "properties": {
+        "preSubstantial": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["NOT_STARTED", "IN_PROGRESS", "COMPLETE"]
+            },
+            "startedAt": { "type": "string", "format": "date-time" },
+            "completedAt": { "type": "string", "format": "date-time" },
+            "commissioning": {
+              "type": "object",
+              "properties": {
+                "systemsTotal": { "type": "integer" },
+                "systemsPassed": { "type": "integer" },
+                "systemsFailed": { "type": "integer" },
+                "systemsPending": { "type": "integer" }
+              }
+            },
+            "documentationComplete": { "type": "boolean" },
+            "trainingComplete": { "type": "boolean" }
+          }
+        },
+        "substantialCompletion": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "NOT_STARTED",
+                "WALKTHROUGH_SCHEDULED",
+                "WALKTHROUGH_COMPLETE",
+                "CERTIFICATE_ISSUED"
+              ]
+            },
+            "walkthroughDate": { "type": "string", "format": "date-time" },
+            "certificateRef": { "$ref": "#/$defs/urn" },
+            "certificateDate": { "type": "string", "format": "date" }
+          }
+        },
+        "punchList": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["NOT_STARTED", "IN_PROGRESS", "COMPLETE"]
+            },
+            "totalItems": { "type": "integer" },
+            "completedItems": { "type": "integer" },
+            "completionDeadline": { "type": "string", "format": "date" }
+          }
+        },
+        "finalAccounting": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "NOT_STARTED",
+                "IN_PROGRESS",
+                "PENDING_APPROVAL",
+                "APPROVED"
+              ]
+            },
+            "savingsDistributionRef": { "$ref": "#/$defs/urn" }
+          }
+        },
+        "finalCompletion": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["NOT_STARTED", "DOCUMENTS_SUBMITTED", "COMPLETE"]
+            },
+            "completedAt": { "type": "string", "format": "date-time" },
+            "warrantyStartDate": { "type": "string", "format": "date" }
+          }
+        }
+      }
+    },
+    "documentation": {
+      "type": "object",
+      "properties": {
+        "asBuiltDrawings": { "type": "boolean" },
+        "oAndMManuals": { "type": "boolean" },
+        "warrantyDocuments": { "type": "boolean" },
+        "commissioningReports": { "type": "boolean" },
+        "lienReleases": { "type": "boolean" },
+        "certificateOfOccupancy": { "type": "boolean" }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    }
+  }
+}

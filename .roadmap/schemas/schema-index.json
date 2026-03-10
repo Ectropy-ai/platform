@@ -1,0 +1,449 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:meta:schema-index",
+  "title": "Ectropy Schema Library Index",
+  "description": "Comprehensive catalog of all JSON Schema files in the Ectropy roadmap architecture, organized by service layer and functional domain",
+  "version": "1.1.0",
+  "lastUpdated": "2026-02-13",
+  "totalSchemas": 51,
+  "metadata": {
+    "format": "JSON Schema Draft 7",
+    "urnPattern": "urn:luhtech:ectropy:schema:{category}:{name}",
+    "requiredFields": ["$schema", "$id", "title", "description", "type"],
+    "versioningStrategy": "V3 schemas denoted with -v3 suffix",
+    "migrationPath": "V2 → V3 with backward compatibility via version field"
+  },
+  "categories": [
+    {
+      "id": "gaas",
+      "name": "Authority & Governance (GAaS)",
+      "description": "Governance-as-a-Service layer for authority, compliance, and decision hierarchy",
+      "schemas": [
+        {
+          "path": "authority/authority-level.schema.json",
+          "description": "Authority level definitions",
+          "status": "stable"
+        },
+        {
+          "path": "gaas/compliance-charter.schema.json",
+          "description": "Contract-level compliance requirements",
+          "status": "new"
+        },
+        {
+          "path": "gaas/authority-tier.schema.json",
+          "description": "7-tier authority decision hierarchy",
+          "status": "new"
+        }
+      ]
+    },
+    {
+      "id": "contract",
+      "name": "Contract Management",
+      "description": "Contract lifecycle management and party coordination",
+      "schemas": [
+        {
+          "path": "contract/contract.schema.json",
+          "description": "Primary contract schema",
+          "status": "stable"
+        },
+        {
+          "path": "contract/contract-party.schema.json",
+          "description": "Contract participants",
+          "status": "stable"
+        },
+        {
+          "path": "contract/contract-template.schema.json",
+          "description": "Reusable contract templates",
+          "status": "stable"
+        }
+      ]
+    },
+    {
+      "id": "daas",
+      "name": "Decision Lifecycle (DaaS)",
+      "description": "Decisions-as-a-Service layer for immutable decision records and consequences",
+      "schemas": [
+        {
+          "path": "decision/decision.schema.json",
+          "description": "Immutable decision records",
+          "status": "stable"
+        },
+        {
+          "path": "decision/pm-decision.schema.json",
+          "description": "Project Manager decision specialization",
+          "status": "stable"
+        },
+        {
+          "path": "consequence/consequence.schema.json",
+          "description": "Decision consequences",
+          "status": "stable"
+        },
+        {
+          "path": "consequence/consequence-v3.schema.json",
+          "description": "V3 consequence schema",
+          "status": "stable"
+        }
+      ]
+    },
+    {
+      "id": "vaas",
+      "name": "Voxel & Spatial (VaaS)",
+      "description": "Voxels-as-a-Service layer for spatial grid and location-based operations",
+      "schemas": [
+        {
+          "path": "voxel/voxel.schema.json",
+          "description": "Spatial voxel grid",
+          "status": "stable"
+        },
+        {
+          "path": "voxel/voxel-v3.schema.json",
+          "description": "V3 voxel schema",
+          "status": "stable"
+        }
+      ]
+    },
+    {
+      "id": "caas",
+      "name": "Coordination (CaaS)",
+      "description": "Coordination-as-a-Service layer for Takt planning and schedule management",
+      "schemas": [
+        {
+          "path": "caas/takt-zone.schema.json",
+          "description": "Takt planning zones",
+          "status": "new"
+        },
+        {
+          "path": "caas/takt-wagon.schema.json",
+          "description": "Takt work trains",
+          "status": "new"
+        },
+        {
+          "path": "schedule/schedule-proposal.schema.json",
+          "description": "Schedule proposals",
+          "status": "stable"
+        },
+        {
+          "path": "schedule/schedule-proposal-v3.schema.json",
+          "description": "V3 schedule schema",
+          "status": "stable"
+        }
+      ]
+    },
+    {
+      "id": "paas",
+      "name": "Payment (PaaS)",
+      "description": "Payment-as-a-Service layer for AIA G702/G703 payment applications",
+      "schemas": [
+        {
+          "path": "paas/pay-application.schema.json",
+          "description": "AIA G702/G703 payment applications",
+          "status": "new"
+        }
+      ]
+    },
+    {
+      "id": "usf",
+      "name": "Universal Service Factors (USF)",
+      "description": "Universal service factor tracking for Quality/Cost/Speed metrics and work packet attribution",
+      "schemas": [
+        {
+          "path": "usf/usf-profile.schema.json",
+          "description": "Provider USF profile with Quality/Cost/Speed metrics",
+          "status": "new"
+        },
+        {
+          "path": "usf/usf-work-packet.schema.json",
+          "description": "Work packet USF tracking and attribution",
+          "status": "new"
+        }
+      ]
+    },
+    {
+      "id": "maas",
+      "name": "Materials & Carbon (MaaS)",
+      "description": "Materials-as-a-Service layer with carbon offset tracking and EPD caching",
+      "schemas": [
+        {
+          "path": "maas/material-supplier.schema.json",
+          "description": "Material suppliers including carbon credits",
+          "status": "new"
+        },
+        {
+          "path": "carbon/carbon-offset.schema.json",
+          "description": "Carbon offset purchases with voxel attribution",
+          "status": "new"
+        },
+        {
+          "path": "carbon/epd-cache.schema.json",
+          "description": "EPD data cache from EC3/2050 Materials",
+          "status": "new"
+        }
+      ]
+    },
+    {
+      "id": "siltana",
+      "name": "Building Operations (Siltana)",
+      "description": "Siltana platform for robot and equipment registry (RaaS/HaaS)",
+      "schemas": [
+        {
+          "path": "siltana/robot.schema.json",
+          "description": "Robot and equipment registry (RaaS/HaaS)",
+          "status": "new"
+        }
+      ]
+    },
+    {
+      "id": "foundation",
+      "name": "Foundation Layer (Shared Infrastructure)",
+      "description": "Shared infrastructure layer for sensor plans and commissioning systems",
+      "schemas": [
+        {
+          "path": "foundation/sensor-plan.schema.json",
+          "description": "IoT sensor deployment plans",
+          "status": "new"
+        },
+        {
+          "path": "commissioning/commissioning-system.schema.json",
+          "description": "Commissioning systems",
+          "status": "stable"
+        },
+        {
+          "path": "commissioning/cx-issue.schema.json",
+          "description": "Commissioning issues",
+          "status": "stable"
+        },
+        {
+          "path": "commissioning/functional-test.schema.json",
+          "description": "Functional test records",
+          "status": "stable"
+        }
+      ]
+    },
+    {
+      "id": "efas",
+      "name": "Forecasting & Analysis (EFAS)",
+      "description": "Ectropy Forecasting & Analysis Service with physics-informed eigenmode decomposition",
+      "schemas": [
+        {
+          "path": "efas/eigenmode-forecast.schema.json",
+          "description": "Physics-informed forecasts with eigenmode decomposition",
+          "status": "new"
+        }
+      ]
+    },
+    {
+      "id": "ros-mro",
+      "name": "ROS MRO Coordination (VaaS)",
+      "description": "Remote Operations Site - Maintenance, Repair, Operations coordination view with voxel decision surfaces",
+      "schemas": [
+        {
+          "path": "ros-mro/coordination-view.schema.json",
+          "description": "Core ROS MRO data structures (VoxelData, VoxelAggregation, ActivityItem)",
+          "status": "stable"
+        },
+        {
+          "path": "ros-mro/voxel-stream.schema.json",
+          "description": "WebSocket message formats for real-time voxel updates",
+          "status": "new"
+        },
+        {
+          "path": "ros-mro/voxel-filter.schema.json",
+          "description": "Query parameter definitions for voxel filtering",
+          "status": "new"
+        }
+      ]
+    },
+    {
+      "id": "dashboard",
+      "name": "Dashboard Data Layer",
+      "description": "Dashboard widget and data layer schemas",
+      "schemas": [
+        {
+          "path": "dashboard/dashboard-data-layer.schema.json",
+          "description": "Dashboard data layer configuration",
+          "status": "stable"
+        }
+      ]
+    },
+    {
+      "id": "eil",
+      "name": "EIL/SEPPA (AI Intelligence Layer)",
+      "description": "Ectropy Intelligence Layer and SEPPA for AI assistant conversations and RAG context",
+      "schemas": [
+        {
+          "path": "eil/assistant-conversation.schema.json",
+          "description": "AI assistant conversations",
+          "status": "stable"
+        },
+        {
+          "path": "eil/assistant-message.schema.json",
+          "description": "Individual assistant messages",
+          "status": "stable"
+        },
+        {
+          "path": "eil/phone-agent-config.schema.json",
+          "description": "Phone agent configuration",
+          "status": "stable"
+        },
+        {
+          "path": "eil/rag-context.schema.json",
+          "description": "RAG context windows",
+          "status": "stable"
+        },
+        {
+          "path": "eil/sms-conversation.schema.json",
+          "description": "SMS conversations",
+          "status": "stable"
+        },
+        {
+          "path": "eil/sms-message.schema.json",
+          "description": "SMS messages",
+          "status": "stable"
+        }
+      ]
+    },
+    {
+      "id": "closeout",
+      "name": "Closeout & Turnover",
+      "description": "Project closeout, punch lists, warranties, and building lifecycle history",
+      "schemas": [
+        {
+          "path": "closeout/closeout.schema.json",
+          "description": "Project closeout",
+          "status": "stable"
+        },
+        {
+          "path": "closeout/g704-certificate.schema.json",
+          "description": "AIA G704 certificates",
+          "status": "stable"
+        },
+        {
+          "path": "closeout/punch-item.schema.json",
+          "description": "Punch list items",
+          "status": "stable"
+        },
+        {
+          "path": "warranty/warranty.schema.json",
+          "description": "Warranty tracking",
+          "status": "stable"
+        },
+        {
+          "path": "warranty/warranty-claim.schema.json",
+          "description": "Warranty claims",
+          "status": "stable"
+        },
+        {
+          "path": "warranty/building-history.schema.json",
+          "description": "Building lifecycle history",
+          "status": "stable"
+        }
+      ]
+    },
+    {
+      "id": "inspection",
+      "name": "Inspections",
+      "description": "Inspection records and tracking",
+      "schemas": [
+        {
+          "path": "inspection/inspection.schema.json",
+          "description": "Inspection records",
+          "status": "stable"
+        }
+      ]
+    },
+    {
+      "id": "ipd",
+      "name": "IPD (Integrated Project Delivery)",
+      "description": "Integrated Project Delivery with savings distribution, target cost, and voting",
+      "schemas": [
+        {
+          "path": "ipd/savings-distribution.schema.json",
+          "description": "Savings pool distribution",
+          "status": "stable"
+        },
+        {
+          "path": "ipd/target-cost.schema.json",
+          "description": "Target cost tracking",
+          "status": "stable"
+        },
+        {
+          "path": "ipd/voting-session.schema.json",
+          "description": "IPD voting sessions",
+          "status": "stable"
+        }
+      ]
+    },
+    {
+      "id": "ops",
+      "name": "Operations & Monitoring",
+      "description": "CI/CD operations, metrics collection, and workflow management schemas",
+      "schemas": [
+        {
+          "path": "workflow-registry.schema.json",
+          "description": "GitHub Actions workflow registry and categorization",
+          "status": "stable"
+        },
+        {
+          "path": "metrics-pipeline.schema.json",
+          "description": "Metrics collection pipeline with failure handling and multi-destination reporting",
+          "status": "new"
+        }
+      ]
+    },
+    {
+      "id": "seed",
+      "name": "Database Seeding (Seed Orchestration)",
+      "description": "Unified database seeding orchestration and validation schemas for staging compliance",
+      "schemas": [
+        {
+          "path": "seed/seed-orchestrator.schema.json",
+          "description": "Orchestrator configuration for phased database seeding with idempotent patterns and GitOps integration",
+          "status": "new"
+        },
+        {
+          "path": "seed/seed-validation.schema.json",
+          "description": "Validation criteria for seed data integrity with 9 validation types (record count, tenant isolation, idempotency)",
+          "status": "new"
+        }
+      ]
+    }
+  ],
+  "urnExamples": [
+    "urn:luhtech:ectropy:schema:gaas:compliance-charter",
+    "urn:luhtech:ectropy:schema:caas:takt-zone",
+    "urn:luhtech:ectropy:schema:carbon:carbon-offset",
+    "urn:luhtech:project-alpha:usf-profile:USF-CREW-ELEC-001",
+    "urn:luhtech:project-alpha:usf-work-packet:WP-2026-0042"
+  ],
+  "repositorySplit": {
+    "openCore": {
+      "repository": "luhtech/Ectropy",
+      "categories": [
+        "Decision",
+        "Voxel",
+        "EIL/SEPPA",
+        "Foundation",
+        "Carbon",
+        "MaaS",
+        "DaaS",
+        "VaaS",
+        "USF"
+      ]
+    },
+    "commercial": {
+      "repository": "luhtech/Ectropy-Business",
+      "categories": ["GaaS", "CaaS", "PaaS", "Siltana (USF integrations)"]
+    }
+  },
+  "relatedDocumentation": {
+    "portAllocation": ".roadmap/PORT_ALLOCATION.md",
+    "infrastructureCatalog": ".roadmap/infrastructure-catalog.json",
+    "roadmap": ".roadmap/roadmap.json",
+    "graphSchema": ".roadmap/schemas/graph.schema.json"
+  },
+  "notes": {
+    "mdSizeThreshold": "500KB",
+    "pattern": "Agent-first repository design: JSON for structured data, READMEs (<500KB) only in code folders for brief human notes",
+    "philosophy": "Enterprise Excellence. Schema-First. No Shortcuts."
+  }
+}

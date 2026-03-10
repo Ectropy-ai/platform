@@ -1,0 +1,18 @@
+demo-environment/**/*
+scripts/
+!scripts/src/
+node_modules/
+dist/
+build/
+coverage/
+*.log
+*.sql
+**/*.sql
+
+# Test files (ESLint parser config issues with Jest/TypeScript)
+**/__tests__/**
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/setupTests.ts

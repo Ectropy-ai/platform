@@ -1,0 +1,10 @@
+{
+  "root": true,
+  "ignorePatterns": [
+    "**/*.sql",
+    "demo-environment/**/*",
+    "demo-environment/**/*.sql",
+    "scripts/**/*.cjs",
+    "scripts/**/*.js"
+  ]
+}

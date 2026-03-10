@@ -1,0 +1,422 @@
+// Shared Trials Database Schema
+// Database: ectropy_shared_trials (shared multi-tenant with RLS)
+// Purpose: Cost-effective trial tenant data with row-level security isolation
+// Tenant Scoping: All models include tenant_id for RLS-based isolation
+// ============================================================================
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../node_modules/@prisma/client-shared"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("SHARED_DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum TenantStatus {
+  TRIAL // 30-day trial period
+  ACTIVE // Active paid subscription
+  SUSPENDED // Payment issues or violations
+  EXPIRED // Trial expired, pending deletion
+  ARCHIVED // Retained for compliance
+
+  @@map("tenant_status")
+}
+
+enum SubscriptionTier {
+  FREE // Trial tier - 1 project, 5 users
+  BASIC // Small teams - 5 projects
+  PROFESSIONAL // Growing teams - 25 projects
+  ENTERPRISE // Unlimited (migrated to dedicated DB)
+
+  @@map("subscription_tier")
+}
+
+enum UserRole {
+  OWNER // Full access, billing
+  ADMIN // Full project access
+  MEMBER // Standard access
+  VIEWER // Read-only access
+  GUEST // Limited access
+
+  @@map("user_role")
+}
+
+enum ProjectStatus {
+  DRAFT // Initial setup
+  ACTIVE // In progress
+  ON_HOLD // Temporarily paused
+  COMPLETED // Finished
+  ARCHIVED // Retained for records
+
+  @@map("project_status")
+}
+
+// ============================================================================
+// TENANT MODEL
+// ============================================================================
+// Central tenant organization model
+// RLS: No tenant_id (this IS the tenant)
+
+model Tenant {
+  id               String           @id @default(uuid()) @db.Uuid
+  slug             String           @unique @db.VarChar(100)
+  name             String           @db.VarChar(255)
+  status           TenantStatus     @default(TRIAL)
+  subscriptionTier SubscriptionTier @default(FREE) @map("subscription_tier")
+
+  // Contact
+  primaryEmail String? @map("primary_email") @db.VarChar(255)
+  billingEmail String? @map("billing_email") @db.VarChar(255)
+  phone        String? @db.VarChar(50)
+
+  // Limits (enforced by tier)
+  maxProjects  Int @default(1) @map("max_projects")
+  maxUsers     Int @default(5) @map("max_users")
+  maxStorageGb Int @default(1) @map("max_storage_gb")
+
+  // Billing
+  stripeCustomerId String? @map("stripe_customer_id") @db.VarChar(100)
+
+  // Trial management
+  trialEndsAt DateTime? @map("trial_ends_at") @db.Timestamptz(6)
+  expiredAt   DateTime? @map("expired_at") @db.Timestamptz(6)
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  users      User[]
+  projects   Project[]
+  portfolios UserPortfolio[]
+  auditLogs  AuditLog[]
+
+  @@index([slug])
+  @@index([status])
+  @@map("tenants")
+}
+
+// ============================================================================
+// USER MODEL
+// ============================================================================
+// Trial users - linked to platform OAuth users
+// RLS: Has tenant_id for isolation
+
+model User {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @map("tenant_id") @db.Uuid
+  email    String  @db.VarChar(255)
+  fullName String? @map("full_name") @db.VarChar(255)
+
+  // OAuth identity (references platform database users table)
+  platformUserId String @map("platform_user_id") @db.Uuid
+
+  // Tenant-specific role
+  role UserRole @default(MEMBER)
+
+  // Status
+  isActive Boolean @default(true) @map("is_active")
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projects   ProjectRole[]
+  portfolios UserPortfolio[]
+  auditLogs  AuditLog[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([platformUserId])
+  @@map("users")
+}
+
+// ============================================================================
+// PROJECT MODEL
+// ============================================================================
+// Trial projects - copied from model catalog or created fresh
+// RLS: Has tenant_id for isolation
+
+model Project {
+  id       String        @id @default(uuid()) @db.Uuid
+  tenantId String        @map("tenant_id") @db.Uuid
+  name     String        @db.VarChar(255)
+  status   ProjectStatus @default(DRAFT)
+
+  // Model catalog reference (if copied from catalog)
+  catalogBuildingType String? @map("catalog_building_type") @db.VarChar(100)
+
+  // Speckle integration
+  speckleStreamId String? @map("speckle_stream_id") @db.VarChar(255)
+  speckleCommitId String? @map("speckle_commit_id") @db.VarChar(255)
+
+  // Project details
+  description      String?   @db.Text
+  location         String?   @db.VarChar(500)
+  estimatedBudget  Decimal?  @map("estimated_budget") @db.Decimal(15, 2)
+  targetCompletion DateTime? @map("target_completion") @db.Timestamptz(6)
+
+  // Metadata
+  metadata Json? @db.JsonB
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  tenant               Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  roles                ProjectRole[]
+  portfolios           UserPortfolio[]
+  speckleStreams       SpeckleStream[]
+  constructionElements ConstructionElement[]
+  budgetItems          BudgetItem[]
+  rfis                 Rfi[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([catalogBuildingType])
+  @@map("projects")
+}
+
+// ============================================================================
+// USER PORTFOLIO MODEL
+// ============================================================================
+// User's "My Projects" that persist between logins
+// RLS: Has tenant_id for isolation
+
+model UserPortfolio {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  // Portfolio metadata
+  portfolioType String?  @map("portfolio_type") @db.VarChar(50) // 'demo', 'custom', 'imported'
+  isPinned      Boolean  @default(false) @map("is_pinned")
+  addedAt       DateTime @default(now()) @map("added_at") @db.Timestamptz(6)
+
+  // Relations
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, projectId])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([projectId])
+  @@map("user_portfolios")
+}
+
+// ============================================================================
+// PROJECT ROLE MODEL
+// ============================================================================
+// User permissions on specific projects
+// RLS: Has tenant_id for isolation
+
+model ProjectRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  role      UserRole
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([userId])
+  @@map("project_roles")
+}
+
+// ============================================================================
+// SPECKLE STREAM MODEL
+// ============================================================================
+// Speckle BIM integration
+// RLS: Has tenant_id for isolation
+
+model SpeckleStream {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  // Speckle server details
+  streamId   String  @map("stream_id") @db.VarChar(255)
+  streamName String  @map("stream_name") @db.VarChar(255)
+  commitId   String? @map("commit_id") @db.VarChar(255)
+  branchName String  @default("main") @map("branch_name") @db.VarChar(100)
+  serverUrl  String  @map("server_url") @db.VarChar(500)
+
+  // Metadata
+  objectCount Int?      @map("object_count")
+  lastSync    DateTime? @map("last_sync") @db.Timestamptz(6)
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, streamId])
+  @@index([tenantId])
+  @@index([projectId])
+  @@map("speckle_streams")
+}
+
+// ============================================================================
+// CONSTRUCTION ELEMENT MODEL
+// ============================================================================
+// BIM elements extracted from Speckle
+// RLS: Has tenant_id for isolation
+
+model ConstructionElement {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  // Element identification
+  elementId   String  @map("element_id") @db.VarChar(255)
+  elementType String  @map("element_type") @db.VarChar(100)
+  name        String? @db.VarChar(255)
+
+  // Properties
+  properties Json? @db.JsonB
+  geometry   Json? @db.JsonB
+
+  // Cost data
+  unitCost  Decimal? @map("unit_cost") @db.Decimal(12, 2)
+  quantity  Decimal? @db.Decimal(12, 4)
+  totalCost Decimal? @map("total_cost") @db.Decimal(15, 2)
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, elementId])
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([elementType])
+  @@map("construction_elements")
+}
+
+// ============================================================================
+// BUDGET ITEM MODEL
+// ============================================================================
+// Cost tracking and budgeting
+// RLS: Has tenant_id for isolation
+
+model BudgetItem {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  // Item details
+  category      String   @db.VarChar(100)
+  description   String   @db.VarChar(500)
+  estimatedCost Decimal  @map("estimated_cost") @db.Decimal(15, 2)
+  actualCost    Decimal? @map("actual_cost") @db.Decimal(15, 2)
+
+  // Tracking
+  isApproved Boolean   @default(false) @map("is_approved")
+  approvedAt DateTime? @map("approved_at") @db.Timestamptz(6)
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([category])
+  @@map("budget_items")
+}
+
+// ============================================================================
+// RFI MODEL
+// ============================================================================
+// Requests for Information
+// RLS: Has tenant_id for isolation
+
+model Rfi {
+  id        String @id @default(uuid()) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  // RFI details
+  title       String @db.VarChar(255)
+  description String @db.Text
+  status      String @db.VarChar(50)
+
+  // Assignment
+  assignedTo String? @map("assigned_to") @db.Uuid
+  priority   String  @default("medium") @db.VarChar(20)
+
+  // Tracking
+  dueDate    DateTime? @map("due_date") @db.Timestamptz(6)
+  resolvedAt DateTime? @map("resolved_at") @db.Timestamptz(6)
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([status])
+  @@map("rfis")
+}
+
+// ============================================================================
+// AUDIT LOG MODEL
+// ============================================================================
+// Compliance and security tracking
+// RLS: Has tenant_id for isolation
+
+model AuditLog {
+  id       String  @id @default(uuid()) @db.Uuid
+  tenantId String  @map("tenant_id") @db.Uuid
+  userId   String? @map("user_id") @db.Uuid
+
+  // Event details
+  action     String  @db.VarChar(100)
+  resource   String  @db.VarChar(100)
+  resourceId String? @map("resource_id") @db.Uuid
+  details    Json    @default("{}") @db.JsonB
+
+  // Request context
+  ipAddress String? @map("ip_address") @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.Text
+
+  // Timestamp
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

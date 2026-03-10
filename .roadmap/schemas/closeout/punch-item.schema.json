@@ -1,0 +1,161 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:punch-item",
+  "title": "Punch Item Schema",
+  "description": "Punch list item with spatial voxel attachment and trade assignment",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "punchItemId",
+    "projectRef",
+    "voxelRef",
+    "description",
+    "status",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:punch-item:PUN-[0-9]{4}-[0-9]{4}$"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:punch-item"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "punchItemId": {
+      "type": "string",
+      "pattern": "^PUN-[0-9]{4}-[0-9]{4}$"
+    },
+    "projectRef": { "$ref": "#/$defs/urn" },
+    "closeoutRef": { "$ref": "#/$defs/urn" },
+    "voxelRef": { "$ref": "#/$defs/urn" },
+    "description": { "type": "string" },
+    "category": {
+      "type": "string",
+      "enum": [
+        "INCOMPLETE_WORK",
+        "DEFECTIVE_WORK",
+        "DAMAGED",
+        "MISSING",
+        "NON_CONFORMING",
+        "FINISH_QUALITY",
+        "SAFETY",
+        "OTHER"
+      ]
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "OPEN",
+        "ASSIGNED",
+        "IN_PROGRESS",
+        "PENDING_VERIFICATION",
+        "VERIFIED",
+        "COMPLETE",
+        "REJECTED"
+      ]
+    },
+    "locationContext": {
+      "type": "object",
+      "properties": {
+        "building": { "type": "string" },
+        "level": { "type": "string" },
+        "room": { "type": "string" },
+        "gridReference": { "type": "string" },
+        "coordinates": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "z": { "type": "number" }
+          }
+        }
+      }
+    },
+    "assignment": {
+      "type": "object",
+      "properties": {
+        "trade": { "type": "string" },
+        "subcontractorRef": { "$ref": "#/$defs/urn" },
+        "assignedTo": { "type": "string" },
+        "assignedPhone": { "type": "string" },
+        "assignedAt": { "type": "string", "format": "date-time" },
+        "dueDate": { "type": "string", "format": "date" }
+      }
+    },
+    "notifications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["ASSIGNED", "REMINDER", "OVERDUE", "COMPLETED", "REJECTED"]
+          },
+          "channel": { "type": "string", "enum": ["SMS", "EMAIL", "PUSH"] },
+          "sentAt": { "type": "string", "format": "date-time" },
+          "response": { "type": "string" }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "identifiedPhoto": { "type": "string", "format": "uri" },
+        "completionPhoto": { "type": "string", "format": "uri" },
+        "identifiedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "properties": {
+        "verifiedBy": { "$ref": "#/$defs/urn" },
+        "verifiedAt": { "type": "string", "format": "date-time" },
+        "outcome": { "type": "string", "enum": ["ACCEPTED", "REJECTED"] },
+        "rejectionReason": { "type": "string" }
+      }
+    },
+    "relatedDecisionRef": {
+      "$ref": "#/$defs/urn",
+      "description": "If this punch item relates to a prior decision"
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    }
+  }
+}

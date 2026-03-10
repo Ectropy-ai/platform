@@ -1,0 +1,33 @@
+{
+  "name": "monitoring",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/monitoring/src",
+  "projectType": "library",
+  "tags": ["scope:infrastructure", "type:service"],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "libs/monitoring/dist",
+        "main": "libs/monitoring/src/index.ts",
+        "tsConfig": "libs/monitoring/tsconfig.lib.json",
+        "assets": ["libs/monitoring/*.md"]
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/monitoring/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --passWithNoTests libs/monitoring/src",
+        "cwd": "{workspaceRoot}"
+      }
+    }
+  }
+}

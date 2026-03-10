@@ -1,0 +1,749 @@
+{
+  "version": "1.0.0",
+  "environment": "production",
+  "runbookType": "validation",
+  "metadata": {
+    "catalogId": "validation-runbook-v1-0-0-smoke-tests",
+    "name": "Production Smoke Tests",
+    "type": "validation",
+    "purpose": "Comprehensive post-deployment validation suite that verifies critical functionality, availability, and performance of production systems at ectropy.ai",
+    "maintainer": "DevOps Team",
+    "author": "Claude (Enterprise Integration)",
+    "created": "2025-11-16T00:00:00Z",
+    "lastUpdated": "2025-11-16T00:00:00Z",
+    "estimatedDuration": "5 minutes",
+    "complexity": "low",
+    "priority": "critical",
+    "relatedDocuments": [
+      "scripts/deployment/smoke-tests-production.sh",
+      "infrastructure/nginx/production.conf",
+      "apps/api-gateway/src/main.ts",
+      "apps/web-dashboard/src/services/config.ts"
+    ],
+    "sourceFile": "scripts/deployment/smoke-tests-production.sh",
+    "conversionDate": "2025-11-16T00:00:00Z",
+    "schemaVersion": "1.0.0"
+  },
+  "executiveSummary": {
+    "description": "Production smoke test suite that validates critical functionality immediately after deployment to ectropy.ai. Verifies main site availability, API health endpoints, SSL/TLS certificates, response times, HTTP redirects, and API subdomain configuration.",
+    "status": "READY_FOR_PRODUCTION",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "LOW",
+    "keyChanges": [
+      "Main site HTTPS availability verification",
+      "API health endpoint validation with response parsing",
+      "API subdomain accessibility check (optional)",
+      "SSL/TLS certificate validity verification",
+      "Response time performance testing (< 3s threshold)",
+      "HTTP to HTTPS redirect validation",
+      "Production URL smoke testing"
+    ],
+    "prerequisites": [
+      "Production deployment completed",
+      "DNS records configured for ectropy.ai",
+      "SSL/TLS certificates installed",
+      "HTTPS configured on web server",
+      "API health endpoints enabled",
+      "curl and openssl available on test machine"
+    ],
+    "impact": {
+      "systems": [
+        "Production Web Application (ectropy.ai)",
+        "Production API Gateway",
+        "Production API Subdomain (api.ectropy.ai)",
+        "SSL/TLS Infrastructure",
+        "HTTP/HTTPS Redirection"
+      ],
+      "downtime": "None - validation only, read-only operations",
+      "rollbackTime": "N/A - validation does not modify state"
+    }
+  },
+  "preFlightChecks": [
+    {
+      "id": "curl-installed",
+      "order": 1,
+      "category": "dependencies",
+      "name": "cURL Installation",
+      "description": "Verify curl is installed and available for HTTP testing",
+      "command": "curl --version",
+      "expectedResult": "curl version string",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Command exits with 0 and returns version",
+      "onFailure": {
+        "action": "abort",
+        "message": "curl is not installed - required for smoke tests"
+      }
+    },
+    {
+      "id": "openssl-installed",
+      "order": 2,
+      "category": "dependencies",
+      "name": "OpenSSL Installation",
+      "description": "Verify openssl is installed for SSL/TLS certificate validation",
+      "command": "openssl version",
+      "expectedResult": "OpenSSL version string",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "validationLogic": "Command exits with 0 and returns version",
+      "onFailure": {
+        "action": "warn",
+        "message": "openssl not available - SSL certificate test will be skipped"
+      }
+    },
+    {
+      "id": "dns-resolution",
+      "order": 3,
+      "category": "infrastructure",
+      "name": "DNS Resolution",
+      "description": "Verify ectropy.ai domain resolves to valid IP",
+      "command": "nslookup ectropy.ai",
+      "expectedResult": "Valid IP address returned",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "DNS lookup returns IP address",
+      "onFailure": {
+        "action": "abort",
+        "message": "ectropy.ai domain does not resolve - check DNS configuration"
+      }
+    },
+    {
+      "id": "network-connectivity",
+      "order": 4,
+      "category": "infrastructure",
+      "name": "Network Connectivity",
+      "description": "Verify network connectivity to production server",
+      "command": "ping -c 1 ectropy.ai",
+      "expectedResult": "Successful ping response",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Ping returns 0 exit code",
+      "onFailure": {
+        "action": "abort",
+        "message": "Cannot reach ectropy.ai - check network connectivity"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Main Site Availability",
+      "description": "Verify main production site is accessible via HTTPS",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Test Main Site HTTPS",
+          "command": "curl --fail --silent --max-time 10 https://ectropy.ai",
+          "purpose": "Verify main site returns successful HTTPS response",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0 indicates successful HTTP 2xx response"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Main site is NOT accessible - deployment failed",
+            "rollbackStep": "rollback-1"
+          }
+        },
+        {
+          "step": "1.2",
+          "name": "Verify HTTPS Connection",
+          "command": "curl -I --silent --max-time 10 https://ectropy.ai",
+          "purpose": "Retrieve HTTP headers to verify HTTPS is working",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "HTTP/2 200 or HTTP/1.1 200",
+          "validation": {
+            "type": "output",
+            "criteria": "Response contains HTTP 200 status"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "HTTPS connection failed or returned non-200 status"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "API Health Check",
+      "description": "Validate API Gateway health endpoint and response",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Test API Health Endpoint",
+          "command": "curl --silent --max-time 10 https://ectropy.ai/api/health",
+          "purpose": "Retrieve health check response from API Gateway",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedOutput": "JSON with 'ok', 'healthy', or 'success' indicator",
+          "validation": {
+            "type": "output",
+            "criteria": "Response contains health status indicator"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "API health check FAILED - API Gateway not responding",
+            "rollbackStep": "rollback-1"
+          }
+        },
+        {
+          "step": "2.2",
+          "name": "Parse Health Response",
+          "description": "Validate health check response contains expected fields",
+          "commands": [
+            "curl --silent --max-time 10 https://ectropy.ai/api/health | grep -E 'ok|healthy|success'"
+          ],
+          "purpose": "Verify health response has correct format",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "Match found for health status",
+          "validation": {
+            "type": "output",
+            "criteria": "grep returns 0 exit code"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "API health response does not contain expected status"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "API Subdomain Validation",
+      "description": "Verify API subdomain configuration (optional)",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Test API Subdomain",
+          "command": "curl --fail --silent --max-time 10 https://api.ectropy.ai/health",
+          "purpose": "Verify dedicated API subdomain is accessible",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0 indicates successful response"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "API subdomain is not configured or not accessible (this is optional)"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "SSL/TLS Certificate Validation",
+      "description": "Verify SSL/TLS certificate is valid and properly configured",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Test SSL Certificate Validity",
+          "command": "echo | openssl s_client -connect ectropy.ai:443 -servername ectropy.ai 2>/dev/null | grep 'Verify return code: 0'",
+          "purpose": "Verify SSL certificate is trusted and not expired",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "Verify return code: 0 (ok)",
+          "validation": {
+            "type": "output",
+            "criteria": "Output contains 'Verify return code: 0'"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "SSL certificate validation failed (might be self-signed or not configured)"
+          }
+        },
+        {
+          "step": "4.2",
+          "name": "Check Certificate Expiration",
+          "command": "echo | openssl s_client -connect ectropy.ai:443 -servername ectropy.ai 2>/dev/null | openssl x509 -noout -dates",
+          "purpose": "Display certificate validity dates",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "notBefore and notAfter dates",
+          "validation": {
+            "type": "output",
+            "criteria": "Certificate dates are displayed"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not retrieve certificate expiration dates"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Performance Validation",
+      "description": "Verify response times meet performance thresholds",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "5.1",
+          "name": "Measure Response Time",
+          "command": "curl -o /dev/null -s -w '%{time_total}' --max-time 10 https://ectropy.ai",
+          "purpose": "Measure total time for HTTPS request",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "Response time in seconds",
+          "validation": {
+            "type": "output",
+            "criteria": "Response time < 3.0 seconds"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Response time exceeds 3s threshold - performance may be degraded"
+          }
+        },
+        {
+          "step": "5.2",
+          "name": "Measure API Response Time",
+          "command": "curl -o /dev/null -s -w '%{time_total}' --max-time 10 https://ectropy.ai/api/health",
+          "purpose": "Measure API health endpoint response time",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "API response time in seconds",
+          "validation": {
+            "type": "output",
+            "criteria": "Response time < 2.0 seconds"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "API response time exceeds 2s threshold - performance may be degraded"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "HTTP to HTTPS Redirect",
+      "description": "Verify HTTP requests are redirected to HTTPS",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "6.1",
+          "name": "Test HTTP Redirect",
+          "command": "curl -I --silent --max-time 5 http://ectropy.ai",
+          "purpose": "Verify HTTP returns 301/302 redirect to HTTPS",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "HTTP/1.1 301 or 302 status",
+          "validation": {
+            "type": "output",
+            "criteria": "Response contains 301 or 302 status code"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "HTTP to HTTPS redirect not configured - security best practice"
+          }
+        },
+        {
+          "step": "6.2",
+          "name": "Verify Redirect Location",
+          "command": "curl -I --silent --max-time 5 http://ectropy.ai | grep -i 'location: https://'",
+          "purpose": "Verify redirect points to HTTPS URL",
+          "required": false,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "Location header with https://",
+          "validation": {
+            "type": "output",
+            "criteria": "Location header contains https://"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Could not verify HTTPS redirect location"
+          }
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "healthChecks": [
+      {
+        "service": "Web Application",
+        "endpoint": "https://ectropy.ai",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "API Gateway Health",
+        "endpoint": "https://ectropy.ai/api/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "expectedBody": {
+          "status": "ok|healthy|success"
+        },
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "API Subdomain",
+        "endpoint": "https://api.ectropy.ai/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": false
+      }
+    ],
+    "smokeTests": [
+      {
+        "test": "Main site HTTPS accessibility",
+        "endpoint": "https://ectropy.ai",
+        "expectedBehavior": "Returns HTTP 200 status within 10 seconds",
+        "priority": "P0"
+      },
+      {
+        "test": "API health endpoint returns valid status",
+        "endpoint": "https://ectropy.ai/api/health",
+        "expectedBehavior": "Returns JSON with 'ok', 'healthy', or 'success' status",
+        "priority": "P0"
+      },
+      {
+        "test": "API subdomain accessibility",
+        "endpoint": "https://api.ectropy.ai/health",
+        "expectedBehavior": "Returns HTTP 200 status (optional)",
+        "priority": "P2"
+      },
+      {
+        "test": "SSL/TLS certificate validity",
+        "endpoint": "https://ectropy.ai:443",
+        "expectedBehavior": "Certificate is trusted and not expired",
+        "priority": "P1"
+      },
+      {
+        "test": "HTTP to HTTPS redirect",
+        "endpoint": "http://ectropy.ai",
+        "expectedBehavior": "Returns 301/302 redirect to HTTPS",
+        "priority": "P1"
+      }
+    ],
+    "performanceThresholds": [
+      {
+        "metric": "Main site response time",
+        "threshold": "< 3.0 seconds",
+        "measurement": "curl total time for https://ectropy.ai"
+      },
+      {
+        "metric": "API health response time",
+        "threshold": "< 2.0 seconds",
+        "measurement": "curl total time for /api/health endpoint"
+      },
+      {
+        "metric": "SSL handshake time",
+        "threshold": "< 1.0 seconds",
+        "measurement": "openssl s_client connection time"
+      }
+    ],
+    "dataIntegrity": []
+  },
+  "rollback": {
+    "supported": true,
+    "estimatedTime": "15 minutes",
+    "dataLossRisk": "none",
+    "triggerConditions": [
+      "Main site (https://ectropy.ai) returns HTTP 5xx errors",
+      "API health endpoint fails to respond",
+      "All smoke tests fail indicating complete deployment failure",
+      "Critical security issue detected (invalid SSL certificate, no HTTPS)"
+    ],
+    "decisionMaker": "DevOps Lead or Site Reliability Engineer",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Stop new traffic to failed deployment",
+        "command": "# Update load balancer or reverse proxy to stop routing",
+        "purpose": "Prevent users from accessing failed deployment",
+        "required": true
+      },
+      {
+        "step": 2,
+        "name": "Switch to previous deployment",
+        "command": "# Execute blue-green deployment rollback or redeploy previous version",
+        "purpose": "Restore service with last known good deployment",
+        "required": true
+      },
+      {
+        "step": 3,
+        "name": "Verify rollback success",
+        "command": "bash scripts/deployment/smoke-tests-production.sh https://ectropy.ai",
+        "purpose": "Run smoke tests against rolled-back deployment",
+        "required": true
+      },
+      {
+        "step": 4,
+        "name": "Update deployment status",
+        "command": "# Update status in deployment tracking system",
+        "purpose": "Document rollback and failed deployment",
+        "required": true
+      },
+      {
+        "step": 5,
+        "name": "Investigate failure",
+        "command": "# Collect logs and error messages from failed deployment",
+        "purpose": "Determine root cause for future fix",
+        "required": true
+      }
+    ],
+    "verification": {
+      "healthCheck": "https://ectropy.ai/api/health",
+      "expectedStatus": 200,
+      "successCriteria": "All smoke tests pass after rollback"
+    }
+  },
+  "monitoring": {
+    "duration": "24 hours post-deployment",
+    "keyMetrics": [
+      {
+        "metric": "HTTP 5xx error rate",
+        "threshold": "< 1%",
+        "alertOn": "> 1% sustained for 5 minutes",
+        "severity": "critical"
+      },
+      {
+        "metric": "API response time (p95)",
+        "threshold": "< 500ms",
+        "alertOn": "> 1000ms sustained for 5 minutes",
+        "severity": "warning"
+      },
+      {
+        "metric": "Main site response time (p95)",
+        "threshold": "< 2.0s",
+        "alertOn": "> 3.0s sustained for 5 minutes",
+        "severity": "warning"
+      },
+      {
+        "metric": "SSL certificate expiration",
+        "threshold": "> 30 days remaining",
+        "alertOn": "< 7 days remaining",
+        "severity": "critical"
+      },
+      {
+        "metric": "Service uptime",
+        "threshold": "99.9%",
+        "alertOn": "< 99.0%",
+        "severity": "critical"
+      }
+    ],
+    "alertThresholds": [
+      {
+        "condition": "API health check returns non-200 status",
+        "severity": "critical",
+        "action": "Page on-call engineer immediately",
+        "escalation": "After 5 minutes, escalate to DevOps Lead"
+      },
+      {
+        "condition": "Main site returns 5xx errors",
+        "severity": "critical",
+        "action": "Trigger automated rollback if error rate > 5%",
+        "escalation": "Notify DevOps Lead and Product Manager"
+      },
+      {
+        "condition": "Response time exceeds 5s",
+        "severity": "warning",
+        "action": "Create incident ticket for performance investigation",
+        "escalation": "After 15 minutes, page on-call engineer"
+      }
+    ],
+    "dashboards": [
+      "Production Application Health Dashboard",
+      "API Gateway Metrics Dashboard",
+      "SSL/TLS Certificate Monitoring",
+      "Response Time & Latency Dashboard"
+    ]
+  },
+  "successCriteria": [
+    {
+      "criterion": "Main site accessible via HTTPS",
+      "status": "REQUIRED",
+      "validation": "curl https://ectropy.ai returns HTTP 200"
+    },
+    {
+      "criterion": "API health endpoint returns valid status",
+      "status": "REQUIRED",
+      "validation": "curl /api/health returns JSON with 'ok', 'healthy', or 'success'"
+    },
+    {
+      "criterion": "SSL/TLS certificate is valid",
+      "status": "REQUIRED",
+      "validation": "openssl s_client verification returns code 0"
+    },
+    {
+      "criterion": "Response time < 3 seconds",
+      "status": "RECOMMENDED",
+      "validation": "curl time_total < 3.0s for main site"
+    },
+    {
+      "criterion": "API response time < 2 seconds",
+      "status": "RECOMMENDED",
+      "validation": "curl time_total < 2.0s for /api/health"
+    },
+    {
+      "criterion": "HTTP redirects to HTTPS",
+      "status": "RECOMMENDED",
+      "validation": "curl http://ectropy.ai returns 301/302 status"
+    },
+    {
+      "criterion": "API subdomain accessible",
+      "status": "OPTIONAL",
+      "validation": "curl https://api.ectropy.ai/health returns 200"
+    }
+  ],
+  "mcpIntegration": {
+    "queryableFields": [
+      "environment",
+      "runbookType",
+      "metadata.catalogId",
+      "metadata.complexity",
+      "metadata.estimatedDuration",
+      "phases[].name",
+      "validation.healthChecks[].service",
+      "validation.smokeTests[].priority",
+      "successCriteria[].status"
+    ],
+    "supportedQueries": [
+      {
+        "query": "What smoke tests are run after production deployment?",
+        "returns": "Main site availability, API health check, API subdomain, SSL certificate validation, response time testing, HTTP to HTTPS redirect",
+        "purpose": "Post-deployment validation checklist"
+      },
+      {
+        "query": "What are the critical smoke tests that must pass?",
+        "returns": "Main site HTTPS accessibility (P0) and API health endpoint validation (P0)",
+        "purpose": "Critical test identification"
+      },
+      {
+        "query": "What response time thresholds are validated?",
+        "returns": "Main site < 3.0s, API health endpoint < 2.0s",
+        "purpose": "Performance threshold validation"
+      },
+      {
+        "query": "How long do production smoke tests take?",
+        "returns": "Approximately 5 minutes for complete validation",
+        "purpose": "Time estimation"
+      },
+      {
+        "query": "What happens if smoke tests fail?",
+        "returns": "Rollback procedures are triggered based on severity - critical failures initiate immediate rollback",
+        "purpose": "Failure response plan"
+      },
+      {
+        "query": "How do I run production smoke tests manually?",
+        "returns": "Execute: bash scripts/deployment/smoke-tests-production.sh https://ectropy.ai",
+        "purpose": "Manual execution instructions"
+      },
+      {
+        "query": "What monitoring is recommended after deployment?",
+        "returns": "24 hours of enhanced monitoring for 5xx errors, response times, SSL certificates, and service uptime",
+        "purpose": "Post-deployment monitoring guidance"
+      }
+    ],
+    "decisionSupport": [
+      "Validates deployment success before declaring production ready",
+      "Identifies critical failures that require immediate rollback",
+      "Provides objective success criteria for go/no-go decisions",
+      "Establishes performance baselines for monitoring",
+      "Detects SSL/TLS configuration issues early",
+      "Verifies security best practices (HTTPS redirect)",
+      "Enables automated validation in CI/CD pipelines"
+    ],
+    "architectureAlignment": {
+      "routingConfig": "Validates NGINX reverse proxy configuration and routing",
+      "portAllocation": "Tests production HTTPS (443) and HTTP (80) accessibility",
+      "oauthConfig": "Indirectly validates API Gateway OAuth infrastructure via health endpoint"
+    }
+  },
+  "knownIssues": [
+    {
+      "id": "KI-001",
+      "title": "First request after cold start may be slow",
+      "severity": "LOW",
+      "impact": "Initial smoke test response time may exceed threshold",
+      "mitigation": "Retry smoke tests or warm up application before validation",
+      "action": "Acceptable to retry if first attempt shows slow response",
+      "priority": "P3"
+    },
+    {
+      "id": "KI-002",
+      "title": "Self-signed certificates fail SSL validation",
+      "severity": "MEDIUM",
+      "impact": "SSL certificate test will fail in non-production environments",
+      "mitigation": "SSL test is marked as optional/recommended, not required",
+      "action": "Use proper CA-signed certificates in production",
+      "priority": "P2"
+    },
+    {
+      "id": "KI-003",
+      "title": "API subdomain may not be configured initially",
+      "severity": "LOW",
+      "impact": "API subdomain test will fail if DNS not configured",
+      "mitigation": "API subdomain test is optional and failure does not block deployment",
+      "action": "Configure api.ectropy.ai DNS when scaling requirements justify it",
+      "priority": "P3"
+    },
+    {
+      "id": "KI-004",
+      "title": "Network latency affects response time tests",
+      "severity": "LOW",
+      "impact": "Response time thresholds may be exceeded due to network conditions",
+      "mitigation": "Run smoke tests from server in same region as production",
+      "action": "Consider adjusting thresholds based on deployment region",
+      "priority": "P3"
+    }
+  ],
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "PROD_URL",
+        "description": "Production URL to test (defaults to https://ectropy.ai)",
+        "example": "https://ectropy.ai",
+        "required": false,
+        "environment": "production",
+        "secret": false
+      }
+    ]
+  }
+}

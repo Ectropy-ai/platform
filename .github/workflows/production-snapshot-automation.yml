@@ -1,0 +1,210 @@
+name: Production Snapshot Automation
+
+# Enterprise snapshot strategy for production infrastructure
+# - Weekly automated snapshots (Sundays at 4 AM UTC)
+# - Manual trigger capability for pre-deployment snapshots
+# - Retention: Last 4 snapshots per server (1 month history)
+# - Cost: ~$25/month for snapshots
+
+on:
+  schedule:
+    # Every Sunday at 4 AM UTC (staggered after retention-enforcement at 3 AM)
+    - cron: '0 4 * * 0'
+
+  workflow_dispatch:
+    inputs:
+      snapshot_type:
+        description: 'Snapshot type (weekly/pre-deployment/emergency)'
+        required: false
+        default: 'manual'
+        type: choice
+        options:
+          - manual
+          - pre-deployment
+          - emergency
+
+env:
+  BLUE_DROPLET_ID: '532797375'
+  GREEN_DROPLET_ID: '532801089'
+  RETENTION_COUNT: 4
+
+jobs:
+  create-snapshots:
+    name: Create Production Snapshots
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Verify Droplet Status
+        id: verify
+        run: |
+          echo "━━━ Verifying Production Infrastructure Status ━━━"
+          echo ""
+          echo "Blue Server:"
+          doctl compute droplet get ${{ env.BLUE_DROPLET_ID }} --format ID,Name,Memory,VCPUs,Status
+          BLUE_STATUS=$(doctl compute droplet get ${{ env.BLUE_DROPLET_ID }} --format Status --no-header)
+
+          echo ""
+          echo "Green Server:"
+          doctl compute droplet get ${{ env.GREEN_DROPLET_ID }} --format ID,Name,Memory,VCPUs,Status
+          GREEN_STATUS=$(doctl compute droplet get ${{ env.GREEN_DROPLET_ID }} --format Status --no-header)
+
+          echo ""
+          echo "blue_status=${BLUE_STATUS}" >> $GITHUB_OUTPUT
+          echo "green_status=${GREEN_STATUS}" >> $GITHUB_OUTPUT
+
+          if [[ "${BLUE_STATUS}" != "active" || "${GREEN_STATUS}" != "active" ]]; then
+            echo "⚠️  Warning: One or more servers not active"
+            echo "Blue: ${BLUE_STATUS}, Green: ${GREEN_STATUS}"
+          else
+            echo "✅ Both servers active and ready for snapshot"
+          fi
+
+      - name: Create Blue Server Snapshot
+        id: snapshot-blue
+        run: |
+          TIMESTAMP=$(date +%Y-%m-%d-%H%M)
+          SNAPSHOT_TYPE="${{ github.event.inputs.snapshot_type || 'weekly' }}"
+          SNAPSHOT_NAME="ectropy-production-blue-${SNAPSHOT_TYPE}-${TIMESTAMP}"
+
+          echo "━━━ Creating Blue Server Snapshot ━━━"
+          echo "Snapshot: ${SNAPSHOT_NAME}"
+          echo "Type: ${SNAPSHOT_TYPE}"
+          echo "⏳ This will take 5-10 minutes..."
+          echo ""
+
+          doctl compute droplet-action snapshot ${{ env.BLUE_DROPLET_ID }} \
+            --snapshot-name "${SNAPSHOT_NAME}" \
+            --wait
+
+          if [ $? -eq 0 ]; then
+            echo "✅ Blue server snapshot created successfully"
+            echo "snapshot_name=${SNAPSHOT_NAME}" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Blue server snapshot failed"
+            exit 1
+          fi
+
+      - name: Create Green Server Snapshot
+        id: snapshot-green
+        run: |
+          TIMESTAMP=$(date +%Y-%m-%d-%H%M)
+          SNAPSHOT_TYPE="${{ github.event.inputs.snapshot_type || 'weekly' }}"
+          SNAPSHOT_NAME="ectropy-production-green-${SNAPSHOT_TYPE}-${TIMESTAMP}"
+
+          echo ""
+          echo "━━━ Creating Green Server Snapshot ━━━"
+          echo "Snapshot: ${SNAPSHOT_NAME}"
+          echo "Type: ${SNAPSHOT_TYPE}"
+          echo "⏳ This will take 5-10 minutes..."
+          echo ""
+
+          doctl compute droplet-action snapshot ${{ env.GREEN_DROPLET_ID }} \
+            --snapshot-name "${SNAPSHOT_NAME}" \
+            --wait
+
+          if [ $? -eq 0 ]; then
+            echo "✅ Green server snapshot created successfully"
+            echo "snapshot_name=${SNAPSHOT_NAME}" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Green server snapshot failed"
+            exit 1
+          fi
+
+      - name: Cleanup Old Snapshots
+        run: |
+          echo ""
+          echo "━━━ Cleaning Up Old Snapshots (Retention: Last ${{ env.RETENTION_COUNT }}) ━━━"
+          echo ""
+
+          # Get all snapshots for Blue server, sorted by creation date
+          echo "Blue Server Snapshots:"
+          BLUE_SNAPSHOTS=$(doctl compute snapshot list --resource droplet --format ID,Name,CreatedAt --no-header | \
+            grep "ectropy-production-blue" | \
+            sort -k3 -r | \
+            awk '{print $1}')
+
+          # Keep only the latest RETENTION_COUNT snapshots, delete the rest
+          BLUE_COUNT=0
+          for SNAPSHOT_ID in $BLUE_SNAPSHOTS; do
+            BLUE_COUNT=$((BLUE_COUNT + 1))
+            if [ $BLUE_COUNT -gt ${{ env.RETENTION_COUNT }} ]; then
+              SNAPSHOT_NAME=$(doctl compute snapshot get $SNAPSHOT_ID --format Name --no-header)
+              echo "🗑️  Deleting old Blue snapshot: ${SNAPSHOT_NAME} (ID: ${SNAPSHOT_ID})"
+              doctl compute snapshot delete $SNAPSHOT_ID --force
+            fi
+          done
+
+          echo ""
+          echo "Green Server Snapshots:"
+          GREEN_SNAPSHOTS=$(doctl compute snapshot list --resource droplet --format ID,Name,CreatedAt --no-header | \
+            grep "ectropy-production-green" | \
+            sort -k3 -r | \
+            awk '{print $1}')
+
+          # Keep only the latest RETENTION_COUNT snapshots, delete the rest
+          GREEN_COUNT=0
+          for SNAPSHOT_ID in $GREEN_SNAPSHOTS; do
+            GREEN_COUNT=$((GREEN_COUNT + 1))
+            if [ $GREEN_COUNT -gt ${{ env.RETENTION_COUNT }} ]; then
+              SNAPSHOT_NAME=$(doctl compute snapshot get $SNAPSHOT_ID --format Name --no-header)
+              echo "🗑️  Deleting old Green snapshot: ${SNAPSHOT_NAME} (ID: ${SNAPSHOT_ID})"
+              doctl compute snapshot delete $SNAPSHOT_ID --force
+            fi
+          done
+
+          echo ""
+          echo "✅ Snapshot cleanup complete"
+
+      - name: Verify Snapshot Creation
+        run: |
+          echo ""
+          echo "━━━ Current Production Snapshots ━━━"
+          echo ""
+          echo "Blue Server:"
+          doctl compute snapshot list --resource droplet --format Name,Size,CreatedAt | \
+            grep "ectropy-production-blue" | \
+            sort -k3 -r | \
+            head -${{ env.RETENTION_COUNT }}
+
+          echo ""
+          echo "Green Server:"
+          doctl compute snapshot list --resource droplet --format Name,Size,CreatedAt | \
+            grep "ectropy-production-green" | \
+            sort -k3 -r | \
+            head -${{ env.RETENTION_COUNT }}
+
+          echo ""
+          echo "✅ Snapshot automation complete"
+
+      - name: Summary
+        run: |
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          echo "PRODUCTION SNAPSHOT AUTOMATION SUMMARY"
+          echo "═══════════════════════════════════════════════════════════"
+          echo ""
+          echo "Snapshots Created:"
+          echo "  ✓ Blue Server: ${{ steps.snapshot-blue.outputs.snapshot_name }}"
+          echo "  ✓ Green Server: ${{ steps.snapshot-green.outputs.snapshot_name }}"
+          echo ""
+          echo "Retention Policy:"
+          echo "  - Keeping last ${{ env.RETENTION_COUNT }} snapshots per server"
+          echo "  - Older snapshots automatically deleted"
+          echo ""
+          echo "Next Scheduled Run:"
+          echo "  - Every Sunday at 2 AM UTC (weekly backups)"
+          echo ""
+          echo "Manual Trigger:"
+          echo "  - Available via workflow_dispatch for pre-deployment snapshots"
+          echo ""
+          echo "Rollback Command (if needed):"
+          echo "  doctl compute droplet-action restore <DROPLET_ID> --snapshot-name <SNAPSHOT_NAME>"
+          echo ""

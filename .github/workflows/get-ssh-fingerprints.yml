@@ -1,0 +1,117 @@
+name: Get SSH Key Fingerprints
+
+on:
+  workflow_dispatch:
+    inputs:
+      auto_set_first:
+        description: 'Automatically set first SSH key fingerprint as TF_VAR_SSH_KEY_FINGERPRINT'
+        type: boolean
+        default: false
+        required: false
+
+# Enterprise Security: Explicit least-privilege permissions
+# NO PERMISSIONS: Info-only workflow requires no GitHub API access
+permissions: {}
+
+jobs:
+  get-fingerprints:
+    name: Retrieve DigitalOcean SSH Key Fingerprints
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get SSH Keys from DigitalOcean
+        id: get-keys
+        env:
+          DO_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+        run: |
+          echo "🔍 Retrieving SSH keys from DigitalOcean..."
+          echo ""
+
+          RESPONSE=$(curl -s -X GET \
+            -H "Authorization: Bearer $DO_TOKEN" \
+            "https://api.digitalocean.com/v2/account/keys")
+
+          echo "response<<EOF" >> $GITHUB_OUTPUT
+          echo "$RESPONSE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          # Parse and display SSH keys
+          echo "📋 Available SSH Keys:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Name | Fingerprint | ID |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------------|-----|" >> $GITHUB_STEP_SUMMARY
+
+          echo "$RESPONSE" | jq -r '.ssh_keys[] | "| \(.name) | \(.fingerprint) | \(.id) |"' >> $GITHUB_STEP_SUMMARY
+
+          # Also output to console
+          echo ""
+          echo "Available SSH Keys:"
+          echo "$RESPONSE" | jq -r '.ssh_keys[] | "  Name: \(.name)\n  Fingerprint: \(.fingerprint)\n  ID: \(.id)\n"'
+
+          # Get first fingerprint for auto-set option
+          FIRST_FINGERPRINT=$(echo "$RESPONSE" | jq -r '.ssh_keys[0].fingerprint // ""')
+          FIRST_NAME=$(echo "$RESPONSE" | jq -r '.ssh_keys[0].name // ""')
+
+          echo "first_fingerprint=$FIRST_FINGERPRINT" >> $GITHUB_OUTPUT
+          echo "first_name=$FIRST_NAME" >> $GITHUB_OUTPUT
+
+          echo ""
+          if [ -z "$FIRST_FINGERPRINT" ]; then
+            echo "⚠️  No SSH keys found in DigitalOcean account"
+            exit 1
+          else
+            echo "✅ Found $(echo "$RESPONSE" | jq -r '.ssh_keys | length') SSH key(s)"
+          fi
+
+      - name: Auto-Set First SSH Key Fingerprint
+        if: ${{ inputs.auto_set_first == true }}
+        env:
+          FIRST_FINGERPRINT: ${{ steps.get-keys.outputs.first_fingerprint }}
+          FIRST_NAME: ${{ steps.get-keys.outputs.first_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "🔧 Auto-setting first SSH key fingerprint..."
+          echo "  Name: $FIRST_NAME"
+          echo "  Fingerprint: $FIRST_FINGERPRINT"
+
+          gh variable set TF_VAR_SSH_KEY_FINGERPRINT \
+            --repo ${{ github.repository }} \
+            --body "$FIRST_FINGERPRINT"
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ TF_VAR_SSH_KEY_FINGERPRINT Set" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Name**: $FIRST_NAME" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Fingerprint**: \`$FIRST_FINGERPRINT\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This fingerprint has been set as the repository variable \`TF_VAR_SSH_KEY_FINGERPRINT\`." >> $GITHUB_STEP_SUMMARY
+
+          echo ""
+          echo "✅ TF_VAR_SSH_KEY_FINGERPRINT has been set to: $FIRST_FINGERPRINT"
+
+      - name: Manual Set Instructions
+        if: ${{ inputs.auto_set_first != true }}
+        env:
+          FIRST_FINGERPRINT: ${{ steps.get-keys.outputs.first_fingerprint }}
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📝 Manual Configuration Instructions" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To set the SSH key fingerprint as a repository variable, run:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "gh variable set TF_VAR_SSH_KEY_FINGERPRINT --body \"$FIRST_FINGERPRINT\"" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Or re-run this workflow with 'auto_set_first' enabled to automatically set the first key." >> $GITHUB_STEP_SUMMARY
+
+          echo ""
+          echo "To manually set the SSH key fingerprint, run:"
+          echo "  gh variable set TF_VAR_SSH_KEY_FINGERPRINT --body \"$FIRST_FINGERPRINT\""
+          echo ""
+          echo "Or re-run this workflow with 'auto_set_first' enabled."

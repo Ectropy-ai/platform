@@ -1,0 +1,223 @@
+# =============================================================================
+# PROMETHEUS ALERTING RULES - ECTROPY PLATFORM
+# =============================================================================
+#
+# PURPOSE: Proactive monitoring and alerting for performance bottlenecks
+# COVERAGE:
+# - API response time degradation
+# - Database query performance
+# - System resource exhaustion
+# - Application errors
+# =============================================================================
+
+groups:
+  - name: ectropy_api_gateway
+    rules:
+      # High API response time
+      - alert: HighAPIResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="ectropy-api-gateway"}[5m])) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: 'High API response time detected'
+          description: '95th percentile API response time is {{ $value }}s, above 500ms threshold'
+
+      # API error rate
+      - alert: HighAPIErrorRate
+        expr: rate(http_requests_total{job="ectropy-api-gateway",status=~"5.."}[5m]) / rate(http_requests_total{job="ectropy-api-gateway"}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          service: api-gateway
+        annotations:
+          summary: 'High API error rate detected'
+          description: 'API error rate is {{ $value | humanizePercentage }}, above 5% threshold'
+
+      # Low API throughput
+      - alert: LowAPIThroughput
+        expr: rate(http_requests_total{job="ectropy-api-gateway"}[5m]) < 1
+        for: 5m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: 'Low API throughput'
+          description: 'API throughput is {{ $value }} requests/second, below expected threshold'
+
+  - name: ectropy_database
+    rules:
+      # Slow database queries
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, rate(database_query_duration_seconds_bucket[5m])) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: 'Slow database queries detected'
+          description: '95th percentile database query time is {{ $value }}s, above 100ms threshold'
+
+      # High database connection usage
+      - alert: HighDatabaseConnections
+        expr: pg_stat_database_numbackends > 80
+        for: 2m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: 'High database connection usage'
+          description: 'Database has {{ $value }} active connections, approaching limit'
+
+      # Database query errors
+      - alert: DatabaseQueryErrors
+        expr: rate(database_queries_total{status="error"}[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: 'Database query errors detected'
+          description: 'Database error rate is {{ $value }} errors/second'
+
+  - name: ectropy_system
+    rules:
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: 'High CPU usage detected'
+          description: 'CPU usage is {{ $value }}%, above 80% threshold'
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: 'High memory usage detected'
+          description: 'Memory usage is {{ $value }}%, above 90% threshold'
+
+      # Low disk space
+      - alert: LowDiskSpace
+        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: 'Low disk space detected'
+          description: 'Disk usage is {{ $value }}%, above 85% threshold'
+
+  - name: ectropy_speckle
+    rules:
+      # Speckle server down
+      - alert: SpeckleServerDown
+        expr: up{job="speckle-server"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: speckle
+        annotations:
+          summary: 'Speckle BIM server is down'
+          description: 'Speckle server has been down for more than 1 minute'
+
+      # High BIM processing time
+      - alert: HighBIMProcessingTime
+        expr: speckle_object_processing_duration_seconds > 30
+        for: 2m
+        labels:
+          severity: warning
+          service: speckle
+        annotations:
+          summary: 'High BIM processing time'
+          description: 'BIM object processing time is {{ $value }}s, above 30s threshold'
+
+  - name: ectropy_cache
+    rules:
+      # Low cache hit ratio
+      - alert: LowCacheHitRatio
+        expr: redis_keyspace_hits / (redis_keyspace_hits + redis_keyspace_misses) < 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: 'Low cache hit ratio'
+          description: 'Redis cache hit ratio is {{ $value | humanizePercentage }}, below 80% threshold'
+
+      # Redis server down
+      - alert: RedisServerDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: 'Redis cache server is down'
+          description: 'Redis server has been down for more than 1 minute'
+
+  - name: ectropy_mcp
+    rules:
+      # High MCP response time
+      - alert: HighMCPResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="mcp-server"}[5m])) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          service: mcp-server
+        annotations:
+          summary: 'High MCP server response time'
+          description: '95th percentile MCP server response time is {{ $value }}s, above 500ms threshold'
+
+      # MCP error rate
+      - alert: HighMCPErrorRate
+        expr: rate(http_requests_total{job="mcp-server",status=~"5.."}[5m]) / rate(http_requests_total{job="mcp-server"}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          service: mcp-server
+        annotations:
+          summary: 'High MCP server error rate'
+          description: 'MCP server error rate is {{ $value | humanizePercentage }}, above 5% threshold'
+
+      # Low cache hit ratio
+      - alert: LowMCPCacheHitRatio
+        expr: redis_keyspace_hits / (redis_keyspace_hits + redis_keyspace_misses) < 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: mcp-server
+        annotations:
+          summary: 'Low cache hit ratio'
+          description: 'Redis cache hit ratio is {{ $value | humanizePercentage }}, below 80% threshold'
+
+  - name: ectropy_application
+    rules:
+      # Service down
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Service {{ $labels.job }} is down'
+          description: 'Service {{ $labels.job }} has been down for more than 1 minute'
+
+      # High active sessions
+      - alert: HighActiveSessions
+        expr: active_sessions > 500
+        for: 5m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: 'High number of active sessions'
+          description: 'Active sessions count is {{ $value }}, above 500 threshold'

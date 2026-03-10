@@ -1,0 +1,366 @@
+name: Terraform Staging GitOps
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY to confirm infrastructure deployment'
+        required: true
+        type: string
+  push:
+    branches:
+      - develop
+    paths:
+      - 'infrastructure/terraform/**' # Terraform staging definitions
+      - 'infrastructure/nginx/**' # Nginx configuration files (ROOT CAUSE #159)
+      - 'docker-compose.staging.yml' # Docker Compose staging configuration
+      - 'terraform/modules/infrastructure-deployment/**' # Infrastructure GitOps module
+      - 'terraform/modules/compose-deployment/**' # Compose GitOps module
+      - 'terraform/modules/env-deployment/**' # Environment GitOps module
+      - '.github/workflows/terraform-staging-gitops.yml'
+
+env:
+  TF_VERSION: '1.14.0'
+  TF_WORKING_DIR: './infrastructure/terraform/environments/staging'
+  AWS_REGION: 'us-east-1' # Required by S3 backend but not used by Spaces
+
+# Prevent concurrent terraform operations on staging state
+# Aligns with terraform-plan-apply.yml concurrency group for staging environment
+concurrency:
+  group: terraform-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: write
+  pull-requests: write # For plan comments
+
+jobs:
+  validate-confirmation:
+    name: Validate Deployment Confirmation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Check confirmation input
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "DEPLOY" ]; then
+            echo "❌ Deployment cancelled - confirmation input must be 'DEPLOY'"
+            echo "Received: ${{ github.event.inputs.confirm }}"
+            exit 1
+          fi
+          echo "✅ Deployment confirmed - proceeding with infrastructure changes"
+
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    needs: [validate-confirmation]
+    if: always() && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && needs.validate-confirmation.result == 'success'))
+    environment: staging
+
+    outputs:
+      plan_exitcode: ${{ steps.plan.outputs.exitcode }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure Terraform Backend Credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "✅ Backend credentials configured (DigitalOcean Spaces)"
+          echo "Using SPACES_ACCESS_KEY_ID for S3-compatible backend"
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "Initializing Terraform with remote state backend..."
+          terraform init -input=false
+          echo "✅ Terraform initialized successfully"
+
+      - name: Terraform Validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          echo "Validating Terraform configuration..."
+          terraform validate
+          echo "✅ Terraform configuration is valid"
+
+      - name: Setup Terraform Variables
+        uses: ./.github/actions/setup-terraform-vars
+        with:
+          environment: staging
+          digitalocean-token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          ssh-private-key: ${{ secrets.TERRAFORM_DEPLOY_PRIVATE_KEY }}
+          ssl-cert-private-key: ${{ secrets.CF_ORIGIN_KEY }}
+          ssl-cert-leaf: ${{ secrets.CF_ORIGIN_CERT }}
+          app-version: ${{ vars.STAGING_APP_VERSION }}
+          api-url: ${{ vars.STAGING_API_URL }}
+          frontend-url: ${{ vars.STAGING_FRONTEND_URL }}
+          database-password: ${{ secrets.DB_PASSWORD }}
+          jwt-secret: ${{ secrets.JWT_SECRET }}
+          jwt-refresh-secret: ${{ secrets.JWT_REFRESH_SECRET }}
+          session-secret: ${{ secrets.SESSION_SECRET }}
+          encryption-key: ${{ secrets.ENCRYPTION_KEY }}
+          google-client-id: ${{ secrets.GOOGLE_CLIENT_ID_STAGING }}
+          google-client-secret: ${{ secrets.GOOGLE_CLIENT_SECRET_STAGING }}
+          redis-password: ${{ secrets.REDIS_PASSWORD }}
+          mcp-api-key: ${{ secrets.MCP_API_KEY }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          speckle-server-token: ${{ secrets.SPECKLE_SERVER_TOKEN }}
+          speckle-admin-password: ${{ secrets.SPECKLE_ADMIN_PASSWORD }}
+          speckle-session-secret: ${{ secrets.SPECKLE_SESSION_SECRET }}
+          minio-access-key: ${{ secrets.MINIO_ACCESS_KEY }}
+          minio-secret-key: ${{ secrets.MINIO_SECRET_KEY }}
+          resend-api-key: ${{ secrets.RESEND_API_KEY }}
+          watchtower-http-api-token: ${{ secrets.WATCHTOWER_HTTP_API_TOKEN }}
+          spaces-access-key-id: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          spaces-secret-access-key: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          docr-config-json: ${{ secrets.DOCR_CONFIG_JSON }}
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-zone-id: ${{ vars.CLOUDFLARE_ZONE_ID }}
+          platform-database-url: ${{ secrets.PLATFORM_DATABASE_URL }}
+          shared-database-url: ${{ secrets.SHARED_DATABASE_URL }}
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "Running Terraform plan..."
+          set -o pipefail  # Ensure pipe failures are captured
+          terraform plan \
+            -input=false \
+            -detailed-exitcode \
+            -out=tfplan \
+            -no-color \
+            2>&1 | tee plan_output.txt
+
+          EXITCODE=${PIPESTATUS[0]}  # Capture terraform's exit code, not tee's
+
+          # ROOT CAUSE #194 FIX: Detect replacement operations
+          # PROBLEM: Terraform returns exitcode=0 for replacements (add+destroy=0 net change)
+          # IMPACT: Apply job skipped even when resources will be replaced
+          # SOLUTION: Override exitcode 0→2 when replacements or any changes detected
+          if grep -q 'must be replaced' plan_output.txt || grep -Eq 'Plan: [1-9][0-9]* to add|[1-9][0-9]* to change|[1-9][0-9]* to destroy' plan_output.txt; then
+            if [ $EXITCODE -eq 0 ]; then
+              echo "ℹ️ Replacement or changes detected in plan output, overriding exitcode 0→2"
+              EXITCODE=2
+            fi
+          fi
+
+          echo "exitcode=$EXITCODE" >> $GITHUB_OUTPUT
+
+          if [ $EXITCODE -eq 0 ]; then
+            echo "✅ No changes detected - infrastructure is up to date"
+          elif [ $EXITCODE -eq 2 ]; then
+            echo "⚠️ Changes detected - infrastructure will be updated"
+          else
+            echo "❌ Terraform plan failed with exit code $EXITCODE"
+            exit $EXITCODE
+          fi
+
+      - name: Upload Terraform Plan
+        if: steps.plan.outputs.exitcode == '2'
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: |
+            ${{ env.TF_WORKING_DIR }}/tfplan
+            ${{ env.TF_WORKING_DIR }}/plan_output.txt
+          retention-days: 5
+
+      - name: Comment Plan on PR
+        if: github.event_name == 'pull_request' && steps.plan.outputs.exitcode == '2'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const planOutput = fs.readFileSync('${{ env.TF_WORKING_DIR }}/plan_output.txt', 'utf8');
+
+            const comment = `## Terraform Plan Results
+
+            **Workflow**: \`${{ github.workflow }}\`
+            **Environment**: Staging
+            **Working Directory**: \`${{ env.TF_WORKING_DIR }}\`
+
+            <details>
+            <summary>📋 Show Plan Output</summary>
+
+            \`\`\`terraform
+            ${planOutput}
+            \`\`\`
+
+            </details>
+
+            **Plan Status**: ⚠️ Changes detected
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: [terraform-plan]
+    if: |
+      always() &&
+      needs.terraform-plan.result == 'success' &&
+      needs.terraform-plan.outputs.plan_exitcode == '2'
+    environment:
+      name: staging
+      url: https://staging.ectropy.ai
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Download Terraform Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+          path: ${{ env.TF_WORKING_DIR }}
+
+      - name: Configure Terraform Backend Credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "✅ Backend credentials configured (DigitalOcean Spaces)"
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "Initializing Terraform with remote state backend..."
+          terraform init -input=false
+          echo "✅ Terraform initialized successfully"
+
+      - name: Setup Terraform Variables
+        uses: ./.github/actions/setup-terraform-vars
+        with:
+          environment: staging
+          digitalocean-token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          ssh-private-key: ${{ secrets.TERRAFORM_DEPLOY_PRIVATE_KEY }}
+          ssl-cert-private-key: ${{ secrets.CF_ORIGIN_KEY }}
+          ssl-cert-leaf: ${{ secrets.CF_ORIGIN_CERT }}
+          app-version: ${{ vars.STAGING_APP_VERSION }}
+          api-url: ${{ vars.STAGING_API_URL }}
+          frontend-url: ${{ vars.STAGING_FRONTEND_URL }}
+          database-password: ${{ secrets.DB_PASSWORD }}
+          jwt-secret: ${{ secrets.JWT_SECRET }}
+          jwt-refresh-secret: ${{ secrets.JWT_REFRESH_SECRET }}
+          session-secret: ${{ secrets.SESSION_SECRET }}
+          encryption-key: ${{ secrets.ENCRYPTION_KEY }}
+          google-client-id: ${{ secrets.GOOGLE_CLIENT_ID_STAGING }}
+          google-client-secret: ${{ secrets.GOOGLE_CLIENT_SECRET_STAGING }}
+          redis-password: ${{ secrets.REDIS_PASSWORD }}
+          mcp-api-key: ${{ secrets.MCP_API_KEY }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          speckle-server-token: ${{ secrets.SPECKLE_SERVER_TOKEN }}
+          speckle-admin-password: ${{ secrets.SPECKLE_ADMIN_PASSWORD }}
+          speckle-session-secret: ${{ secrets.SPECKLE_SESSION_SECRET }}
+          minio-access-key: ${{ secrets.MINIO_ACCESS_KEY }}
+          minio-secret-key: ${{ secrets.MINIO_SECRET_KEY }}
+          resend-api-key: ${{ secrets.RESEND_API_KEY }}
+          watchtower-http-api-token: ${{ secrets.WATCHTOWER_HTTP_API_TOKEN }}
+          spaces-access-key-id: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          spaces-secret-access-key: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          docr-config-json: ${{ secrets.DOCR_CONFIG_JSON }}
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-zone-id: ${{ vars.CLOUDFLARE_ZONE_ID }}
+          platform-database-url: ${{ secrets.PLATFORM_DATABASE_URL }}
+          shared-database-url: ${{ secrets.SHARED_DATABASE_URL }}
+
+      - name: Terraform Apply
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "Applying Terraform plan..."
+          terraform apply -auto-approve tfplan
+          echo "✅ Terraform apply completed successfully"
+
+      - name: Terraform Output
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+        run: |
+          echo "=== Deployment Outputs ==="
+          terraform output -json > outputs.json
+
+          if [ -s outputs.json ]; then
+            echo "Compose deployment hash: $(terraform output -raw compose_deployment_hash 2>/dev/null || echo 'N/A')"
+            echo "Env deployment hash: $(terraform output -raw env_deployment_hash 2>/dev/null || echo 'N/A')"
+            echo "Deployment timestamp: $(terraform output -raw deployment_timestamp 2>/dev/null || echo 'N/A')"
+          fi
+
+      - name: Validate Deployment
+        run: |
+          echo "=== Health Check ==="
+          echo "Waiting 30 seconds for services to stabilize..."
+          sleep 30
+
+          HEALTH_URL="https://staging.ectropy.ai/api/health"
+          echo "Checking health endpoint: $HEALTH_URL"
+
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$HEALTH_URL" || echo "000")
+
+          if [ "$RESPONSE" = "200" ]; then
+            echo "✅ Health check passed - HTTP 200"
+          else
+            echo "⚠️ Health check returned HTTP $RESPONSE (may take additional time to stabilize)"
+          fi
+
+      - name: Upload Apply Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-apply-results
+          path: |
+            ${{ env.TF_WORKING_DIR }}/outputs.json
+          retention-days: 30
+
+  notify-completion:
+    name: Notify Deployment Completion
+    runs-on: ubuntu-latest
+    needs: [terraform-apply]
+    if: always()
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "=== GitOps Deployment Summary ==="
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Trigger: ${{ github.event_name }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Status: ${{ needs.terraform-apply.result }}"
+
+          if [ "${{ needs.terraform-apply.result }}" = "success" ]; then
+            echo "✅ Infrastructure deployment completed successfully"
+          else
+            echo "❌ Infrastructure deployment failed or was skipped"
+          fi

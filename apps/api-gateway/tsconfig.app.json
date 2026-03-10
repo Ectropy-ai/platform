@@ -1,0 +1,41 @@
+{
+  "extends": "../../tsconfig.enterprise-standard.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "ES2015.Promise", "ES2015.Core"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "sourceMap": true,
+    "outDir": "../../dist/apps/api-gateway",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "../../global.d.ts",
+    "../../types/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.disabled",
+    "**/*.md",
+    "**/*.sql",
+    "**/*.sh",
+    "**/LICENSE*",
+    "**/*.map",
+    "dist",
+    "coverage",
+    "**/*.spec.*"
+  ]
+}

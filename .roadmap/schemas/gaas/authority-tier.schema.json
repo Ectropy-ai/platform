@@ -1,0 +1,164 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:gaas:authority-tier",
+  "title": "Authority Tier",
+  "description": "Authority tier definition for 7-tier decision lifecycle within a contract",
+  "type": "object",
+  "required": ["tier", "role", "thresholds"],
+  "properties": {
+    "tier": {
+      "type": "string",
+      "enum": [
+        "FIELD",
+        "FOREMAN",
+        "SUPERINTENDENT",
+        "PM",
+        "ARCHITECT",
+        "OWNER",
+        "REGULATORY"
+      ],
+      "description": "Authority tier level"
+    },
+    "role": {
+      "type": "string",
+      "description": "Role name or title for this tier"
+    },
+    "participants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "userId": { "type": "string" },
+          "name": { "type": "string" },
+          "organization": { "type": "string" },
+          "contactInfo": {
+            "type": "object",
+            "properties": {
+              "email": { "type": "string", "format": "email" },
+              "phone": { "type": "string" }
+            }
+          }
+        },
+        "required": ["userId", "name"]
+      },
+      "description": "Participants authorized at this tier"
+    },
+    "thresholds": {
+      "$ref": "#/definitions/DecisionThresholds",
+      "description": "Decision thresholds requiring this tier's authority"
+    },
+    "escalationRules": {
+      "$ref": "#/definitions/EscalationRules",
+      "description": "Rules for escalating to next tier"
+    },
+    "delegationRules": {
+      "$ref": "#/definitions/DelegationRules",
+      "description": "Rules for delegating to lower tier"
+    }
+  },
+  "definitions": {
+    "DecisionThresholds": {
+      "type": "object",
+      "properties": {
+        "costImpact": {
+          "type": "object",
+          "properties": {
+            "min": {
+              "type": "number",
+              "description": "Minimum cost impact requiring this tier"
+            },
+            "max": {
+              "type": "number",
+              "description": "Maximum cost impact this tier can approve"
+            },
+            "currency": { "type": "string", "default": "USD" }
+          }
+        },
+        "scheduleImpact": {
+          "type": "object",
+          "properties": {
+            "minDays": {
+              "type": "number",
+              "description": "Minimum schedule days requiring this tier"
+            },
+            "maxDays": {
+              "type": "number",
+              "description": "Maximum schedule days this tier can approve"
+            }
+          }
+        },
+        "safetyImpact": {
+          "type": "string",
+          "enum": ["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"],
+          "description": "Safety impact level requiring this tier"
+        },
+        "qualityImpact": {
+          "type": "string",
+          "enum": ["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"],
+          "description": "Quality impact level requiring this tier"
+        },
+        "decisionTypes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Types of decisions requiring this tier (design change, RFI response, etc.)"
+        }
+      }
+    },
+    "EscalationRules": {
+      "type": "object",
+      "properties": {
+        "autoEscalateAfter": {
+          "type": "number",
+          "description": "Hours after which decision auto-escalates to next tier"
+        },
+        "requiredApprovals": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Number of approvals required from this tier before escalation"
+        },
+        "escalationConditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "condition": {
+                "type": "string",
+                "description": "Condition triggering escalation"
+              },
+              "targetTier": {
+                "type": "string",
+                "enum": [
+                  "FIELD",
+                  "FOREMAN",
+                  "SUPERINTENDENT",
+                  "PM",
+                  "ARCHITECT",
+                  "OWNER",
+                  "REGULATORY"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "DelegationRules": {
+      "type": "object",
+      "properties": {
+        "allowDelegation": { "type": "boolean", "default": false },
+        "maxDelegationDepth": {
+          "type": "number",
+          "description": "How many tiers down delegation is allowed",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "delegationRequiresApproval": { "type": "boolean", "default": true },
+        "delegationConditions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Conditions under which delegation is allowed"
+        }
+      }
+    }
+  }
+}

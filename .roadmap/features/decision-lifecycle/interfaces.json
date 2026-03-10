@@ -1,0 +1,812 @@
+{
+  "$schema": "https://luhtech.dev/schemas/interfaces.schema.json",
+  "$id": "urn:luhtech:ectropy:interfaces:pm-decision",
+  "schemaVersion": "3.0.0",
+  "meta": {
+    "ventureId": "ectropy",
+    "featureId": "decision-lifecycle",
+    "createdAt": "2026-01-07T00:00:00Z",
+    "lastUpdated": "2026-01-07T00:00:00Z",
+    "author": "erik",
+    "sourceDoc": ".roadmap/features/decision-lifecycle/interfaces.json"
+  },
+  "summary": "Interface specifications for PM Decision Lifecycle - 17 MCP tools, REST API endpoints, authority validation middleware",
+  "mcpTools": {
+    "totalCount": 17,
+    "categories": [
+      {
+        "name": "Decision Management",
+        "tools": [
+          {
+            "name": "capture_decision",
+            "description": "Creates a new PM decision attached to a voxel",
+            "authorityRequired": 0,
+            "input": {
+              "projectId": { "type": "string", "required": true },
+              "voxelId": {
+                "type": "string",
+                "pattern": "VOX-[A-Z0-9-]+",
+                "required": true
+              },
+              "title": {
+                "type": "string",
+                "minLength": 5,
+                "maxLength": 200,
+                "required": true
+              },
+              "type": {
+                "type": "enum",
+                "values": ["APPROVAL", "REJECTION", "DEFERRAL", "PROPOSAL"],
+                "required": true
+              },
+              "description": { "type": "string" },
+              "budgetImpact": { "type": "number" },
+              "scheduleImpact": { "type": "number", "description": "Hours" },
+              "safetyImpact": { "type": "boolean" },
+              "designChange": { "type": "boolean" },
+              "evidence": { "type": "array", "items": "Evidence" },
+              "requestedBy": { "type": "urn" }
+            },
+            "output": {
+              "decision": "PMDecision",
+              "requiredAuthority": { "type": "integer", "min": 0, "max": 6 },
+              "escalationRequired": { "type": "boolean" },
+              "voxelDecisionCount": { "type": "integer" }
+            }
+          },
+          {
+            "name": "route_decision",
+            "description": "Routes a decision to the appropriate authority level based on impacts",
+            "authorityRequired": 1,
+            "input": {
+              "decisionUrn": { "type": "urn", "required": true },
+              "forceLevel": { "type": "integer", "min": 0, "max": 6 }
+            },
+            "output": {
+              "decision": "PMDecision",
+              "routedTo": {
+                "participantUrn": "urn",
+                "authorityLevel": "integer",
+                "authorityName": "string"
+              },
+              "escalationPath": { "type": "array", "items": "EscalationStep" },
+              "notificationsSent": { "type": "array", "items": "urn" }
+            }
+          },
+          {
+            "name": "approve_decision",
+            "description": "Approves a decision at the current authority level",
+            "authorityRequired": "varies",
+            "input": {
+              "decisionUrn": { "type": "urn", "required": true },
+              "approverUrn": { "type": "urn", "required": true },
+              "comments": { "type": "string" },
+              "conditions": { "type": "array", "items": "string" }
+            },
+            "output": {
+              "decision": "PMDecision",
+              "consequences": { "type": "array", "items": "ConsequenceRef" },
+              "voxelUpdated": { "type": "boolean" },
+              "notificationsSent": { "type": "array", "items": "urn" }
+            }
+          },
+          {
+            "name": "reject_decision",
+            "description": "Rejects a decision with rationale",
+            "authorityRequired": "varies",
+            "input": {
+              "decisionUrn": { "type": "urn", "required": true },
+              "rejecterUrn": { "type": "urn", "required": true },
+              "reason": { "type": "string", "required": true },
+              "alternativeAction": { "type": "string" }
+            },
+            "output": {
+              "decision": "PMDecision",
+              "consequences": { "type": "array", "items": "ConsequenceRef" },
+              "notificationsSent": { "type": "array", "items": "urn" }
+            }
+          },
+          {
+            "name": "escalate_decision",
+            "description": "Escalates a decision to a higher authority level",
+            "authorityRequired": "current",
+            "input": {
+              "decisionUrn": { "type": "urn", "required": true },
+              "escalatorUrn": { "type": "urn", "required": true },
+              "reason": { "type": "string", "required": true },
+              "targetLevel": { "type": "integer", "min": 0, "max": 6 }
+            },
+            "output": {
+              "originalDecision": "PMDecision",
+              "escalatedDecision": "PMDecision",
+              "escalationEdge": "GraphEdge",
+              "routedTo": "ParticipantRef"
+            }
+          },
+          {
+            "name": "query_decision_history",
+            "description": "Queries decisions by various filters",
+            "authorityRequired": 0,
+            "input": {
+              "projectId": { "type": "string" },
+              "voxelId": { "type": "string" },
+              "status": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "PENDING",
+                    "APPROVED",
+                    "REJECTED",
+                    "SUPERSEDED",
+                    "EXPIRED"
+                  ]
+                }
+              },
+              "type": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "APPROVAL",
+                    "REJECTION",
+                    "DEFERRAL",
+                    "ESCALATION",
+                    "PROPOSAL",
+                    "CONSEQUENCE"
+                  ]
+                }
+              },
+              "authorityLevel": { "type": "integer|range" },
+              "dateRange": {
+                "type": "object",
+                "properties": { "start": "datetime", "end": "datetime" }
+              },
+              "participantUrn": { "type": "urn" },
+              "limit": { "type": "integer", "default": 50 },
+              "offset": { "type": "integer", "default": 0 },
+              "sortBy": {
+                "type": "enum",
+                "values": [
+                  "createdAt",
+                  "updatedAt",
+                  "budgetImpact",
+                  "scheduleImpact"
+                ]
+              },
+              "sortOrder": { "type": "enum", "values": ["asc", "desc"] }
+            },
+            "output": {
+              "decisions": { "type": "array", "items": "PMDecision" },
+              "total": { "type": "integer" },
+              "limit": { "type": "integer" },
+              "offset": { "type": "integer" },
+              "facets": {
+                "byStatus": "Record<string, number>",
+                "byType": "Record<string, number>",
+                "byAuthority": "Record<number, number>"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Authority & Graph",
+        "tools": [
+          {
+            "name": "get_authority_graph",
+            "description": "Returns the complete authority cascade definition",
+            "authorityRequired": 0,
+            "input": {
+              "projectId": { "type": "string" }
+            },
+            "output": {
+              "levels": { "type": "array", "items": "AuthorityLevel" },
+              "escalationRules": { "type": "array", "items": "EscalationRule" },
+              "graphEdges": { "type": "array", "items": "GraphEdge" }
+            }
+          },
+          {
+            "name": "find_decision_authority",
+            "description": "Calculates the required authority level for a decision",
+            "authorityRequired": 0,
+            "input": {
+              "budgetImpact": { "type": "number" },
+              "scheduleImpactHours": { "type": "number" },
+              "dimensionalVariance": { "type": "string" },
+              "safetyImpact": { "type": "boolean" },
+              "designChange": { "type": "boolean" },
+              "codeVariance": { "type": "boolean" },
+              "multiTradeImpact": { "type": "boolean" }
+            },
+            "output": {
+              "requiredLevel": { "type": "integer", "min": 0, "max": 6 },
+              "requiredName": { "type": "string" },
+              "triggeringFactors": { "type": "array", "items": "string" },
+              "escalationPath": { "type": "array", "items": "AuthorityLevel" }
+            }
+          },
+          {
+            "name": "validate_authority_level",
+            "description": "Validates if a participant can approve a specific decision",
+            "authorityRequired": 0,
+            "input": {
+              "participantUrn": { "type": "urn", "required": true },
+              "decisionUrn": { "type": "urn", "required": true }
+            },
+            "output": {
+              "canApprove": { "type": "boolean" },
+              "participantLevel": { "type": "integer" },
+              "requiredLevel": { "type": "integer" },
+              "gap": { "type": "integer" },
+              "escalationRequired": { "type": "boolean" },
+              "suggestedApprover": { "type": "urn" }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Voxel Operations",
+        "tools": [
+          {
+            "name": "attach_decision_to_voxel",
+            "description": "Links a decision to a 3D spatial location",
+            "authorityRequired": 1,
+            "input": {
+              "decisionUrn": { "type": "urn", "required": true },
+              "voxelUrn": { "type": "urn", "required": true },
+              "attachmentType": {
+                "type": "enum",
+                "values": ["PRIMARY", "AFFECTED", "ADJACENT", "DOWNSTREAM"],
+                "required": true
+              },
+              "affectedTrades": { "type": "array", "items": "string" },
+              "requiresAcknowledgment": { "type": "boolean" }
+            },
+            "output": {
+              "voxel": "Voxel",
+              "attachment": "VoxelAttachment",
+              "graphEdge": "GraphEdge",
+              "alertsCreated": { "type": "array", "items": "VoxelAlert" }
+            }
+          },
+          {
+            "name": "get_voxel_decisions",
+            "description": "Returns all decisions attached to a voxel",
+            "authorityRequired": 0,
+            "input": {
+              "voxelUrn": { "type": "urn", "required": true },
+              "includeAdjacent": { "type": "boolean" },
+              "attachmentTypes": {
+                "type": "array",
+                "items": {
+                  "enum": ["PRIMARY", "AFFECTED", "ADJACENT", "DOWNSTREAM"]
+                }
+              },
+              "status": { "type": "array", "items": "string" }
+            },
+            "output": {
+              "voxel": "Voxel",
+              "decisions": {
+                "primary": { "type": "array", "items": "PMDecision" },
+                "affected": { "type": "array", "items": "PMDecision" },
+                "adjacent": { "type": "array", "items": "PMDecision" },
+                "downstream": { "type": "array", "items": "PMDecision" }
+              },
+              "decisionSurface": "DecisionSurface",
+              "toleranceOverrides": {
+                "type": "array",
+                "items": "ToleranceOverride"
+              },
+              "preApprovals": { "type": "array", "items": "PreApproval" },
+              "activeAlerts": { "type": "array", "items": "VoxelAlert" }
+            }
+          },
+          {
+            "name": "navigate_decision_surface",
+            "description": "Navigates the decision surface from a starting voxel",
+            "authorityRequired": 0,
+            "input": {
+              "startVoxelUrn": { "type": "urn", "required": true },
+              "direction": {
+                "type": "enum",
+                "values": [
+                  "up",
+                  "down",
+                  "north",
+                  "south",
+                  "east",
+                  "west",
+                  "adjacent"
+                ]
+              },
+              "maxDepth": { "type": "integer" },
+              "filterTrades": { "type": "array", "items": "string" }
+            },
+            "output": {
+              "path": { "type": "array", "items": "VoxelNode" },
+              "decisions": { "type": "array", "items": "PMDecision" },
+              "alerts": { "type": "array", "items": "VoxelAlert" },
+              "graph": {
+                "nodes": { "type": "array", "items": "GraphNode" },
+                "edges": { "type": "array", "items": "GraphEdge" }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Tolerance Management",
+        "tools": [
+          {
+            "name": "apply_tolerance_override",
+            "description": "Creates a pre-approved tolerance variance",
+            "authorityRequired": 2,
+            "input": {
+              "voxelUrn": { "type": "urn", "required": true },
+              "toleranceType": {
+                "type": "enum",
+                "values": [
+                  "WALL_FLATNESS",
+                  "CEILING_HEIGHT",
+                  "FLOOR_LEVEL",
+                  "PROTRUSION",
+                  "GAP",
+                  "ALIGNMENT",
+                  "FINISH_QUALITY",
+                  "EQUIPMENT_CLEARANCE",
+                  "PIPE_SLOPE",
+                  "DUCT_SIZE"
+                ],
+                "required": true
+              },
+              "standardValue": { "type": "ToleranceValue", "required": true },
+              "approvedValue": { "type": "ToleranceValue", "required": true },
+              "rationale": { "type": "string", "required": true },
+              "sourceDecisionUrn": { "type": "urn", "required": true },
+              "applicableTrades": { "type": "array", "items": "string" },
+              "expiresAt": { "type": "datetime" }
+            },
+            "output": {
+              "override": "ToleranceOverride",
+              "voxel": "Voxel",
+              "alertsCreated": { "type": "array", "items": "VoxelAlert" }
+            }
+          },
+          {
+            "name": "query_tolerance_overrides",
+            "description": "Queries tolerance overrides by filters",
+            "authorityRequired": 0,
+            "input": {
+              "projectId": { "type": "string" },
+              "voxelUrn": { "type": "urn" },
+              "toleranceType": { "type": "enum" },
+              "applicableTrade": { "type": "string" },
+              "includeExpired": { "type": "boolean" }
+            },
+            "output": {
+              "overrides": { "type": "array", "items": "ToleranceOverride" },
+              "total": { "type": "integer" },
+              "byType": "Record<ToleranceType, number>"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Consequence & Inspection",
+        "tools": [
+          {
+            "name": "track_consequence",
+            "description": "Creates a consequence record from a decision",
+            "authorityRequired": 1,
+            "input": {
+              "sourceDecisionUrn": { "type": "urn", "required": true },
+              "category": {
+                "type": "enum",
+                "values": [
+                  "SCHEDULE_DELAY",
+                  "COST_INCREASE",
+                  "SAFETY_RISK",
+                  "QUALITY_IMPACT",
+                  "SCOPE_CHANGE",
+                  "REWORK_REQUIRED",
+                  "RESOURCE_CONFLICT",
+                  "PERMIT_REQUIRED",
+                  "DESIGN_CHANGE",
+                  "WARRANTY_IMPACT",
+                  "COORDINATION_CONFLICT",
+                  "TOLERANCE_VARIANCE",
+                  "MATERIAL_MISMATCH",
+                  "ACCESS_ISSUE",
+                  "REGULATORY_CONCERN"
+                ],
+                "required": true
+              },
+              "severity": {
+                "type": "enum",
+                "values": ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+                "required": true
+              },
+              "description": { "type": "string", "required": true },
+              "affectedVoxelUrns": { "type": "array", "items": "urn" },
+              "budgetImpact": { "type": "BudgetImpact" },
+              "scheduleImpact": { "type": "ScheduleImpact" },
+              "evidence": { "type": "array", "items": "Evidence" }
+            },
+            "output": {
+              "consequence": "Consequence",
+              "graphEdges": { "type": "array", "items": "GraphEdge" },
+              "affectedVoxels": { "type": "array", "items": "Voxel" },
+              "escalationRequired": { "type": "boolean" }
+            }
+          },
+          {
+            "name": "request_inspection",
+            "description": "Requests an inspection for decision validation",
+            "authorityRequired": 1,
+            "input": {
+              "voxelUrns": {
+                "type": "array",
+                "items": "urn",
+                "required": true
+              },
+              "inspectionType": {
+                "type": "enum",
+                "values": [
+                  "ROUGH_IN",
+                  "COVER_UP",
+                  "FINAL",
+                  "SAFETY",
+                  "QUALITY",
+                  "SPECIAL",
+                  "REGULATORY"
+                ],
+                "required": true
+              },
+              "requestedDate": { "type": "datetime" },
+              "decisionsToValidate": { "type": "array", "items": "urn" },
+              "notes": { "type": "string" }
+            },
+            "output": {
+              "inspection": "Inspection",
+              "scheduledDate": { "type": "datetime" },
+              "assignedInspector": "ParticipantRef"
+            }
+          },
+          {
+            "name": "complete_inspection",
+            "description": "Records inspection results",
+            "authorityRequired": 2,
+            "input": {
+              "inspectionUrn": { "type": "urn", "required": true },
+              "inspectorUrn": { "type": "urn", "required": true },
+              "outcome": {
+                "type": "enum",
+                "values": ["PASSED", "FAILED", "CONDITIONAL"],
+                "required": true
+              },
+              "findings": {
+                "type": "array",
+                "items": "InspectionFinding",
+                "required": true
+              },
+              "decisionsValidated": { "type": "array", "items": "urn" },
+              "decisionsFailed": { "type": "array", "items": "urn" },
+              "evidence": { "type": "array", "items": "Evidence" },
+              "conditions": { "type": "array", "items": "string" },
+              "reinspectionRequired": { "type": "boolean" }
+            },
+            "output": {
+              "inspection": "Inspection",
+              "validatedDecisions": { "type": "array", "items": "PMDecision" },
+              "failedDecisions": { "type": "array", "items": "PMDecision" },
+              "consequencesCreated": {
+                "type": "array",
+                "items": "Consequence"
+              },
+              "decisionsTriggered": { "type": "array", "items": "PMDecision" },
+              "graphEdges": { "type": "array", "items": "GraphEdge" }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Value & Reporting",
+        "tools": [
+          {
+            "name": "calculate_decision_value",
+            "description": "Calculates the value impact of decisions",
+            "authorityRequired": 3,
+            "input": {
+              "projectId": { "type": "string" },
+              "decisionUrns": { "type": "array", "items": "urn" },
+              "dateRange": {
+                "type": "object",
+                "properties": { "start": "datetime", "end": "datetime" }
+              }
+            },
+            "output": {
+              "summary": {
+                "totalDecisions": { "type": "integer" },
+                "totalBudgetImpact": { "type": "number" },
+                "totalScheduleImpact": { "type": "number" },
+                "valueGenerated": { "type": "number" },
+                "incidentsAvoided": { "type": "integer" },
+                "timeReduction": { "type": "string" }
+              },
+              "byCategory": "Record<string, ValueMetrics>",
+              "byAuthority": "Record<number, ValueMetrics>",
+              "roi": { "type": "number" }
+            }
+          },
+          {
+            "name": "generate_decision_report",
+            "description": "Generates a decision report for stakeholders",
+            "authorityRequired": 2,
+            "input": {
+              "projectId": { "type": "string", "required": true },
+              "reportType": {
+                "type": "enum",
+                "values": ["DAILY", "WEEKLY", "MONTHLY", "EXECUTIVE"],
+                "required": true
+              },
+              "dateRange": {
+                "type": "object",
+                "properties": { "start": "datetime", "end": "datetime" },
+                "required": true
+              },
+              "includeVoxels": { "type": "boolean" },
+              "includeConsequences": { "type": "boolean" },
+              "format": { "type": "enum", "values": ["JSON", "PDF", "HTML"] }
+            },
+            "output": {
+              "report": "DecisionReport",
+              "downloadUrl": { "type": "string" },
+              "emailSent": { "type": "array", "items": "string" }
+            }
+          },
+          {
+            "name": "link_decision_to_schedule",
+            "description": "Links a decision to the 10-day look-ahead schedule",
+            "authorityRequired": 2,
+            "input": {
+              "decisionUrn": { "type": "urn", "required": true },
+              "taskId": { "type": "string", "required": true },
+              "linkType": {
+                "type": "enum",
+                "values": ["BLOCKS", "ENABLES", "MODIFIES", "DELAYS"],
+                "required": true
+              },
+              "impactDescription": { "type": "string", "required": true }
+            },
+            "output": {
+              "decision": "PMDecision",
+              "scheduleProposal": "ScheduleProposal",
+              "affectedTasks": { "type": "array", "items": "ScheduleTask" }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "restApi": {
+    "baseUrl": "/api/pm",
+    "endpoints": {
+      "decisions": [
+        {
+          "method": "POST",
+          "path": "/decisions",
+          "description": "Create decision",
+          "authorityRequired": 0
+        },
+        {
+          "method": "GET",
+          "path": "/decisions",
+          "description": "Query decisions",
+          "authorityRequired": 0
+        },
+        {
+          "method": "GET",
+          "path": "/decisions/:urn",
+          "description": "Get decision by URN",
+          "authorityRequired": 0
+        },
+        {
+          "method": "PUT",
+          "path": "/decisions/:urn",
+          "description": "Update decision",
+          "authorityRequired": "varies"
+        },
+        {
+          "method": "POST",
+          "path": "/decisions/:urn/approve",
+          "description": "Approve decision",
+          "authorityRequired": "varies"
+        },
+        {
+          "method": "POST",
+          "path": "/decisions/:urn/reject",
+          "description": "Reject decision",
+          "authorityRequired": "varies"
+        },
+        {
+          "method": "POST",
+          "path": "/decisions/:urn/escalate",
+          "description": "Escalate decision",
+          "authorityRequired": "current"
+        }
+      ],
+      "voxels": [
+        {
+          "method": "GET",
+          "path": "/voxels",
+          "description": "Query voxels",
+          "authorityRequired": 0
+        },
+        {
+          "method": "GET",
+          "path": "/voxels/:urn",
+          "description": "Get voxel by URN",
+          "authorityRequired": 0
+        },
+        {
+          "method": "GET",
+          "path": "/voxels/:urn/decisions",
+          "description": "Get voxel decisions",
+          "authorityRequired": 0
+        },
+        {
+          "method": "GET",
+          "path": "/voxels/:urn/surface",
+          "description": "Get decision surface",
+          "authorityRequired": 0
+        },
+        {
+          "method": "POST",
+          "path": "/voxels/:urn/attachments",
+          "description": "Attach decision",
+          "authorityRequired": 1
+        },
+        {
+          "method": "POST",
+          "path": "/voxels/:urn/acknowledge",
+          "description": "Acknowledge decision",
+          "authorityRequired": 0
+        }
+      ],
+      "consequences": [
+        {
+          "method": "POST",
+          "path": "/consequences",
+          "description": "Create consequence",
+          "authorityRequired": 1
+        },
+        {
+          "method": "GET",
+          "path": "/consequences",
+          "description": "Query consequences",
+          "authorityRequired": 0
+        },
+        {
+          "method": "GET",
+          "path": "/consequences/:urn",
+          "description": "Get consequence",
+          "authorityRequired": 0
+        },
+        {
+          "method": "PUT",
+          "path": "/consequences/:urn",
+          "description": "Update consequence",
+          "authorityRequired": 1
+        },
+        {
+          "method": "POST",
+          "path": "/consequences/:urn/resolve",
+          "description": "Resolve consequence",
+          "authorityRequired": "varies"
+        }
+      ],
+      "inspections": [
+        {
+          "method": "POST",
+          "path": "/inspections",
+          "description": "Request inspection",
+          "authorityRequired": 1
+        },
+        {
+          "method": "GET",
+          "path": "/inspections",
+          "description": "Query inspections",
+          "authorityRequired": 0
+        },
+        {
+          "method": "GET",
+          "path": "/inspections/:urn",
+          "description": "Get inspection",
+          "authorityRequired": 0
+        },
+        {
+          "method": "PUT",
+          "path": "/inspections/:urn/complete",
+          "description": "Complete inspection",
+          "authorityRequired": "inspector"
+        }
+      ],
+      "graph": [
+        {
+          "method": "GET",
+          "path": "/graph/authority",
+          "description": "Get authority cascade",
+          "authorityRequired": 0
+        },
+        {
+          "method": "POST",
+          "path": "/graph/traverse",
+          "description": "Traverse graph",
+          "authorityRequired": 0
+        },
+        {
+          "method": "GET",
+          "path": "/graph/node/:urn",
+          "description": "Get node by URN",
+          "authorityRequired": 0
+        },
+        {
+          "method": "GET",
+          "path": "/graph/edges",
+          "description": "Query edges",
+          "authorityRequired": 0
+        }
+      ]
+    }
+  },
+  "errorCodes": [
+    {
+      "code": "DECISION_NOT_FOUND",
+      "httpStatus": 404,
+      "description": "Decision URN does not exist"
+    },
+    {
+      "code": "VOXEL_NOT_FOUND",
+      "httpStatus": 404,
+      "description": "Voxel URN does not exist"
+    },
+    {
+      "code": "INSUFFICIENT_AUTHORITY",
+      "httpStatus": 403,
+      "description": "Authority level too low"
+    },
+    {
+      "code": "MISSING_PERMISSION",
+      "httpStatus": 403,
+      "description": "Specific permission not granted"
+    },
+    {
+      "code": "INVALID_URN_FORMAT",
+      "httpStatus": 400,
+      "description": "URN does not match pattern"
+    },
+    {
+      "code": "VALIDATION_ERROR",
+      "httpStatus": 400,
+      "description": "Schema validation failed"
+    },
+    {
+      "code": "DECISION_ALREADY_APPROVED",
+      "httpStatus": 409,
+      "description": "Cannot modify approved decision"
+    },
+    {
+      "code": "ESCALATION_REQUIRED",
+      "httpStatus": 409,
+      "description": "Decision requires escalation"
+    },
+    {
+      "code": "VOXEL_BLOCKED",
+      "httpStatus": 409,
+      "description": "Voxel has blocking decisions"
+    }
+  ],
+  "graphMetadata": {
+    "inEdges": ["urn:luhtech:ectropy:feature:decision-lifecycle"],
+    "outEdges": []
+  }
+}

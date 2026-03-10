@@ -1,0 +1,247 @@
+{
+  "$schema": "https://luhtech.dev/schemas/interfaces.schema.json",
+  "$id": "urn:luhtech:ectropy:interfaces:ipd-governance",
+  "schemaVersion": "3.0.0",
+  "meta": {
+    "ventureId": "ectropy",
+    "featureId": "ipd-governance",
+    "createdAt": "2026-01-15T10:00:00Z",
+    "lastUpdated": "2026-01-15T10:00:00Z",
+    "author": "erik",
+    "sourceDoc": ".roadmap/features/ipd-governance/interfaces.json"
+  },
+  "summary": "MCP tools for IPD governance - 6 tools for PMT/PET voting and Target Cost",
+  "mcpTools": {
+    "totalCount": 6,
+    "categories": [
+      {
+        "name": "PMT/PET Voting",
+        "tools": [
+          {
+            "name": "initiate_pmt_vote_tool",
+            "description": "Start a PMT voting session for an IPD decision",
+            "authorityRequired": 3,
+            "input": {
+              "decisionUrn": { "type": "urn", "required": true },
+              "projectId": { "type": "string", "required": true },
+              "votingWindowHours": { "type": "integer", "default": 48 },
+              "urgency": {
+                "type": "enum",
+                "values": ["STANDARD", "EXPEDITED", "EMERGENCY"]
+              },
+              "notifyViaChannels": {
+                "type": "array",
+                "items": "enum",
+                "values": ["EMAIL", "SMS", "PUSH"]
+              }
+            },
+            "output": {
+              "votingSession": { "type": "VotingSession" },
+              "eligibleVoters": { "type": "array", "items": "VoterInfo" },
+              "deadline": { "type": "datetime" },
+              "notificationsSent": {
+                "type": "array",
+                "items": "NotificationResult"
+              }
+            }
+          },
+          {
+            "name": "cast_vote_tool",
+            "description": "Record a vote in a PMT or PET voting session",
+            "authorityRequired": "varies",
+            "input": {
+              "sessionUrn": { "type": "urn", "required": true },
+              "voterUrn": { "type": "urn", "required": true },
+              "vote": {
+                "type": "enum",
+                "values": ["FOR", "AGAINST", "ABSTAIN"],
+                "required": true
+              },
+              "rationale": { "type": "string" },
+              "conditions": {
+                "type": "array",
+                "items": "string",
+                "description": "Conditions attached to FOR vote"
+              }
+            },
+            "output": {
+              "voteRecorded": { "type": "boolean" },
+              "sessionStatus": { "type": "VotingSession" },
+              "votesFor": { "type": "integer" },
+              "votesAgainst": { "type": "integer" },
+              "quorumMet": { "type": "boolean" },
+              "sessionComplete": { "type": "boolean" },
+              "outcome": { "type": "string" }
+            }
+          },
+          {
+            "name": "get_voting_status_tool",
+            "description": "Query the current status of a voting session",
+            "authorityRequired": 0,
+            "input": {
+              "sessionUrn": { "type": "urn", "required": true }
+            },
+            "output": {
+              "session": { "type": "VotingSession" },
+              "votesReceived": { "type": "integer" },
+              "votesRequired": { "type": "integer" },
+              "pendingVoters": { "type": "array", "items": "VoterInfo" },
+              "timeRemaining": { "type": "string" },
+              "projectedOutcome": { "type": "string" }
+            }
+          },
+          {
+            "name": "escalate_to_pet_tool",
+            "description": "Escalate a PMT deadlock or threshold exceedance to PET",
+            "authorityRequired": 3,
+            "input": {
+              "pmtSessionUrn": { "type": "urn", "required": true },
+              "escalationReason": {
+                "type": "enum",
+                "values": [
+                  "DEADLOCK",
+                  "THRESHOLD_EXCEEDED",
+                  "TIMEOUT",
+                  "UNANIMOUS_REQUIRED"
+                ],
+                "required": true
+              },
+              "additionalContext": { "type": "string" }
+            },
+            "output": {
+              "petSession": { "type": "VotingSession" },
+              "pmtSessionClosed": { "type": "boolean" },
+              "petMembers": { "type": "array", "items": "VoterInfo" },
+              "notificationsSent": {
+                "type": "array",
+                "items": "NotificationResult"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Target Cost Management",
+        "tools": [
+          {
+            "name": "update_target_cost_tool",
+            "description": "Record a Target Cost amendment (requires PMT/PET approval)",
+            "authorityRequired": "varies",
+            "input": {
+              "projectId": { "type": "string", "required": true },
+              "amendmentAmount": { "type": "number", "required": true },
+              "reason": { "type": "string", "required": true },
+              "category": {
+                "type": "enum",
+                "values": [
+                  "SCOPE_CHANGE",
+                  "UNFORESEEN_CONDITION",
+                  "OWNER_REQUEST",
+                  "CODE_CHANGE",
+                  "VALUE_ENGINEERING"
+                ],
+                "required": true
+              },
+              "approvalSessionUrn": {
+                "type": "urn",
+                "description": "Reference to approval voting session"
+              }
+            },
+            "output": {
+              "targetCost": { "type": "TargetCost" },
+              "amendment": { "type": "Amendment" },
+              "newTargetCost": { "type": "number" },
+              "contingencyRemaining": { "type": "number" }
+            }
+          },
+          {
+            "name": "calculate_savings_projection_tool",
+            "description": "Project final savings/overrun and distribution",
+            "authorityRequired": 0,
+            "input": {
+              "projectId": { "type": "string", "required": true },
+              "includeGoalAchievement": { "type": "boolean", "default": true },
+              "asOfDate": { "type": "date" }
+            },
+            "output": {
+              "projection": {
+                "adjustedTargetCost": { "type": "number" },
+                "projectedFinalCost": { "type": "number" },
+                "projectedSavings": { "type": "number" },
+                "projectedOverrun": { "type": "number" },
+                "confidenceLevel": { "type": "number" }
+              },
+              "distribution": {
+                "type": "array",
+                "items": {
+                  "partyName": { "type": "string" },
+                  "sharePercentage": { "type": "number" },
+                  "projectedAmount": { "type": "number" }
+                }
+              },
+              "goalAchievement": {
+                "type": "array",
+                "items": {
+                  "goalDescription": { "type": "string" },
+                  "status": { "type": "string" },
+                  "compensationAmount": { "type": "number" }
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "restApi": {
+    "baseUrl": "/api/ipd",
+    "endpoints": [
+      {
+        "method": "GET",
+        "path": "/projects/:id/pmt",
+        "description": "Get PMT configuration",
+        "authorityRequired": 0
+      },
+      {
+        "method": "POST",
+        "path": "/decisions/:id/vote",
+        "description": "Initiate or cast vote",
+        "authorityRequired": "varies"
+      },
+      {
+        "method": "GET",
+        "path": "/decisions/:id/voting-status",
+        "description": "Get voting status",
+        "authorityRequired": 0
+      },
+      {
+        "method": "POST",
+        "path": "/decisions/:id/escalate-to-pet",
+        "description": "Escalate to PET",
+        "authorityRequired": 3
+      },
+      {
+        "method": "GET",
+        "path": "/projects/:id/target-cost",
+        "description": "Get target cost data",
+        "authorityRequired": 0
+      },
+      {
+        "method": "POST",
+        "path": "/projects/:id/target-cost/amendment",
+        "description": "Record amendment",
+        "authorityRequired": "varies"
+      },
+      {
+        "method": "GET",
+        "path": "/projects/:id/savings-projection",
+        "description": "Get savings projection",
+        "authorityRequired": 0
+      }
+    ]
+  },
+  "graphMetadata": {
+    "inEdges": ["urn:luhtech:ectropy:feature:ipd-governance"],
+    "outEdges": []
+  }
+}

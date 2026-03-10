@@ -1,0 +1,920 @@
+{
+  "version": "1.0.0",
+  "environment": "all",
+  "runbookType": "validation",
+  "metadata": {
+    "catalogId": "validation-runbook-v1-0-0",
+    "name": "Pre-Flight Check - Speckle Deployment Readiness",
+    "type": "validation",
+    "purpose": "Comprehensive system validation for Ectropy deployment readiness including Docker, ports, resources, environment configuration, and database migrations",
+    "maintainer": "DevOps Team",
+    "author": "Claude (Enterprise Integration)",
+    "created": "2025-11-14T00:00:00Z",
+    "lastUpdated": "2025-11-16T00:00:00Z",
+    "estimatedDuration": "10 minutes",
+    "complexity": "medium",
+    "priority": "critical",
+    "relatedDocuments": [
+      ".env.local",
+      ".env.template",
+      "docker-compose.development.yml",
+      "libs/database/migrations/001_init.sql",
+      "libs/database/migrations/002_ai_features.sql",
+      "libs/database/migrations/003_speckle_integration.sql"
+    ],
+    "sourceFile": "scripts/deployment/preflight-check.ps1",
+    "conversionDate": "2025-11-16T00:00:00Z",
+    "schemaVersion": "1.0.0"
+  },
+  "executiveSummary": {
+    "description": "Enterprise pre-flight validation runbook that verifies system readiness for Ectropy deployment with Speckle integration. Validates Docker installation and resources, port availability, environment configuration, Docker Compose validity, database migrations, and disk space requirements.",
+    "status": "READY",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "LOW",
+    "keyChanges": [
+      "Docker Desktop installation and daemon status check",
+      "Docker resource allocation validation (CPU, Memory)",
+      "Port availability verification for all services",
+      "Environment file validation (.env.local)",
+      "Critical environment variable verification",
+      "Docker Compose configuration validation",
+      "Database migration file verification",
+      "Disk space requirement check"
+    ],
+    "prerequisites": [
+      "Docker Desktop installed (Windows)",
+      "PowerShell 5.1 or higher",
+      "Minimum 8GB RAM available for Docker",
+      "Minimum 20GB free disk space",
+      "Access to project root directory"
+    ],
+    "impact": {
+      "systems": [
+        "Docker Desktop",
+        "Local Development Environment",
+        "Port Allocation",
+        "File System"
+      ],
+      "downtime": "None - validation only",
+      "rollbackTime": "N/A"
+    }
+  },
+  "preFlightChecks": [
+    {
+      "id": "docker-installed",
+      "order": 1,
+      "category": "infrastructure",
+      "name": "Docker Installation Check",
+      "description": "Verify Docker Desktop is installed and in PATH",
+      "command": "docker --version",
+      "expectedResult": "Docker version string",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Command exits with 0 and returns version",
+      "onFailure": {
+        "action": "abort",
+        "message": "Docker is not installed or not in PATH"
+      }
+    },
+    {
+      "id": "docker-daemon-running",
+      "order": 2,
+      "category": "infrastructure",
+      "name": "Docker Daemon Status",
+      "description": "Verify Docker daemon is running and accessible",
+      "command": "docker info",
+      "expectedResult": "Docker daemon information",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "docker info returns 0 exit code",
+      "onFailure": {
+        "action": "abort",
+        "message": "Docker daemon is not running - please start Docker Desktop"
+      }
+    },
+    {
+      "id": "docker-resources-cpu",
+      "order": 3,
+      "category": "infrastructure",
+      "name": "Docker CPU Allocation",
+      "description": "Check Docker has sufficient CPU cores allocated",
+      "commands": [],
+      "expectedResult": "4+ CPUs recommended",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "validationLogic": "Parse NCPU from docker info JSON",
+      "onFailure": {
+        "action": "warn",
+        "message": "Consider increasing Docker CPU allocation to 4+"
+      }
+    },
+    {
+      "id": "docker-resources-memory",
+      "order": 4,
+      "category": "infrastructure",
+      "name": "Docker Memory Allocation",
+      "description": "Check Docker has sufficient memory allocated",
+      "commands": [],
+      "expectedResult": "8GB+ RAM required",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Parse MemTotal from docker info JSON, must be >= 8GB",
+      "onFailure": {
+        "action": "abort",
+        "message": "Minimum 8GB RAM required for Docker"
+      }
+    },
+    {
+      "id": "ports-available",
+      "order": 5,
+      "category": "infrastructure",
+      "name": "Port Availability",
+      "description": "Verify all required ports are available",
+      "commands": [],
+      "expectedResult": "All ports free: 3000, 3001, 4000, 5432, 6333, 6334, 6379, 8080, 9000, 9001",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Attempt to bind TCP listener to each port",
+      "onFailure": {
+        "action": "abort",
+        "message": "Required ports are in use - stop conflicting services"
+      }
+    },
+    {
+      "id": "env-file-exists",
+      "order": 6,
+      "category": "configuration",
+      "name": "Environment File",
+      "description": "Check .env.local exists",
+      "command": "Test-Path .env.local",
+      "expectedResult": "True",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "File exists check",
+      "onFailure": {
+        "action": "abort",
+        "message": "Run: cp .env.template .env.local"
+      }
+    },
+    {
+      "id": "env-vars-configured",
+      "order": 7,
+      "category": "configuration",
+      "name": "Critical Environment Variables",
+      "description": "Verify critical environment variables are configured",
+      "commands": [],
+      "expectedResult": "All critical vars set: DATABASE_PASSWORD, JWT_SECRET, SESSION_SECRET, SPECKLE_SESSION_SECRET, MINIO_ACCESS_KEY, MINIO_SECRET_KEY",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Regex match for variable assignment",
+      "onFailure": {
+        "action": "abort",
+        "message": "Critical environment variables missing in .env.local"
+      }
+    },
+    {
+      "id": "docker-compose-valid",
+      "order": 8,
+      "category": "configuration",
+      "name": "Docker Compose Configuration",
+      "description": "Validate docker-compose.development.yml syntax",
+      "command": "docker-compose -f docker-compose.development.yml config",
+      "expectedResult": "Valid YAML with no errors",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "docker-compose config exits with 0",
+      "onFailure": {
+        "action": "abort",
+        "message": "Docker Compose configuration has errors"
+      }
+    },
+    {
+      "id": "migrations-exist",
+      "order": 9,
+      "category": "dependencies",
+      "name": "Database Migrations",
+      "description": "Verify database migration files exist",
+      "commands": [],
+      "expectedResult": "All migration files present: 001_init.sql, 002_ai_features.sql, 003_speckle_integration.sql",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "File existence checks",
+      "onFailure": {
+        "action": "abort",
+        "message": "Database migration files not found"
+      }
+    },
+    {
+      "id": "disk-space",
+      "order": 10,
+      "category": "infrastructure",
+      "name": "Disk Space",
+      "description": "Verify sufficient disk space for deployment",
+      "commands": [],
+      "expectedResult": "20GB+ free space",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Check drive free space >= 20GB",
+      "onFailure": {
+        "action": "abort",
+        "message": "Minimum 20GB free space required"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Docker Validation",
+      "description": "Validate Docker Desktop installation and configuration",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Check Docker Installation",
+          "command": "docker --version",
+          "purpose": "Verify Docker is installed and accessible",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Docker is not installed or not in PATH"
+          }
+        },
+        {
+          "step": "1.2",
+          "name": "Check Docker Daemon Status",
+          "command": "docker info 2>&1",
+          "purpose": "Verify Docker daemon is running",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0 indicates daemon running"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Docker daemon is not running - please start Docker Desktop"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Resource Validation",
+      "description": "Verify Docker has sufficient resources allocated",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Get Docker Resource Information",
+          "command": "docker info --format json",
+          "purpose": "Retrieve Docker resource allocation",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedOutput": "JSON with NCPU and MemTotal",
+          "expectedStatus": 0
+        },
+        {
+          "step": "2.2",
+          "name": "Validate CPU Allocation",
+          "description": "Parse NCPU and verify >= 4 CPUs (recommended)",
+          "commands": [],
+          "purpose": "Ensure sufficient CPU resources",
+          "required": false,
+          "automatable": true,
+          "validation": {
+            "type": "output",
+            "criteria": "NCPU >= 4"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Warning: Recommended 4+ CPUs"
+          }
+        },
+        {
+          "step": "2.3",
+          "name": "Validate Memory Allocation",
+          "description": "Parse MemTotal and verify >= 8GB",
+          "commands": [],
+          "purpose": "Ensure sufficient memory resources",
+          "required": true,
+          "automatable": true,
+          "validation": {
+            "type": "output",
+            "criteria": "MemTotal >= 8GB"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Minimum 8GB RAM required (increase in Docker Desktop settings)"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Port Availability",
+      "description": "Verify all required ports are available",
+      "estimatedDuration": "2 minutes",
+      "parallel": true,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Test Web Dashboard Port (3000)",
+          "description": "Attempt to bind TCP listener to port 3000",
+          "commands": [],
+          "purpose": "Verify Web Dashboard port is available",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "validation": {
+            "type": "output",
+            "criteria": "Port is available for binding"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Port 3000 (Web Dashboard) is in use"
+          }
+        },
+        {
+          "step": "3.2",
+          "name": "Test API Gateway Port (4000)",
+          "description": "Attempt to bind TCP listener to port 4000",
+          "commands": [],
+          "purpose": "Verify API Gateway port is available",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "validation": {
+            "type": "output",
+            "criteria": "Port is available for binding"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Port 4000 (API Gateway) is in use"
+          }
+        },
+        {
+          "step": "3.3",
+          "name": "Test MCP Server Port (3001)",
+          "description": "Attempt to bind TCP listener to port 3001",
+          "commands": [],
+          "purpose": "Verify MCP Server port is available",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "validation": {
+            "type": "output",
+            "criteria": "Port is available for binding"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Port 3001 (MCP Server) is in use"
+          }
+        },
+        {
+          "step": "3.4",
+          "name": "Test PostgreSQL Port (5432)",
+          "description": "Attempt to bind TCP listener to port 5432",
+          "commands": [],
+          "purpose": "Verify PostgreSQL port is available",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "validation": {
+            "type": "output",
+            "criteria": "Port is available for binding"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Port 5432 (PostgreSQL) is in use"
+          }
+        },
+        {
+          "step": "3.5",
+          "name": "Test Redis Port (6379)",
+          "description": "Attempt to bind TCP listener to port 6379",
+          "commands": [],
+          "purpose": "Verify Redis port is available",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "validation": {
+            "type": "output",
+            "criteria": "Port is available for binding"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Port 6379 (Redis) is in use"
+          }
+        },
+        {
+          "step": "3.6",
+          "name": "Test Speckle Frontend Port (8080)",
+          "description": "Attempt to bind TCP listener to port 8080",
+          "commands": [],
+          "purpose": "Verify Speckle Frontend port is available",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "validation": {
+            "type": "output",
+            "criteria": "Port is available for binding"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Port 8080 (Speckle Frontend) is in use"
+          }
+        },
+        {
+          "step": "3.7",
+          "name": "Test MinIO API Port (9000)",
+          "description": "Attempt to bind TCP listener to port 9000",
+          "commands": [],
+          "purpose": "Verify MinIO S3 API port is available",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "validation": {
+            "type": "output",
+            "criteria": "Port is available for binding"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Port 9000 (MinIO S3 API) is in use"
+          }
+        },
+        {
+          "step": "3.8",
+          "name": "Test MinIO Console Port (9001)",
+          "description": "Attempt to bind TCP listener to port 9001",
+          "commands": [],
+          "purpose": "Verify MinIO Console port is available",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "validation": {
+            "type": "output",
+            "criteria": "Port is available for binding"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Port 9001 (MinIO Console) is in use"
+          }
+        },
+        {
+          "step": "3.9",
+          "name": "Test Qdrant HTTP Port (6333)",
+          "description": "Attempt to bind TCP listener to port 6333",
+          "commands": [],
+          "purpose": "Verify Qdrant HTTP port is available",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "validation": {
+            "type": "output",
+            "criteria": "Port is available for binding"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Port 6333 (Qdrant HTTP) is in use"
+          }
+        },
+        {
+          "step": "3.10",
+          "name": "Test Qdrant gRPC Port (6334)",
+          "description": "Attempt to bind TCP listener to port 6334",
+          "commands": [],
+          "purpose": "Verify Qdrant gRPC port is available",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "validation": {
+            "type": "output",
+            "criteria": "Port is available for binding"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Port 6334 (Qdrant gRPC) is in use"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Configuration Validation",
+      "description": "Verify environment and Docker Compose configuration",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Check .env.local exists",
+          "command": "Test-Path .env.local",
+          "purpose": "Verify environment file is present",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "True",
+          "validation": {
+            "type": "output",
+            "criteria": "Returns True"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Run: cp .env.template .env.local"
+          }
+        },
+        {
+          "step": "4.2",
+          "name": "Load environment file content",
+          "command": "Get-Content .env.local -Raw",
+          "purpose": "Read environment file for variable validation",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "File contents"
+        },
+        {
+          "step": "4.3",
+          "name": "Validate critical environment variables",
+          "description": "Check for: DATABASE_PASSWORD, JWT_SECRET, SESSION_SECRET, SPECKLE_SESSION_SECRET, MINIO_ACCESS_KEY, MINIO_SECRET_KEY",
+          "commands": [],
+          "purpose": "Ensure all critical secrets are configured",
+          "required": true,
+          "automatable": true,
+          "validation": {
+            "type": "output",
+            "criteria": "All variables present with non-empty values"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Critical environment variables missing or empty"
+          }
+        },
+        {
+          "step": "4.4",
+          "name": "Check SPECKLE_SERVER_TOKEN placeholder",
+          "description": "Informational check if token needs to be set",
+          "commands": [],
+          "purpose": "Notify if Speckle token is still placeholder value",
+          "required": false,
+          "automatable": true,
+          "validation": {
+            "type": "output",
+            "criteria": "Token is not REPLACE_WITH_TOKEN"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Info: SPECKLE_SERVER_TOKEN needs to be set after admin creation"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Docker Compose Validation",
+      "description": "Validate Docker Compose configuration file",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "5.1",
+          "name": "Check Docker Compose file exists",
+          "command": "Test-Path docker-compose.development.yml",
+          "purpose": "Verify Docker Compose file is present",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "True",
+          "validation": {
+            "type": "output",
+            "criteria": "Returns True"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "docker-compose.development.yml not found"
+          }
+        },
+        {
+          "step": "5.2",
+          "name": "Validate Docker Compose syntax",
+          "command": "docker-compose -f docker-compose.development.yml config",
+          "purpose": "Parse and validate YAML syntax",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0 indicates valid configuration"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Docker Compose configuration has syntax errors"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Database Migration Validation",
+      "description": "Verify database migration files exist",
+      "estimatedDuration": "1 minute",
+      "parallel": true,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "6.1",
+          "name": "Check 001_init.sql",
+          "command": "Test-Path libs/database/migrations/001_init.sql",
+          "purpose": "Verify initial schema migration exists",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "True",
+          "validation": {
+            "type": "output",
+            "criteria": "Returns True"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Migration 001_init.sql not found"
+          }
+        },
+        {
+          "step": "6.2",
+          "name": "Check 002_ai_features.sql",
+          "command": "Test-Path libs/database/migrations/002_ai_features.sql",
+          "purpose": "Verify AI features migration exists",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "True",
+          "validation": {
+            "type": "output",
+            "criteria": "Returns True"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Migration 002_ai_features.sql not found"
+          }
+        },
+        {
+          "step": "6.3",
+          "name": "Check 003_speckle_integration.sql",
+          "command": "Test-Path libs/database/migrations/003_speckle_integration.sql",
+          "purpose": "Verify Speckle integration migration exists",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "True",
+          "validation": {
+            "type": "output",
+            "criteria": "Returns True"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Migration 003_speckle_integration.sql not found"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 7,
+      "name": "Disk Space Validation",
+      "description": "Verify sufficient disk space for deployment",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "7.1",
+          "name": "Check available disk space",
+          "command": "(Get-Location).Drive.Free",
+          "purpose": "Retrieve free space on current drive",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "Free space in bytes",
+          "validation": {
+            "type": "output",
+            "criteria": "Free space >= 20GB"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Minimum 20GB free space required for deployment"
+          }
+        }
+      ]
+    }
+  ],
+  "successCriteria": [
+    {
+      "criterion": "Docker is installed and accessible",
+      "status": "REQUIRED",
+      "validation": "docker --version returns 0"
+    },
+    {
+      "criterion": "Docker daemon is running",
+      "status": "REQUIRED",
+      "validation": "docker info returns 0"
+    },
+    {
+      "criterion": "Docker has 4+ CPUs allocated",
+      "status": "RECOMMENDED",
+      "validation": "NCPU >= 4 from docker info"
+    },
+    {
+      "criterion": "Docker has 8GB+ RAM allocated",
+      "status": "REQUIRED",
+      "validation": "MemTotal >= 8GB from docker info"
+    },
+    {
+      "criterion": "All required ports are available",
+      "status": "REQUIRED",
+      "validation": "TCP listener can bind to all ports"
+    },
+    {
+      "criterion": ".env.local exists",
+      "status": "REQUIRED",
+      "validation": "File existence check"
+    },
+    {
+      "criterion": "All critical environment variables configured",
+      "status": "REQUIRED",
+      "validation": "Variables present and non-empty"
+    },
+    {
+      "criterion": "Docker Compose configuration is valid",
+      "status": "REQUIRED",
+      "validation": "docker-compose config succeeds"
+    },
+    {
+      "criterion": "All database migrations exist",
+      "status": "REQUIRED",
+      "validation": "All three migration files present"
+    },
+    {
+      "criterion": "20GB+ free disk space",
+      "status": "REQUIRED",
+      "validation": "Drive free space >= 20GB"
+    }
+  ],
+  "mcpIntegration": {
+    "queryableFields": [
+      "environment",
+      "runbookType",
+      "metadata.catalogId",
+      "metadata.complexity",
+      "metadata.estimatedDuration",
+      "preFlightChecks[].category",
+      "preFlightChecks[].severity",
+      "phases[].name"
+    ],
+    "supportedQueries": [
+      {
+        "query": "What are the system requirements for Ectropy deployment?",
+        "returns": "Docker Desktop with 8GB+ RAM, 4+ CPUs (recommended), 20GB+ disk space, and specific ports available",
+        "purpose": "System requirements summary"
+      },
+      {
+        "query": "Which ports need to be available?",
+        "returns": "3000 (Web), 3001 (MCP), 4000 (API), 5432 (PostgreSQL), 6333/6334 (Qdrant), 6379 (Redis), 8080 (Speckle), 9000/9001 (MinIO)",
+        "purpose": "Port allocation details"
+      },
+      {
+        "query": "What environment variables are required?",
+        "returns": "DATABASE_PASSWORD, JWT_SECRET, SESSION_SECRET, SPECKLE_SESSION_SECRET, MINIO_ACCESS_KEY, MINIO_SECRET_KEY",
+        "purpose": "Required configuration"
+      },
+      {
+        "query": "How do I prepare for deployment?",
+        "returns": "Run pre-flight check to validate Docker, ports, environment file, and disk space",
+        "purpose": "Deployment preparation"
+      },
+      {
+        "query": "What if a port is in use?",
+        "returns": "Pre-flight check fails - stop the conflicting service before deploying",
+        "purpose": "Port conflict resolution"
+      },
+      {
+        "query": "How long does pre-flight validation take?",
+        "returns": "Approximately 10 minutes for complete validation",
+        "purpose": "Time estimation"
+      }
+    ],
+    "decisionSupport": [
+      "Identifies missing dependencies before deployment starts",
+      "Validates Docker resource allocation meets minimum requirements",
+      "Detects port conflicts early in the process",
+      "Ensures all required configuration is present",
+      "Verifies database migrations are available",
+      "Confirms sufficient disk space for containers and data"
+    ]
+  },
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "DATABASE_PASSWORD",
+        "description": "PostgreSQL database password",
+        "required": true,
+        "environment": "all",
+        "secret": true,
+        "minimumLength": 16
+      },
+      {
+        "name": "JWT_SECRET",
+        "description": "JWT token signing secret",
+        "required": true,
+        "environment": "all",
+        "secret": true,
+        "minimumLength": 32
+      },
+      {
+        "name": "SESSION_SECRET",
+        "description": "Session encryption secret",
+        "required": true,
+        "environment": "all",
+        "secret": true,
+        "minimumLength": 32
+      },
+      {
+        "name": "SPECKLE_SESSION_SECRET",
+        "description": "Speckle session secret",
+        "required": true,
+        "environment": "all",
+        "secret": true,
+        "minimumLength": 32
+      },
+      {
+        "name": "MINIO_ACCESS_KEY",
+        "description": "MinIO S3 access key",
+        "required": true,
+        "environment": "all",
+        "secret": false,
+        "minimumLength": 8
+      },
+      {
+        "name": "MINIO_SECRET_KEY",
+        "description": "MinIO S3 secret key",
+        "required": true,
+        "environment": "all",
+        "secret": true,
+        "minimumLength": 16
+      },
+      {
+        "name": "SPECKLE_SERVER_TOKEN",
+        "description": "Speckle server API token (set after admin user creation)",
+        "required": false,
+        "environment": "all",
+        "secret": true
+      }
+    ]
+  },
+  "knownIssues": [
+    {
+      "id": "KI-001",
+      "title": "PowerShell execution policy may block script",
+      "severity": "MEDIUM",
+      "impact": "Pre-flight check script may not execute",
+      "mitigation": "Run: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser",
+      "action": "Set PowerShell execution policy before running",
+      "priority": "P2"
+    },
+    {
+      "id": "KI-002",
+      "title": "Docker Desktop WSL2 backend may require restart",
+      "severity": "LOW",
+      "impact": "docker info may fail on first attempt",
+      "mitigation": "Restart Docker Desktop if daemon is not responding",
+      "action": "Restart Docker Desktop and retry",
+      "priority": "P3"
+    }
+  ]
+}

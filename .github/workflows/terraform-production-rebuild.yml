@@ -1,0 +1,290 @@
+name: Terraform Production Rebuild
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_rebuild:
+        description: 'Type "REBUILD PRODUCTION" to confirm'
+        required: true
+        type: string
+
+env:
+  TF_VERSION: '1.14.0' # Standardized across all Terraform workflows (aligned with local development)
+  WORKING_DIR: terraform
+
+jobs:
+  terraform-rebuild:
+    name: Rebuild Production Infrastructure
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Validate Confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_rebuild }}" != "REBUILD PRODUCTION" ]; then
+            echo "❌ Confirmation failed. You must type 'REBUILD PRODUCTION' exactly."
+            exit 1
+          fi
+          echo "✅ Rebuild confirmation validated"
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure DigitalOcean Token
+        run: |
+          echo "Configuring DigitalOcean authentication..."
+          # Terraform will use DIGITALOCEAN_TOKEN environment variable
+        env:
+          DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "INITIALIZING TERRAFORM"
+          echo "═══════════════════════════════════════════════════════════"
+          terraform init
+        env:
+          DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "GENERATING TERRAFORM PLAN"
+          echo "═══════════════════════════════════════════════════════════"
+          # ENTERPRISE FIX (2026-01-02): Load production environment configuration
+          # Uses production tfvars for environment/project_id and all production-specific config
+          # Prevents "No value for required variable" errors
+          terraform plan -var-file=environments/production/terraform.tfvars -out=production-rebuild.tfplan
+
+          echo ""
+          echo "━━━ Plan Summary ━━━"
+          terraform show -no-color production-rebuild.tfplan | tail -50
+        env:
+          DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Terraform Apply
+        id: apply
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "APPLYING TERRAFORM CONFIGURATION"
+          echo "═══════════════════════════════════════════════════════════"
+          echo ""
+          echo "Creating new production infrastructure:"
+          echo "  - 2x c2-4vcpu-8gb droplets (Blue & Green)"
+          echo "  - 1x Load Balancer with SSL"
+          echo "  - 2x Reserved IPs"
+          echo "  - 1x Firewall"
+          echo ""
+          echo "⏳ This will take approximately 3-5 minutes..."
+          echo ""
+
+          terraform apply -auto-approve production-rebuild.tfplan
+
+          echo ""
+          echo "✅ Infrastructure created successfully!"
+        env:
+          DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Extract Outputs
+        id: outputs
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "INFRASTRUCTURE OUTPUTS"
+          echo "═══════════════════════════════════════════════════════════"
+          echo ""
+
+          # Extract outputs
+          BLUE_IP=$(terraform output -raw production_blue_ip)
+          GREEN_IP=$(terraform output -raw production_green_ip)
+          BLUE_RESERVED_IP=$(terraform output -raw production_blue_reserved_ip)
+          GREEN_RESERVED_IP=$(terraform output -raw production_green_reserved_ip)
+          LB_IP=$(terraform output -raw load_balancer_ip)
+          LB_ID=$(terraform output -raw load_balancer_id)
+          BLUE_ID=$(terraform output -raw production_blue_id)
+          GREEN_ID=$(terraform output -raw production_green_id)
+
+          # Display outputs
+          echo "🔵 Blue Server:"
+          echo "   IP: $BLUE_IP"
+          echo "   Reserved IP: $BLUE_RESERVED_IP"
+          echo "   Droplet ID: $BLUE_ID"
+          echo ""
+          echo "🟢 Green Server:"
+          echo "   IP: $GREEN_IP"
+          echo "   Reserved IP: $GREEN_RESERVED_IP"
+          echo "   Droplet ID: $GREEN_ID"
+          echo ""
+          echo "⚖️  Load Balancer:"
+          echo "   IP: $LB_IP"
+          echo "   ID: $LB_ID"
+          echo ""
+
+          # Set outputs for use in later steps
+          echo "blue_ip=$BLUE_IP" >> $GITHUB_OUTPUT
+          echo "green_ip=$GREEN_IP" >> $GITHUB_OUTPUT
+          echo "blue_reserved_ip=$BLUE_RESERVED_IP" >> $GITHUB_OUTPUT
+          echo "green_reserved_ip=$GREEN_RESERVED_IP" >> $GITHUB_OUTPUT
+          echo "lb_ip=$LB_IP" >> $GITHUB_OUTPUT
+          echo "lb_id=$LB_ID" >> $GITHUB_OUTPUT
+          echo "blue_id=$BLUE_ID" >> $GITHUB_OUTPUT
+          echo "green_id=$GREEN_ID" >> $GITHUB_OUTPUT
+        env:
+          DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Verify New Servers
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "VERIFYING NEW INFRASTRUCTURE"
+          echo "═══════════════════════════════════════════════════════════"
+          echo ""
+          echo "⏳ Waiting 60 seconds for servers to initialize..."
+          sleep 60
+
+          echo ""
+          echo "🔍 Checking Blue server (${{ steps.outputs.outputs.blue_reserved_ip }})..."
+          # Servers won't have SSH access yet (no keys deployed), but we can check if they're reachable
+          ping -c 3 ${{ steps.outputs.outputs.blue_reserved_ip }} || echo "Server not yet reachable (normal during provisioning)"
+
+          echo ""
+          echo "🔍 Checking Green server (${{ steps.outputs.outputs.green_reserved_ip }})..."
+          ping -c 3 ${{ steps.outputs.outputs.green_reserved_ip }} || echo "Server not yet reachable (normal during provisioning)"
+
+          echo ""
+          echo "🔍 Checking Load Balancer (${{ steps.outputs.outputs.lb_ip }})..."
+          ping -c 3 ${{ steps.outputs.outputs.lb_ip }} || echo "Load balancer not yet reachable (normal during provisioning)"
+
+      - name: Update GitHub Secrets
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "UPDATING GITHUB SECRETS"
+          echo "═══════════════════════════════════════════════════════════"
+          echo ""
+          echo "Updating production deployment secrets..."
+
+          gh secret set PRODUCTION_BLUE_IP --body "${{ steps.outputs.outputs.blue_reserved_ip }}" --env production
+          gh secret set PRODUCTION_GREEN_IP --body "${{ steps.outputs.outputs.green_reserved_ip }}" --env production
+          gh secret set PRODUCTION_LB_IP --body "${{ steps.outputs.outputs.lb_ip }}" --env production
+          gh secret set PRODUCTION_BLUE_ID --body "${{ steps.outputs.outputs.blue_id }}" --env production
+          gh secret set PRODUCTION_GREEN_ID --body "${{ steps.outputs.outputs.green_id }}" --env production
+
+          echo "✅ Secrets updated successfully"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Infrastructure Summary
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          # ✅ Production Infrastructure Rebuild Complete
+
+          ## New Infrastructure Created
+
+          ### 🔵 Blue Server (Primary)
+          - **Droplet ID**: `${{ steps.outputs.outputs.blue_id }}`
+          - **IP Address**: `${{ steps.outputs.outputs.blue_ip }}`
+          - **Reserved IP**: `${{ steps.outputs.outputs.blue_reserved_ip }}`
+          - **Size**: c2-4vcpu-8gb (Dedicated CPU)
+          - **Region**: sfo3
+          - **Status**: ✅ Created
+
+          ### 🟢 Green Server (Standby)
+          - **Droplet ID**: `${{ steps.outputs.outputs.green_id }}`
+          - **IP Address**: `${{ steps.outputs.outputs.green_ip }}`
+          - **Reserved IP**: `${{ steps.outputs.outputs.green_reserved_ip }}`
+          - **Size**: c2-4vcpu-8gb (Dedicated CPU)
+          - **Region**: sfo3
+          - **Status**: ✅ Created
+
+          ### ⚖️ Load Balancer
+          - **Load Balancer ID**: `${{ steps.outputs.outputs.lb_id }}`
+          - **IP Address**: `${{ steps.outputs.outputs.lb_ip }}`
+          - **Health Check**: `/health` endpoint
+          - **Status**: ✅ Created
+
+          ## Next Steps
+
+          1. **Wait for Server Provisioning** (~5-10 minutes)
+             - Docker installation
+             - System configuration
+             - Monitoring tools setup
+
+          2. **Deploy Application**
+             - Use deployment workflow
+             - Target new Blue/Green servers
+             - Verify health endpoints
+
+          3. **Update DNS** (when ready)
+             - Point production.ectropy.ai to `${{ steps.outputs.outputs.lb_ip }}`
+             - Lower TTL to 300 seconds first
+             - Monitor traffic cutover
+
+          4. **Verify Old Infrastructure** (after 30 min of stable operation)
+             - Old Blue: 532797375
+             - Old Green: 532801089
+             - Old LB: e37f30b0-f14a-4abe-b7a7-88d8b6b6ec40
+
+          5. **Destroy Old Infrastructure** (after full verification)
+             ```bash
+             doctl compute load-balancer delete e37f30b0-f14a-4abe-b7a7-88d8b6b6ec40
+             doctl compute droplet delete 532797375
+             doctl compute droplet delete 532801089
+             ```
+
+          ## Cost Impact
+
+          - **New Infrastructure**: ~$248/month
+            - 2x c2-4vcpu-8gb: $188/month
+            - 2x Reserved IPs: $8/month
+            - Load Balancer: $12/month
+            - Snapshots: ~$40/month
+
+          - **Old Infrastructure**: ~$108/month (can be destroyed after verification)
+
+          - **Net Increase**: +$140/month (during transition), then stable at $248/month
+
+          ## 🎯 Deployment Status
+
+          ✅ Infrastructure created via Terraform
+          ✅ Servers provisioning (user_data scripts running)
+          ✅ GitHub secrets updated
+          ⏳ Application deployment (next step)
+          ⏳ DNS update (after app deployed)
+          ⏳ Old infrastructure cleanup (after verification)
+
+          ---
+
+          **Generated**: ${{ github.run_id }}
+          **Workflow**: Terraform Production Rebuild
+          **Approach**: NO SHORTCUTS - Enterprise IaC
+          EOF
+
+      - name: Workflow Summary
+        if: always()
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "WORKFLOW SUMMARY"
+          echo "═══════════════════════════════════════════════════════════"
+          echo ""
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Production infrastructure rebuild completed successfully!"
+            echo ""
+            echo "🔵 Blue Server: ${{ steps.outputs.outputs.blue_reserved_ip }}"
+            echo "🟢 Green Server: ${{ steps.outputs.outputs.green_reserved_ip }}"
+            echo "⚖️  Load Balancer: ${{ steps.outputs.outputs.lb_ip }}"
+            echo ""
+            echo "Next: Deploy application to new servers"
+          else
+            echo "❌ Workflow failed. Check logs for details."
+            echo ""
+            echo "Rollback: No action needed - old infrastructure still running"
+          fi

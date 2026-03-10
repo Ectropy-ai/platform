@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "ectropy": {
+      "url": "http://143.198.154.94:3002",
+      "description": "Ectropy MCP Server for BIM collaboration and AI agent workflows",
+      "authentication": {
+        "type": "api-key",
+        "headerName": "X-API-Key",
+        "envVariable": "MCP_API_KEY"
+      },
+      "timeout": 30000,
+      "retry": {
+        "attempts": 3,
+        "delay": 1000
+      },
+      "endpoints": {
+        "health": "/health",
+        "tools": "/api/tools",
+        "execute": "/api/tools/execute",
+        "agentStatus": "/api/mcp/health"
+      }
+    }
+  }
+}

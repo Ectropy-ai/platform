@@ -1,0 +1,43 @@
+{
+  "name": "@ectropy/iot-edge",
+  "version": "1.0.0",
+  "description": "IoT edge computing and sensor integration services",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "types": "./src/index.ts"
+    }
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "dependencies": {
+    "mqtt": "^5.0.0",
+    "ws": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/ws": "^8.5.10",
+    "eslint": "^9.31.0",
+    "jest": "^30.0.4",
+    "prettier": "^3.6.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "keywords": [
+    "iot",
+    "edge",
+    "sensors",
+    "mqtt",
+    "data-collection"
+  ],
+  "author": "Ectropy Team",
+  "license": "MIT"
+}

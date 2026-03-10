@@ -1,0 +1,255 @@
+name: 'Setup Ectropy Environment'
+description: 'Setup Node.js, pnpm, and restore dependencies for Ectropy platform with enterprise standards'
+
+inputs:
+  cache-key:
+    description: 'Cache key for dependencies'
+    required: true
+  node-version:
+    description: 'Node.js version to use'
+    required: false
+    default: '20'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure Git for enterprise standards
+      shell: bash
+      run: |
+        git config --global init.defaultBranch main
+        git config --global advice.defaultBranchName false
+        git config --global user.email "ci@ectropy.com"
+        git config --global user.name "Ectropy CI"
+        git config --global core.autocrlf input
+        git config --global core.eol lf
+        echo "✅ Git configured with enterprise standards"
+
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        echo "📦 Installing system dependencies for native modules..."
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          libvips-dev \
+          libcairo2-dev \
+          libjpeg-dev \
+          libpango1.0-dev \
+          libgif-dev \
+          libglib2.0-dev \
+          librsvg2-dev \
+          pkg-config
+        echo "✅ System dependencies installed"
+        echo "🔍 Verifying libglib2.0-dev installation..."
+        pkg-config --exists glib-2.0 && echo "✅ glib-2.0 found" || echo "❌ glib-2.0 not found"
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        run_install: false
+
+    - name: Configure pnpm for caching
+      shell: bash
+      run: |
+        echo "🔧 Configuring pnpm for optimal caching..."
+        pnpm config set store-dir ~/.pnpm-store
+        pnpm config set cache-dir ~/.cache/pnpm
+        echo "✅ pnpm configuration completed"
+
+    - name: Verify runtime environment
+      shell: bash
+      run: |
+        echo "🔍 Verifying complete runtime environment..."
+        
+        # Verify Node.js
+        if ! command -v node >/dev/null 2>&1; then
+          echo "❌ Error: Node.js runtime not available"
+          echo "Expected Node.js version: ${{ inputs.node-version }}"
+          echo "PATH: $PATH"
+          exit 1
+        fi
+        
+        node_version=$(node --version)
+        echo "✅ Node.js runtime available: $node_version"
+        
+        # Verify pnpm
+        if ! command -v pnpm >/dev/null 2>&1; then
+          echo "❌ Error: pnpm not available after setup"
+          echo "PATH: $PATH"
+          echo "Available package managers:"
+          command -v npm || echo "npm not available"
+          exit 1
+        fi
+        
+        pnpm_version=$(pnpm --version)
+        echo "✅ pnpm available: v$pnpm_version"
+        
+        # Verify package.json packageManager field matches
+        package_manager_field=$(jq -r '.packageManager' package.json 2>/dev/null || echo 'not found')
+        if [[ "$package_manager_field" == "not found" ]]; then
+          echo "⚠️  Warning: package.json does not specify packageManager field"
+        else
+          # Extract version from packageManager field (e.g., "pnpm@10.14.0+sha512...")
+          expected_pnpm_version=$(echo "$package_manager_field" | sed 's/pnpm@\([^+]*\).*/\1/')
+          if [[ "$pnpm_version" != "$expected_pnpm_version" ]]; then
+            echo "⚠️  Warning: pnpm version mismatch"
+            echo "Expected: $expected_pnpm_version (from package.json), Got: $pnpm_version"
+            echo "package.json specifies: $package_manager_field"
+          else
+            echo "✅ pnpm version matches package.json specification"
+          fi
+        fi
+        
+        echo "✅ Runtime verification complete"
+
+    - name: Cache pnpm store
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.pnpm-store
+          ~/.cache/pnpm
+        key: ${{ runner.os }}-${{ inputs.node-version }}-pnpm-store-v3-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ inputs.node-version }}-pnpm-store-v3-
+          ${{ runner.os }}-${{ inputs.node-version }}-pnpm-store-
+
+    - name: Restore dependencies
+      id: restore-deps
+      uses: actions/cache@v4
+      with:
+        path: |
+          node_modules
+          ~/.pnpm-store
+          ~/.cache/pnpm
+        key: ${{ inputs.cache-key }}
+        restore-keys: |
+          node-${{ runner.os }}-${{ inputs.node-version }}-
+        fail-on-cache-miss: false
+
+    - name: Install dependencies
+      if: steps.restore-deps.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "📦 Installing dependencies with enhanced error handling..."
+        
+        # Set environment variables for native module compilation
+        export SHARP_IGNORE_GLOBAL_LIBVIPS=1
+        export SHARP_BINARY_HOST=https://sharp.pixelplumbing.com
+        export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+        export CPPFLAGS="$(pkg-config --cflags glib-2.0 2>/dev/null || echo '')"
+        export LDFLAGS="$(pkg-config --libs glib-2.0 2>/dev/null || echo '')"
+        export NODE_OPTIONS="--max-old-space-size=4096"
+        
+        echo "🧹 Cleaning any existing problematic state..."
+        pnpm store prune
+        
+        echo "📦 Installing dependencies with frozen lockfile..."
+        if ! pnpm install --frozen-lockfile --prefer-offline; then
+          echo "❌ Initial install failed, retrying with verbose output..."
+          pnpm install --frozen-lockfile --reporter=default
+          exit 1
+        fi
+        
+        echo "✅ Dependencies installed successfully"
+
+    - name: Rebuild native modules
+      shell: bash
+      run: |
+        echo "🔧 Rebuilding native modules for CI consistency..."
+        
+        # Set environment for native compilation
+        export SHARP_IGNORE_GLOBAL_LIBVIPS=1
+        export SHARP_BINARY_HOST=https://sharp.pixelplumbing.com
+        export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+        export CPPFLAGS="$(pkg-config --cflags glib-2.0 2>/dev/null || echo '')"
+        export LDFLAGS="$(pkg-config --libs glib-2.0 2>/dev/null || echo '')"
+        
+        # Use centralized script if available
+        if [ -f "scripts/ci/rebuild-native-dependencies.sh" ]; then
+          echo "📝 Using centralized native dependency rebuild script..."
+          bash scripts/ci/rebuild-native-dependencies.sh
+        else
+          echo "📝 Using manual rebuild process..."
+          
+          # Rebuild all native modules
+          echo "🔄 Rebuilding all native modules..."
+          pnpm rebuild
+          
+          # Specific Sharp rebuild with comprehensive flags
+          echo "🔧 Rebuilding Sharp with platform targeting..."
+          npm rebuild sharp \
+            --platform=linux \
+            --arch=x64 \
+            --ignore-scripts=false \
+            --foreground-scripts \
+            --sharp-binary-host=https://sharp.pixelplumbing.com || echo "Sharp rebuild attempted"
+        fi
+        
+        echo "✅ Native module rebuild completed"
+
+    - name: Verify environment
+      shell: bash
+      run: |
+        echo "🔍 Verifying complete environment setup..."
+        echo "Node.js: $(node --version)"
+        echo "pnpm: $(pnpm --version)"
+        echo "npm: $(npm --version)"
+        
+        # Verify Git configuration
+        echo "Git default branch: $(git config --global init.defaultBranch || echo 'not set')"
+        
+        echo "🔍 Verifying critical dependencies are available..."
+        
+        # Verify Sharp installation with detailed error handling
+        echo "🔧 Testing Sharp module..."
+        if node -e "try { const sharp = require('sharp'); console.log('✅ Sharp verification successful:', sharp.versions || 'Available'); } catch(e) { console.error('❌ Sharp verification failed:', e.message); process.exit(1); }"; then
+          echo "✅ Sharp module is properly installed and functional"
+        else
+          echo "❌ Sharp module verification failed"
+          echo "🔧 Attempting fallback Sharp rebuild..."
+          npm rebuild sharp --platform=linux --arch=x64 --ignore-scripts=false --foreground-scripts --sharp-binary-host=https://sharp.pixelplumbing.com || echo "Fallback Sharp rebuild attempted"
+          
+          # Test again after rebuild
+          if node -e "try { require('sharp'); console.log('✅ Sharp verification successful after rebuild'); } catch(e) { console.error('❌ Sharp still fails after rebuild:', e.message); process.exit(1); }"; then
+            echo "✅ Sharp module is now functional after rebuild"
+          else
+            echo "⚠️  Sharp module still failing - this may affect image processing features"
+            if [ "${FAIL_ON_SHARP_ERROR:-false}" = "true" ]; then
+              echo "💥 Failing build due to Sharp verification failure"
+              exit 1
+            else
+              echo "⚠️  Continuing despite Sharp failure (enterprise fallback strategy)"
+            fi
+          fi
+        fi
+        
+        # Verify other critical dependencies
+        echo "🔍 Testing other critical native dependencies..."
+        
+        # Test @xenova/transformers if available
+        if node -e "try { require('@xenova/transformers'); console.log('✅ @xenova/transformers available'); } catch(e) { console.log('ℹ️  @xenova/transformers not available (optional)'); }" 2>/dev/null; then
+          echo "✅ @xenova/transformers module is available"
+        fi
+        
+        # Test Nx availability
+        if command -v npx >/dev/null 2>&1; then
+          if npx nx --version >/dev/null 2>&1; then
+            echo "✅ Nx: $(npx nx --version)"
+          else
+            echo "⚠️  Nx not available - will be installed if needed"
+          fi
+        fi
+        
+        # Verify workspace structure
+        if [ -f "nx.json" ]; then
+          echo "✅ Nx workspace configuration found"
+        else
+          echo "❌ Nx workspace configuration missing"
+        fi
+        
+        echo "✅ Environment verification complete"

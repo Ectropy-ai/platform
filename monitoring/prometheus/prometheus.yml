@@ -1,0 +1,120 @@
+# =============================================================================
+# PROMETHEUS CONFIGURATION - ECTROPY PLATFORM MONITORING
+# =============================================================================
+#
+# PURPOSE: Comprehensive metrics collection for the Ectropy federated platform
+# COVERAGE:
+# - API Gateway performance
+# - Database query statistics
+# - BIM processing metrics
+# - DAO governance activity
+# - System resource utilization
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'ectropy-production'
+    environment: 'production'
+
+rule_files:
+  - 'alerts.yml'
+
+# Alert manager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  # =============================================================================
+  # ECTROPY API GATEWAY - CORE APPLICATION METRICS
+  # =============================================================================
+  - job_name: 'ectropy-api-gateway'
+    static_configs:
+      - targets: ['host.docker.internal:4000']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    honor_labels: true
+    params:
+      format: ['prometheus']
+
+  # =============================================================================
+  # SPECKLE BIM SERVER - 3D MODEL PROCESSING
+  # =============================================================================
+  - job_name: 'speckle-server'
+    static_configs:
+      - targets: ['host.docker.internal:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # =============================================================================
+  # WEB DASHBOARD - FRONTEND PERFORMANCE
+  # =============================================================================
+  - job_name: 'web-dashboard'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # =============================================================================
+  # POSTGRESQL DATABASE - QUERY PERFORMANCE
+  # =============================================================================
+  - job_name: 'postgresql'
+    static_configs:
+      - targets: ['host.docker.internal:5432']
+    scrape_interval: 30s
+    # Note: Requires postgres_exporter to be configured
+
+  # =============================================================================
+  # REDIS CACHE - CACHE PERFORMANCE
+  # =============================================================================
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['host.docker.internal:6379']
+    scrape_interval: 30s
+    # Note: Requires redis_exporter to be configured
+
+  # =============================================================================
+  # SYSTEM METRICS - NODE EXPORTER
+  # =============================================================================
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node_exporter:9100']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # =============================================================================
+  # CONTAINER METRICS - CADVISOR
+  # =============================================================================
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # =============================================================================
+  # PROMETHEUS SELF-MONITORING
+  # =============================================================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+
+  # =============================================================================
+  # GRAFANA MONITORING
+  # =============================================================================
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+# =============================================================================
+# RECORDING RULES - PRE-CALCULATED METRICS (already defined above)
+# =============================================================================
+# rule_files already defined at line 21

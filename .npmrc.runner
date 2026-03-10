@@ -1,0 +1,41 @@
+# Ectropy Self-Hosted Runner - Enterprise pnpm Configuration
+# Purpose: Maximum reliability with local Verdaccio cache proxy
+# Usage: Copy this file to /etc/npmrc on the runner after running setup-runner-optimization.sh
+
+# Registry: Use local Verdaccio cache (must be running)
+registry=http://localhost:4873/
+
+# Retry configuration (enterprise-grade resilience)
+# Industry standard: 5-10 retries with exponential backoff
+fetch-retries=10
+fetch-retry-mintimeout=10000       # 10 seconds
+fetch-retry-maxtimeout=60000       # 60 seconds
+fetch-retry-factor=2               # Exponential backoff
+fetch-timeout=300000               # 5 minutes per package
+
+# Network configuration
+network-timeout=300000             # 5 minutes total per package
+network-concurrency=16             # Parallel downloads
+
+# Cache strategy
+prefer-offline=true                # Use cache before network
+prefer-frozen-lockfile=true        # Ensure reproducible installs
+
+# Store configuration (use fast local storage)
+store-dir=/opt/pnpm/store
+cache-dir=/opt/pnpm/cache
+state-dir=/opt/pnpm/state
+
+# Performance optimization
+side-effects-cache=true            # Cache package side effects
+side-effects-cache-readonly=false  # Allow cache writes
+package-import-method=copy         # Reliable for CI/CD
+
+# Logging (useful for debugging)
+loglevel=warn                      # Balance between info and noise
+
+# Security
+strict-ssl=true                    # Verify SSL certificates
+
+# Lockfile handling (CI/CD best practice)
+frozen-lockfile=false              # Allow updates when needed

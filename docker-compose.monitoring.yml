@@ -1,0 +1,148 @@
+# MCP Monitoring Configuration
+# Production-Grade Prometheus and Grafana setup for MCP monitoring
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: ectropy-prometheus
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts:/etc/prometheus/alerts:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=10GB'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+      - '--log.level=info'
+    restart: unless-stopped
+    networks:
+      - ectropy-monitoring
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--quiet',
+          '--tries=1',
+          '--spider',
+          'http://localhost:9090/-/healthy',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: ectropy-grafana
+    ports:
+      - '3003:3000' # Changed port to avoid conflict with MCP server
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=redis-datasource,grafana-piechart-panel
+      - GF_SECURITY_DISABLE_GRAVATAR=true
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_LOG_LEVEL=info
+    restart: unless-stopped
+    networks:
+      - ectropy-monitoring
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:3000/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Alertmanager for production alerts (ROOT CAUSE #92: Slack integration)
+  # PATTERN: Enterprise Docker secret injection with envsubst wrapper script
+  # Alertmanager lacks native env var support (issue #2818, #504), industry pattern uses entrypoint
+  alertmanager:
+    image: prom/alertmanager:v0.25.0
+    container_name: ectropy-alertmanager
+    ports:
+      - '9093:9093'
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./monitoring/alertmanager-entrypoint.sh:/usr/local/bin/alertmanager-entrypoint.sh:ro
+      - alertmanager_data:/alertmanager
+    environment:
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+    entrypoint: ['/bin/sh', '/usr/local/bin/alertmanager-entrypoint.sh']
+    restart: unless-stopped
+    networks:
+      - ectropy-monitoring
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--quiet',
+          '--tries=1',
+          '--spider',
+          'http://localhost:9093/-/healthy',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    container_name: ectropy-node-exporter
+    ports:
+      - '9100:9100'
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - '/:/host:ro,rslave'
+    restart: unless-stopped
+    networks:
+      - ectropy-monitoring
+
+  # Redis monitoring for cache performance
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.45.0
+    container_name: ectropy-redis-exporter
+    ports:
+      - '9121:9121'
+    environment:
+      - REDIS_ADDR=${REDIS_URL:-redis://localhost:6379}
+      - REDIS_EXPORTER_LOG_FORMAT=json
+    restart: unless-stopped
+    networks:
+      - ectropy-monitoring
+
+  # PostgreSQL monitoring for database performance
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.12.1
+    container_name: ectropy-postgres-exporter
+    ports:
+      - '9187:9187'
+    environment:
+      - DATA_SOURCE_NAME=${DATABASE_URL:-postgresql://postgres:password@localhost:5432/postgres?sslmode=disable}
+      - PG_EXPORTER_LOG_LEVEL=info
+    restart: unless-stopped
+    networks:
+      - ectropy-monitoring
+
+networks:
+  ectropy-monitoring:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:

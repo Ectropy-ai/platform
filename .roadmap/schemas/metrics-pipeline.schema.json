@@ -1,0 +1,444 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:ops:metrics-pipeline",
+  "title": "Metrics Pipeline Schema",
+  "description": "Schema for robust metrics collection, failure handling, and multi-destination reporting following luh-tech enterprise patterns",
+  "version": "1.0.0",
+  "type": "object",
+  "required": [
+    "$schema",
+    "version",
+    "sources",
+    "destinations",
+    "failureMatrix",
+    "normalization"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Reference to this schema"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "lastUpdated": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sources": {
+      "type": "object",
+      "description": "Metrics data sources and their configurations",
+      "additionalProperties": {
+        "$ref": "#/definitions/metricSource"
+      }
+    },
+    "destinations": {
+      "type": "object",
+      "description": "Where metrics are reported to",
+      "additionalProperties": {
+        "$ref": "#/definitions/reportingDestination"
+      }
+    },
+    "failureMatrix": {
+      "type": "object",
+      "description": "How to handle failures from each source",
+      "additionalProperties": {
+        "$ref": "#/definitions/failureHandler"
+      }
+    },
+    "normalization": {
+      "$ref": "#/definitions/normalizationRules"
+    },
+    "workflows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/metricsWorkflow"
+      },
+      "description": "Workflow definitions that implement this pipeline"
+    }
+  },
+  "definitions": {
+    "metricSource": {
+      "type": "object",
+      "required": ["id", "type", "endpoint", "criticality"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Unique source identifier"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "prometheus",
+            "github-api",
+            "grafana",
+            "alertmanager",
+            "custom-api",
+            "file-system"
+          ],
+          "description": "Source type"
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "API endpoint or file path"
+        },
+        "authentication": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "none",
+                "bearer-token",
+                "basic-auth",
+                "github-token",
+                "api-key"
+              ]
+            },
+            "secretRef": {
+              "type": "string",
+              "description": "GitHub secret name containing credentials"
+            }
+          }
+        },
+        "criticality": {
+          "type": "string",
+          "enum": ["critical", "important", "informational"],
+          "description": "How critical is this data source"
+        },
+        "timeout": {
+          "type": "integer",
+          "default": 30,
+          "description": "Request timeout in seconds"
+        },
+        "retries": {
+          "type": "integer",
+          "default": 3,
+          "description": "Number of retry attempts"
+        },
+        "healthCheck": {
+          "type": "object",
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "description": "Health check endpoint"
+            },
+            "expectedStatus": {
+              "type": "integer",
+              "default": 200
+            },
+            "interval": {
+              "type": "string",
+              "description": "How often to check health"
+            }
+          }
+        },
+        "fallback": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["cache", "placeholder", "skip", "fail"]
+            },
+            "cacheMaxAge": {
+              "type": "string",
+              "description": "Max age for cached data (e.g., '1h', '24h')"
+            },
+            "placeholderMessage": {
+              "type": "string",
+              "description": "Message when using placeholder"
+            }
+          }
+        }
+      }
+    },
+    "reportingDestination": {
+      "type": "object",
+      "required": ["id", "type", "priority"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "github-step-summary",
+            "slack",
+            "file-commit",
+            "notion",
+            "prometheus-pushgateway",
+            "webhook"
+          ]
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["required", "best-effort"],
+          "description": "required = fail workflow if unreachable, best-effort = warn only"
+        },
+        "config": {
+          "type": "object",
+          "description": "Destination-specific configuration",
+          "additionalProperties": true
+        },
+        "filters": {
+          "type": "object",
+          "properties": {
+            "onSuccess": {
+              "type": "boolean",
+              "default": true
+            },
+            "onWarning": {
+              "type": "boolean",
+              "default": true
+            },
+            "onFailure": {
+              "type": "boolean",
+              "default": true
+            },
+            "minSeverity": {
+              "type": "string",
+              "enum": ["info", "warning", "error", "critical"]
+            }
+          }
+        },
+        "format": {
+          "type": "object",
+          "properties": {
+            "template": {
+              "type": "string",
+              "description": "Template name or inline template"
+            },
+            "includeMetrics": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "excludeMetrics": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "failureHandler": {
+      "type": "object",
+      "required": ["sourceId", "scenarios"],
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "scenarios": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["condition", "action", "workflowResult"],
+            "properties": {
+              "condition": {
+                "type": "string",
+                "enum": [
+                  "connection-timeout",
+                  "connection-refused",
+                  "rate-limited",
+                  "authentication-failed",
+                  "not-found",
+                  "server-error",
+                  "invalid-response",
+                  "partial-data"
+                ]
+              },
+              "action": {
+                "type": "string",
+                "enum": [
+                  "retry",
+                  "use-cache",
+                  "use-placeholder",
+                  "skip",
+                  "fail",
+                  "alert"
+                ]
+              },
+              "workflowResult": {
+                "type": "string",
+                "enum": ["success", "warning", "failure"],
+                "description": "What the workflow reports as its result"
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable message to include in summary"
+              },
+              "notify": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Destinations to notify about this failure"
+              }
+            }
+          }
+        }
+      }
+    },
+    "normalizationRules": {
+      "type": "object",
+      "required": ["resultMapping", "summaryFormat"],
+      "properties": {
+        "resultMapping": {
+          "type": "object",
+          "description": "Maps internal states to GitHub Actions status",
+          "properties": {
+            "success": {
+              "type": "object",
+              "properties": {
+                "githubStatus": {
+                  "type": "string",
+                  "const": "success"
+                },
+                "icon": {
+                  "type": "string",
+                  "default": "✅"
+                },
+                "meaning": {
+                  "type": "string"
+                }
+              }
+            },
+            "warning": {
+              "type": "object",
+              "properties": {
+                "githubStatus": {
+                  "type": "string",
+                  "const": "success",
+                  "description": "Warnings still pass but with messages"
+                },
+                "icon": {
+                  "type": "string",
+                  "default": "⚠️"
+                },
+                "meaning": {
+                  "type": "string"
+                }
+              }
+            },
+            "failure": {
+              "type": "object",
+              "properties": {
+                "githubStatus": {
+                  "type": "string",
+                  "const": "failure"
+                },
+                "icon": {
+                  "type": "string",
+                  "default": "❌"
+                },
+                "meaning": {
+                  "type": "string"
+                }
+              }
+            },
+            "skipped": {
+              "type": "object",
+              "properties": {
+                "githubStatus": {
+                  "type": "string",
+                  "const": "success"
+                },
+                "icon": {
+                  "type": "string",
+                  "default": "⏭️"
+                },
+                "meaning": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "summaryFormat": {
+          "type": "object",
+          "properties": {
+            "includeTimestamp": {
+              "type": "boolean",
+              "default": true
+            },
+            "includeSourceStatus": {
+              "type": "boolean",
+              "default": true
+            },
+            "includeMetricsTable": {
+              "type": "boolean",
+              "default": true
+            },
+            "includeFailureDetails": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        },
+        "slackFormat": {
+          "type": "object",
+          "properties": {
+            "successColor": {
+              "type": "string",
+              "default": "good"
+            },
+            "warningColor": {
+              "type": "string",
+              "default": "warning"
+            },
+            "failureColor": {
+              "type": "string",
+              "default": "danger"
+            },
+            "includeViewLogsButton": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        }
+      }
+    },
+    "metricsWorkflow": {
+      "type": "object",
+      "required": ["file", "sources", "destinations"],
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "Workflow filename"
+        },
+        "name": {
+          "type": "string"
+        },
+        "schedule": {
+          "type": "string",
+          "description": "Cron expression"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Source IDs this workflow collects from"
+        },
+        "destinations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Destination IDs this workflow reports to"
+        },
+        "failureMode": {
+          "type": "string",
+          "enum": ["fail-fast", "collect-all", "best-effort"],
+          "description": "How to handle partial failures"
+        }
+      }
+    }
+  }
+}

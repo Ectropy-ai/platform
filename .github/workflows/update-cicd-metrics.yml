@@ -1,0 +1,279 @@
+name: Update CI/CD Metrics
+
+# ============================================================================
+# CI/CD Metrics Collection Workflow
+# ============================================================================
+# Purpose: Automatically updates roadmap.json with GitHub Actions workflow metrics
+# Frequency: Hourly (configurable via schedule) + Manual dispatch
+# Output: Updated roadmap.json with workflow status, duration, and timestamps
+#
+# Enterprise Monitoring Integration:
+#   - GitHub Actions writes CI/CD metrics TO roadmap.json (source of truth)
+#   - Grafana reads FROM roadmap.json via JSON datasource plugin
+#   - Enables workflow health tracking and alerting
+#   - Complements Prometheus time-series application metrics
+#
+# Roadmap Integration:
+#   - Updates "Deployment Frequency" KPIs
+#   - Tracks "Build Success Rate" metrics
+#   - Monitors "Mean Time to Recovery" (MTTR)
+#   - Provides historical trend data for retrospectives
+# ============================================================================
+
+on:
+  # DISABLED (2026-02-27): Metrics auto-commits cause merge conflicts (1,267 commits = 14.7% of git history)
+  # and race against real deployments. Will re-enable post repo split in luh-tech observability repo.
+  # Original triggers preserved below for migration reference.
+  workflow_dispatch:
+    inputs:
+      lookback_hours:
+        description: 'Hours of workflow history to analyze'
+        required: false
+        default: '24'
+        type: string
+
+  # schedule:
+  #   - cron: '0 * * * *'
+  # workflow_run:
+  #   workflows: ["Deploy Staging", "Deploy Production", "Build Production Images"]
+  #   types: [completed]
+
+permissions:
+  contents: write  # Required to commit roadmap.json updates
+  actions: read    # Required to query workflow runs
+
+jobs:
+  collect-metrics:
+    name: Collect and Update CI/CD Metrics
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🛒 Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📊 Collect Workflow Metrics
+        id: metrics
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LOOKBACK_HOURS: ${{ inputs.lookback_hours || '24' }}
+        run: |
+          # ============================================================================
+          # Workflow Metrics Collection Script
+          # ============================================================================
+          # Queries GitHub Actions API for recent workflow runs
+          # Calculates success rates, durations, and failure patterns
+          # Outputs JSON formatted metrics for roadmap.json integration
+          # ============================================================================
+
+          echo "Collecting metrics for last ${LOOKBACK_HOURS} hours..."
+
+          # Calculate timestamp for lookback period
+          LOOKBACK_DATE=$(date -u -d "${LOOKBACK_HOURS} hours ago" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -v-${LOOKBACK_HOURS}H +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Workflows to track (core CI/CD pipelines)
+          WORKFLOWS=(
+            "deploy-staging.yml"
+            "deploy-production.yml"
+            "enterprise-test-suite.yml"
+            "build-production-images.yml"
+            "pr-validation.yml"
+            "e2e-tests.yml"
+          )
+
+          # Initialize metrics JSON
+          echo "{" > metrics.json
+          echo '  "timestamp": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'",' >> metrics.json
+          echo '  "lookback_hours": '${LOOKBACK_HOURS}',' >> metrics.json
+          echo '  "workflows": {' >> metrics.json
+
+          FIRST=true
+          for WORKFLOW in "${WORKFLOWS[@]}"; do
+            # Add comma separator (except for first item)
+            if [ "$FIRST" = false ]; then
+              echo "," >> metrics.json
+            fi
+            FIRST=false
+
+            echo "  Analyzing: $WORKFLOW"
+
+            # Query workflow runs via GitHub API
+            RUNS=$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "/repos/${{ github.repository }}/actions/workflows/${WORKFLOW}/runs?created=>${LOOKBACK_DATE}&per_page=100" \
+              --jq '.workflow_runs | length')
+
+            # Calculate success/failure counts
+            SUCCESS=$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${{ github.repository }}/actions/workflows/${WORKFLOW}/runs?created=>${LOOKBACK_DATE}&status=success&per_page=100" \
+              --jq '.workflow_runs | length')
+
+            FAILURE=$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${{ github.repository }}/actions/workflows/${WORKFLOW}/runs?created=>${LOOKBACK_DATE}&status=failure&per_page=100" \
+              --jq '.workflow_runs | length')
+
+            # Get latest run details
+            LATEST=$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${{ github.repository }}/actions/workflows/${WORKFLOW}/runs?per_page=1" \
+              --jq '.workflow_runs[0] // {}')
+
+            LATEST_STATUS=$(echo "$LATEST" | jq -r '.conclusion // "unknown"')
+            LATEST_DURATION=$(echo "$LATEST" | jq -r '
+              if .run_started_at and .updated_at then
+                (((.updated_at | fromdateiso8601) - (.run_started_at | fromdateiso8601)) / 60 | floor)
+              else
+                0
+              end
+            ')
+            LATEST_TIMESTAMP=$(echo "$LATEST" | jq -r '.updated_at // "N/A"')
+
+            # Calculate success rate
+            if [ "$RUNS" -gt 0 ]; then
+              SUCCESS_RATE=$(echo "scale=2; ($SUCCESS / $RUNS) * 100" | bc)
+            else
+              SUCCESS_RATE="0"
+            fi
+
+            # Write workflow metrics to JSON
+            echo '    "'${WORKFLOW%.yml}'": {' >> metrics.json
+            echo '      "total_runs": '${RUNS}',' >> metrics.json
+            echo '      "successful_runs": '${SUCCESS}',' >> metrics.json
+            echo '      "failed_runs": '${FAILURE}',' >> metrics.json
+            echo '      "success_rate_percent": '${SUCCESS_RATE}',' >> metrics.json
+            echo '      "latest_status": "'${LATEST_STATUS}'",' >> metrics.json
+            echo '      "latest_duration_minutes": '${LATEST_DURATION}',' >> metrics.json
+            echo '      "latest_timestamp": "'${LATEST_TIMESTAMP}'"' >> metrics.json
+            echo -n '    }' >> metrics.json
+          done
+
+          # Close JSON structure
+          echo "" >> metrics.json
+          echo "  }" >> metrics.json
+          echo "}" >> metrics.json
+
+          echo "Metrics collection complete!"
+          cat metrics.json
+
+          # Set output for next step
+          echo "metrics_file=metrics.json" >> $GITHUB_OUTPUT
+
+      - name: 📝 Update roadmap.json
+        if: steps.metrics.outcome == 'success'
+        continue-on-error: true
+        env:
+          METRICS_FILE: ${{ steps.metrics.outputs.metrics_file }}
+        run: |
+          # ============================================================================
+          # Roadmap.json Update Script
+          # ============================================================================
+          # Merges collected workflow metrics into roadmap.json
+          # Preserves existing roadmap structure while adding CI/CD metrics
+          # Creates backup before modification for safety
+          # ============================================================================
+
+          ROADMAP_FILE=".roadmap/roadmap.json"
+          BACKUP_FILE=".roadmap/roadmap.backup.$(date +%s).json"
+
+          echo "Updating $ROADMAP_FILE with CI/CD metrics..."
+
+          # Create backup
+          if [ -f "$ROADMAP_FILE" ]; then
+            cp "$ROADMAP_FILE" "$BACKUP_FILE"
+            echo "Backup created: $BACKUP_FILE"
+          else
+            echo "Warning: $ROADMAP_FILE not found, creating new file"
+            echo "{}" > "$ROADMAP_FILE"
+          fi
+
+          # Merge metrics into roadmap.json using jq
+          jq --slurpfile metrics metrics.json '
+            . + {
+              "cicd_metrics": $metrics[0],
+              "last_updated": $metrics[0].timestamp
+            }
+          ' "$ROADMAP_FILE" > "${ROADMAP_FILE}.tmp"
+
+          mv "${ROADMAP_FILE}.tmp" "$ROADMAP_FILE"
+
+          echo "Roadmap updated successfully!"
+          echo "Preview of updated metrics:"
+          jq '.cicd_metrics' "$ROADMAP_FILE" | head -20
+
+      - name: 🚀 Commit Changes
+        if: steps.metrics.outcome == 'success'
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check if there are changes to commit
+          if git diff --quiet .roadmap/roadmap.json; then
+            echo "No changes to .roadmap/roadmap.json"
+            exit 0
+          fi
+
+          git add .roadmap/roadmap.json
+
+          # Create commit with detailed metadata
+          git commit -m "chore(metrics): Update CI/CD metrics - $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+
+          Automated metrics collection from GitHub Actions workflows.
+
+          Metrics Period: Last ${{ inputs.lookback_hours || '24' }} hours
+          Workflows Tracked: 6 core CI/CD pipelines
+          Updated By: update-cicd-metrics workflow
+
+          Generated automatically by GitHub Actions"
+          git push
+
+          echo "Changes committed and pushed successfully!"
+
+          # Clean up backup files (keep last 3 for debugging)
+          cd .roadmap
+          ls -1t roadmap.backup.*.json 2>/dev/null | tail -n +4 | xargs -r rm -f
+          echo "Cleanup complete"
+
+      - name: 📊 Generate Summary
+        if: always()
+        run: |
+          echo "## CI/CD Metrics Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "**Lookback Period:** ${{ inputs.lookback_hours || '24' }} hours" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "metrics.json" ] && [ "${{ steps.metrics.outcome }}" == "success" ]; then
+            echo "### Workflow Metrics" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Workflow | Total Runs | Success Rate | Latest Status |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|-----------|--------------|---------------|" >> $GITHUB_STEP_SUMMARY
+
+            # Extract metrics for each workflow
+            jq -r '.workflows | to_entries[] |
+              "| \(.key) | \(.value.total_runs) | \(.value.success_rate_percent)% | \(.value.latest_status) |"
+            ' metrics.json >> $GITHUB_STEP_SUMMARY
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Metrics collected and committed to roadmap.json" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Metrics collection skipped or had issues**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This is non-blocking. Possible causes:" >> $GITHUB_STEP_SUMMARY
+            echo "- GitHub API rate limiting" >> $GITHUB_STEP_SUMMARY
+            echo "- Temporary network issues" >> $GITHUB_STEP_SUMMARY
+            echo "- Workflow history unavailable" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The workflow will retry on next scheduled run." >> $GITHUB_STEP_SUMMARY
+          fi

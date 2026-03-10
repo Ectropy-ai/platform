@@ -1,0 +1,831 @@
+/**
+ * AI Codebase Agent - Main Interface for Code Standards and Architecture Guidance
+ *
+ * Integrates all specialized advisors to provide comprehensive codebase guidance:
+ * - Code standards alignment
+ * - Architecture best practices
+ * - Dependency management
+ * - Testing strategies
+ * - Documentation completeness
+ */
+
+/*
+import {
+  CodeStandardsAgent,
+  type AlignmentReport,
+  type CodeSuggestion,
+  type ValidationResult,
+  type DependencyAdvice,
+  type StandardsTestingStrategy,
+  type DocGaps,
+} from './code-standards-agent.js';
+*/
+import {
+  ArchitectureAdvisor,
+  type ArchitectureAnalysis,
+  type ArchitectureRecommendation,
+} from './architecture-advisor.js';
+import {
+  DependencyAdvisor,
+  type DependencyAnalysis,
+  type DependencyRecommendation,
+} from './dependency-advisor.js';
+import {
+  TestingAdvisor,
+  type TestingAnalysis,
+  type TestingRecommendation,
+  type TestingStrategy,
+} from './testing-advisor.js';
+import {
+  DocumentationAdvisor,
+  type DocumentationAnalysis,
+  type DocumentationRecommendation,
+} from './documentation-advisor.js';
+
+export interface CodebaseAgentConfig {
+  rootPath?: string;
+  standards?: {
+    typescript?: boolean;
+    eslint?: boolean;
+    prettier?: boolean;
+  };
+  coverage?: {
+    minimum?: number;
+    target?: number;
+  };
+  documentation?: {
+    apiRequired?: boolean;
+    examplesRequired?: boolean;
+  };
+}
+
+export interface CodebaseAnalysisResult {
+  overall: {
+    score: number;
+    grade: 'A' | 'B' | 'C' | 'D' | 'F';
+    summary: string;
+  };
+  standards: AlignmentReport;
+  architecture: ArchitectureAnalysis;
+  dependencies: DependencyAnalysis;
+  testing: TestingAnalysis;
+  documentation: DocumentationAnalysis;
+  recommendations: PrioritizedRecommendation[];
+  actionPlan: ActionPlan;
+}
+
+export interface PrioritizedRecommendation {
+  id: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  category:
+    | 'standards'
+    | 'architecture'
+    | 'dependencies'
+    | 'testing'
+    | 'documentation';
+  title: string;
+  description: string;
+  impact: string;
+  effort: 'low' | 'medium' | 'high';
+  implementation: RecommendationStep[];
+  dependsOn?: string[];
+  estimatedTime: string;
+}
+
+export interface RecommendationStep {
+  step: number;
+  action: string;
+  details: string;
+  files?: string[];
+  commands?: string[];
+  verification?: string;
+}
+
+export interface ActionPlan {
+  immediate: PrioritizedRecommendation[]; // Can be done right now
+  shortTerm: PrioritizedRecommendation[]; // Next 1-2 weeks
+  longTerm: PrioritizedRecommendation[]; // Next month+
+  totalEffort: string;
+  estimatedDuration: string;
+}
+
+export interface ComponentGuidance {
+  component: string;
+  type: string;
+  standards: ValidationResult;
+  architecture: ArchitectureRecommendation[];
+  testing: TestingStrategy;
+  documentation: DocumentationRecommendation[];
+  summary: string;
+  nextSteps: string[];
+}
+
+export class CodebaseAgent {
+  private readonly config: CodebaseAgentConfig;
+  private readonly standardsAgent: CodeStandardsAgent;
+  private readonly architectureAdvisor: ArchitectureAdvisor;
+  private readonly dependencyAdvisor: DependencyAdvisor;
+  private readonly testingAdvisor: TestingAdvisor;
+  private readonly documentationAdvisor: DocumentationAdvisor;
+
+  constructor(config: CodebaseAgentConfig = {}) {
+    this.config = {
+      rootPath: process.cwd(),
+      standards: {
+        typescript: true,
+        eslint: true,
+        prettier: true,
+      },
+      coverage: {
+        minimum: 70,
+        target: 80,
+      },
+      documentation: {
+        apiRequired: true,
+        examplesRequired: true,
+      },
+      ...config,
+    };
+
+    // Initialize all specialized advisors
+    this.standardsAgent = new CodeStandardsAgent(this.config.rootPath);
+    this.architectureAdvisor = new ArchitectureAdvisor(this.config.rootPath);
+    this.dependencyAdvisor = new DependencyAdvisor(this.config.rootPath);
+    this.testingAdvisor = new TestingAdvisor(this.config.rootPath);
+    this.documentationAdvisor = new DocumentationAdvisor(this.config.rootPath);
+  }
+
+  /**
+   * Analyze the entire codebase and provide comprehensive recommendations
+   */
+  async analyzeCodebase(): Promise<CodebaseAnalysisResult> {
+
+    // Run all analyses in parallel for efficiency
+    const [standards, architecture, dependencies, testing, documentation] =
+      await Promise.all([
+        this.analyzeStandards(),
+        this.analyzeArchitecture(),
+        this.analyzeDependencies(),
+        this.analyzeTesting(),
+        this.analyzeDocumentation(),
+      ]);
+
+    // Generate consolidated recommendations
+    const recommendations = this.consolidateRecommendations(
+      standards,
+      architecture,
+      dependencies,
+      testing,
+      documentation
+    );
+
+    // Calculate overall scores and grades
+    const overall = this.calculateOverallScore(
+      standards,
+      architecture,
+      dependencies,
+      testing,
+      documentation
+    );
+
+    // Create action plan
+    const actionPlan = this.createActionPlan(recommendations);
+
+    return {
+      overall,
+      standards,
+      architecture,
+      dependencies,
+      testing,
+      documentation,
+      recommendations,
+      actionPlan,
+    };
+  }
+
+  /**
+   * Provide guidance for a specific component
+   */
+  async provideComponentGuidance(
+    componentPath: string
+  ): Promise<ComponentGuidance> {
+
+    const [standards, architecture, testing, documentation] = await Promise.all(
+      [
+        this.standardsAgent.validateCodingStandards(
+          await this.readFile(componentPath)
+        ),
+        this.architectureAdvisor.provideComponentGuidance(componentPath),
+        this.testingAdvisor.generateTestGuidance(componentPath),
+        this.documentationAdvisor.generateDocumentationSuggestions(
+          componentPath
+        ),
+      ]
+    );
+
+    const componentType = this.determineComponentType(componentPath);
+    const summary = this.generateComponentSummary(
+      standards,
+      architecture,
+      testing,
+      documentation
+    );
+    const nextSteps = this.generateNextSteps(
+      standards,
+      architecture,
+      testing,
+      documentation
+    );
+
+    return {
+      component: componentPath,
+      type: componentType,
+      standards,
+      architecture,
+      testing,
+      documentation,
+      summary,
+      nextSteps,
+    };
+  }
+
+  /**
+   * Get quick recommendations for immediate improvements
+   */
+  async getQuickWins(): Promise<PrioritizedRecommendation[]> {
+    const analysis = await this.analyzeCodebase();
+    return analysis.recommendations.filter(
+      (rec) =>
+        rec.effort === 'low' &&
+        (rec.priority === 'high' || rec.priority === 'critical')
+    );
+  }
+
+  /**
+   * Check if code follows project standards
+   */
+  async validateStandards(code: string): Promise<ValidationResult> {
+    return this.standardsAgent.validateCodingStandards(code);
+  }
+
+  /**
+   * Suggest architecture improvements for a component
+   */
+  async suggestArchitectureImprovements(
+    componentPath: string
+  ): Promise<CodeSuggestion[]> {
+    return this.standardsAgent.suggestArchitectureImprovements(componentPath);
+  }
+
+  /**
+   * Recommend dependencies for requirements
+   */
+  async recommendDependencies(requirements: string): Promise<DependencyAdvice> {
+    return this.standardsAgent.recommendDependencies(requirements);
+  }
+
+  /**
+   * Generate test guidance for component
+   */
+  async generateTestGuidance(componentPath: string): Promise<TestingStrategy> {
+    return this.testingAdvisor.generateTestGuidance(componentPath);
+  }
+
+  /**
+   * Check documentation completeness
+   */
+  async checkDocumentationCompleteness(modulePath: string): Promise<DocGaps[]> {
+    return this.standardsAgent.checkDocumentationCompleteness(modulePath);
+  }
+
+  /**
+   * Generate a health report for the codebase
+   */
+  async generateHealthReport(): Promise<string> {
+    const analysis = await this.analyzeCodebase();
+
+    return `
+# 🏥 Codebase Health Report
+
+## Overall Score: ${analysis.overall.score}/100 (Grade: ${analysis.overall.grade})
+
+${analysis.overall.summary}
+
+## Key Metrics
+
+### Code Standards
+- **Score:** ${analysis.standards.score}/100
+- **Critical Issues:** ${analysis.standards.violations.filter((v) => v.severity === 'error').length}
+- **Warnings:** ${analysis.standards.violations.filter((v) => v.severity === 'warning').length}
+
+### Architecture
+- **Violations:** ${analysis.architecture.violations.length}
+- **Critical:** ${analysis.architecture.violations.filter((v) => v.severity === 'critical').length}
+- **Patterns Detected:** ${analysis.architecture.patterns.filter((p) => p.present).length}
+
+### Dependencies
+- **Vulnerabilities:** ${analysis.dependencies.vulnerabilities.length}
+- **Outdated:** ${analysis.dependencies.outdated.length}
+- **Conflicts:** ${analysis.dependencies.conflicts.length}
+
+### Testing
+- **Coverage:** ${analysis.testing.coverage.overall}%
+- **Missing Tests:** ${analysis.testing.gaps.filter((g) => g.type === 'missing_tests').length}
+- **Test Quality:** ${analysis.testing.strategies.reduce((avg, s) => avg + s.current.quality, 0) / analysis.testing.strategies.length}/100
+
+### Documentation
+- **Completeness:** ${analysis.documentation.completeness.overall}%
+- **API Coverage:** ${analysis.documentation.coverage.apis.percentage}%
+- **Missing Docs:** ${analysis.documentation.gaps.length}
+
+## Top Priorities
+
+${analysis.recommendations
+  .filter((r) => r.priority === 'critical' || r.priority === 'high')
+  .slice(0, 5)
+  .map(
+    (rec, i) => `${i + 1}. **${rec.title}** (${rec.effort} effort)
+   ${rec.description}`
+  )
+  .join('\n\n')}
+
+## Action Plan
+
+### Immediate (Next 1-2 days)
+${analysis.actionPlan.immediate.length} tasks - ${this.estimateEffort(analysis.actionPlan.immediate)}
+
+### Short Term (Next 1-2 weeks)  
+${analysis.actionPlan.shortTerm.length} tasks - ${this.estimateEffort(analysis.actionPlan.shortTerm)}
+
+### Long Term (Next month+)
+${analysis.actionPlan.longTerm.length} tasks - ${this.estimateEffort(analysis.actionPlan.longTerm)}
+
+**Total Estimated Effort:** ${analysis.actionPlan.totalEffort}
+**Estimated Duration:** ${analysis.actionPlan.estimatedDuration}
+
+---
+*Generated by Ectropy AI Codebase Agent*
+`;
+  }
+
+  // Private implementation methods
+
+  private async analyzeStandards(): Promise<AlignmentReport> {
+    // Find relevant source files
+    const sourceFiles = await this.findSourceFiles();
+    return this.standardsAgent.analyzeCodeAlignment(sourceFiles);
+  }
+
+  private async analyzeArchitecture(): Promise<ArchitectureAnalysis> {
+    return this.architectureAdvisor.analyzeArchitecture();
+  }
+
+  private async analyzeDependencies(): Promise<DependencyAnalysis> {
+    return this.dependencyAdvisor.analyzeDependencies();
+  }
+
+  private async analyzeTesting(): Promise<TestingAnalysis> {
+    return this.testingAdvisor.analyzeTestingStrategy();
+  }
+
+  private async analyzeDocumentation(): Promise<DocumentationAnalysis> {
+    return this.documentationAdvisor.analyzeDocumentation();
+  }
+
+  private consolidateRecommendations(
+    standards: AlignmentReport,
+    architecture: ArchitectureAnalysis,
+    dependencies: DependencyAnalysis,
+    testing: TestingAnalysis,
+    documentation: DocumentationAnalysis
+  ): PrioritizedRecommendation[] {
+    const recommendations: PrioritizedRecommendation[] = [];
+    let id = 1;
+
+    // Standards recommendations
+    for (const suggestion of standards.suggestions) {
+      recommendations.push({
+        id: `STD-${id++}`,
+        priority: this.mapPriorityFromStandards(suggestion.priority),
+        category: 'standards',
+        title: `Standards: ${suggestion.description}`,
+        description: suggestion.description,
+        impact: 'Improves code quality and maintainability',
+        effort: this.mapEffortFromStandards(suggestion.priority),
+        implementation: suggestion.implementation.map((impl, idx) => ({
+          step: idx + 1,
+          action: impl,
+          details: suggestion.examples?.[idx] || '',
+          verification: 'Run linting and verify no violations',
+        })),
+        estimatedTime: this.estimateTime(suggestion.priority),
+      });
+    }
+
+    // Architecture recommendations
+    for (const rec of architecture.recommendations) {
+      recommendations.push({
+        id: `ARCH-${id++}`,
+        priority: rec.priority,
+        category: 'architecture',
+        title: `Architecture: ${rec.title}`,
+        description: rec.description,
+        impact: rec.benefits.join(', '),
+        effort: rec.effort,
+        implementation: rec.implementation.map((step) => ({
+          step: step.step,
+          action: step.description,
+          details: '',
+          files: step.files,
+          commands: step.commands,
+          verification: 'Verify architecture improvement',
+        })),
+        estimatedTime: this.estimateTimeFromEffort(rec.effort),
+      });
+    }
+
+    // Dependencies recommendations
+    for (const rec of dependencies.recommendations) {
+      recommendations.push({
+        id: `DEP-${id++}`,
+        priority: this.mapDependencyPriority(rec),
+        category: 'dependencies',
+        title: `Dependencies: ${rec.type} ${rec.package}`,
+        description: rec.reason,
+        impact: `${rec.impact} impact on project`,
+        effort: rec.effort,
+        implementation: [
+          {
+            step: 1,
+            action: rec.commands[0] || `${rec.type} ${rec.package}`,
+            details: rec.reason,
+            commands: rec.commands,
+            verification: 'Verify dependency change works correctly',
+          },
+        ],
+        estimatedTime: this.estimateTimeFromEffort(rec.effort),
+      });
+    }
+
+    // Testing recommendations
+    for (const rec of testing.recommendations) {
+      recommendations.push({
+        id: `TEST-${id++}`,
+        priority: rec.priority,
+        category: 'testing',
+        title: `Testing: ${rec.title}`,
+        description: rec.description,
+        impact: rec.benefits.join(', '),
+        effort: rec.effort,
+        implementation: rec.implementation.map((step) => ({
+          step: step.step,
+          action: step.description,
+          details: step.code || '',
+          files: step.files,
+          commands: step.commands,
+          verification: 'Run tests and verify coverage improvement',
+        })),
+        estimatedTime: this.estimateTimeFromEffort(rec.effort),
+      });
+    }
+
+    // Documentation recommendations
+    for (const rec of documentation.recommendations) {
+      recommendations.push({
+        id: `DOC-${id++}`,
+        priority: rec.priority,
+        category: 'documentation',
+        title: `Documentation: ${rec.title}`,
+        description: rec.description,
+        impact: rec.benefits.join(', '),
+        effort: rec.effort,
+        implementation: rec.implementation.map((step) => ({
+          step: step.step,
+          action: step.description,
+          details: step.content || '',
+          files: step.files,
+          commands: step.commands,
+          verification: 'Review documentation for completeness and clarity',
+        })),
+        estimatedTime: this.estimateTimeFromEffort(rec.effort),
+      });
+    }
+
+    // Sort by priority and impact
+    return recommendations.sort((a, b) => {
+      const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+      return priorityOrder[b.priority] - priorityOrder[a.priority];
+    });
+  }
+
+  private calculateOverallScore(
+    standards: AlignmentReport,
+    architecture: ArchitectureAnalysis,
+    dependencies: DependencyAnalysis,
+    testing: TestingAnalysis,
+    documentation: DocumentationAnalysis
+  ): { score: number; grade: 'A' | 'B' | 'C' | 'D' | 'F'; summary: string } {
+    const weights = {
+      standards: 0.25,
+      architecture: 0.2,
+      dependencies: 0.15,
+      testing: 0.25,
+      documentation: 0.15,
+    };
+
+    const scores = {
+      standards: standards.score,
+      architecture: this.calculateArchitectureScore(architecture),
+      dependencies: this.calculateDependencyScore(dependencies),
+      testing: testing.coverage.overall,
+      documentation: documentation.completeness.overall,
+    };
+
+    const weightedScore = Math.round(
+      Object.entries(scores).reduce((total, [key, score]) => {
+        return total + score * weights[key as keyof typeof weights];
+      }, 0)
+    );
+
+    const grade = this.scoreToGrade(weightedScore);
+    const summary = this.generateScoreSummary(weightedScore, scores);
+
+    return { score: weightedScore, grade, summary };
+  }
+
+  private createActionPlan(
+    recommendations: PrioritizedRecommendation[]
+  ): ActionPlan {
+    const immediate = recommendations.filter(
+      (r) =>
+        r.effort === 'low' &&
+        (r.priority === 'critical' || r.priority === 'high')
+    );
+
+    const shortTerm = recommendations.filter(
+      (r) =>
+        (r.effort === 'medium' && r.priority !== 'low') ||
+        (r.effort === 'low' && r.priority === 'medium')
+    );
+
+    const longTerm = recommendations.filter(
+      (r) =>
+        r.effort === 'high' ||
+        (r.effort === 'medium' && r.priority === 'low') ||
+        r.priority === 'low'
+    );
+
+    const totalEffort = this.estimateEffort(recommendations);
+    const estimatedDuration = this.estimateDuration(recommendations);
+
+    return {
+      immediate,
+      shortTerm,
+      longTerm,
+      totalEffort,
+      estimatedDuration,
+    };
+  }
+
+  // Helper methods
+
+  private async findSourceFiles(): Promise<string[]> {
+    // Would recursively find TypeScript/JavaScript files
+    return [];
+  }
+
+  private async readFile(filePath: string): Promise<string> {
+    const fs = await import('node:fs/promises');
+    try {
+      return await fs.readFile(filePath, 'utf-8');
+    } catch {
+      return '';
+    }
+  }
+
+  private determineComponentType(componentPath: string): string {
+    if (componentPath.includes('component')) return 'React Component';
+    if (componentPath.includes('service')) return 'Service';
+    if (componentPath.includes('util')) return 'Utility';
+    if (componentPath.includes('api')) return 'API';
+    return 'Module';
+  }
+
+  private generateComponentSummary(
+    standards: ValidationResult,
+    architecture: ArchitectureRecommendation[],
+    testing: TestingStrategy,
+    documentation: DocumentationRecommendation[]
+  ): string {
+    const issues = [
+      !standards.isValid && 'code standards violations',
+      architecture.length > 0 && 'architecture improvements needed',
+      testing.current.coverage < 80 && 'test coverage below target',
+      documentation.length > 0 && 'documentation gaps',
+    ].filter(Boolean);
+
+    if (issues.length === 0) {
+      return 'Component follows best practices with good quality scores.';
+    }
+
+    return `Component has ${issues.length} areas for improvement: ${issues.join(', ')}.`;
+  }
+
+  private generateNextSteps(
+    standards: ValidationResult,
+    architecture: ArchitectureRecommendation[],
+    testing: TestingStrategy,
+    documentation: DocumentationRecommendation[]
+  ): string[] {
+    const steps: string[] = [];
+
+    if (!standards.isValid) {
+      steps.push('Fix code standards violations');
+    }
+
+    if (testing.current.coverage < 80) {
+      steps.push('Improve test coverage');
+    }
+
+    if (architecture.length > 0) {
+      steps.push(`Address architecture: ${architecture[0].title}`);
+    }
+
+    if (documentation.length > 0) {
+      steps.push(`Add documentation: ${documentation[0].title}`);
+    }
+
+    return steps.length > 0
+      ? steps
+      : ['Component is in good shape - consider minor optimizations'];
+  }
+
+  private mapPriorityFromStandards(
+    priority: 'high' | 'medium' | 'low'
+  ): 'critical' | 'high' | 'medium' | 'low' {
+    const mapping = {
+      high: 'high' as const,
+      medium: 'medium' as const,
+      low: 'low' as const,
+    };
+    return mapping[priority];
+  }
+
+  private mapEffortFromStandards(
+    priority: 'high' | 'medium' | 'low'
+  ): 'low' | 'medium' | 'high' {
+    const mapping = {
+      high: 'medium' as const,
+      medium: 'low' as const,
+      low: 'low' as const,
+    };
+    return mapping[priority];
+  }
+
+  private mapDependencyPriority(
+    rec: DependencyRecommendation
+  ): 'critical' | 'high' | 'medium' | 'low' {
+    if (rec.type === 'update' && rec.reason.includes('security'))
+      return 'critical';
+    if (rec.effort === 'low' && rec.impact === 'positive') return 'high';
+    return 'medium';
+  }
+
+  private estimateTime(priority: 'high' | 'medium' | 'low'): string {
+    const mapping = {
+      high: '2-4 hours',
+      medium: '1-2 hours',
+      low: '30 minutes',
+    };
+    return mapping[priority];
+  }
+
+  private estimateTimeFromEffort(effort: 'low' | 'medium' | 'high'): string {
+    const mapping = { low: '1-2 hours', medium: '4-8 hours', high: '1-2 days' };
+    return mapping[effort];
+  }
+
+  private calculateArchitectureScore(
+    architecture: ArchitectureAnalysis
+  ): number {
+    const criticalViolations = architecture.violations.filter(
+      (v) => v.severity === 'critical'
+    ).length;
+    const majorViolations = architecture.violations.filter(
+      (v) => v.severity === 'major'
+    ).length;
+
+    let score = 100;
+    score -= criticalViolations * 20;
+    score -= majorViolations * 10;
+
+    return Math.max(0, score);
+  }
+
+  private calculateDependencyScore(dependencies: DependencyAnalysis): number {
+    const criticalVulns = dependencies.vulnerabilities.filter(
+      (v) => v.severity === 'critical'
+    ).length;
+    const highVulns = dependencies.vulnerabilities.filter(
+      (v) => v.severity === 'high'
+    ).length;
+
+    let score = 100;
+    score -= criticalVulns * 25;
+    score -= highVulns * 15;
+    score -= dependencies.outdated.length * 2;
+
+    return Math.max(0, score);
+  }
+
+  private scoreToGrade(score: number): 'A' | 'B' | 'C' | 'D' | 'F' {
+    if (score >= 90) return 'A';
+    if (score >= 80) return 'B';
+    if (score >= 70) return 'C';
+    if (score >= 60) return 'D';
+    return 'F';
+  }
+
+  private generateScoreSummary(
+    overall: number,
+    scores: Record<string, number>
+  ): string {
+    const grade = this.scoreToGrade(overall);
+    const weak = Object.entries(scores)
+      .filter(([_, score]) => score < 70)
+      .map(([area, _]) => area);
+
+    if (grade === 'A') {
+      return 'Excellent codebase with high standards across all areas.';
+    } else if (grade === 'B') {
+      return `Good codebase with minor improvements needed${weak.length ? ` in ${weak.join(', ')}` : ''}.`;
+    } else if (grade === 'C') {
+      return `Adequate codebase requiring improvements in ${weak.join(', ')}.`;
+    } else {
+      return `Codebase needs significant improvements, particularly in ${weak.join(', ')}.`;
+    }
+  }
+
+  private estimateEffort(recommendations: PrioritizedRecommendation[]): string {
+    const hours = recommendations.reduce((total, rec) => {
+      const effort = { low: 2, medium: 6, high: 16 };
+      return total + effort[rec.effort];
+    }, 0);
+
+    if (hours < 8) return `${hours} hours`;
+    const days = Math.ceil(hours / 8);
+    return `${days} day${days > 1 ? 's' : ''}`;
+  }
+
+  private estimateDuration(
+    recommendations: PrioritizedRecommendation[]
+  ): string {
+    const criticalHigh = recommendations.filter((r) =>
+      ['critical', 'high'].includes(r.priority)
+    ).length;
+
+    if (criticalHigh === 0) return '1-2 weeks';
+    if (criticalHigh < 5) return '2-3 weeks';
+    if (criticalHigh < 10) return '1 month';
+    return '1-2 months';
+  }
+}
+
+// Export specific types to avoid naming conflicts
+/*
+export {
+  CodeStandardsAgent,
+  type AlignmentReport,
+  type CodeSuggestion,
+  type ValidationResult,
+  type DependencyAdvice,
+  type StandardsTestingStrategy,
+  type StandardsDependencyRecommendation,
+  type DocGaps,
+} from './code-standards-agent.js';
+*/
+
+export {
+  ArchitectureAdvisor,
+  type ArchitectureAnalysis,
+  type ArchitectureRecommendation,
+} from './architecture-advisor.js';
+
+export {
+  DependencyAdvisor,
+  type DependencyAnalysis,
+  type DependencyRecommendation,
+} from './dependency-advisor.js';
+
+export {
+  TestingAdvisor,
+  type TestingAnalysis,
+  type TestingRecommendation,
+  type TestingStrategy,
+} from './testing-advisor.js';
+
+export {
+  DocumentationAdvisor,
+  type DocumentationAnalysis,
+  type DocumentationRecommendation,
+} from './documentation-advisor.js';

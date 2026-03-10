@@ -1,0 +1,218 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ectropy://schemas/decision/v2",
+  "title": "Decision",
+  "description": "Immutable record of a construction decision with authority chain and spatial reference",
+  "type": "object",
+  "required": ["id", "type", "timestamp", "status", "context", "authority"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^DEC-[0-9]{4}-[0-9]{4,}$",
+      "description": "Unique decision identifier (e.g., DEC-2024-0847)"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["APPROVAL", "REJECTION", "DEFERRAL", "ESCALATION", "PROPOSAL", "CONSEQUENCE"],
+      "description": "Type of decision action"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the decision was made"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PENDING", "APPROVED", "REJECTED", "SUPERSEDED", "EXPIRED"],
+      "description": "Current status of the decision"
+    },
+    "context": {
+      "$ref": "#/definitions/DecisionContext",
+      "description": "The question, rationale, options, and AI advice"
+    },
+    "authority": {
+      "$ref": "#/definitions/AuthorityChain",
+      "description": "Who had authority and escalation path"
+    },
+    "spatial": {
+      "$ref": "#/definitions/SpatialReference",
+      "description": "Location in BIM model (voxel attachment)"
+    },
+    "relationships": {
+      "$ref": "#/definitions/DecisionRelationships",
+      "description": "Causal links to other decisions"
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/Evidence" },
+      "description": "Photos, documents, voice notes supporting decision"
+    },
+    "immutableHash": {
+      "type": "string",
+      "description": "SHA-256 hash for blockchain anchoring"
+    }
+  },
+  "definitions": {
+    "DecisionContext": {
+      "type": "object",
+      "required": ["question", "rationale", "options"],
+      "properties": {
+        "question": {
+          "type": "string",
+          "description": "The decision question being answered"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "The WHY - captured explanation for this decision"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "description": { "type": "string" },
+              "consequences": { "type": "array", "items": { "type": "string" } },
+              "selected": { "type": "boolean" }
+            },
+            "required": ["id", "description"]
+          },
+          "description": "Available options that were considered"
+        },
+        "aiAdvice": {
+          "type": "object",
+          "properties": {
+            "recommendation": { "type": "string" },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "analysisPath": { "type": "array", "items": { "type": "string" } },
+            "precedents": { "type": "array", "items": { "type": "string" } }
+          },
+          "description": "AI agent's recommendation and reasoning"
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "schedule": { "type": "string" },
+            "budget": { "type": "string" },
+            "safety": { "type": "string" },
+            "quality": { "type": "string" }
+          },
+          "description": "Project constraints affecting the decision"
+        }
+      }
+    },
+    "AuthorityChain": {
+      "type": "object",
+      "required": ["requiredLevel", "actualDecider"],
+      "properties": {
+        "requiredLevel": {
+          "type": "string",
+          "enum": ["FIELD", "FOREMAN", "SUPERINTENDENT", "PM", "ARCHITECT", "OWNER", "REGULATORY"],
+          "description": "Authority level required to make this decision"
+        },
+        "actualDecider": {
+          "$ref": "#/definitions/Participant",
+          "description": "Person who made the final decision"
+        },
+        "escalationPath": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "participant": { "$ref": "#/definitions/Participant" },
+              "action": { "type": "string", "enum": ["ESCALATED", "DECIDED", "DEFERRED"] },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "reason": { "type": "string" }
+            },
+            "required": ["participant", "action", "timestamp"]
+          },
+          "description": "Path the decision took through the authority hierarchy"
+        }
+      }
+    },
+    "Participant": {
+      "type": "object",
+      "required": ["id", "role", "organization"],
+      "properties": {
+        "id": { "type": "string", "description": "Unique participant ID" },
+        "name": { "type": "string", "description": "Display name" },
+        "role": { "type": "string", "description": "Job role/title" },
+        "organization": { "type": "string", "description": "Company/org name" },
+        "authorityLevel": { 
+          "type": "string",
+          "enum": ["FIELD", "FOREMAN", "SUPERINTENDENT", "PM", "ARCHITECT", "OWNER", "REGULATORY"]
+        }
+      }
+    },
+    "SpatialReference": {
+      "type": "object",
+      "description": "Links decision to BIM location (voxel)",
+      "properties": {
+        "voxelId": { 
+          "type": "string",
+          "description": "Unique voxel identifier in BIM model"
+        },
+        "coordinates": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "z": { "type": "number" }
+          },
+          "required": ["x", "y", "z"]
+        },
+        "ifcElements": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Related IFC element GUIDs"
+        },
+        "zone": { "type": "string" },
+        "level": { "type": "string" },
+        "room": { "type": "string" }
+      }
+    },
+    "DecisionRelationships": {
+      "type": "object",
+      "properties": {
+        "causedBy": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Decision IDs that led to this decision"
+        },
+        "causes": {
+          "type": "array", 
+          "items": { "type": "string" },
+          "description": "Decision IDs caused by this decision"
+        },
+        "supersedes": {
+          "type": "string",
+          "description": "Decision ID this replaces"
+        },
+        "supersededBy": {
+          "type": "string",
+          "description": "Decision ID that replaced this"
+        },
+        "relatedTo": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Associated decisions (non-causal)"
+        }
+      }
+    },
+    "Evidence": {
+      "type": "object",
+      "required": ["type", "timestamp"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["PHOTO", "DOCUMENT", "VOICE", "VIDEO", "SMS", "EMAIL", "MEETING_TRANSCRIPT"]
+        },
+        "uri": { "type": "string", "format": "uri" },
+        "hash": { "type": "string", "description": "SHA-256 of content for verification" },
+        "capturedBy": { "$ref": "#/definitions/Participant" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object", "additionalProperties": true }
+      }
+    }
+  }
+}

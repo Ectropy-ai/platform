@@ -1,0 +1,283 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://luhtech.dev/schemas/pm/consequence.schema.json",
+  "title": "Consequence Schema",
+  "description": "Tracks downstream effects of PM decisions, enabling root cause tracing",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "consequenceId",
+    "category",
+    "sourceDecisionRef",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:consequence:CONSQ-[0-9]{4}-[0-9]{4}$",
+      "description": "URN identifier for this consequence"
+    },
+    "$schema": {
+      "const": "https://luhtech.dev/schemas/pm/consequence.schema.json"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string" },
+        "sourceOfTruth": { "type": "string" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      }
+    },
+    "consequenceId": {
+      "type": "string",
+      "pattern": "^CONSQ-[0-9]{4}-[0-9]{4}$"
+    },
+    "sourceDecisionRef": {
+      "$ref": "#/$defs/urn"
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 5000
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "SCHEDULE_DELAY",
+        "COST_INCREASE",
+        "SAFETY_RISK",
+        "QUALITY_IMPACT",
+        "SCOPE_CHANGE",
+        "REWORK_REQUIRED",
+        "RESOURCE_CONFLICT",
+        "PERMIT_REQUIRED",
+        "DESIGN_CHANGE",
+        "WARRANTY_IMPACT",
+        "COORDINATION_CONFLICT",
+        "TOLERANCE_VARIANCE",
+        "MATERIAL_MISMATCH",
+        "ACCESS_ISSUE",
+        "REGULATORY_CONCERN"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["IDENTIFIED", "ASSESSED", "MITIGATED", "ACCEPTED", "CLOSED"],
+      "default": "IDENTIFIED"
+    },
+    "discoveredBy": { "$ref": "#/$defs/urn" },
+    "discoveredAt": { "type": "string", "format": "date-time" },
+    "affectedVoxels": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "spatialReference": {
+      "type": "object",
+      "properties": {
+        "primaryVoxelRef": { "$ref": "#/$defs/urn" },
+        "voxelId": { "type": "string" },
+        "coordinates": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "z": { "type": "number" }
+          }
+        },
+        "building": { "type": "string" },
+        "level": { "type": "string" },
+        "zone": { "type": "string" }
+      }
+    },
+    "budgetImpact": {
+      "type": "object",
+      "properties": {
+        "estimated": { "type": "number" },
+        "actual": { "type": "number" },
+        "currency": { "type": "string", "default": "USD" },
+        "isConfirmed": { "type": "boolean" }
+      }
+    },
+    "scheduleImpact": {
+      "type": "object",
+      "properties": {
+        "delayDays": { "type": "integer" },
+        "affectedMilestones": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" }
+        },
+        "criticalPath": { "type": "boolean" }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "timestamp"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["photo", "document", "voice-note", "video", "measurement"]
+          },
+          "uri": { "type": "string", "format": "uri" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "capturedBy": { "$ref": "#/$defs/urn" }
+        }
+      }
+    },
+    "mitigationPlan": { "type": "string" },
+    "resolutionPath": {
+      "type": "object",
+      "properties": {
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "description": { "type": "string" },
+              "estimatedCost": { "type": "number" },
+              "requiredApprovalLevel": {
+                "type": "string",
+                "enum": [
+                  "FIELD",
+                  "FOREMAN",
+                  "SUPERINTENDENT",
+                  "PM",
+                  "ARCHITECT",
+                  "OWNER",
+                  "REGULATORY"
+                ]
+              }
+            }
+          }
+        },
+        "selectedOption": { "type": "string" },
+        "resolutionDecisionRef": { "$ref": "#/$defs/urn" }
+      }
+    },
+    "aiTraceAnalysis": {
+      "type": "object",
+      "properties": {
+        "rootCauseChain": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" }
+        },
+        "originalDecisionRef": { "$ref": "#/$defs/urn" },
+        "chainLength": { "type": "integer" },
+        "participantsInvolved": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" }
+        },
+        "analysisNarrative": { "type": "string" }
+      }
+    },
+    "escalation": {
+      "type": "object",
+      "properties": {
+        "currentLevel": {
+          "type": "string",
+          "enum": [
+            "FIELD",
+            "FOREMAN",
+            "SUPERINTENDENT",
+            "PM",
+            "ARCHITECT",
+            "OWNER",
+            "REGULATORY"
+          ]
+        },
+        "requiredLevel": {
+          "type": "string",
+          "enum": [
+            "FIELD",
+            "FOREMAN",
+            "SUPERINTENDENT",
+            "PM",
+            "ARCHITECT",
+            "OWNER",
+            "REGULATORY"
+          ]
+        },
+        "escalationPath": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "participantRef": { "$ref": "#/$defs/urn" },
+              "action": {
+                "type": "string",
+                "enum": ["ESCALATED", "REVIEWING", "DECIDED"]
+              },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
+    },
+    "relatedConsequences": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "resolutionDecisionRef": { "$ref": "#/$defs/urn" },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "resolvedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to", "type"],
+            "properties": {
+              "from": { "$ref": "#/$defs/urn" },
+              "to": { "$ref": "#/$defs/urn" },
+              "type": {
+                "type": "string",
+                "enum": ["triggers", "affects", "causes", "references"]
+              },
+              "weight": { "type": "number", "minimum": 0, "maximum": 1 },
+              "label": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    }
+  }
+}

@@ -1,0 +1,426 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://luhtech.dev/schemas/usf/usf-work-packet.schema.json",
+  "title": "USF Work Packet Schema",
+  "description": "Tracks USF metrics for a unit of work (wagon, voxel cluster) - connects planned targets to actual results for profile updates and billing",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "workPacketId",
+    "projectId",
+    "status",
+    "targets",
+    "laborAllocation",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:usf-work-packet:WP-[0-9]{4}-[0-9]{4}$",
+      "description": "URN identifier for this USF work packet"
+    },
+    "$schema": {
+      "const": "https://luhtech.dev/schemas/usf/usf-work-packet.schema.json"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "meta": {
+      "$ref": "#/$defs/meta"
+    },
+    "workPacketId": {
+      "type": "string",
+      "pattern": "^WP-[0-9]{4}-[0-9]{4}$",
+      "description": "Human-readable work packet identifier (e.g., WP-2026-0042)"
+    },
+    "projectId": {
+      "type": "string",
+      "description": "Project this work packet belongs to"
+    },
+    "sourceRef": {
+      "type": "object",
+      "description": "Reference to source work unit",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["wagon", "voxel", "voxel-cluster", "task", "milestone"]
+        },
+        "urn": { "$ref": "#/$defs/urn" },
+        "externalId": { "type": "string" }
+      }
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the work being tracked"
+    },
+    "workType": {
+      "type": "string",
+      "description": "Type of work (e.g., electrical-rough, plumbing-trim, drywall-finish)"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["planned", "in_progress", "completed", "cancelled", "disputed"],
+      "description": "Current status of the work packet"
+    },
+    "targets": {
+      "type": "object",
+      "description": "Planned targets for USF measurement",
+      "required": ["qualityTarget"],
+      "properties": {
+        "qualityTarget": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Target quality score (first-pass yield expectation)"
+        },
+        "budgetAmount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Budgeted cost for this work packet"
+        },
+        "budgetCurrency": {
+          "type": "string",
+          "default": "USD"
+        },
+        "durationHours": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Planned duration in hours"
+        },
+        "taktTime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Takt time target (from CaaS schedule)"
+        },
+        "marketBenchmark": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Market benchmark cost for this work type"
+        }
+      }
+    },
+    "actuals": {
+      "type": "object",
+      "description": "Actual results after work completion",
+      "properties": {
+        "qualityScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Actual quality score (first-pass yield)"
+        },
+        "defectCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of defects identified"
+        },
+        "reworkHours": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Hours spent on rework"
+        },
+        "actualCost": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Actual cost incurred"
+        },
+        "actualDurationHours": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Actual duration in hours"
+        },
+        "actualTaktTime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Actual takt time achieved"
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "usfResults": {
+      "type": "object",
+      "description": "Calculated USF scores from actuals",
+      "properties": {
+        "quality": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Calculated quality USF score"
+        },
+        "cost": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Calculated cost USF score"
+        },
+        "speed": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Calculated speed USF score"
+        },
+        "composite": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Weighted composite score"
+        }
+      }
+    },
+    "variance": {
+      "type": "object",
+      "description": "Variance between planned and actual",
+      "properties": {
+        "qualityVariance": {
+          "type": "number",
+          "description": "Quality: actual - target"
+        },
+        "costVariance": {
+          "type": "number",
+          "description": "Cost: actual - budget (negative is under budget)"
+        },
+        "costVariancePercent": {
+          "type": "number",
+          "description": "Cost variance as percentage"
+        },
+        "scheduleVariance": {
+          "type": "number",
+          "description": "Schedule: actual hours - planned hours"
+        },
+        "scheduleVariancePercent": {
+          "type": "number",
+          "description": "Schedule variance as percentage"
+        }
+      }
+    },
+    "laborAllocation": {
+      "type": "array",
+      "description": "Providers allocated to this work packet",
+      "items": { "$ref": "#/$defs/laborAllocationItem" }
+    },
+    "attribution": {
+      "type": "array",
+      "description": "USF attribution to individual providers (for mixed labor)",
+      "items": { "$ref": "#/$defs/attributionItem" }
+    },
+    "pricingTier": {
+      "type": "string",
+      "enum": ["economy", "standard", "premium", "expedited"],
+      "description": "Pricing tier applied to this work packet"
+    },
+    "billing": {
+      "type": "object",
+      "description": "Billing calculation based on USF",
+      "properties": {
+        "baseRate": {
+          "type": "number",
+          "description": "Base rate for work type"
+        },
+        "tierMultiplier": {
+          "type": "number",
+          "description": "Multiplier from pricing tier"
+        },
+        "reputationMultiplier": {
+          "type": "number",
+          "description": "Multiplier from provider composite score"
+        },
+        "varianceAdjustment": {
+          "type": "number",
+          "description": "Bonus or penalty based on variance"
+        },
+        "finalAmount": {
+          "type": "number",
+          "description": "Final billable amount"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "invoiced", "paid", "disputed"]
+        },
+        "payApplicationRef": {
+          "$ref": "#/$defs/urn",
+          "description": "Reference to PaaS pay application"
+        }
+      }
+    },
+    "inspectionRef": {
+      "$ref": "#/$defs/urn",
+      "description": "Reference to inspection that verified quality"
+    },
+    "contractRef": {
+      "$ref": "#/$defs/urn",
+      "description": "Reference to governing contract (GaaS)"
+    },
+    "contractThresholds": {
+      "type": "object",
+      "description": "Contract-specified USF thresholds",
+      "properties": {
+        "minimumQuality": { "type": "number", "minimum": 0, "maximum": 1 },
+        "maximumCostVariance": { "type": "number" },
+        "maximumScheduleVariance": { "type": "number" },
+        "bonusTrigger": { "type": "number", "minimum": 0, "maximum": 1 },
+        "bonusPercent": { "type": "number" },
+        "penaltyTrigger": { "type": "number", "minimum": 0, "maximum": 1 },
+        "penaltyPercent": { "type": "number" }
+      }
+    },
+    "voxelRefs": {
+      "type": "array",
+      "description": "Voxels covered by this work packet",
+      "items": { "$ref": "#/$defs/urn" }
+    },
+    "evidence": {
+      "type": "array",
+      "description": "Evidence supporting USF calculations",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["photo", "document", "measurement", "inspection-report", "timesheet"]
+          },
+          "uri": { "type": "string", "format": "uri" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "timestamps": {
+      "$ref": "#/$defs/timestamps"
+    },
+    "graphMetadata": {
+      "$ref": "#/$defs/graphMetadata"
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$",
+      "description": "LuhTech URN identifier"
+    },
+    "meta": {
+      "type": "object",
+      "description": "V3 file metadata for sync tracking",
+      "properties": {
+        "projectId": { "type": "string" },
+        "sourceOfTruth": { "type": "string" },
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "syncStatus": {
+          "type": "object",
+          "properties": {
+            "syncDirection": {
+              "type": "string",
+              "enum": ["v3-is-source-of-truth", "bidirectional"]
+            }
+          }
+        }
+      }
+    },
+    "laborAllocationItem": {
+      "type": "object",
+      "required": ["providerUrn", "allocationPercent"],
+      "properties": {
+        "providerUrn": {
+          "$ref": "#/$defs/urn",
+          "description": "URN of the provider"
+        },
+        "allocationPercent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of work allocated to this provider"
+        },
+        "role": {
+          "type": "string",
+          "description": "Role of provider in this work packet"
+        },
+        "plannedHours": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "attributionItem": {
+      "type": "object",
+      "required": ["providerUrn"],
+      "properties": {
+        "providerUrn": {
+          "$ref": "#/$defs/urn"
+        },
+        "contributionPercent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Actual contribution percentage"
+        },
+        "qualityContribution": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Quality score attributed to this provider"
+        },
+        "costContribution": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Cost score attributed to this provider"
+        },
+        "speedContribution": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Speed score attributed to this provider"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to", "type"],
+            "properties": {
+              "from": { "$ref": "#/$defs/urn" },
+              "to": { "$ref": "#/$defs/urn" },
+              "type": {
+                "type": "string",
+                "enum": ["tracks", "updates-profile", "bills-to", "covers-voxel", "attributed-to"]
+              },
+              "weight": { "type": "number", "minimum": 0, "maximum": 1 },
+              "label": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,181 @@
+name: Emergency Production Server Cleanup
+
+# ============================================================================
+# EMERGENCY CLEANUP WORKFLOW - ROOT CAUSE #15
+# Purpose: Aggressive cleanup of ALL Docker artifacts except latest version
+# Use Case: When standard cleanup is ineffective (all images < 7 days old)
+# Safety: ONLY for alpha/staging servers - removes ALL running containers
+# ============================================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target server(s) for EMERGENCY cleanup'
+        required: true
+        type: choice
+        options:
+          - blue
+          - green
+          - both
+      confirm:
+        description: 'Type "CONFIRM" to proceed with emergency cleanup'
+        required: true
+        type: string
+
+env:
+  PROD_BLUE_IP: ${{ vars.PROD_BLUE_IP }}
+  PROD_GREEN_IP: ${{ vars.PROD_GREEN_IP }}
+  PROD_BLUE_DROPLET_ID: ${{ vars.PROD_BLUE_DROPLET_ID }}
+  PROD_GREEN_DROPLET_ID: ${{ vars.PROD_GREEN_DROPLET_ID }}
+
+jobs:
+  validate:
+    name: Validate Emergency Cleanup Confirmation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation
+        run: |
+          if [ "${{ inputs.confirm }}" != "CONFIRM" ]; then
+            echo "❌ Emergency cleanup not confirmed"
+            echo "You must type 'CONFIRM' to proceed"
+            exit 1
+          fi
+          echo "✅ Emergency cleanup confirmed"
+
+  emergency-cleanup-blue:
+    name: Emergency Cleanup - Blue Production Server
+    runs-on: ubuntu-latest
+    needs: validate
+    if: ${{ inputs.target == 'blue' || inputs.target == 'both' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/ectropy_prod
+          chmod 600 ~/.ssh/ectropy_prod
+          ssh-keyscan -H ${{ env.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+
+      - name: Display warning
+        run: |
+          echo "========================================="
+          echo "⚠️  EMERGENCY CLEANUP - BLUE SERVER"
+          echo "========================================="
+          echo ""
+          echo "IP: ${{ env.PROD_BLUE_IP }}"
+          echo ""
+          echo "WARNING: This will:"
+          echo "  - Stop and remove ALL containers"
+          echo "  - Remove ALL Docker images except latest"
+          echo "  - Remove ALL volumes"
+          echo "  - Clear ALL build cache"
+          echo ""
+          echo "This is SAFE for alpha servers only!"
+          echo "========================================="
+
+      - name: Transfer emergency cleanup script
+        run: |
+          scp -i ~/.ssh/ectropy_prod \
+            scripts/deployment/emergency-cleanup.sh \
+            root@${{ env.PROD_BLUE_IP }}:/tmp/emergency-cleanup.sh
+
+      - name: Execute emergency cleanup
+        run: |
+          ssh -i ~/.ssh/ectropy_prod root@${{ env.PROD_BLUE_IP }} \
+            "chmod +x /tmp/emergency-cleanup.sh && /tmp/emergency-cleanup.sh"
+
+  emergency-cleanup-green:
+    name: Emergency Cleanup - Green Production Server
+    runs-on: ubuntu-latest
+    needs: validate
+    if: ${{ inputs.target == 'green' || inputs.target == 'both' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/ectropy_prod
+          chmod 600 ~/.ssh/ectropy_prod
+          ssh-keyscan -H ${{ env.PROD_GREEN_IP }} >> ~/.ssh/known_hosts
+
+      - name: Display warning
+        run: |
+          echo "========================================="
+          echo "⚠️  EMERGENCY CLEANUP - GREEN SERVER"
+          echo "========================================="
+          echo ""
+          echo "IP: ${{ env.PROD_GREEN_IP }}"
+          echo ""
+          echo "WARNING: This will:"
+          echo "  - Stop and remove ALL containers"
+          echo "  - Remove ALL Docker images except latest"
+          echo "  - Remove ALL volumes"
+          echo "  - Clear ALL build cache"
+          echo ""
+          echo "This is SAFE for alpha servers only!"
+          echo "========================================="
+
+      - name: Transfer emergency cleanup script
+        run: |
+          scp -i ~/.ssh/ectropy_prod \
+            scripts/deployment/emergency-cleanup.sh \
+            root@${{ env.PROD_GREEN_IP }}:/tmp/emergency-cleanup.sh
+
+      - name: Execute emergency cleanup
+        run: |
+          ssh -i ~/.ssh/ectropy_prod root@${{ env.PROD_GREEN_IP }} \
+            "chmod +x /tmp/emergency-cleanup.sh && /tmp/emergency-cleanup.sh"
+
+  summary:
+    name: Emergency Cleanup Summary
+    runs-on: ubuntu-latest
+    needs: [emergency-cleanup-blue, emergency-cleanup-green]
+    if: always()
+
+    steps:
+      - name: Display summary
+        run: |
+          echo "========================================="
+          echo "EMERGENCY CLEANUP COMPLETE"
+          echo "========================================="
+          echo ""
+          echo "Target: ${{ inputs.target }}"
+          echo ""
+          if [ "${{ needs.emergency-cleanup-blue.result }}" == "success" ]; then
+            echo "✅ Blue server emergency cleanup: SUCCESS"
+          elif [ "${{ needs.emergency-cleanup-blue.result }}" == "skipped" ]; then
+            echo "⏭️  Blue server emergency cleanup: SKIPPED"
+          else
+            echo "❌ Blue server emergency cleanup: FAILED"
+          fi
+
+          if [ "${{ needs.emergency-cleanup-green.result }}" == "success" ]; then
+            echo "✅ Green server emergency cleanup: SUCCESS"
+          elif [ "${{ needs.emergency-cleanup-green.result }}" == "skipped" ]; then
+            echo "⏭️  Green server emergency cleanup: SKIPPED"
+          else
+            echo "❌ Green server emergency cleanup: FAILED"
+          fi
+          echo ""
+          echo "Expected disk space freed: ~89GB on blue server"
+          echo "Target disk usage: < 50%"
+          echo ""
+          echo "Next step: Retry production deployment (attempt #15)"
+          echo "========================================="

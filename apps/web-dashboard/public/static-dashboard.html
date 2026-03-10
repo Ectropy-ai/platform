@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ectropy Dashboard</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .header {
+        background-color: #1976d2;
+        color: white;
+        padding: 20px;
+        margin: -20px -20px 20px -20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .role-buttons {
+        display: flex;
+        gap: 10px;
+      }
+      .role-button {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: white;
+        border: 1px solid white;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .role-button:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+      }
+      .dashboard-container {
+        display: flex;
+        gap: 20px;
+        max-width: 1200px;
+      }
+      .sidebar {
+        width: 30%;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .main-content {
+        width: 70%;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .dashboard-title {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        color: #1976d2;
+      }
+      .metric-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        border-left: 4px solid #1976d2;
+      }
+      .metric-value {
+        font-size: 32px;
+        font-weight: bold;
+        color: #1976d2;
+      }
+      .metric-label {
+        color: #666;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>🏗️ Ectropy Federated Construction Platform</h1>
+      <div class="role-buttons">
+        <button class="role-button" onclick="switchRole('architect')">🏛️ Architect</button>
+        <button class="role-button" onclick="switchRole('engineer')">⚙️ Engineer</button>
+        <button class="role-button" onclick="switchRole('contractor')">🔨 Contractor</button>
+        <button class="role-button" onclick="switchRole('owner')">💼 Owner</button>
+      </div>
+    </div>
+
+    <div class="dashboard-container">
+      <div class="sidebar">
+        <h3>Project Overview</h3>
+        <div class="metric-card">
+          <div class="metric-value">5</div>
+          <div class="metric-label">Active Projects</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">248</div>
+          <div class="metric-label">Total Stakeholders</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">8</div>
+          <div class="metric-label">DAO Proposals</div>
+        </div>
+        <h4>Recent Activity</h4>
+        <ul>
+          <li>New sustainability template approved</li>
+          <li>Milestone payment released - Phase 2</li>
+          <li>BIM model updated by architect</li>
+        </ul>
+      </div>
+
+      <div class="main-content">
+        <div class="dashboard-title" id="dashboardTitle">Architect Dashboard</div>
+        <div id="dashboardContent">
+          <div class="metric-card">
+            <h4>BIM Model Management</h4>
+            <p>Upload, manage, and share 3D building models with stakeholders</p>
+            <button
+              style="
+                padding: 10px 20px;
+                background: #1976d2;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+              "
+            >
+              Upload Model
+            </button>
+          </div>
+          <div class="metric-card">
+            <h4>Sustainability Metrics</h4>
+            <p>Track carbon footprint: <strong>245 kg CO2</strong></p>
+            <p>Energy efficiency: <strong>88%</strong></p>
+            <p>LEED Score: <strong>82/100</strong></p>
+          </div>
+          <div class="metric-card">
+            <h4>Element Properties</h4>
+            <p>Manage building element properties and specifications</p>
+            <ul>
+              <li>Foundation - Complete (85% sustainable)</li>
+              <li>Steel Frame - In Progress (72% sustainable)</li>
+              <li>HVAC System - Design (90% sustainable)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function switchRole(role) {
+        const title = document.getElementById('dashboardTitle');
+        const content = document.getElementById('dashboardContent');
+
+        const roleData = {
+          architect: {
+            title: 'Architect Dashboard',
+            content: `
+                        <div class="metric-card">
+                            <h4>BIM Model Management</h4>
+                            <p>Upload, manage, and share 3D building models with stakeholders</p>
+                            <button style="padding: 10px 20px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">Upload Model</button>
+                        </div>
+                        <div class="metric-card">
+                            <h4>Sustainability Metrics</h4>
+                            <p>Track carbon footprint: <strong>245 kg CO2</strong></p>
+                            <p>Energy efficiency: <strong>88%</strong></p>
+                            <p>LEED Score: <strong>82/100</strong></p>
+                        </div>
+                        <div class="metric-card">
+                            <h4>Element Properties</h4>
+                            <p>Manage building element properties and specifications</p>
+                            <ul>
+                                <li>Foundation - Complete (85% sustainable)</li>
+                                <li>Steel Frame - In Progress (72% sustainable)</li>
+                                <li>HVAC System - Design (90% sustainable)</li>
+                            </ul>
+                        </div>
+                    `,
+          },
+          engineer: {
+            title: 'Engineer Dashboard',
+            content: `
+                        <div class="metric-card">
+                            <h4>Structural Analysis</h4>
+                            <p>Perform load calculations and safety factor monitoring</p>
+                            <button style="padding: 10px 20px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">Run Analysis</button>
+                        </div>
+                        <div class="metric-card">
+                            <h4>Safety Compliance</h4>
+                            <p>Safety factor: <strong>2.5</strong></p>
+                            <p>Compliance status: <strong>98%</strong></p>
+                            <p>Last inspection: <strong>2 days ago</strong></p>
+                        </div>
+                        <div class="metric-card">
+                            <h4>Material Properties</h4>
+                            <p>Validate material specifications and performance</p>
+                            <ul>
+                                <li>Steel Grade A36 - Validated</li>
+                                <li>Concrete C30 - Pending test</li>
+                                <li>Reinforcement B500 - Approved</li>
+                            </ul>
+                        </div>
+                    `,
+          },
+          contractor: {
+            title: 'Contractor Dashboard',
+            content: `
+                        <div class="metric-card">
+                            <h4>Progress Tracking</h4>
+                            <p>Monitor construction progress and milestones</p>
+                            <button style="padding: 10px 20px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">Update Progress</button>
+                        </div>
+                        <div class="metric-card">
+                            <h4>Schedule Management</h4>
+                            <p>Overall progress: <strong>65%</strong></p>
+                            <p>On schedule: <strong>Yes</strong></p>
+                            <p>Next milestone: <strong>Jan 15, 2025</strong></p>
+                        </div>
+                        <div class="metric-card">
+                            <h4>Payment Status</h4>
+                            <p>Track payment milestones and invoice status</p>
+                            <ul>
+                                <li>Phase 1 - Paid ($125,000)</li>
+                                <li>Phase 2 - Pending ($180,000)</li>
+                                <li>Phase 3 - Scheduled ($150,000)</li>
+                            </ul>
+                        </div>
+                    `,
+          },
+          owner: {
+            title: 'Owner Dashboard',
+            content: `
+                        <div class="metric-card">
+                            <h4>Project Oversight</h4>
+                            <p>Monitor overall project status and governance</p>
+                            <button style="padding: 10px 20px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">View Reports</button>
+                        </div>
+                        <div class="metric-card">
+                            <h4>DAO Governance</h4>
+                            <p>Active proposals: <strong>3</strong></p>
+                            <p>Voting power: <strong>25%</strong></p>
+                            <p>Last vote: <strong>1 day ago</strong></p>
+                        </div>
+                        <div class="metric-card">
+                            <h4>ROI Analytics</h4>
+                            <p>Track project ROI and financial metrics</p>
+                            <ul>
+                                <li>Total investment: $2.5M</li>
+                                <li>Expected ROI: 15%</li>
+                                <li>Current value: $2.8M</li>
+                            </ul>
+                        </div>
+                    `,
+          },
+        };
+
+        title.textContent = roleData[role].title;
+        content.innerHTML = roleData[role].content;
+      }
+    </script>
+  </body>
+</html>

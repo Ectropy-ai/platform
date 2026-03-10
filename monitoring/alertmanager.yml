@@ -1,0 +1,95 @@
+# =============================================================================
+# ALERTMANAGER CONFIGURATION - ROOT CAUSE #92
+# =============================================================================
+#
+# PURPOSE: Production alert routing with Slack integration
+# PATTERN: Enterprise observability standard (Google SRE, Netflix, PagerDuty)
+#
+# CONFIGURATION FLOW:
+# 1. Prometheus evaluates alert rules (monitoring/prometheus/alerts.yml)
+# 2. Fires alerts to Alertmanager (this config)
+# 3. Alertmanager routes by severity (critical vs warning)
+# 4. Sends notifications to Slack (#ectropy-alerts channel)
+#
+# ROOT CAUSE #92 FIX: Added Slack integration for 24 production alert rules
+# =============================================================================
+
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@ectropy.platform'
+
+route:
+  group_by: ['alertname', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default-receiver'
+  routes:
+    # Critical alerts: immediate notification, 5min repeat
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 5s
+      repeat_interval: 5m
+
+    # Warning alerts: standard notification, 30min repeat
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      repeat_interval: 30m
+
+receivers:
+  # Default receiver (fallback for alerts without severity label)
+  - name: 'default-receiver'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ectropy-alerts'
+        title: 'Ectropy Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          *Alert:* {{ .GroupLabels.alertname }}
+          *Service:* {{ .GroupLabels.service }}
+          {{ range .Alerts }}
+          *Summary:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+
+  # Critical alerts: urgent notification with red emoji
+  - name: 'critical-alerts'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ectropy-alerts'
+        title: '🚨 CRITICAL: {{ .GroupLabels.alertname }} on {{ .GroupLabels.service }}'
+        text: |
+          *Severity:* CRITICAL
+          *Service:* {{ .GroupLabels.service }}
+          {{ range .Alerts }}
+          *Summary:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+        color: 'danger'
+
+  # Warning alerts: standard notification with yellow emoji
+  - name: 'warning-alerts'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#ectropy-alerts'
+        title: '⚠️ WARNING: {{ .GroupLabels.alertname }} on {{ .GroupLabels.service }}'
+        text: |
+          *Severity:* WARNING
+          *Service:* {{ .GroupLabels.service }}
+          {{ range .Alerts }}
+          *Summary:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+        color: 'warning'
+
+inhibit_rules:
+  # Suppress warning alerts when critical alert for same issue is firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']

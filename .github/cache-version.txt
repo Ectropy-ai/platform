@@ -1,0 +1,7 @@
+# Cache version: 1727396382
+# Updated: 2024-09-26T23:39:42.000Z
+# Reason: Fix workflow inline scripts to use ES module imports
+# Changes: Fixed generate-security-summary.js and dependency-health.yml CommonJS issues
+
+This file forces cache invalidation for GitHub Actions to ensure fresh execution
+of the fixed workflow files with proper ES module syntax.

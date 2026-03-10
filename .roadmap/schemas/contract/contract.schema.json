@@ -1,0 +1,355 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:contract",
+  "title": "Contract Schema",
+  "description": "Construction contract parsed from AIA, CCDC, or ConsensusDOCS documents with authority cascade configuration",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "contractId",
+    "contractFamily",
+    "contractType",
+    "deliveryMethod",
+    "projectRef",
+    "parties",
+    "authorityMapping",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:contract:CON-[0-9]{4}-[0-9]{4}$",
+      "description": "URN identifier for this contract"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:contract"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "meta": {
+      "$ref": "#/$defs/meta"
+    },
+    "contractId": {
+      "type": "string",
+      "pattern": "^CON-[0-9]{4}-[0-9]{4}$",
+      "description": "Human-readable contract identifier"
+    },
+    "contractFamily": {
+      "type": "string",
+      "enum": ["AIA", "ConsensusDOCS", "CCDC", "FIDIC", "NEC", "Custom"],
+      "description": "Contract document family"
+    },
+    "contractType": {
+      "type": "string",
+      "enum": [
+        "IPD-MultiParty",
+        "IPD-SPE",
+        "GMP",
+        "StipulatedSum",
+        "CostPlus",
+        "DesignBuild",
+        "CMAR"
+      ],
+      "description": "Contract type classification"
+    },
+    "contractNumber": {
+      "type": "string",
+      "description": "Specific contract document number (e.g., C191-2009, A133-2019, CCDC 2-2020)"
+    },
+    "deliveryMethod": {
+      "type": "string",
+      "enum": ["IPD", "DBB", "DB", "CMAR", "CMAdvisor", "Alliance"],
+      "description": "Project delivery method"
+    },
+    "projectRef": {
+      "$ref": "#/$defs/urn",
+      "description": "URN reference to the project configured from this contract"
+    },
+    "parties": {
+      "type": "array",
+      "description": "Contract parties extracted from document",
+      "items": {
+        "$ref": "#/$defs/urn"
+      },
+      "minItems": 2
+    },
+    "partyDetails": {
+      "type": "array",
+      "description": "Detailed party information",
+      "items": {
+        "$ref": "#/$defs/partyDetail"
+      }
+    },
+    "financialTerms": {
+      "$ref": "#/$defs/financialTerms"
+    },
+    "keyDates": {
+      "$ref": "#/$defs/keyDates"
+    },
+    "governanceStructure": {
+      "$ref": "#/$defs/governanceStructure"
+    },
+    "authorityMapping": {
+      "$ref": "#/$defs/authorityMapping"
+    },
+    "disputeResolution": {
+      "$ref": "#/$defs/disputeResolution"
+    },
+    "insuranceRequirements": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/insuranceRequirement"
+      }
+    },
+    "sourceDocument": {
+      "$ref": "#/$defs/sourceDocument"
+    },
+    "extractionConfidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Overall confidence score of data extraction"
+    },
+    "humanReviewFlags": {
+      "type": "array",
+      "description": "Items flagged for human review",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string" },
+          "reason": { "type": "string" },
+          "suggestedValue": { "type": "string" },
+          "reviewed": { "type": "boolean" }
+        }
+      }
+    },
+    "timestamps": {
+      "$ref": "#/$defs/timestamps"
+    },
+    "graphMetadata": {
+      "$ref": "#/$defs/graphMetadata"
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$",
+      "description": "LuhTech URN identifier"
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "tenantId": { "type": "string" },
+        "sourceOfTruth": { "type": "string" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      }
+    },
+    "partyDetail": {
+      "type": "object",
+      "required": ["partyRef", "role", "name"],
+      "properties": {
+        "partyRef": { "$ref": "#/$defs/urn" },
+        "role": {
+          "type": "string",
+          "enum": [
+            "Owner",
+            "Architect",
+            "Contractor",
+            "KeyParticipant",
+            "Consultant",
+            "DesignBuilder",
+            "CMAtRisk",
+            "Subcontractor"
+          ]
+        },
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "contactEmail": { "type": "string", "format": "email" },
+        "contactPhone": { "type": "string" },
+        "pmtRepresentative": {
+          "type": "boolean",
+          "description": "Is this party's rep on PMT (IPD)"
+        },
+        "petRepresentative": {
+          "type": "boolean",
+          "description": "Is this party's exec on PET (IPD)"
+        },
+        "savingsShare": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of shared savings (IPD)"
+        }
+      }
+    },
+    "financialTerms": {
+      "type": "object",
+      "properties": {
+        "contractValue": { "type": "number" },
+        "targetCost": { "type": "number", "description": "IPD Target Cost" },
+        "gmp": { "type": "number", "description": "Guaranteed Maximum Price" },
+        "contingency": { "type": "number" },
+        "currency": { "type": "string", "default": "USD" },
+        "savingsDistribution": {
+          "type": "object",
+          "description": "How savings are distributed in IPD",
+          "properties": {
+            "ownerShare": { "type": "number" },
+            "designTeamShare": { "type": "number" },
+            "constructionTeamShare": { "type": "number" }
+          }
+        },
+        "overrunDistribution": {
+          "type": "object",
+          "description": "How cost overruns are distributed",
+          "properties": {
+            "atRiskPool": { "type": "number" },
+            "ownerResponsibility": { "type": "number" }
+          }
+        }
+      }
+    },
+    "keyDates": {
+      "type": "object",
+      "properties": {
+        "executionDate": { "type": "string", "format": "date" },
+        "commencementDate": { "type": "string", "format": "date" },
+        "substantialCompletion": { "type": "string", "format": "date" },
+        "finalCompletion": { "type": "string", "format": "date" },
+        "warrantyExpiration": { "type": "string", "format": "date" }
+      }
+    },
+    "governanceStructure": {
+      "type": "object",
+      "description": "IPD-specific governance configuration",
+      "properties": {
+        "hasPMT": {
+          "type": "boolean",
+          "description": "Has Project Management Team"
+        },
+        "hasPET": {
+          "type": "boolean",
+          "description": "Has Project Executive Team"
+        },
+        "pmtVotingRules": {
+          "type": "object",
+          "properties": {
+            "quorumRequirement": {
+              "type": "string",
+              "enum": ["majority", "unanimous", "supermajority"]
+            },
+            "decisionThreshold": {
+              "type": "number",
+              "description": "Dollar amount requiring PMT vote"
+            },
+            "votingWindow": {
+              "type": "integer",
+              "description": "Hours to complete vote"
+            }
+          }
+        },
+        "petEscalationTriggers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "goalAchievementCompensation": { "type": "boolean" }
+      }
+    },
+    "authorityMapping": {
+      "type": "object",
+      "description": "Maps contract roles to Ectropy 7-tier authority levels",
+      "properties": {
+        "level0_FIELD": { "type": "array", "items": { "type": "string" } },
+        "level1_FOREMAN": { "type": "array", "items": { "type": "string" } },
+        "level2_SUPERINTENDENT": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "level3_PM": { "type": "array", "items": { "type": "string" } },
+        "level4_ARCHITECT": { "type": "array", "items": { "type": "string" } },
+        "level5_OWNER": { "type": "array", "items": { "type": "string" } },
+        "level6_REGULATORY": { "type": "array", "items": { "type": "string" } },
+        "pmtAuthority": {
+          "type": "object",
+          "description": "PMT collective authority (IPD)",
+          "properties": {
+            "budgetLimit": { "type": "number" },
+            "scheduleLimit": { "type": "integer", "description": "Days" }
+          }
+        },
+        "petAuthority": {
+          "type": "object",
+          "description": "PET collective authority (IPD)",
+          "properties": {
+            "budgetLimit": {
+              "type": "string",
+              "enum": ["unlimited", "contract-maximum"]
+            },
+            "scheduleLimit": {
+              "type": "string",
+              "enum": ["unlimited", "contract-maximum"]
+            }
+          }
+        }
+      }
+    },
+    "disputeResolution": {
+      "type": "object",
+      "properties": {
+        "initialMediationRequired": { "type": "boolean" },
+        "arbitrationProvider": { "type": "string" },
+        "arbitrationRules": { "type": "string" },
+        "litigationVenue": { "type": "string" },
+        "governingLaw": { "type": "string" }
+      }
+    },
+    "insuranceRequirement": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "minimumCoverage": { "type": "number" },
+        "requiredParty": { "type": "string" }
+      }
+    },
+    "sourceDocument": {
+      "type": "object",
+      "properties": {
+        "filename": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "uploadedAt": { "type": "string", "format": "date-time" },
+        "uploadedBy": { "$ref": "#/$defs/urn" },
+        "storageUri": { "type": "string", "format": "uri" },
+        "sha256Hash": { "type": "string" },
+        "pageCount": { "type": "integer" }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "parsedAt": { "type": "string", "format": "date-time" },
+        "configuredAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

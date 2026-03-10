@@ -1,0 +1,437 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:decision:decision-event",
+  "title": "Decision Event",
+  "description": "Complete decision event capture for dual-process architecture. Records the full context, engine outputs, mediation decision, and eventual outcome for pattern learning.",
+  "type": "object",
+  "required": ["$id", "timestamp", "projectId", "actorId", "trigger", "state", "engine1", "engine2", "mediation"],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[^:]+:decision-event:DEV-[0-9]{4}-[0-9]{4,}$",
+      "description": "URN identifier for the decision event"
+    },
+    "$schema": {
+      "type": "string",
+      "const": "https://luhtech.dev/schemas/decision/decision-event.schema.json"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "const": "3.0.0"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of event creation"
+    },
+    "projectId": {
+      "type": "string",
+      "description": "Project identifier"
+    },
+    "zoneId": {
+      "type": "string",
+      "description": "Takt zone reference (optional)"
+    },
+    "phaseId": {
+      "type": "string",
+      "description": "Project phase reference (optional)"
+    },
+    "actorId": {
+      "type": "string",
+      "description": "Agent or human URN who triggered the decision"
+    },
+    "trigger": {
+      "$ref": "#/definitions/DecisionTrigger"
+    },
+    "state": {
+      "$ref": "#/definitions/StateSnapshot"
+    },
+    "engine1": {
+      "$ref": "#/definitions/Engine1Output"
+    },
+    "engine2": {
+      "$ref": "#/definitions/Engine2Output"
+    },
+    "mediation": {
+      "$ref": "#/definitions/MediationDecision"
+    },
+    "outcome": {
+      "$ref": "#/definitions/DecisionOutcome",
+      "description": "Filled after decision execution completes"
+    },
+    "graphMetadata": {
+      "$ref": "#/definitions/GraphMetadata"
+    }
+  },
+  "definitions": {
+    "DecisionTrigger": {
+      "type": "object",
+      "required": ["type", "source", "urgency"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["scheduled", "exception", "opportunity", "escalation"],
+          "description": "What initiated this decision point"
+        },
+        "source": {
+          "type": "string",
+          "description": "System or entity that triggered (e.g., 'takt-scheduler', 'inspection-failure')"
+        },
+        "urgency": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "0 = low urgency, 1 = critical"
+        },
+        "deadline": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When decision must be made by"
+        },
+        "context": {
+          "type": "object",
+          "description": "Additional trigger-specific context"
+        }
+      }
+    },
+    "StateSnapshot": {
+      "type": "object",
+      "required": ["sdi", "eigenmodes", "activeConstraints", "resourceAvailability"],
+      "properties": {
+        "sdi": {
+          "type": "number",
+          "description": "Solution Density Index at decision time"
+        },
+        "eigenmodes": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 12,
+          "maxItems": 12,
+          "description": "12-element eigenmode vector (EFAS)"
+        },
+        "activeConstraints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Active constraint identifiers"
+        },
+        "resourceAvailability": {
+          "type": "object",
+          "properties": {
+            "laborSlack": { "type": "number" },
+            "materialSlack": { "type": "number" },
+            "equipmentSlack": { "type": "number" },
+            "budgetSlack": { "type": "number" },
+            "slackRatio": { "type": "number", "description": "Combined slack ratio 0-1" }
+          }
+        },
+        "downstreamDependencies": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "URNs of dependent items"
+        },
+        "upstreamDecisions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "URNs of decisions this depends on"
+        }
+      }
+    },
+    "Engine1Output": {
+      "type": "object",
+      "description": "Success Stack (System 1) output",
+      "properties": {
+        "applicablePatterns": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/PatternSummary" }
+        },
+        "patternMatchScores": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "Similarity scores for each pattern"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Overall confidence in pattern recommendations"
+        },
+        "recommendedAction": {
+          "$ref": "#/definitions/Action"
+        },
+        "projectedOutcome": {
+          "$ref": "#/definitions/ProjectedOutcome"
+        },
+        "queryLatencyMs": {
+          "type": "number",
+          "description": "Time to query Success Stack"
+        }
+      }
+    },
+    "Engine2Output": {
+      "type": "object",
+      "description": "Possibility Space (System 2) output",
+      "properties": {
+        "viableOptions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Option" }
+        },
+        "novelOptions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Option" },
+          "description": "Options without pattern precedent"
+        },
+        "sdiProjections": {
+          "type": "object",
+          "additionalProperties": { "type": "number" },
+          "description": "Map of option ID to projected SDI"
+        },
+        "riskProfiles": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/RiskProfile" }
+        },
+        "explorationValue": {
+          "type": "object",
+          "additionalProperties": { "type": "number" },
+          "description": "Information value of exploring each option"
+        },
+        "computationDepth": {
+          "type": "integer",
+          "description": "Search depth used"
+        },
+        "generationLatencyMs": {
+          "type": "number"
+        }
+      }
+    },
+    "MediationDecision": {
+      "type": "object",
+      "required": ["selectedAction", "sourceEngine", "rationale", "explorationAllocation"],
+      "properties": {
+        "selectedAction": {
+          "$ref": "#/definitions/Action"
+        },
+        "sourceEngine": {
+          "type": "string",
+          "enum": ["engine1", "engine2", "blend", "escalate"],
+          "description": "Which engine's recommendation was selected"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Human-readable explanation of arbitration decision"
+        },
+        "explorationAllocation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "How much exploration was permitted"
+        },
+        "riskBearer": {
+          "type": "string",
+          "description": "Who bears risk for this decision"
+        },
+        "monitoringTriggers": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/MonitoringTrigger" }
+        },
+        "fallbackAction": {
+          "$ref": "#/definitions/Action",
+          "description": "Action to take if monitoring trigger fires"
+        },
+        "escalationTarget": {
+          "type": "string",
+          "description": "Who to escalate to if needed"
+        },
+        "decisionPath": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Which of the 5 decision paths was taken"
+        }
+      }
+    },
+    "DecisionOutcome": {
+      "type": "object",
+      "description": "Recorded after decision execution completes",
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Did the decision achieve desired outcome"
+        },
+        "actualVsProjected": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1,
+          "description": "-1 = much worse, 0 = as expected, 1 = much better"
+        },
+        "downstreamEffects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "affectedEntity": { "type": "string" },
+              "effectType": { "type": "string" },
+              "magnitude": { "type": "number" }
+            }
+          }
+        },
+        "learningsExtracted": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "compressionEligible": {
+          "type": "boolean",
+          "description": "Does this qualify for pattern compression"
+        },
+        "validationConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "patternUrn": {
+          "type": "string",
+          "description": "If compressed, URN of resulting pattern"
+        }
+      }
+    },
+    "PatternSummary": {
+      "type": "object",
+      "properties": {
+        "patternUrn": { "type": "string" },
+        "actionType": { "type": "string" },
+        "confidence": { "type": "number" },
+        "frequency": { "type": "integer" },
+        "similarityScore": { "type": "number" }
+      }
+    },
+    "Action": {
+      "type": "object",
+      "properties": {
+        "actionType": {
+          "type": "string",
+          "description": "Type of action to take"
+        },
+        "targetUrn": {
+          "type": "string",
+          "description": "Entity this action targets"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Action-specific parameters"
+        },
+        "estimatedDuration": {
+          "type": "number",
+          "description": "Hours to complete"
+        },
+        "estimatedCost": {
+          "type": "number",
+          "description": "USD"
+        }
+      }
+    },
+    "ProjectedOutcome": {
+      "type": "object",
+      "properties": {
+        "successProbability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "expectedImprovement": {
+          "type": "number",
+          "description": "Expected improvement factor"
+        },
+        "variance": {
+          "type": "number"
+        },
+        "confidenceInterval": {
+          "type": "object",
+          "properties": {
+            "lower": { "type": "number" },
+            "upper": { "type": "number" }
+          }
+        }
+      }
+    },
+    "Option": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "$ref": "#/definitions/Action" },
+        "isNovel": {
+          "type": "boolean",
+          "description": "No pattern precedent exists"
+        },
+        "projectedSdi": { "type": "number" },
+        "riskLevel": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "explorationValue": {
+          "type": "number",
+          "description": "Information value of choosing this option"
+        }
+      }
+    },
+    "RiskProfile": {
+      "type": "object",
+      "properties": {
+        "overallRisk": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"]
+        },
+        "factors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "severity": { "type": "number", "minimum": 0, "maximum": 1 },
+              "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+              "mitigation": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "MonitoringTrigger": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["sdi_breach", "timeline_deviation", "resource_exhaustion", "cascade_detection", "confidence_collapse"]
+        },
+        "condition": {
+          "type": "object",
+          "properties": {
+            "metric": { "type": "string" },
+            "operator": { "type": "string", "enum": ["<", ">", "<=", ">=", "==", "!="] },
+            "threshold": { "type": "number" }
+          }
+        },
+        "response": {
+          "type": "string",
+          "enum": ["fallback", "escalate", "constrain", "re_mediate"]
+        },
+        "checkIntervalMs": { "type": "integer" }
+      }
+    },
+    "GraphMetadata": {
+      "type": "object",
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

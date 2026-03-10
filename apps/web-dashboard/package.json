@@ -1,0 +1,115 @@
+{
+  "name": "web-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^6.4.9",
+    "@mui/material": "^6.4.9",
+    "@mui/system": "^6.4.9",
+    "@mui/utils": "^6.4.9",
+    "@mui/x-charts": "^7.22.2",
+    "@mui/x-data-grid": "^7.22.2",
+    "@react-three/drei": "^9.3.5",
+    "@react-three/fiber": "^8.18.0",
+    "@sentry/react": "10.27.0",
+    "@sentry/vite-plugin": "4.6.1",
+    "@speckle/objectloader": "^2.25.7",
+    "@speckle/viewer": "^2.25.7",
+    "@tanstack/react-query": "^5.62.0",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jest": "^30.0.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "axios": "1.11.0",
+    "date-fns": "^3.6.0",
+    "eslint": "^8.56.0",
+    "eslint-plugin-jsx-a11y": "^6.7.1",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "isomorphic-dompurify": "2.28.0",
+    "js-cookie": "^3.0.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "10.1.0",
+    "react-router-dom": "^7.6.3",
+    "recharts": "^3.0.2",
+    "three": "^0.178.0",
+    "web-vitals": "^5.1.0",
+    "zod": "^3.22.4"
+  },
+  "scripts": {
+    "start": "vite",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "_note_migration": "Migrated from react-scripts to Vite for modern build tooling",
+    "_note": "Stylus and related packages have been removed due to deprecation and registry removal. See CI/CD logs for details.",
+    "test:e2e": "playwright test",
+    "test:e2e:ci": "playwright test --config=playwright.config.ci.ts",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report"
+  },
+  "eslintConfig": {
+    "extends": [
+      "plugin:react/recommended",
+      "plugin:react-hooks/recommended"
+    ],
+    "rules": {
+      "@typescript-eslint/no-unused-vars": "warn",
+      "react-hooks/exhaustive-deps": "warn",
+      "react/react-in-jsx-scope": "off"
+    },
+    "settings": {
+      "react": {
+        "version": "detect"
+      }
+    }
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.28.5",
+    "@babel/preset-react": "^7.27.1",
+    "@babel/preset-typescript": "^7.27.1",
+    "@nx/react": "^21.3.1",
+    "@nx/webpack": "^21.3.1",
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^20.19.10",
+    "@types/recharts": "^2.0.1",
+    "@vitejs/plugin-react": "^4.7.0",
+    "baseline-browser-mapping": "2.8.32",
+    "ts-jest": "^29.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "vite": "^5.4.21",
+    "vite-plugin-svgr": "^4.5.0",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^2.1.9",
+    "webpack-dev-server": "4.15.0"
+  },
+  "jest": {
+    "testMatch": [
+      "<rootDir>/src/**/__tests__/**/*.{js,jsx,ts,tsx}",
+      "<rootDir>/src/**/*.{test,spec}.{js,jsx,ts,tsx}"
+    ]
+  }
+}

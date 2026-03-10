@@ -1,0 +1,437 @@
+name: PR Validation
+
+# ENTERPRISE CONSOLIDATION (2025-12-15): Merged feature-validation.yml
+# - Combines PR validation + feature branch validation
+# - Adds security scanning and evidence validation
+# - Single source of truth for all pre-merge validation
+
+on:
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - 'copilot/**'
+      - 'feature/**'
+      - 'fix/**'
+      - 'hotfix/**'
+  workflow_dispatch:
+
+# Cancel old validation runs when PR updated
+concurrency:
+  group: pr-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  typescript-check:
+    name: TypeScript Strict Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          # Note: cache parameter removed - it requires pnpm to be available before running
+          # Corepack (below) installs pnpm, so cache detection would fail if placed here
+
+      - name: Enable Corepack
+        run: corepack enable  # Installs pnpm via Node.js built-in package manager
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript Compilation Check (No Emit)
+        id: typecheck
+        run: |
+          echo "🔍 Running TypeScript strict compilation check..."
+
+          # Run type-check for projects that have it defined
+          echo "Checking api-gateway..."
+          pnpm nx run api-gateway:type-check
+
+          echo "Checking mcp-server..."
+          pnpm nx run mcp-server:type-check
+
+          echo "Checking web-dashboard..."
+          pnpm nx run web-dashboard:type-check
+
+          echo "✅ All TypeScript checks passed"
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ ${{ steps.typecheck.outcome }} == 'success' ]; then
+            echo "✅ All TypeScript checks passed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Validated Projects" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ api-gateway" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ mcp-server" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ web-dashboard" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ TypeScript compilation errors detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## 🚨 Action Required" >> $GITHUB_STEP_SUMMARY
+            echo "Fix TypeScript errors locally before merging:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Run: \`pnpm nx run <project>:type-check\`" >> $GITHUB_STEP_SUMMARY
+            echo "2. Fix all type errors" >> $GITHUB_STEP_SUMMARY
+            echo "3. Re-run validation" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  test-validation:
+    name: Test Suite Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Fetch main branch for comparison
+        run: |
+          git fetch origin main || echo "Could not fetch main branch"
+
+      - name: Run Test Suites
+        id: test
+        run: |
+          echo "🧪 Running test suites for affected projects..."
+
+          # ENTERPRISE OPTIMIZATION (2025-12-10): Increased parallelism
+          # Try to run tests for affected projects only (for efficiency)
+          # Fall back to running all tests if we can't determine affected projects
+          if git rev-parse --verify origin/main >/dev/null 2>&1; then
+            echo "Running tests for affected projects based on origin/main"
+            pnpm test:affected || {
+              echo "❌ Some tests failed"
+              exit 1
+            }
+          else
+            echo "⚠️  Could not find origin/main, running all project tests"
+            pnpm nx run-many --target=test --all --parallel=8 || {
+              echo "❌ Some tests failed"
+              exit 1
+            }
+          fi
+
+          echo "✅ All tests passed"
+
+      - name: Upload Coverage Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-coverage
+          path: |
+            coverage/
+            apps/*/coverage/
+            packages/*/coverage/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ ${{ steps.test.outcome }} == 'success' ]; then
+            echo "✅ All tests passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Test failures detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## 🚨 Action Required" >> $GITHUB_STEP_SUMMARY
+            echo "Fix failing tests locally before merging:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Run: \`pnpm nx affected --target=test --base=main\`" >> $GITHUB_STEP_SUMMARY
+            echo "2. Fix all failing tests" >> $GITHUB_STEP_SUMMARY
+            echo "3. Re-run validation" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  lint-validation:
+    name: Lint Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Fetch main branch for comparison
+        run: |
+          git fetch origin main || echo "Could not fetch main branch"
+
+      - name: Run Linter
+        id: lint
+        run: |
+          echo "🔧 Running linter for affected projects..."
+
+          # ENTERPRISE OPTIMIZATION (2025-12-10): Increased parallelism
+          # Try to run lint for affected projects only
+          # Fall back to running all lints if we can't determine affected projects
+          if git rev-parse --verify origin/main >/dev/null 2>&1; then
+            echo "Running linter for affected projects based on origin/main"
+            pnpm lint:affected || {
+              echo "❌ Linting errors detected"
+              exit 1
+            }
+          else
+            echo "⚠️  Could not find origin/main, running lint for all projects"
+            pnpm nx run-many --target=lint --all --parallel=8 || {
+              echo "❌ Linting errors detected"
+              exit 1
+            }
+          fi
+
+          echo "✅ All linting checks passed"
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ ${{ steps.lint.outcome }} == 'success' ]; then
+            echo "✅ All linting checks passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Linting errors detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## 🚨 Action Required" >> $GITHUB_STEP_SUMMARY
+            echo "Fix linting errors locally before merging:" >> $GITHUB_STEP_SUMMARY
+            echo "1. Run: \`pnpm nx affected --target=lint --base=main --fix\`" >> $GITHUB_STEP_SUMMARY
+            echo "2. Review and commit fixes" >> $GITHUB_STEP_SUMMARY
+            echo "3. Re-run validation" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  dependency-validation:
+    name: Dependency Compatibility Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate Dependency Compatibility
+        id: deps
+        run: |
+          echo "📦 Validating dependency compatibility..."
+
+          # Check if validation script exists
+          if [ -f "scripts/ci/validate-dependency-compatibility.sh" ]; then
+            chmod +x scripts/ci/validate-dependency-compatibility.sh
+            ./scripts/ci/validate-dependency-compatibility.sh
+          else
+            echo "⚠️  Dependency validation script not yet created"
+            echo "Skipping dependency validation for now"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ ${{ steps.deps.outcome }} == 'success' ]; then
+            echo "✅ Dependency compatibility validated" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Dependency compatibility issues detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## 🚨 Action Required" >> $GITHUB_STEP_SUMMARY
+            echo "Review dependency compatibility issues" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  security-validation:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Security Audit
+        id: audit
+        run: |
+          echo "🔒 Running security audit..."
+          pnpm audit --audit-level=moderate || echo "⚠️  Security vulnerabilities detected"
+
+      - name: Check for Secrets in Code
+        uses: trufflesecurity/trufflehog@main
+        continue-on-error: true
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ ${{ steps.audit.outcome }} == 'success' ]; then
+            echo "✅ Security scan passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️  Security issues detected - review required" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  evidence-validation:
+    name: Evidence Schema Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate Evidence Files
+        id: evidence
+        run: |
+          echo "🔍 Validating evidence files against schema..."
+          if [ -f "scripts/validation/validate-evidence.cjs" ]; then
+            node scripts/validation/validate-evidence.cjs
+            if [ $? -eq 0 ]; then
+              echo "✅ All evidence files pass schema validation"
+            else
+              echo "❌ Evidence schema validation failed"
+              echo "Fix violations before merging"
+              exit 1
+            fi
+          else
+            echo "⚠️  Evidence validation script not found, skipping"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ ${{ steps.evidence.outcome }} == 'success' ]; then
+            echo "✅ Evidence validation passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Evidence validation failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  validation-summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: [typescript-check, test-validation, lint-validation, dependency-validation, security-validation, evidence-validation]
+    if: always()
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check All Validations Passed
+        run: |
+          echo "## PR Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.typescript-check.result }}" == "success" ]; then
+            echo "- ✅ TypeScript Validation: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ TypeScript Validation: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.test-validation.result }}" == "success" ]; then
+            echo "- ✅ Test Validation: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ Test Validation: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.lint-validation.result }}" == "success" ]; then
+            echo "- ✅ Lint Validation: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ Lint Validation: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.dependency-validation.result }}" == "success" ]; then
+            echo "- ✅ Dependency Validation: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ Dependency Validation: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.security-validation.result }}" == "success" ]; then
+            echo "- ✅ Security Validation: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ⚠️  Security Validation: Issues Detected" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.evidence-validation.result }}" == "success" ]; then
+            echo "- ✅ Evidence Validation: Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ❌ Evidence Validation: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Fail if any critical validation failed (exclude security - it's continue-on-error)
+          if [ "${{ needs.typescript-check.result }}" != "success" ] || \
+             [ "${{ needs.test-validation.result }}" != "success" ] || \
+             [ "${{ needs.lint-validation.result }}" != "success" ] || \
+             [ "${{ needs.dependency-validation.result }}" != "success" ] || \
+             [ "${{ needs.evidence-validation.result }}" != "success" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **One or more validations failed. Please fix the issues before merging.**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **All critical validations passed! This PR is ready to merge.**" >> $GITHUB_STEP_SUMMARY

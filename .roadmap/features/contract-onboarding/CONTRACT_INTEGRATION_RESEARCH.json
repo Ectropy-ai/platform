@@ -1,0 +1,426 @@
+{
+  "$schema": "../../schemas/feature.schema.json",
+  "$id": "urn:luhtech:ectropy:research:contract-integration",
+  "schemaVersion": "1.0.0",
+  "meta": {
+    "sourceOfTruth": ".roadmap/features/contract-onboarding/CONTRACT_INTEGRATION_RESEARCH.json",
+    "createdAt": "2026-01-29T00:00:00Z",
+    "lastUpdated": "2026-01-29T00:00:00Z",
+    "author": "Claude Agent",
+    "purpose": "Deep dive research on contract parsing integration requirements"
+  },
+  "executiveSummary": {
+    "currentStatus": "Core feature COMPLETE, document extraction is MOCK",
+    "estimatedGap": "8-16 hours",
+    "productionReadiness": "85%",
+    "criticalPath": "PDF extraction library integration"
+  },
+  "currentImplementation": {
+    "complete": [
+      {
+        "component": "Type System",
+        "file": "apps/mcp-server/src/types/contract.types.ts",
+        "status": "PRODUCTION_READY",
+        "coverage": [
+          "5 contract families (AIA, CCDC, ConsensusDOCS, FIDIC, NEC)",
+          "7 contract types (IPD, GMP, Stipulated Sum, etc.)",
+          "6 delivery methods",
+          "8 party roles",
+          "URN patterns for all entities"
+        ]
+      },
+      {
+        "component": "Template Service",
+        "file": "apps/mcp-server/src/services/contract-template.service.ts",
+        "status": "PRODUCTION_READY",
+        "tests": 52,
+        "features": [
+          "Template registration and validation",
+          "Contract type detection from text",
+          "Template matching with confidence scoring",
+          "Built-in templates for AIA and CCDC"
+        ]
+      },
+      {
+        "component": "Contract Parser",
+        "file": "apps/mcp-server/src/services/contract-parser.service.ts",
+        "status": "INTEGRATION_PENDING",
+        "tests": 62,
+        "features": [
+          "Party extraction via regex patterns",
+          "Financial terms extraction",
+          "Date extraction",
+          "Governance extraction (IPD PMT/PET)",
+          "Confidence scoring system",
+          "Review flagging for low confidence"
+        ],
+        "mockImplementations": [
+          "extractTextFromPDF() - returns mock data",
+          "extractTextFromDOCX() - returns mock data"
+        ]
+      },
+      {
+        "component": "Authority Mapper",
+        "file": "apps/mcp-server/src/services/authority-mapper.service.ts",
+        "status": "PRODUCTION_READY",
+        "tests": 47,
+        "features": [
+          "7-tier authority cascade mapping",
+          "Contract role to authority level mapping",
+          "IPD governance configuration",
+          "Project configuration builder"
+        ]
+      },
+      {
+        "component": "MCP Tools",
+        "file": "apps/mcp-server/src/services/contract-onboarding-tools.ts",
+        "status": "PRODUCTION_READY",
+        "tests": 40,
+        "tools": [
+          "parse_contract - Parse uploaded contract documents",
+          "extract_authority_cascade - Extract 7-tier authority mappings",
+          "configure_project_from_contract - Auto-configure project setup"
+        ]
+      }
+    ]
+  },
+  "integrationGap": {
+    "description": "Document text extraction is currently mock implementation",
+    "location": "apps/mcp-server/src/services/contract-parser.service.ts:119-148",
+    "requiredWork": [
+      {
+        "task": "PDF Text Extraction",
+        "library": "pdf-parse (MIT) or pdf.js (Apache 2.0)",
+        "effort": "4 hours",
+        "notes": "pdf-parse is lightweight and handles most construction contracts"
+      },
+      {
+        "task": "DOCX Text Extraction",
+        "library": "mammoth (BSD-2-Clause)",
+        "effort": "2 hours",
+        "notes": "mammoth preserves document structure, good for contract sections"
+      },
+      {
+        "task": "OCR Fallback (optional)",
+        "library": "tesseract.js (Apache 2.0)",
+        "effort": "8 hours",
+        "notes": "Only needed for scanned PDFs, most contracts are digital"
+      },
+      {
+        "task": "Claude API Enhancement (optional)",
+        "library": "Anthropic SDK (already installed)",
+        "effort": "4-8 hours",
+        "notes": "For semantic extraction of complex clauses"
+      }
+    ],
+    "totalEffort": {
+      "minimum": "8 hours (PDF + DOCX)",
+      "recommended": "12 hours (+ basic testing)",
+      "comprehensive": "20 hours (+ OCR + Claude enhancement)"
+    }
+  },
+  "contractStandards": {
+    "aia": {
+      "family": "American Institute of Architects",
+      "criticalForDemo": true,
+      "supportedContracts": [
+        {
+          "number": "C191-2009",
+          "name": "Multi-Party Agreement for IPD",
+          "deliveryMethod": "IPD",
+          "priority": "HIGH",
+          "keyFeatures": [
+            "Multi-party (Owner, Architect, Contractor as one agreement)",
+            "Shared risk/reward pool",
+            "Project Management Team (PMT) governance",
+            "Target Cost with incentive layer"
+          ],
+          "extractionComplexity": "HIGH",
+          "uniqueStructure": [
+            "Article 6: Compensation (Target Cost, Profit at Risk)",
+            "Article 7: Project Management Team",
+            "Article 10: Insurance and Waivers",
+            "Exhibit A: Key Participants"
+          ]
+        },
+        {
+          "number": "A133-2019",
+          "name": "Standard Form for CM at Risk",
+          "deliveryMethod": "CMAR",
+          "priority": "HIGH",
+          "keyFeatures": [
+            "GMP (Guaranteed Maximum Price)",
+            "Preconstruction services",
+            "Cost of the Work basis"
+          ],
+          "extractionComplexity": "MEDIUM"
+        },
+        {
+          "number": "A101-2017",
+          "name": "Standard Form of Agreement (Stipulated Sum)",
+          "deliveryMethod": "DBB",
+          "priority": "MEDIUM",
+          "keyFeatures": [
+            "Fixed price contract",
+            "Progress payments",
+            "Retainage provisions"
+          ],
+          "extractionComplexity": "LOW"
+        }
+      ],
+      "commonStructure": {
+        "articles": [
+          "Article 1: General Provisions",
+          "Article 2: Owner's Responsibilities",
+          "Article 3: Contractor's Responsibilities",
+          "Article 4: Compensation",
+          "Article 5: Progress Payments",
+          "Article 6: Final Payment",
+          "Article 7: Insurance and Bonds",
+          "Article 8: Claims and Disputes"
+        ],
+        "exhibits": [
+          "Exhibit A: Initial Information",
+          "Exhibit B: Insurance and Bonds",
+          "Exhibit C: Modifications"
+        ]
+      }
+    },
+    "ccdc": {
+      "family": "Canadian Construction Documents Committee",
+      "criticalForDemo": true,
+      "note": "Critical for March 2026 Canadian pilot",
+      "supportedContracts": [
+        {
+          "number": "2-2020",
+          "name": "Stipulated Price Contract",
+          "deliveryMethod": "DBB",
+          "priority": "HIGH",
+          "keyFeatures": [
+            "Fixed price with progress payments",
+            "PIPEDA compliant clauses",
+            "Canadian provincial law references"
+          ],
+          "extractionComplexity": "MEDIUM",
+          "canadianSpecifics": [
+            "Provincial builder's lien holdback (varies by province)",
+            "WSIB/WCB insurance requirements",
+            "HST/GST provisions"
+          ]
+        },
+        {
+          "number": "5B",
+          "name": "Construction Management Contract for Services and Construction",
+          "deliveryMethod": "CMAR",
+          "priority": "MEDIUM",
+          "keyFeatures": [
+            "CM services during design",
+            "GMP or Cost Plus",
+            "Trade contractor management"
+          ],
+          "extractionComplexity": "HIGH"
+        }
+      ],
+      "commonStructure": {
+        "generalConditions": "GC (General Conditions)",
+        "supplementaryConditions": "SC (Project-specific modifications)",
+        "articles": [
+          "GC 1.1: Contract Documents",
+          "GC 2.1: Roles and Responsibilities",
+          "GC 3.1: Contract Price",
+          "GC 5.1: Payment",
+          "GC 6.1: Changes in the Work",
+          "GC 7.1: Default, Termination"
+        ]
+      }
+    },
+    "consensusdocs": {
+      "family": "ConsensusDOCS Coalition",
+      "criticalForDemo": false,
+      "supportedContracts": [
+        {
+          "number": "300",
+          "name": "Standard Tri-Party Agreement for IPD",
+          "deliveryMethod": "IPD",
+          "priority": "MEDIUM",
+          "keyFeatures": [
+            "Tri-party (Owner, Designer, Constructor)",
+            "Consensus-based decision making",
+            "Shared savings/overruns"
+          ],
+          "extractionComplexity": "HIGH"
+        }
+      ]
+    }
+  },
+  "authorityMappingRules": {
+    "description": "Contract roles mapped to Ectropy 7-tier authority cascade",
+    "cascade": [
+      {
+        "level": 0,
+        "name": "FIELD",
+        "contractRoles": ["Field Worker", "Tradesperson", "Laborer"],
+        "typicalThreshold": "$0 - notification only"
+      },
+      {
+        "level": 1,
+        "name": "FOREMAN",
+        "contractRoles": ["Foreman", "Lead", "Working Foreman"],
+        "typicalThreshold": "$500"
+      },
+      {
+        "level": 2,
+        "name": "SUPERINTENDENT",
+        "contractRoles": ["Superintendent", "Site Manager", "Construction Manager"],
+        "typicalThreshold": "$5,000"
+      },
+      {
+        "level": 3,
+        "name": "PM",
+        "contractRoles": ["Project Manager", "Project Coordinator", "APM"],
+        "typicalThreshold": "$25,000"
+      },
+      {
+        "level": 4,
+        "name": "ARCHITECT",
+        "contractRoles": ["Architect", "Design Professional", "Engineer of Record"],
+        "typicalThreshold": "$100,000",
+        "note": "Design decisions, code compliance"
+      },
+      {
+        "level": 5,
+        "name": "OWNER",
+        "contractRoles": ["Owner", "Owner's Representative", "Client"],
+        "typicalThreshold": "Unlimited (within contract)",
+        "note": "Budget authority, scope changes"
+      },
+      {
+        "level": 6,
+        "name": "REGULATORY",
+        "contractRoles": ["Authority Having Jurisdiction", "Inspector", "Code Official"],
+        "typicalThreshold": "N/A",
+        "note": "Safety, code compliance, permits"
+      }
+    ],
+    "ipdSpecial": {
+      "pmt": {
+        "name": "Project Management Team",
+        "composition": "Owner PM + Architect PM + Contractor PM",
+        "authority": "Day-to-day decisions up to PMT threshold"
+      },
+      "pet": {
+        "name": "Project Executive Team",
+        "composition": "Owner Executive + Architect Principal + Contractor Executive",
+        "authority": "Strategic decisions, disputes, budget overages"
+      },
+      "srg": {
+        "name": "Senior Representative Group",
+        "composition": "Principals from all parties",
+        "authority": "Final dispute resolution, contract modifications"
+      }
+    }
+  },
+  "implementationPlan": {
+    "phase1": {
+      "name": "PDF/DOCX Extraction",
+      "effort": "8 hours",
+      "tasks": [
+        {
+          "task": "Install dependencies",
+          "command": "npm install pdf-parse mammoth",
+          "effort": "0.5 hours"
+        },
+        {
+          "task": "Implement extractTextFromPDF",
+          "file": "apps/mcp-server/src/services/contract-parser.service.ts",
+          "effort": "3 hours",
+          "details": [
+            "Replace mock with pdf-parse call",
+            "Handle multi-page extraction",
+            "Preserve page boundaries for source citations"
+          ]
+        },
+        {
+          "task": "Implement extractTextFromDOCX",
+          "file": "apps/mcp-server/src/services/contract-parser.service.ts",
+          "effort": "2 hours",
+          "details": [
+            "Replace mock with mammoth call",
+            "Preserve heading structure"
+          ]
+        },
+        {
+          "task": "Integration tests with sample contracts",
+          "effort": "2.5 hours",
+          "sampleContracts": [
+            "Sample AIA C191 (IPD)",
+            "Sample CCDC 2-2020",
+            "Sample AIA A101"
+          ]
+        }
+      ]
+    },
+    "phase2": {
+      "name": "Claude Enhancement (Optional)",
+      "effort": "8 hours",
+      "tasks": [
+        {
+          "task": "Add Claude extraction for complex clauses",
+          "effort": "4 hours",
+          "details": [
+            "Implement LLM extraction method in extraction rules",
+            "Create prompts for authority thresholds",
+            "Create prompts for IPD governance extraction"
+          ]
+        },
+        {
+          "task": "Add confidence boosting",
+          "effort": "2 hours",
+          "details": [
+            "Cross-validate regex results with Claude",
+            "Flag discrepancies for review"
+          ]
+        },
+        {
+          "task": "Testing and validation",
+          "effort": "2 hours"
+        }
+      ]
+    }
+  },
+  "sampleContractSources": {
+    "note": "For testing - these are publicly available template examples",
+    "aia": {
+      "source": "AIA Contract Documents on Demand",
+      "url": "https://www.aiacontracts.org/",
+      "recommendation": "Use AIA sample documents or create synthetic test contracts"
+    },
+    "ccdc": {
+      "source": "Canadian Construction Documents Committee",
+      "url": "https://www.ccdc.org/",
+      "recommendation": "Contact CCDC for sample documents or use redacted project contracts"
+    }
+  },
+  "riskAssessment": {
+    "low": [
+      "PDF extraction libraries are mature and well-tested",
+      "Pattern matching logic already proven with 62+ tests",
+      "Authority mapping already complete with 47+ tests"
+    ],
+    "medium": [
+      "Some contracts may have unusual formatting requiring regex tuning",
+      "Scanned PDFs may need OCR fallback"
+    ],
+    "mitigations": [
+      "Manual review flagging for low-confidence extractions",
+      "Template system allows per-contract-type rules",
+      "Human-in-the-loop validation before project configuration"
+    ]
+  },
+  "graphMetadata": {
+    "inEdges": [
+      "urn:luhtech:ectropy:feature:contract-onboarding"
+    ],
+    "outEdges": []
+  }
+}

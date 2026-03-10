@@ -1,0 +1,33 @@
+{
+  "name": "@ectropy/demo-projects",
+  "version": "1.0.0",
+  "description": "Demo projects and examples for Ectropy BIM integration",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node bim-integration-demo.ts",
+    "demo": "node bim-integration-demo.js",
+    "demo:ts": "ts-node bim-integration-demo.ts"
+  },
+  "dependencies": {
+    "@ectropy/ifc-processing": "file:../../libs/ifc-processing",
+    "@ectropy/speckle-integration": "file:../../libs/speckle-integration",
+    "pg": "^8.11.0",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.10.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
+  },
+  "keywords": [
+    "bim",
+    "ifc",
+    "speckle",
+    "demo",
+    "construction"
+  ],
+  "author": "Ectropy Team",
+  "license": "MIT"
+}

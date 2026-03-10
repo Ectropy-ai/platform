@@ -1,0 +1,33 @@
+# Development Dockerfile for MCP Server
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@10.14.0 && \
+    pnpm --version
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/mcp-server/package.json ./apps/mcp-server/
+COPY nx.json tsconfig.base.json ./
+COPY scripts ./scripts
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+# Copy source code
+COPY . .
+
+# Build for development
+RUN pnpm nx build mcp-server
+
+# Expose ports
+EXPOSE 3001 9090
+
+# Health check for development
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => { process.exit(1) })"
+
+# Start with development configuration
+CMD ["./scripts/startup-mcp-server.sh"]

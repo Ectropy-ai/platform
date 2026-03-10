@@ -1,0 +1,137 @@
+# =============================================================================
+# PROMETHEUS ALERTING RULES - ECTROPY STAGING ENVIRONMENT
+# =============================================================================
+# Enterprise-grade alerting for staging environment
+# Purpose: Early detection of issues before production deployment
+# =============================================================================
+
+groups:
+  # =============================================================================
+  # CRITICAL SYSTEM ALERTS
+  # =============================================================================
+  - name: ectropy.staging.critical
+    rules:
+      - alert: StagingAPIGatewayDown
+        expr: up{job="ectropy-api-gateway-staging"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: api-gateway
+          environment: staging
+        annotations:
+          summary: "Staging API Gateway is down"
+          description: "The API Gateway in staging environment has been down for more than 2 minutes."
+          runbook_url: "https://docs.ectropy.com/runbooks/api-gateway-down"
+
+      - alert: StagingDatabaseDown
+        expr: up{job="postgresql-staging"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+          environment: staging
+        annotations:
+          summary: "Staging Database is unreachable"
+          description: "PostgreSQL database in staging environment is not responding."
+          runbook_url: "https://docs.ectropy.com/runbooks/database-down"
+
+      - alert: StagingRedisDown
+        expr: up{job="redis-staging"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: redis
+          environment: staging
+        annotations:
+          summary: "Staging Redis cache is down"
+          description: "Redis cache in staging environment has been down for more than 2 minutes."
+
+  # =============================================================================
+  # PERFORMANCE ALERTS
+  # =============================================================================
+  - name: ectropy.staging.performance
+    rules:
+      - alert: StagingHighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes{job="node-exporter"} / node_memory_MemTotal_bytes{job="node-exporter"})) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          environment: staging
+        annotations:
+          summary: "High memory usage in staging"
+          description: "Memory usage is above 85% for more than 5 minutes in staging environment."
+
+      - alert: StagingHighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{job="node-exporter",mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          environment: staging
+        annotations:
+          summary: "High CPU usage in staging"
+          description: "CPU usage is above 80% for more than 5 minutes in staging environment."
+
+      - alert: StagingDiskSpaceLow
+        expr: (node_filesystem_avail_bytes{job="node-exporter",mountpoint="/"} / node_filesystem_size_bytes{job="node-exporter",mountpoint="/"}) * 100 < 15
+        for: 2m
+        labels:
+          severity: warning
+          environment: staging
+        annotations:
+          summary: "Low disk space in staging"
+          description: "Available disk space is below 15% in staging environment."
+
+  # =============================================================================
+  # APPLICATION HEALTH ALERTS
+  # =============================================================================
+  - name: ectropy.staging.health
+    rules:
+      - alert: StagingWebDashboardDown
+        expr: up{job="web-dashboard-staging"} == 0
+        for: 3m
+        labels:
+          severity: warning
+          service: web-dashboard
+          environment: staging
+        annotations:
+          summary: "Staging Web Dashboard is down"
+          description: "Web Dashboard in staging environment has been down for more than 3 minutes."
+
+      - alert: StagingSpeckleServerDown
+        expr: up{job="speckle-server-staging"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: speckle
+          environment: staging
+        annotations:
+          summary: "Staging Speckle BIM server is down"
+          description: "Speckle BIM server in staging environment has been down for more than 5 minutes."
+
+  # =============================================================================
+  # ENTERPRISE SECURITY ALERTS
+  # =============================================================================
+  - name: ectropy.staging.security
+    rules:
+      - alert: StagingUnauthorizedAccess
+        expr: increase(http_requests_total{job="ectropy-api-gateway-staging",status="401"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: api-gateway
+          environment: staging
+          type: security
+        annotations:
+          summary: "High number of unauthorized access attempts in staging"
+          description: "More than 10 401 responses in the last 5 minutes in staging environment."
+
+      - alert: StagingHighErrorRate
+        expr: (rate(http_requests_total{job="ectropy-api-gateway-staging",status=~"5.."}[5m]) / rate(http_requests_total{job="ectropy-api-gateway-staging"}[5m])) * 100 > 5
+        for: 3m
+        labels:
+          severity: warning
+          service: api-gateway
+          environment: staging
+        annotations:
+          summary: "High error rate in staging API Gateway"
+          description: "Error rate is above 5% for more than 3 minutes in staging environment."

@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist/apps/edge-server",
+    "module": "Node16",
+    "target": "ES2022",
+    "moduleResolution": "Node16",
+    "rootDir": "../../"
+  },
+  "include": ["src/main.ts"],
+  "exclude": ["**/*.spec.ts", "**/*.test.ts"]
+}

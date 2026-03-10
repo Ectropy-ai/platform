@@ -1,0 +1,497 @@
+{
+  "$schema": "../../schemas/feature.schema.json",
+  "$id": "urn:luhtech:ectropy:feature:platform-agent",
+  "featureId": "platform-agent",
+  "name": "Platform Decision Agent (Ectropy Internal)",
+  "version": "1.0.0",
+  "status": "PLANNING",
+  "priority": "HIGH",
+  "owner": "Erik Luhman",
+  "repository": "luh-tech/Ectropy-Business",
+  "branch": "feature/platform-decision-agent",
+  "targetRelease": "2026-02-28",
+  "schemaVersion": "3.1.0",
+  "meta": {
+    "sourceOfTruth": ".roadmap/features/platform-agent/FEATURE.json",
+    "createdAt": "2026-01-29T00:00:00Z",
+    "lastUpdated": "2026-01-29T00:00:00Z",
+    "author": "Claude Agent",
+    "dependsOn": [
+      "urn:luhtech:ectropy:feature:dual-process-decision",
+      "urn:luhtech:ectropy:feature:multi-tenant-foundation"
+    ],
+    "relatedDocs": [
+      ".roadmap/features/platform-agent/STRATEGY.json",
+      ".roadmap/features/dual-process-decision/FEATURE.json",
+      ".roadmap/DEMO_STATUS_MARCH_2026.json"
+    ]
+  },
+  "description": "Internal Platform Agent using the Dual-Process Decision Engine for Ectropy's own development planning, feature roadmapping, and venture coordination. This agent operates on code/feature planning data in the private luh-tech/Ectropy-Business repository, completely isolated from tenant construction data.",
+  "strategicContext": {
+    "problem": {
+      "description": "Ectropy development decisions are made ad-hoc without leveraging the same cognitive architecture used for construction decisions",
+      "impact": "Inconsistent feature decomposition, repeated planning mistakes, no pattern reuse from successful milestones"
+    },
+    "solution": {
+      "description": "Apply the production-ready Dual-Process Decision Engine to Ectropy's own planning process",
+      "mechanism": "Platform Agent with isolated data context, domain-specific Success Stack patterns, and authority cascade (Dev → Architect → Erik)"
+    },
+    "differentiator": "Only platform that uses its own decision intelligence for internal development - dogfooding at the architectural level"
+  },
+  "isolationArchitecture": {
+    "description": "Platform Agent operates in complete isolation from Tenant Agents",
+    "layers": [
+      {
+        "layer": "Repository Boundary",
+        "implementation": "Platform data exists only in luh-tech/Ectropy-Business (private)",
+        "files": [
+          ".roadmap/roadmap.json",
+          ".roadmap/decision-log.json",
+          ".roadmap/venture-summary.json",
+          ".roadmap/success-stack-platform.json"
+        ]
+      },
+      {
+        "layer": "Database Isolation",
+        "implementation": "Platform Agent uses tenant_id = NULL (platform admin scope)",
+        "note": "PostgreSQL RLS bypassed for platform operations"
+      },
+      {
+        "layer": "Success Stack Tier",
+        "implementation": "Platform patterns stored in separate tier, never mixed with tenant patterns",
+        "tiers": {
+          "platform": "Feature delivery, venture coordination, schema design",
+          "global": "Anonymized construction patterns (tenant visible)",
+          "tenant": "Per-tenant construction patterns (isolated)"
+        }
+      },
+      {
+        "layer": "MCP Tool Context",
+        "implementation": "excluded_contexts blocks tenant data from platform queries",
+        "excludedContexts": [
+          "tenant_projects",
+          "construction_decisions",
+          "field_operations",
+          "cross_tenant_data"
+        ]
+      }
+    ],
+    "authorityMapping": {
+      "platform": {
+        "cascade": [
+          {"level": 0, "role": "CLAUDE_AGENT", "description": "Automated decisions within guidelines"},
+          {"level": 1, "role": "DEVELOPER", "description": "Implementation decisions, test fixes"},
+          {"level": 2, "role": "ARCHITECT", "description": "Design decisions, schema changes"},
+          {"level": 3, "role": "ERIK", "description": "Strategic decisions, venture coordination"}
+        ],
+        "thresholds": {
+          "CLAUDE_AGENT": {"maxEffort": 4, "scopeLimit": "single file"},
+          "DEVELOPER": {"maxEffort": 40, "scopeLimit": "single feature"},
+          "ARCHITECT": {"maxEffort": 200, "scopeLimit": "multi-feature"},
+          "ERIK": {"maxEffort": "unlimited", "scopeLimit": "strategic"}
+        }
+      }
+    }
+  },
+  "schemaAlignment": {
+    "description": "Bidirectional mapping between Decision Engine and Roadmap schemas",
+    "mappings": [
+      {
+        "decisionField": "trigger.type",
+        "roadmapField": "classification",
+        "mapping": {
+          "scheduled": "LEAD",
+          "exception": "DERIVED",
+          "opportunity": "FLEXIBLE",
+          "escalation": "EXTERNAL"
+        }
+      },
+      {
+        "decisionField": "trigger.urgency (0-1)",
+        "roadmapField": "critical (boolean)",
+        "mapping": "urgency > 0.8 → critical: true"
+      },
+      {
+        "decisionField": "graphMetadata.inEdges",
+        "roadmapField": "graphMetadata.predecessors",
+        "mapping": "identical structure"
+      },
+      {
+        "decisionField": "graphMetadata.outEdges",
+        "roadmapField": "graphMetadata.successors",
+        "mapping": "identical structure"
+      },
+      {
+        "decisionField": "outcome.success",
+        "roadmapField": "status",
+        "mapping": "true → complete, false → blocked"
+      }
+    ],
+    "newRoadmapFields": {
+      "healthScore": {
+        "type": "number",
+        "range": "0-1",
+        "description": "Maps to SDI for milestone health assessment",
+        "calculation": "SDI normalized to 0-1 scale"
+      },
+      "eigenmodeSnapshot": {
+        "type": "number[12]",
+        "description": "EFAS eigenmode values at milestone snapshot",
+        "platformModes": [
+          "codebase_health",
+          "test_coverage",
+          "technical_debt",
+          "dependency_freshness",
+          "ci_stability",
+          "deployment_frequency",
+          "documentation_coverage",
+          "api_stability",
+          "performance_regression",
+          "security_posture",
+          "team_velocity",
+          "feature_completion"
+        ]
+      },
+      "patternConfidence": {
+        "type": "number",
+        "range": "0-1",
+        "description": "Success Stack match confidence for milestone approach"
+      },
+      "explorationBudget": {
+        "type": "number",
+        "range": "0-1",
+        "description": "USF exploration allocation for novel approaches"
+      },
+      "monitoringTriggers": {
+        "type": "Trigger[]",
+        "description": "Early warning conditions (SDI breach, timeline deviation)"
+      }
+    }
+  },
+  "platformDomainPatterns": {
+    "description": "Success Stack patterns specific to Ectropy platform development",
+    "categories": [
+      {
+        "category": "feature-decomposition",
+        "description": "Patterns for breaking features into milestones",
+        "examplePatterns": [
+          {
+            "name": "M7_MILESTONE_PATTERN",
+            "description": "Standard 7-milestone feature decomposition",
+            "sequence": ["M1-Foundation", "M2-Schema", "M3-Service", "M4-Tools", "M5-Integration", "M6-Testing", "M7-Documentation"],
+            "successRate": 0.85,
+            "conditions": ["feature complexity > medium", "has database changes"]
+          },
+          {
+            "name": "M3_QUICK_PATTERN",
+            "description": "Lightweight 3-milestone feature for simple additions",
+            "sequence": ["M1-Implementation", "M2-Testing", "M3-Integration"],
+            "successRate": 0.92,
+            "conditions": ["feature complexity <= low", "no schema changes"]
+          }
+        ]
+      },
+      {
+        "category": "schema-design",
+        "description": "Patterns for schema evolution decisions",
+        "examplePatterns": [
+          {
+            "name": "V3_SCHEMA_EVOLUTION",
+            "description": "Schema version bump pattern",
+            "steps": ["Add fields with defaults", "Migrate data", "Deprecate old fields", "Remove in next major"],
+            "successRate": 0.90
+          }
+        ]
+      },
+      {
+        "category": "multi-tenant-isolation",
+        "description": "Patterns for tenant isolation decisions",
+        "examplePatterns": [
+          {
+            "name": "RLS_FIRST_PATTERN",
+            "description": "PostgreSQL RLS before application-level checks",
+            "successRate": 0.95
+          }
+        ]
+      },
+      {
+        "category": "deployment-strategy",
+        "description": "Patterns for deployment decisions",
+        "examplePatterns": [
+          {
+            "name": "STAGING_GATE_PATTERN",
+            "description": "Always validate on staging before production",
+            "successRate": 0.98
+          }
+        ]
+      }
+    ]
+  },
+  "milestones": [
+    {
+      "id": "PA-M1",
+      "name": "Schema Extension (V3.1)",
+      "targetDate": "2026-02-05",
+      "status": "PLANNED",
+      "description": "Extend roadmap schema with decision engine cognitive fields",
+      "deliverables": [
+        ".roadmap/schemas/roadmap.schema.v3.1.json",
+        ".roadmap/schemas/decision/decision-event.schema.v3.1.json",
+        ".roadmap/schemas/definitions/classification.schema.json"
+      ],
+      "completionCriteria": [
+        "healthScore, eigenmodeSnapshot, patternConfidence fields added to roadmap milestones",
+        "classification, dependsOn, blocks fields added to decision events",
+        "JSON Schema validation passes",
+        "Backward compatible with V3.0"
+      ]
+    },
+    {
+      "id": "PA-M2",
+      "name": "Platform Success Stack Initialization",
+      "targetDate": "2026-02-10",
+      "status": "PLANNED",
+      "description": "Create initial platform pattern library from historical decisions",
+      "deliverables": [
+        ".roadmap/success-stack-platform.json",
+        "apps/mcp-server/src/services/platform-pattern-seeder.ts"
+      ],
+      "completionCriteria": [
+        "50+ initial platform patterns seeded",
+        "Patterns cover feature decomposition, schema design, deployment",
+        "Pattern confidence scores based on historical outcomes",
+        "Platform tier isolated from tenant tiers"
+      ]
+    },
+    {
+      "id": "PA-M3",
+      "name": "Platform Agent MCP Configuration",
+      "targetDate": "2026-02-15",
+      "status": "PLANNED",
+      "description": "Configure MCP tools for platform agent context",
+      "deliverables": [
+        "apps/mcp-server/src/config/platform-agent.config.ts",
+        "apps/mcp-server/src/services/platform-context.service.ts"
+      ],
+      "completionCriteria": [
+        "Platform agent tool whitelist configured",
+        "Excluded contexts block tenant data",
+        "Authority cascade routes to Dev → Architect → Erik",
+        "Platform-specific SDI calculation (12 platform eigenmodes)"
+      ]
+    },
+    {
+      "id": "PA-M4",
+      "name": "Decision-Milestone Linking",
+      "targetDate": "2026-02-20",
+      "status": "PLANNED",
+      "description": "Implement bidirectional linking between decisions and milestones",
+      "deliverables": [
+        "apps/mcp-server/src/services/decision-milestone-linker.service.ts",
+        "apps/mcp-server/src/services/__tests__/decision-milestone-linker.spec.ts"
+      ],
+      "completionCriteria": [
+        "Decisions link to milestones via linkedMilestoneUrn field",
+        "graphMetadata edges connect decision ↔ milestone",
+        "Query: 'What decisions drove this milestone?' works",
+        "Classification propagates decision → pattern"
+      ]
+    },
+    {
+      "id": "PA-M5",
+      "name": "Platform Agent Integration",
+      "targetDate": "2026-02-28",
+      "status": "PLANNED",
+      "description": "Full integration of platform agent with Ectropy planning workflow",
+      "deliverables": [
+        "Integration tests for platform agent scenarios",
+        "Documentation for platform agent usage"
+      ],
+      "completionCriteria": [
+        "Platform agent makes feature decomposition recommendations",
+        "Pattern matching for milestone approach (>60% match rate)",
+        "Novel exploration for unprecedented features",
+        "Full audit trail of platform decisions"
+      ]
+    }
+  ],
+  "mcpToolConfiguration": {
+    "platformAgentTools": {
+      "include": [
+        "calculate_health_score",
+        "get_eigenmodes",
+        "query_success_stack",
+        "mediate_decision",
+        "generate_viable_options",
+        "validate_dag",
+        "propagate_date_change",
+        "resolve_dependencies",
+        "compress_to_pattern",
+        "record_decision_outcome",
+        "read_roadmap",
+        "read_decision_log",
+        "query_venture_summary"
+      ],
+      "exclude": [
+        "capture_decision",
+        "route_decision",
+        "approve_decision",
+        "reject_decision",
+        "escalate_decision"
+      ],
+      "note": "Platform tools exclude construction-specific PM decision tools"
+    },
+    "contextInjection": {
+      "agentType": "PLATFORM",
+      "tenantId": null,
+      "dataScope": "PLATFORM_ONLY",
+      "successStackTier": "platform",
+      "authorityContext": {
+        "cascade": ["CLAUDE_AGENT", "DEVELOPER", "ARCHITECT", "ERIK"],
+        "currentActor": "{{CURRENT_ACTOR}}"
+      },
+      "excludedContexts": [
+        "tenant_projects",
+        "construction_decisions",
+        "field_operations",
+        "cross_tenant_data",
+        "global_patterns"
+      ]
+    }
+  },
+  "platformEigenmodes": {
+    "description": "12 eigenmodes specific to Ectropy platform health",
+    "modes": [
+      {
+        "index": 0,
+        "name": "codebase_health",
+        "description": "TypeScript errors, linting warnings, code quality metrics",
+        "sources": ["tsc --noEmit output", "eslint reports"]
+      },
+      {
+        "index": 1,
+        "name": "test_coverage",
+        "description": "Unit, integration, and E2E test coverage percentages",
+        "sources": ["vitest coverage", "playwright reports"]
+      },
+      {
+        "index": 2,
+        "name": "technical_debt",
+        "description": "TODO count, deprecated usage, complexity metrics",
+        "sources": ["sonarqube", "code complexity tools"]
+      },
+      {
+        "index": 3,
+        "name": "dependency_freshness",
+        "description": "npm outdated count, security vulnerabilities",
+        "sources": ["npm audit", "dependabot alerts"]
+      },
+      {
+        "index": 4,
+        "name": "ci_stability",
+        "description": "CI pass rate, flaky test rate, build times",
+        "sources": ["GitHub Actions metrics"]
+      },
+      {
+        "index": 5,
+        "name": "deployment_frequency",
+        "description": "Deploy cadence, rollback rate, DORA metrics",
+        "sources": ["deployment logs", "GitHub releases"]
+      },
+      {
+        "index": 6,
+        "name": "documentation_coverage",
+        "description": "JSDoc coverage, README completeness, API docs",
+        "sources": ["typedoc coverage", "manual audit"]
+      },
+      {
+        "index": 7,
+        "name": "api_stability",
+        "description": "Breaking changes, deprecation warnings, versioning",
+        "sources": ["API changelog", "OpenAPI diff"]
+      },
+      {
+        "index": 8,
+        "name": "performance_regression",
+        "description": "Response times, memory usage, bundle size",
+        "sources": ["Lighthouse", "bundle analyzer"]
+      },
+      {
+        "index": 9,
+        "name": "security_posture",
+        "description": "Vulnerability count, secrets exposure, auth coverage",
+        "sources": ["snyk", "gitleaks", "security audit"]
+      },
+      {
+        "index": 10,
+        "name": "team_velocity",
+        "description": "PR throughput, review time, cycle time",
+        "sources": ["GitHub Insights", "linear.app"]
+      },
+      {
+        "index": 11,
+        "name": "feature_completion",
+        "description": "Milestone completion rate, scope creep, rework rate",
+        "sources": ["roadmap.json status", "commit analysis"]
+      }
+    ]
+  },
+  "implementationPlan": {
+    "phase1": {
+      "name": "Foundation (Week 1)",
+      "effort": "24 hours",
+      "tasks": [
+        "Create V3.1 schema extensions for roadmap milestones",
+        "Add decision-milestone linking fields to decision-event schema",
+        "Initialize platform Success Stack tier"
+      ]
+    },
+    "phase2": {
+      "name": "Pattern Library (Week 2)",
+      "effort": "32 hours",
+      "tasks": [
+        "Seed 50+ platform patterns from historical milestones",
+        "Implement feature decomposition patterns",
+        "Create schema design and deployment patterns"
+      ]
+    },
+    "phase3": {
+      "name": "Integration (Week 3-4)",
+      "effort": "40 hours",
+      "tasks": [
+        "Configure platform agent MCP tools",
+        "Implement decision-milestone bidirectional linking",
+        "Create platform-specific SDI calculation",
+        "Integration testing and documentation"
+      ]
+    }
+  },
+  "successMetrics": {
+    "patternMatchRate": {
+      "target": ">60%",
+      "description": "Percentage of platform decisions with applicable patterns"
+    },
+    "explorationSuccessRate": {
+      "target": ">40%",
+      "description": "Novel approaches that improve on patterns"
+    },
+    "milestoneOnTimeRate": {
+      "target": ">80%",
+      "description": "Milestones completed by target date"
+    },
+    "decisionAuditCoverage": {
+      "target": "100%",
+      "description": "All platform decisions have full audit trail"
+    }
+  },
+  "graphMetadata": {
+    "inEdges": [
+      "urn:luhtech:ectropy:feature:dual-process-decision",
+      "urn:luhtech:ectropy:feature:multi-tenant-foundation"
+    ],
+    "outEdges": [
+      "urn:luhtech:ectropy:schema:roadmap:v3.1",
+      "urn:luhtech:ectropy:file:success-stack-platform"
+    ]
+  }
+}

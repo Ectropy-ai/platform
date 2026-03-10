@@ -1,0 +1,226 @@
+# ============================================================================
+# ⚠️ DEPRECATED - Archived 2025-12-16 (Session 5)
+# ============================================================================
+#
+# This workflow has been DEPRECATED and consolidated into compliance-automation.yml
+#
+# CONSOLIDATION RATIONALE:
+# - SOC2 compliance workflows consolidated to reduce workflow sprawl (30→28)
+# - Evidence collection and archival unified under single compliance interface
+# - Maintains automated monthly scheduling (1st of month at 2:00 AM UTC)
+# - Clearer DevOps UX: compliance-automation covers all evidence operations
+#
+# MIGRATION PATH:
+# Use compliance-automation.yml with compliance_mode: evidence-archival
+#
+# Example:
+#   Compliance Mode: evidence-archival
+#   Dry Run: false (optional parameter)
+#   (Runs automatically on schedule: monthly on 1st at 2:00 AM UTC)
+#
+# FUNCTIONALITY PRESERVED:
+# ✅ Monthly evidence archival to Git LFS
+# ✅ 90-day retention policy management
+# ✅ Archive evidence older than 30 days
+# ✅ Repository size monitoring and warnings
+# ✅ Git LFS configuration validation
+# ✅ Dry run mode support for testing
+# ✅ Automated commit and push with size metrics
+# ✅ Evidence size before/after tracking
+#
+# WORKFLOW MATRIX REFERENCE:
+# apps/mcp-server/data/cicd-environment-workflow-matrix.json v1.7.0
+#
+# ARCHIVED: 2025-12-16T05:00:00Z
+# SESSION: 5 (Workflow Consolidation Phase 3 - SOC2 Compliance Automation)
+# REPLACEMENT: .github/workflows/compliance-automation.yml (evidence-archival mode)
+# ============================================================================
+
+name: Evidence Archival
+
+# Runs monthly to archive evidence older than 30 days to Git LFS
+# Maintains 90-day retention policy for historical evidence
+on:
+  schedule:
+    # Run on the 1st of each month at 2:00 AM UTC
+    - cron: '0 2 1 * *'
+
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (do not commit changes)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  archive-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install Git LFS
+        run: |
+          git lfs install
+          git lfs version
+
+      - name: Verify Git LFS Configuration
+        run: |
+          echo "Checking Git LFS tracking patterns..."
+          git lfs track
+
+          if ! git lfs track | grep -q "evidence/archive/\*.tar.gz"; then
+            echo "❌ ERROR: Git LFS not configured for evidence archives"
+            exit 1
+          fi
+
+          echo "✅ Git LFS configured correctly"
+
+      - name: Check Evidence Directory Size (Before)
+        id: size_before
+        run: |
+          evidence_size=$(du -sh evidence/ 2>/dev/null | cut -f1 || echo "0K")
+          repo_size=$(du -sh . 2>/dev/null | cut -f1 || echo "0M")
+
+          echo "evidence_size=$evidence_size" >> $GITHUB_OUTPUT
+          echo "repo_size=$repo_size" >> $GITHUB_OUTPUT
+
+          echo "📊 Evidence directory size: $evidence_size"
+          echo "📊 Total repository size: $repo_size"
+
+      - name: Run Evidence Archival Script
+        id: archival
+        run: |
+          echo "🗂️ Starting evidence archival process..."
+
+          if ! bash scripts/archive-evidence.sh; then
+            echo "❌ Archival script failed"
+            exit 1
+          fi
+
+          echo "✅ Archival script completed successfully"
+
+      - name: Check Evidence Directory Size (After)
+        id: size_after
+        run: |
+          evidence_size=$(du -sh evidence/ 2>/dev/null | cut -f1 || echo "0K")
+          archive_size=$(du -sh evidence/archive/ 2>/dev/null | cut -f1 || echo "0K")
+          repo_size=$(du -sh . 2>/dev/null | cut -f1 || echo "0M")
+
+          echo "evidence_size=$evidence_size" >> $GITHUB_OUTPUT
+          echo "archive_size=$archive_size" >> $GITHUB_OUTPUT
+          echo "repo_size=$repo_size" >> $GITHUB_OUTPUT
+
+          echo "📊 Evidence directory size: $evidence_size"
+          echo "📊 Archive directory size: $archive_size"
+          echo "📊 Total repository size: $repo_size"
+
+      - name: Check for Changes
+        id: changes
+        run: |
+          git add evidence/
+
+          if git diff --cached --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "📝 No changes to commit"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "📝 Changes detected"
+            
+            # Count archived directories
+            archived=$(git diff --cached --name-only | grep -E "evidence/archive/.*\.tar\.gz$" | wc -l)
+            deleted=$(git diff --cached --name-only --diff-filter=D | grep -v "evidence/archive/" | wc -l)
+            
+            echo "archived_count=$archived" >> $GITHUB_OUTPUT
+            echo "deleted_count=$deleted" >> $GITHUB_OUTPUT
+            
+            echo "📦 Archived: $archived items"
+            echo "🗑️ Deleted: $deleted items"
+          fi
+
+      - name: Commit and Push Changes
+        if: steps.changes.outputs.has_changes == 'true' && inputs.dry_run != true
+        run: |
+          archived_count="${{ steps.changes.outputs.archived_count }}"
+          deleted_count="${{ steps.changes.outputs.deleted_count }}"
+          evidence_before="${{ steps.size_before.outputs.evidence_size }}"
+          evidence_after="${{ steps.size_after.outputs.evidence_size }}"
+          archive_size="${{ steps.size_after.outputs.archive_size }}"
+          repo_size="${{ steps.size_after.outputs.repo_size }}"
+
+          git commit -m "chore: Archive evidence older than 30 days
+
+          Automated evidence archival:
+          - Archived ${archived_count} evidence directories to Git LFS
+          - Removed ${deleted_count} directories from active evidence
+          - Maintained 90-day retention policy
+
+          Evidence size before: ${evidence_before}
+          Evidence size after: ${evidence_after}
+          Archive size: ${archive_size}
+
+          Repository size: ${repo_size}"
+
+          git push origin main
+
+          echo "✅ Changes committed and pushed"
+
+      - name: Create Summary Report
+        if: always()
+        run: |
+          evidence_before="${{ steps.size_before.outputs.evidence_size }}"
+          evidence_after="${{ steps.size_after.outputs.evidence_size }}"
+          repo_size="${{ steps.size_after.outputs.repo_size }}"
+          archive_size="${{ steps.size_after.outputs.archive_size }}"
+          has_changes="${{ steps.changes.outputs.has_changes }}"
+          archived_count="${{ steps.changes.outputs.archived_count || 0 }}"
+          deleted_count="${{ steps.changes.outputs.deleted_count || 0 }}"
+          dry_run="${{ inputs.dry_run }}"
+          status="${{ steps.archival.outcome }}"
+
+          cat >> $GITHUB_STEP_SUMMARY << SUMMARY
+          # Evidence Archival Summary
+
+          ## Size Metrics
+
+          - Evidence Directory Before: ${evidence_before}
+          - Evidence Directory After: ${evidence_after}
+          - Repository Size: ${repo_size}
+          - Archive Size: ${archive_size}
+
+          ## Archival Results
+
+          - Changes Detected: ${has_changes}
+          - Archived: ${archived_count} items
+          - Deleted: ${deleted_count} items
+          - Dry Run: ${dry_run}
+
+          ## Status
+
+          Archival Status: ${status}
+
+          ---
+
+          Next scheduled run: 1st of next month at 2:00 AM UTC
+          SUMMARY
+
+      - name: Repository Size Warning
+        if: steps.size_after.outputs.repo_size > '100M'
+        run: |
+          echo "⚠️ WARNING: Repository size (${{ steps.size_after.outputs.repo_size }}) exceeds 100MB target"
+          echo "Consider adjusting archival threshold or retention policy"

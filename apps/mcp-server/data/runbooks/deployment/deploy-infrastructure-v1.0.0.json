@@ -1,0 +1,950 @@
+{
+  "version": "1.0.0",
+  "environment": "all",
+  "runbookType": "deployment",
+  "deploymentType": "Phased Infrastructure Deployment with Health Validation",
+  "metadata": {
+    "catalogId": "deployment-runbook-v1-0-0",
+    "name": "Ectropy Enterprise Infrastructure Deployment",
+    "type": "deployment",
+    "purpose": "Deploy core infrastructure (PostgreSQL, Redis, MinIO) and Speckle BIM stack with comprehensive health validation and phased rollout approach",
+    "maintainer": "DevOps / Infrastructure Team",
+    "author": "Claude (Enterprise Integration)",
+    "created": "2025-11-14T00:00:00Z",
+    "lastUpdated": "2025-11-16T00:00:00Z",
+    "estimatedDuration": "15 minutes",
+    "complexity": "high",
+    "priority": "critical",
+    "relatedDocuments": [
+      "scripts/deployment/preflight-check.ps1",
+      "scripts/deployment/apply-migration.ps1",
+      "docker-compose.development.yml",
+      "docs/SPECKLE_INTEGRATION.md"
+    ],
+    "sourceFile": "scripts/deployment/deploy-infrastructure.ps1",
+    "conversionDate": "2025-11-16T00:00:00Z",
+    "schemaVersion": "1.0.0"
+  },
+  "executiveSummary": {
+    "description": "Automated deployment script for Ectropy enterprise infrastructure including core databases (PostgreSQL, Redis), Speckle BIM platform (GraphQL API, Web UI, S3 storage), and application services (API Gateway, MCP Server, Web Dashboard). Implements phased deployment with health validation at each stage.",
+    "status": "READY_FOR_PRODUCTION",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "MEDIUM",
+    "keyChanges": [
+      "Implements phased deployment: Core → Speckle → Application",
+      "Health checks with configurable timeouts and retry logic",
+      "Pre-flight validation integration",
+      "Speckle database auto-creation and migration support",
+      "MinIO S3 storage for BIM file management"
+    ],
+    "prerequisites": [
+      "Windows PowerShell 5.1+ or PowerShell Core 7+",
+      "Docker Desktop or Docker Engine running",
+      "Docker Compose v2+",
+      "Network access to container registries",
+      ".env.local or .env.development configured",
+      "Minimum 8GB RAM, 20GB disk space available"
+    ],
+    "impact": {
+      "systems": [
+        "PostgreSQL database (ectropy_dev, speckle)",
+        "Redis cache",
+        "MinIO S3 storage",
+        "Speckle BIM platform (server, frontend, preview, webhook, fileimport)",
+        "Ectropy API Gateway",
+        "MCP Server",
+        "Web Dashboard"
+      ],
+      "downtime": "Zero downtime for fresh deployments; potential brief interruption if updating existing services",
+      "rollbackTime": "5 minutes (automated container stop and previous configuration restore)"
+    }
+  },
+  "preFlightChecks": [
+    {
+      "id": "preflight-script",
+      "order": 1,
+      "category": "infrastructure",
+      "name": "Run Pre-Flight Check Script",
+      "description": "Execute automated pre-flight validation script (can be skipped with -SkipPreFlight flag)",
+      "command": ".\\scripts\\deployment\\preflight-check.ps1",
+      "expectedResult": "Exit code 0, all checks pass",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "Pre-flight checks failed. Resolve issues or use -SkipPreFlight to override (not recommended)"
+      }
+    },
+    {
+      "id": "docker-running",
+      "order": 2,
+      "category": "infrastructure",
+      "name": "Docker Engine Running",
+      "description": "Verify Docker daemon is accessible",
+      "command": "docker ps",
+      "expectedResult": "Command succeeds, daemon responds",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "Docker is not running. Start Docker Desktop or Docker Engine service."
+      }
+    },
+    {
+      "id": "compose-file-exists",
+      "order": 3,
+      "category": "configuration",
+      "name": "Docker Compose File Validation",
+      "description": "Ensure docker-compose.development.yml exists and is valid",
+      "command": "docker compose -f docker-compose.development.yml config",
+      "expectedResult": "Configuration validates successfully",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "Docker Compose file is missing or invalid"
+      }
+    },
+    {
+      "id": "env-file-check",
+      "order": 4,
+      "category": "configuration",
+      "name": "Environment Variables Configured",
+      "description": "Check for required environment file",
+      "command": "Test-Path .env.local -or Test-Path .env.development",
+      "expectedResult": "At least one environment file exists",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "onFailure": {
+        "action": "skip",
+        "message": "No environment file found. Services may use default values."
+      }
+    },
+    {
+      "id": "port-availability",
+      "order": 5,
+      "category": "infrastructure",
+      "name": "Critical Ports Available",
+      "description": "Verify ports 3000, 4000, 5432, 6379, 8080, 9000 are not in use",
+      "command": "Test-NetConnection -Port 3000,4000,5432,6379,8080,9000 -InformationLevel Quiet",
+      "expectedResult": "All ports available",
+      "severity": "error",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "Required ports are in use. Stop conflicting services."
+      }
+    },
+    {
+      "id": "resource-check",
+      "order": 6,
+      "category": "infrastructure",
+      "name": "System Resources Available",
+      "description": "Check available RAM and disk space",
+      "command": "(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory -gt 4GB",
+      "expectedResult": "At least 4GB free RAM",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "onFailure": {
+        "action": "skip",
+        "message": "Low memory detected. Close unnecessary applications."
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Core Infrastructure Deployment",
+      "description": "Deploy PostgreSQL database, Redis cache, and initialize Speckle database",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Start PostgreSQL Database",
+          "description": "Launch PostgreSQL container with persistent volume",
+          "command": "docker-compose -f docker-compose.development.yml up -d postgres",
+          "purpose": "Initialize primary database for Ectropy and Speckle data",
+          "required": true,
+          "automatable": true,
+          "timeout": "120s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Container starts successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to start PostgreSQL. Check Docker logs."
+          },
+          "relatedFiles": [
+            "docker-compose.development.yml"
+          ]
+        },
+        {
+          "step": "1.2",
+          "name": "Wait for PostgreSQL Initialization",
+          "description": "Poll pg_isready until database accepts connections (max 60 seconds)",
+          "command": "for ($i = 1; $i -le 12; $i++) { docker exec ectropy-postgres-1 pg_isready -U postgres; if ($LASTEXITCODE -eq 0) { break }; Start-Sleep 5 }",
+          "purpose": "Ensure database is fully initialized before dependent services start",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "pg_isready returns 0"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "PostgreSQL failed to initialize. Check logs: docker logs ectropy-postgres-1"
+          }
+        },
+        {
+          "step": "1.3",
+          "name": "Start Redis Cache",
+          "description": "Launch Redis container for session and cache management",
+          "command": "docker-compose -f docker-compose.development.yml up -d redis",
+          "purpose": "Initialize distributed cache for API Gateway and application state",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to start Redis"
+          }
+        },
+        {
+          "step": "1.4",
+          "name": "Verify Redis Health",
+          "description": "Test Redis connectivity with PING command",
+          "command": "Start-Sleep 5; docker exec ectropy-redis-1 redis-cli ping",
+          "purpose": "Confirm Redis is accepting connections",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedOutput": "PONG",
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "abort",
+            "message": "Redis health check failed"
+          }
+        },
+        {
+          "step": "1.5",
+          "name": "Create Speckle Database",
+          "description": "Create dedicated Speckle database for BIM platform data",
+          "command": "docker exec ectropy-postgres-1 psql -U postgres -c 'CREATE DATABASE speckle'",
+          "purpose": "Initialize separate database for Speckle BIM metadata and stream data",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": [0],
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Database created or already exists"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Database may already exist, continuing..."
+          }
+        },
+        {
+          "step": "1.6",
+          "name": "Check Migration Status",
+          "description": "Verify if Speckle tables exist in database",
+          "command": "docker exec ectropy-postgres-1 psql -U postgres -d ectropy_dev -c '\\dt speckle*'",
+          "purpose": "Determine if migrations need to be applied",
+          "required": false,
+          "automatable": true,
+          "timeout": "15s",
+          "expectedOutput": "List of speckle tables or empty result",
+          "onFailure": {
+            "action": "skip",
+            "message": "Migration status check informational only"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Speckle BIM Platform Deployment",
+      "description": "Deploy MinIO S3 storage, Speckle Server, Frontend, and support services",
+      "estimatedDuration": "7 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Start MinIO S3 Storage",
+          "description": "Launch MinIO for BIM file storage",
+          "command": "docker-compose -f docker-compose.development.yml up -d minio",
+          "purpose": "Provide S3-compatible object storage for Speckle file uploads and previews",
+          "required": true,
+          "automatable": true,
+          "timeout": "90s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to start MinIO"
+          }
+        },
+        {
+          "step": "2.2",
+          "name": "Wait for MinIO Health",
+          "description": "Poll MinIO health endpoint until ready (60 second timeout)",
+          "command": "Wait-ForHealthy -ServiceName 'MinIO' -Url 'http://localhost:9000/minio/health/live' -TimeoutSeconds 60",
+          "purpose": "Ensure object storage is ready before Speckle server starts",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "HTTP 200 from health endpoint"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "MinIO did not become healthy. Check logs: docker logs ectropy-minio-1"
+          }
+        },
+        {
+          "step": "2.3",
+          "name": "Start Speckle Server (GraphQL API)",
+          "description": "Launch Speckle Server with database and storage connections",
+          "command": "docker-compose -f docker-compose.development.yml up -d speckle-server",
+          "purpose": "Deploy core Speckle GraphQL API for BIM data management",
+          "required": true,
+          "automatable": true,
+          "timeout": "120s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to start Speckle Server"
+          },
+          "relatedFiles": [
+            ".env.local",
+            "docker-compose.development.yml"
+          ]
+        },
+        {
+          "step": "2.4",
+          "name": "Wait for Speckle Server Initialization",
+          "description": "Poll Speckle readiness endpoint for up to 60 seconds",
+          "command": "Start-Sleep 30; for ($i = 1; $i -le 12; $i++) { docker exec ectropy-speckle-server-1 wget -q -O - http://localhost:3000/readiness; if ($LASTEXITCODE -eq 0) { break }; Start-Sleep 5 }",
+          "purpose": "Ensure Speckle server has completed database migrations and is ready",
+          "required": true,
+          "automatable": true,
+          "timeout": "90s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "/readiness endpoint returns success"
+          },
+          "onFailure": {
+            "action": "skip",
+            "rollbackStep": "2.3",
+            "message": "Speckle server may still be initializing. Check logs: docker logs ectropy-speckle-server-1"
+          }
+        },
+        {
+          "step": "2.5",
+          "name": "Start Speckle Frontend (Web UI)",
+          "description": "Launch Speckle web interface",
+          "command": "docker-compose -f docker-compose.development.yml up -d speckle-frontend",
+          "purpose": "Deploy Speckle user interface for BIM model viewing and management",
+          "required": true,
+          "automatable": true,
+          "timeout": "90s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "expectedOutput": "Container started on port 8080"
+        },
+        {
+          "step": "2.6",
+          "name": "Start Speckle Support Services",
+          "description": "Launch preview service, webhook handler, and file import processor",
+          "command": "docker-compose -f docker-compose.development.yml up -d speckle-preview speckle-webhook speckle-fileimport",
+          "purpose": "Enable BIM preview generation, webhook notifications, and file import capabilities",
+          "required": true,
+          "automatable": true,
+          "timeout": "120s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Ectropy Application Services Deployment",
+      "description": "Deploy API Gateway, MCP Server, and Web Dashboard",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Start API Gateway",
+          "description": "Launch Ectropy REST API Gateway with Speckle integration",
+          "command": "docker-compose -f docker-compose.development.yml up -d api-gateway",
+          "purpose": "Deploy main API layer connecting frontend to database and Speckle BIM platform",
+          "required": true,
+          "automatable": true,
+          "timeout": "90s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "relatedFiles": [
+            "apps/api-gateway/src/main.ts",
+            "apps/api-gateway/src/config/session.config.ts"
+          ]
+        },
+        {
+          "step": "3.2",
+          "name": "Verify API Gateway Health",
+          "description": "Poll /health endpoint until API is ready",
+          "command": "Wait-ForHealthy -ServiceName 'API Gateway' -Url 'http://localhost:4000/health' -TimeoutSeconds 60",
+          "purpose": "Confirm API Gateway is accepting requests and connected to dependencies",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "retryable": false,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "HTTP 200 from /health endpoint"
+          },
+          "onFailure": {
+            "action": "skip",
+            "rollbackStep": "3.1",
+            "message": "API Gateway may still be starting. Check logs: docker logs ectropy-api-gateway-1"
+          }
+        },
+        {
+          "step": "3.3",
+          "name": "Start MCP Server",
+          "description": "Launch Model Context Protocol server for AI integration",
+          "command": "docker-compose -f docker-compose.development.yml up -d mcp-server",
+          "purpose": "Deploy MCP server for Claude AI integration and runbook management",
+          "required": true,
+          "automatable": true,
+          "timeout": "90s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0
+        },
+        {
+          "step": "3.4",
+          "name": "Verify MCP Server Health",
+          "description": "Poll MCP health endpoint",
+          "command": "Wait-ForHealthy -ServiceName 'MCP Server' -Url 'http://localhost:3001/health' -TimeoutSeconds 60",
+          "purpose": "Confirm MCP server is operational",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "retryable": false,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "HTTP 200 from /health endpoint"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "MCP Server may still be starting"
+          }
+        },
+        {
+          "step": "3.5",
+          "name": "Start Web Dashboard",
+          "description": "Launch React frontend application",
+          "command": "docker-compose -f docker-compose.development.yml up -d web-dashboard",
+          "purpose": "Deploy user-facing web application with BIM viewer integration",
+          "required": true,
+          "automatable": true,
+          "timeout": "120s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0
+        },
+        {
+          "step": "3.6",
+          "name": "Verify Web Dashboard Health",
+          "description": "Wait for web server to respond",
+          "command": "Start-Sleep 10; Wait-ForHealthy -ServiceName 'Web Dashboard' -Url 'http://localhost:3000' -TimeoutSeconds 60",
+          "purpose": "Confirm frontend is accessible and serving content",
+          "required": true,
+          "automatable": true,
+          "timeout": "70s",
+          "retryable": false,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "HTTP 200 from root endpoint"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Web Dashboard may still be building"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Post-Deployment Validation",
+      "description": "Verify all services are running and provide next steps",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Display Container Status",
+          "description": "Show status of all Ectropy containers",
+          "command": "docker ps --format 'table {{.Names}}\\t{{.Status}}\\t{{.Ports}}' --filter 'name=ectropy'",
+          "purpose": "Provide visual confirmation of all running services",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "Table showing all containers in Up state"
+        },
+        {
+          "step": "4.2",
+          "name": "Display Next Steps",
+          "description": "Show post-deployment instructions for database migration and Speckle setup",
+          "command": "Write-Host instructions for migration, Speckle user creation, environment updates, smoke tests, and access URLs",
+          "purpose": "Guide operator through required manual configuration steps",
+          "required": true,
+          "automatable": false,
+          "expectedOutput": "Formatted instructions for: migration script, Speckle admin setup, token configuration, smoke tests, application URLs"
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "healthChecks": [
+      {
+        "service": "postgres",
+        "endpoint": "tcp://localhost:5432",
+        "method": "GET",
+        "expectedStatus": 0,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "redis",
+        "endpoint": "tcp://localhost:6379",
+        "method": "GET",
+        "expectedStatus": 0,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "minio",
+        "endpoint": "http://localhost:9000/minio/health/live",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "speckle-server",
+        "endpoint": "http://localhost:3000/readiness",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "15s",
+        "critical": true
+      },
+      {
+        "service": "speckle-frontend",
+        "endpoint": "http://localhost:8080",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "api-gateway",
+        "endpoint": "http://localhost:4000/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "mcp-server",
+        "endpoint": "http://localhost:3001/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "web-dashboard",
+        "endpoint": "http://localhost:3000",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      }
+    ],
+    "smokeTests": [
+      {
+        "test": "Database Connectivity",
+        "endpoint": "pg_isready check",
+        "expectedBehavior": "PostgreSQL accepts connections",
+        "priority": "P0"
+      },
+      {
+        "test": "Speckle Database Exists",
+        "endpoint": "psql -l | grep speckle",
+        "expectedBehavior": "Speckle database present in listing",
+        "priority": "P0"
+      },
+      {
+        "test": "MinIO Storage Accessible",
+        "endpoint": "http://localhost:9000/minio/health/live",
+        "expectedBehavior": "Returns HTTP 200 OK",
+        "priority": "P0"
+      },
+      {
+        "test": "Speckle GraphQL API",
+        "endpoint": "http://localhost:3000/graphql",
+        "expectedBehavior": "GraphQL playground accessible",
+        "priority": "P0"
+      },
+      {
+        "test": "API Gateway Health",
+        "endpoint": "http://localhost:4000/health",
+        "expectedBehavior": "Returns health status JSON",
+        "priority": "P0"
+      }
+    ],
+    "performanceThresholds": [
+      {
+        "metric": "Container Startup Time",
+        "threshold": "< 2 minutes per service",
+        "measurement": "Time from 'docker compose up' to healthy state"
+      },
+      {
+        "metric": "Database Initialization",
+        "threshold": "< 60 seconds",
+        "measurement": "Time until pg_isready succeeds"
+      },
+      {
+        "metric": "Speckle Server Ready",
+        "threshold": "< 90 seconds",
+        "measurement": "Time until /readiness endpoint responds"
+      }
+    ]
+  },
+  "rollback": {
+    "supported": true,
+    "estimatedTime": "5 minutes",
+    "dataLossRisk": "minimal",
+    "triggerConditions": [
+      "Phase 1 core infrastructure fails to start",
+      "Database health checks timeout",
+      "Phase 2 Speckle services fail to initialize",
+      "Phase 3 application services cannot connect to dependencies",
+      "Critical health checks fail after deployment"
+    ],
+    "decisionMaker": "DevOps Engineer or Deployment Operator",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Stop All Running Containers",
+        "command": "docker-compose -f docker-compose.development.yml down",
+        "purpose": "Gracefully stop all services to prevent data corruption",
+        "required": true
+      },
+      {
+        "step": 2,
+        "name": "Preserve Database Volumes",
+        "command": "docker volume ls | Select-String ectropy",
+        "purpose": "Verify data volumes are intact for potential recovery",
+        "required": true
+      },
+      {
+        "step": 3,
+        "name": "Restore Previous Configuration",
+        "command": "git checkout HEAD~1 -- docker-compose.development.yml .env.local",
+        "purpose": "Revert to last known good compose and environment configuration",
+        "required": false
+      },
+      {
+        "step": 4,
+        "name": "Restart with Previous Configuration",
+        "command": "docker-compose -f docker-compose.development.yml up -d",
+        "purpose": "Attempt to restore service with previous configuration",
+        "required": false
+      },
+      {
+        "step": 5,
+        "name": "Verify Rollback Success",
+        "command": "docker ps --filter 'name=ectropy' --filter 'status=running'",
+        "purpose": "Confirm services are running after rollback",
+        "required": true
+      }
+    ],
+    "verification": {
+      "healthCheck": "Invoke-WebRequest http://localhost:4000/health",
+      "expectedStatus": 200,
+      "successCriteria": "All critical services (postgres, redis, api-gateway) are running and healthy"
+    }
+  },
+  "monitoring": {
+    "duration": "24 hours post-deployment",
+    "keyMetrics": [
+      {
+        "metric": "Container Health Status",
+        "threshold": "All containers must remain healthy",
+        "alertOn": "Any container enters unhealthy or restarting state",
+        "severity": "critical"
+      },
+      {
+        "metric": "Database Connection Pool",
+        "threshold": "< 80% pool utilization",
+        "alertOn": "Pool exhaustion or connection timeouts",
+        "severity": "warning"
+      },
+      {
+        "metric": "API Response Time",
+        "threshold": "< 500ms p95 latency",
+        "alertOn": "Response time degradation > 20%",
+        "severity": "warning"
+      },
+      {
+        "metric": "Speckle Upload Success Rate",
+        "threshold": "> 95% success rate",
+        "alertOn": "Upload failures or MinIO errors",
+        "severity": "critical"
+      }
+    ],
+    "dashboards": [
+      "Docker container health status",
+      "Application performance metrics",
+      "Database query performance",
+      "Speckle BIM platform usage"
+    ]
+  },
+  "successCriteria": [
+    {
+      "criterion": "All Phase 1 infrastructure services (postgres, redis) start and pass health checks",
+      "status": "REQUIRED",
+      "validation": "pg_isready and redis-cli ping both succeed"
+    },
+    {
+      "criterion": "Speckle database created and accessible",
+      "status": "REQUIRED",
+      "validation": "psql can connect to speckle database"
+    },
+    {
+      "criterion": "Phase 2 Speckle BIM platform services running (minio, speckle-server, speckle-frontend)",
+      "status": "REQUIRED",
+      "validation": "All health endpoints return HTTP 200"
+    },
+    {
+      "criterion": "Phase 3 Ectropy application services operational (api-gateway, mcp-server, web-dashboard)",
+      "status": "REQUIRED",
+      "validation": "All services respond to health checks within 60 seconds"
+    },
+    {
+      "criterion": "No error messages in container logs",
+      "status": "RECOMMENDED",
+      "validation": "docker compose logs shows no FATAL or ERROR messages"
+    },
+    {
+      "criterion": "Speckle frontend accessible at http://localhost:8080",
+      "status": "REQUIRED",
+      "validation": "HTTP 200 response from Speckle web UI"
+    },
+    {
+      "criterion": "Web dashboard accessible at http://localhost:3000",
+      "status": "REQUIRED",
+      "validation": "HTTP 200 response from Ectropy dashboard"
+    },
+    {
+      "criterion": "MinIO console accessible at http://localhost:9001",
+      "status": "RECOMMENDED",
+      "validation": "MinIO admin interface loads successfully"
+    }
+  ],
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "DATABASE_URL",
+        "description": "PostgreSQL connection string for Ectropy database",
+        "example": "postgresql://ectropy:password@localhost:5432/ectropy_dev",
+        "required": true,
+        "environment": "all",
+        "secret": true
+      },
+      {
+        "name": "SPECKLE_SERVER_URL",
+        "description": "Speckle GraphQL API endpoint URL",
+        "example": "http://localhost:3000",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "SPECKLE_SERVER_TOKEN",
+        "description": "Speckle Personal Access Token for API authentication",
+        "example": "spk_abc123...",
+        "required": true,
+        "environment": "all",
+        "secret": true,
+        "minimumLength": 32
+      },
+      {
+        "name": "MINIO_ROOT_USER",
+        "description": "MinIO admin username",
+        "example": "minioadmin",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "MINIO_ROOT_PASSWORD",
+        "description": "MinIO admin password",
+        "example": "minioadmin",
+        "required": true,
+        "environment": "all",
+        "secret": true,
+        "minimumLength": 8
+      },
+      {
+        "name": "REDIS_URL",
+        "description": "Redis connection string",
+        "example": "redis://localhost:6379",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "SESSION_SECRET",
+        "description": "Express session encryption secret",
+        "example": "your_secure_session_secret_min_32_chars",
+        "required": true,
+        "environment": "all",
+        "secret": true,
+        "minimumLength": 32
+      }
+    ]
+  },
+  "mcpIntegration": {
+    "queryableFields": [
+      "metadata.catalogId",
+      "metadata.purpose",
+      "phases[].name",
+      "phases[].steps[].name",
+      "phases[].steps[].command",
+      "successCriteria[].criterion",
+      "rollback.steps[].name"
+    ],
+    "supportedQueries": [
+      {
+        "query": "How do I deploy the Ectropy infrastructure?",
+        "returns": "Full deployment runbook with phased approach",
+        "purpose": "Guide operators through infrastructure deployment"
+      },
+      {
+        "query": "What services are deployed in Phase 1?",
+        "returns": "PostgreSQL, Redis, Speckle database creation",
+        "purpose": "Understand core infrastructure components"
+      },
+      {
+        "query": "How long does Speckle deployment take?",
+        "returns": "Phase 2: 7 minutes estimated",
+        "purpose": "Set deployment time expectations"
+      },
+      {
+        "query": "What health checks are performed?",
+        "returns": "8 service health checks including database, cache, BIM platform, and application layers",
+        "purpose": "Understand validation strategy"
+      },
+      {
+        "query": "How do I roll back a failed deployment?",
+        "returns": "5-step rollback procedure with container stop and configuration restore",
+        "purpose": "Recover from deployment failures"
+      },
+      {
+        "query": "What are the post-deployment next steps?",
+        "returns": "Phase 4: Database migration, Speckle admin user creation, environment token update, smoke tests",
+        "purpose": "Complete deployment configuration"
+      }
+    ],
+    "decisionSupport": [
+      "Use -SkipPreFlight only if you've manually verified all prerequisites",
+      "Use -CoreOnly to deploy just databases without Speckle or applications",
+      "Use -SpeckleOnly to deploy only Speckle stack (requires core infrastructure already running)",
+      "Use -Verbose for detailed logging during deployment",
+      "Monitor health check timeouts - increase if services need more startup time",
+      "Always run smoke tests after deployment before declaring success"
+    ],
+    "architectureAlignment": {
+      "routingConfig": "Deploys services matching routing-architecture.json port allocations",
+      "portAllocation": "Core infrastructure (5xxx, 6xxx), Speckle (3000, 8080, 9000), Apps (3xxx, 4xxx)",
+      "oauthConfig": "Speckle OAuth callbacks must be configured in .env.local after token creation"
+    }
+  },
+  "knownIssues": [
+    {
+      "id": "SPECKLE-INIT-001",
+      "title": "Speckle Server Slow Initialization",
+      "severity": "MEDIUM",
+      "impact": "First-time Speckle deployment can take 90+ seconds",
+      "mitigation": "Health check includes 60 second timeout with retry logic",
+      "action": "Monitor logs for migration progress: docker logs ectropy-speckle-server-1",
+      "priority": "P1"
+    },
+    {
+      "id": "TOKEN-CONFIG-002",
+      "title": "Speckle Token Must Be Manually Created",
+      "severity": "HIGH",
+      "impact": "API Gateway cannot connect to Speckle until token is configured",
+      "mitigation": "Post-deployment step guides token creation and environment update",
+      "action": "Follow Phase 4 instructions to create Speckle admin user and generate token",
+      "priority": "P0"
+    },
+    {
+      "id": "RESOURCE-003",
+      "title": "High Memory Usage During Initial Build",
+      "severity": "MEDIUM",
+      "impact": "Docker may consume 6-8GB RAM during image builds and startup",
+      "mitigation": "Pre-flight check validates available system resources",
+      "action": "Close unnecessary applications or increase Docker Desktop memory limit",
+      "priority": "P2"
+    },
+    {
+      "id": "PORT-CONFLICT-004",
+      "title": "Port 8080 Conflict with Speckle Frontend",
+      "severity": "HIGH",
+      "impact": "Deployment fails if port 8080 is already in use",
+      "mitigation": "Pre-flight check validates port availability",
+      "action": "Stop conflicting service or modify docker-compose.development.yml port mapping",
+      "priority": "P0"
+    }
+  ]
+}

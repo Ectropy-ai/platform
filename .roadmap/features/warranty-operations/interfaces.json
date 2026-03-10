@@ -1,0 +1,735 @@
+{
+  "$schema": "https://luhtech.dev/schemas/interfaces.schema.json",
+  "$id": "urn:luhtech:ectropy:interfaces:warranty-operations",
+  "schemaVersion": "3.0.0",
+  "meta": {
+    "ventureId": "ectropy",
+    "featureId": "warranty-operations",
+    "createdAt": "2026-01-16T00:15:00Z",
+    "lastUpdated": "2026-01-16T00:15:00Z",
+    "author": "erik",
+    "sourceDoc": ".roadmap/features/warranty-operations/interfaces.json"
+  },
+  "summary": "MCP tools for warranty management and building operations - 3 tools for warranty claims, decision archive search, and natural language building history queries",
+  "mcpTools": {
+    "totalCount": 3,
+    "categories": [
+      {
+        "name": "Warranty Management",
+        "tools": [
+          {
+            "name": "create_warranty_claim_tool",
+            "description": "Create a warranty claim with automatic vendor notification and decision traceability",
+            "authorityRequired": 1,
+            "input": {
+              "warrantyUrn": {
+                "type": "urn",
+                "required": true,
+                "description": "Reference to warranty record"
+              },
+              "projectId": {
+                "type": "string",
+                "required": true,
+                "description": "Project identifier (for building identification)"
+              },
+              "claimType": {
+                "type": "enum",
+                "values": ["DEFECT", "FAILURE", "PERFORMANCE", "MAINTENANCE"],
+                "required": true,
+                "description": "Type of warranty claim"
+              },
+              "description": {
+                "type": "string",
+                "required": true,
+                "minLength": 20,
+                "description": "Detailed description of the issue"
+              },
+              "severity": {
+                "type": "enum",
+                "values": ["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+                "required": true,
+                "description": "Severity of the issue"
+              },
+              "discoveredAt": {
+                "type": "datetime",
+                "required": true,
+                "description": "When issue was discovered"
+              },
+              "discoveredBy": {
+                "type": "urn",
+                "required": true,
+                "description": "Person who discovered the issue"
+              },
+              "voxelUrns": {
+                "type": "array",
+                "items": "urn",
+                "description": "Voxel locations affected"
+              },
+              "relatedDecisionUrns": {
+                "type": "array",
+                "items": "urn",
+                "description": "PM decisions that may be related to issue"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "enum",
+                      "values": ["PHOTO", "VIDEO", "DOCUMENT", "MEASUREMENT"]
+                    },
+                    "uri": { "type": "string", "format": "uri" },
+                    "description": { "type": "string" },
+                    "timestamp": { "type": "datetime" }
+                  }
+                },
+                "description": "Evidence documenting the issue"
+              },
+              "requestedResolution": {
+                "type": "enum",
+                "values": ["REPAIR", "REPLACE", "CREDIT", "SERVICE_VISIT"],
+                "description": "Requested resolution type"
+              },
+              "urgentResponse": {
+                "type": "boolean",
+                "default": false,
+                "description": "Request urgent vendor response"
+              },
+              "notifyVendor": {
+                "type": "boolean",
+                "default": true,
+                "description": "Auto-notify vendor of claim"
+              }
+            },
+            "output": {
+              "warrantyClaim": {
+                "type": "WarrantyClaim",
+                "description": "Created warranty claim"
+              },
+              "claimUrn": {
+                "type": "urn"
+              },
+              "warrantyStatus": {
+                "type": "object",
+                "properties": {
+                  "isActive": { "type": "boolean" },
+                  "daysRemaining": { "type": "integer" },
+                  "expirationDate": { "type": "date" }
+                }
+              },
+              "relatedHistory": {
+                "type": "object",
+                "properties": {
+                  "installationDate": { "type": "date" },
+                  "commissioningDate": { "type": "date" },
+                  "relatedDecisions": {
+                    "type": "array",
+                    "items": "PMDecisionSummary"
+                  },
+                  "previousClaims": {
+                    "type": "array",
+                    "items": "WarrantyClaimSummary"
+                  }
+                }
+              },
+              "vendorNotification": {
+                "type": "object",
+                "properties": {
+                  "sent": { "type": "boolean" },
+                  "method": { "type": "string" },
+                  "vendorContact": { "type": "string" },
+                  "expectedResponseTime": { "type": "string" }
+                }
+              },
+              "documentsAttached": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "documentType": { "type": "string" },
+                    "documentName": { "type": "string" },
+                    "attachedAutomatically": { "type": "boolean" }
+                  }
+                },
+                "description": "Auto-attached relevant documents (O&M manual, commissioning report)"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "name": "Building History & Archive",
+        "tools": [
+          {
+            "name": "search_decision_archive_tool",
+            "description": "Search the decision archive with filters for time, space, category, and participants",
+            "authorityRequired": 0,
+            "input": {
+              "projectId": {
+                "type": "string",
+                "required": true,
+                "description": "Project/building identifier"
+              },
+              "query": {
+                "type": "string",
+                "description": "Full-text search query"
+              },
+              "filters": {
+                "type": "object",
+                "properties": {
+                  "voxelUrns": {
+                    "type": "array",
+                    "items": "urn",
+                    "description": "Filter by spatial location"
+                  },
+                  "building": {
+                    "type": "string",
+                    "description": "Building identifier"
+                  },
+                  "level": {
+                    "type": "string",
+                    "description": "Floor/level"
+                  },
+                  "zone": {
+                    "type": "string",
+                    "description": "Zone identifier"
+                  },
+                  "decisionTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "enum",
+                      "values": [
+                        "APPROVAL",
+                        "REJECTION",
+                        "DEFERRAL",
+                        "ESCALATION",
+                        "PROPOSAL"
+                      ]
+                    }
+                  },
+                  "categories": {
+                    "type": "array",
+                    "items": "string",
+                    "description": "Decision categories (e.g., HVAC, Structural)"
+                  },
+                  "trades": {
+                    "type": "array",
+                    "items": "string",
+                    "description": "Affected trades"
+                  },
+                  "participantUrns": {
+                    "type": "array",
+                    "items": "urn",
+                    "description": "Decisions involving these participants"
+                  },
+                  "dateRange": {
+                    "type": "object",
+                    "properties": {
+                      "start": { "type": "date" },
+                      "end": { "type": "date" }
+                    }
+                  },
+                  "budgetImpactRange": {
+                    "type": "object",
+                    "properties": {
+                      "min": { "type": "number" },
+                      "max": { "type": "number" }
+                    }
+                  },
+                  "hasConsequences": {
+                    "type": "boolean",
+                    "description": "Only decisions with recorded consequences"
+                  }
+                }
+              },
+              "includeRelated": {
+                "type": "boolean",
+                "default": true,
+                "description": "Include related decisions via graph traversal"
+              },
+              "maxResults": {
+                "type": "integer",
+                "default": 20,
+                "description": "Maximum results to return"
+              },
+              "sortBy": {
+                "type": "enum",
+                "values": [
+                  "RELEVANCE",
+                  "DATE_ASC",
+                  "DATE_DESC",
+                  "BUDGET_IMPACT"
+                ],
+                "default": "RELEVANCE"
+              }
+            },
+            "output": {
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "decisionUrn": { "type": "urn" },
+                    "title": { "type": "string" },
+                    "description": { "type": "string" },
+                    "type": { "type": "string" },
+                    "status": { "type": "string" },
+                    "date": { "type": "datetime" },
+                    "approvedBy": { "type": "string" },
+                    "location": {
+                      "type": "object",
+                      "properties": {
+                        "voxelUrn": { "type": "urn" },
+                        "building": { "type": "string" },
+                        "level": { "type": "string" },
+                        "zone": { "type": "string" }
+                      }
+                    },
+                    "budgetImpact": { "type": "number" },
+                    "scheduleImpact": { "type": "number" },
+                    "relevanceScore": { "type": "number" },
+                    "snippet": {
+                      "type": "string",
+                      "description": "Highlighted text snippet"
+                    }
+                  }
+                }
+              },
+              "totalResults": {
+                "type": "integer"
+              },
+              "facets": {
+                "type": "object",
+                "properties": {
+                  "byType": { "type": "object" },
+                  "byCategory": { "type": "object" },
+                  "byTrade": { "type": "object" },
+                  "byLevel": { "type": "object" },
+                  "byYear": { "type": "object" }
+                }
+              },
+              "relatedDecisions": {
+                "type": "array",
+                "items": "urn",
+                "description": "Related decisions found via graph traversal"
+              },
+              "suggestedFilters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "filterType": { "type": "string" },
+                    "value": { "type": "string" },
+                    "count": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "query_building_history_tool",
+            "description": "Natural language query interface for facility managers to ask questions about building history",
+            "authorityRequired": 0,
+            "input": {
+              "projectId": {
+                "type": "string",
+                "required": true,
+                "description": "Project/building identifier"
+              },
+              "question": {
+                "type": "string",
+                "required": true,
+                "description": "Natural language question about building history"
+              },
+              "context": {
+                "type": "object",
+                "properties": {
+                  "currentLocation": {
+                    "type": "object",
+                    "properties": {
+                      "building": { "type": "string" },
+                      "level": { "type": "string" },
+                      "room": { "type": "string" }
+                    },
+                    "description": "Facility manager's current location for context"
+                  },
+                  "equipmentTag": {
+                    "type": "string",
+                    "description": "Equipment tag if asking about specific equipment"
+                  },
+                  "previousQuestions": {
+                    "type": "array",
+                    "items": "string",
+                    "description": "Previous questions in conversation for context"
+                  }
+                }
+              },
+              "responseFormat": {
+                "type": "enum",
+                "values": ["CONVERSATIONAL", "DETAILED", "SUMMARY", "TIMELINE"],
+                "default": "CONVERSATIONAL",
+                "description": "Desired response format"
+              },
+              "includeDocumentLinks": {
+                "type": "boolean",
+                "default": true,
+                "description": "Include links to relevant documents"
+              },
+              "includeContactInfo": {
+                "type": "boolean",
+                "default": true,
+                "description": "Include vendor/contractor contact if relevant"
+              }
+            },
+            "output": {
+              "answer": {
+                "type": "string",
+                "description": "Natural language answer to the question"
+              },
+              "confidence": {
+                "type": "number",
+                "min": 0,
+                "max": 1,
+                "description": "Confidence in the answer"
+              },
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "enum",
+                      "values": [
+                        "DECISION",
+                        "COMMISSIONING",
+                        "WARRANTY",
+                        "DOCUMENT",
+                        "EQUIPMENT"
+                      ]
+                    },
+                    "urn": { "type": "urn" },
+                    "title": { "type": "string" },
+                    "date": { "type": "datetime" },
+                    "relevance": { "type": "number" }
+                  }
+                },
+                "description": "Sources used to generate answer"
+              },
+              "relatedDecisions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "decisionUrn": { "type": "urn" },
+                    "title": { "type": "string" },
+                    "date": { "type": "datetime" },
+                    "summary": { "type": "string" }
+                  }
+                },
+                "description": "Related PM decisions"
+              },
+              "documents": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "documentType": { "type": "string" },
+                    "title": { "type": "string" },
+                    "url": { "type": "string", "format": "uri" }
+                  }
+                },
+                "description": "Relevant documents"
+              },
+              "contacts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": { "type": "string" },
+                    "name": { "type": "string" },
+                    "company": { "type": "string" },
+                    "phone": { "type": "string" },
+                    "email": { "type": "string" }
+                  }
+                },
+                "description": "Relevant vendor/contractor contacts"
+              },
+              "followUpQuestions": {
+                "type": "array",
+                "items": "string",
+                "description": "Suggested follow-up questions"
+              },
+              "visualizations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "enum",
+                      "values": [
+                        "TIMELINE",
+                        "VOXEL_MAP",
+                        "DECISION_GRAPH",
+                        "COST_CHART"
+                      ]
+                    },
+                    "title": { "type": "string" },
+                    "data": { "type": "object" }
+                  }
+                },
+                "description": "Visual representations of the answer"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "restApi": {
+    "baseUrl": "/api/warranty",
+    "endpoints": [
+      {
+        "method": "GET",
+        "path": "/projects/:projectId/warranties",
+        "description": "List warranties for project/building",
+        "authorityRequired": 0,
+        "queryParams": ["type", "status", "expiring_within_days"]
+      },
+      {
+        "method": "GET",
+        "path": "/warranties/:urn",
+        "description": "Get warranty by URN",
+        "authorityRequired": 0
+      },
+      {
+        "method": "POST",
+        "path": "/claims",
+        "description": "Create warranty claim",
+        "authorityRequired": 1,
+        "requestBody": "CreateWarrantyClaimRequest",
+        "response": "WarrantyClaimResponse"
+      },
+      {
+        "method": "GET",
+        "path": "/claims/:urn",
+        "description": "Get claim by URN",
+        "authorityRequired": 0
+      },
+      {
+        "method": "PUT",
+        "path": "/claims/:urn",
+        "description": "Update claim status",
+        "authorityRequired": 1
+      },
+      {
+        "method": "POST",
+        "path": "/claims/:urn/resolution",
+        "description": "Record claim resolution",
+        "authorityRequired": 2
+      },
+      {
+        "method": "GET",
+        "path": "/projects/:projectId/claims",
+        "description": "List claims for project",
+        "authorityRequired": 0
+      },
+      {
+        "method": "GET",
+        "path": "/projects/:projectId/archive/search",
+        "description": "Search decision archive",
+        "authorityRequired": 0,
+        "requestBody": "ArchiveSearchRequest",
+        "response": "ArchiveSearchResponse"
+      },
+      {
+        "method": "POST",
+        "path": "/projects/:projectId/history/query",
+        "description": "Natural language building history query",
+        "authorityRequired": 0,
+        "requestBody": "BuildingHistoryQueryRequest",
+        "response": "BuildingHistoryQueryResponse"
+      },
+      {
+        "method": "GET",
+        "path": "/projects/:projectId/history/timeline",
+        "description": "Get decision timeline for location",
+        "authorityRequired": 0,
+        "queryParams": [
+          "voxel",
+          "building",
+          "level",
+          "zone",
+          "start_date",
+          "end_date"
+        ]
+      },
+      {
+        "method": "GET",
+        "path": "/projects/:projectId/expiring-warranties",
+        "description": "Get warranties expiring soon",
+        "authorityRequired": 0,
+        "queryParams": ["days"]
+      }
+    ]
+  },
+  "cmmsIntegration": {
+    "description": "Export capabilities for CMMS systems",
+    "supportedSystems": [
+      "Maximo",
+      "Fiix",
+      "UpKeep",
+      "Limble",
+      "Custom Webhook"
+    ],
+    "exportFormats": ["JSON", "CSV", "XML"],
+    "dataTypes": [
+      {
+        "type": "equipment",
+        "fields": [
+          "tag",
+          "description",
+          "location",
+          "manufacturer",
+          "model",
+          "serial",
+          "install_date",
+          "warranty_expiration"
+        ]
+      },
+      {
+        "type": "pm_schedule",
+        "fields": [
+          "equipment_tag",
+          "task",
+          "frequency",
+          "last_completed",
+          "next_due",
+          "procedure_reference"
+        ]
+      },
+      {
+        "type": "warranty",
+        "fields": [
+          "item",
+          "vendor",
+          "start_date",
+          "end_date",
+          "contact",
+          "coverage"
+        ]
+      },
+      {
+        "type": "decision_summary",
+        "fields": [
+          "location",
+          "date",
+          "type",
+          "description",
+          "approved_by",
+          "related_equipment"
+        ]
+      }
+    ],
+    "webhookEvents": [
+      "warranty.expiring",
+      "warranty.expired",
+      "claim.created",
+      "claim.resolved"
+    ]
+  },
+  "webhooks": [
+    {
+      "event": "warranty.expiring_soon",
+      "description": "Fired when warranty approaching expiration",
+      "payload": "WarrantyExpirationEvent",
+      "triggers": ["30_days", "7_days", "1_day"]
+    },
+    {
+      "event": "warranty.expired",
+      "description": "Fired when warranty expires",
+      "payload": "WarrantyExpiredEvent"
+    },
+    {
+      "event": "claim.created",
+      "description": "Fired when warranty claim is created",
+      "payload": "ClaimEvent"
+    },
+    {
+      "event": "claim.vendor_notified",
+      "description": "Fired when vendor is notified of claim",
+      "payload": "ClaimNotificationEvent"
+    },
+    {
+      "event": "claim.vendor_response",
+      "description": "Fired when vendor responds to claim",
+      "payload": "ClaimResponseEvent"
+    },
+    {
+      "event": "claim.resolved",
+      "description": "Fired when claim is resolved",
+      "payload": "ClaimResolutionEvent"
+    },
+    {
+      "event": "archive.indexed",
+      "description": "Fired when new decisions are indexed for search",
+      "payload": "ArchiveIndexEvent"
+    }
+  ],
+  "errorCodes": [
+    {
+      "code": "WARRANTY_NOT_FOUND",
+      "httpStatus": 404,
+      "description": "Warranty URN does not exist"
+    },
+    {
+      "code": "WARRANTY_EXPIRED",
+      "httpStatus": 400,
+      "description": "Cannot create claim for expired warranty"
+    },
+    {
+      "code": "CLAIM_NOT_FOUND",
+      "httpStatus": 404,
+      "description": "Warranty claim URN does not exist"
+    },
+    {
+      "code": "INSUFFICIENT_AUTHORITY",
+      "httpStatus": 403,
+      "description": "Authority level too low for operation"
+    },
+    {
+      "code": "PROJECT_NOT_FOUND",
+      "httpStatus": 404,
+      "description": "Project/building identifier not found"
+    },
+    {
+      "code": "ARCHIVE_SEARCH_FAILED",
+      "httpStatus": 500,
+      "description": "Decision archive search failed"
+    },
+    {
+      "code": "QUERY_TOO_VAGUE",
+      "httpStatus": 400,
+      "description": "Natural language query too vague to answer"
+    },
+    {
+      "code": "NO_RESULTS_FOUND",
+      "httpStatus": 404,
+      "description": "No matching results in decision archive"
+    },
+    {
+      "code": "CMMS_EXPORT_FAILED",
+      "httpStatus": 500,
+      "description": "Failed to export to CMMS"
+    },
+    {
+      "code": "VENDOR_NOTIFICATION_FAILED",
+      "httpStatus": 500,
+      "description": "Failed to notify vendor"
+    }
+  ],
+  "graphMetadata": {
+    "inEdges": ["urn:luhtech:ectropy:feature:warranty-operations"],
+    "outEdges": []
+  }
+}

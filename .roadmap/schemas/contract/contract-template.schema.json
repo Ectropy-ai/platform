@@ -1,0 +1,226 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:contract-template",
+  "title": "Contract Template Schema",
+  "description": "Template for parsing specific contract types with extraction rules and authority mapping",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "templateId",
+    "contractFamily",
+    "contractType",
+    "extractionRules",
+    "authorityMapping",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:contract-template:TPL-[A-Z0-9-]+$",
+      "description": "URN identifier for this contract template"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:contract-template"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "templateId": {
+      "type": "string",
+      "pattern": "^TPL-[A-Z0-9-]+$",
+      "description": "Template identifier (e.g., TPL-AIA-C191-2009)"
+    },
+    "contractFamily": {
+      "type": "string",
+      "enum": ["AIA", "ConsensusDOCS", "CCDC", "FIDIC", "NEC", "Custom"]
+    },
+    "contractType": {
+      "type": "string",
+      "enum": [
+        "IPD-MultiParty",
+        "IPD-SPE",
+        "GMP",
+        "StipulatedSum",
+        "CostPlus",
+        "DesignBuild",
+        "CMAR"
+      ]
+    },
+    "contractNumber": {
+      "type": "string",
+      "description": "Specific contract document number (e.g., C191-2009)"
+    },
+    "deliveryMethod": {
+      "type": "string",
+      "enum": ["IPD", "DBB", "DB", "CMAR", "CMAdvisor", "Alliance"]
+    },
+    "documentStructure": {
+      "type": "object",
+      "description": "Expected document structure for parsing",
+      "properties": {
+        "hasExhibits": { "type": "boolean" },
+        "exhibitTypes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "articleStructure": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "articleNumber": { "type": "string" },
+              "title": { "type": "string" },
+              "contentType": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "extractionRules": {
+      "type": "object",
+      "description": "Rules for extracting data from contract documents",
+      "properties": {
+        "parties": {
+          "$ref": "#/$defs/extractionRule"
+        },
+        "projectIdentification": {
+          "$ref": "#/$defs/extractionRule"
+        },
+        "financialTerms": {
+          "$ref": "#/$defs/extractionRule"
+        },
+        "governanceStructure": {
+          "$ref": "#/$defs/extractionRule"
+        },
+        "decisionThresholds": {
+          "$ref": "#/$defs/extractionRule"
+        },
+        "keyDates": {
+          "$ref": "#/$defs/extractionRule"
+        },
+        "disputeResolution": {
+          "$ref": "#/$defs/extractionRule"
+        },
+        "insuranceRequirements": {
+          "$ref": "#/$defs/extractionRule"
+        }
+      }
+    },
+    "authorityMapping": {
+      "type": "object",
+      "description": "Maps contract-specific roles to 7-tier authority cascade",
+      "properties": {
+        "defaultMappings": {
+          "type": "object",
+          "properties": {
+            "fieldWorker": { "type": "integer", "minimum": 0, "maximum": 6 },
+            "foreman": { "type": "integer", "minimum": 0, "maximum": 6 },
+            "superintendent": { "type": "integer", "minimum": 0, "maximum": 6 },
+            "projectManager": { "type": "integer", "minimum": 0, "maximum": 6 },
+            "architect": { "type": "integer", "minimum": 0, "maximum": 6 },
+            "owner": { "type": "integer", "minimum": 0, "maximum": 6 },
+            "regulatory": { "type": "integer", "minimum": 0, "maximum": 6 }
+          }
+        },
+        "ipdMappings": {
+          "type": "object",
+          "description": "IPD-specific authority mappings",
+          "properties": {
+            "pmtLevel": { "type": "integer" },
+            "petLevel": { "type": "integer" },
+            "escalationFromPMTToPET": { "type": "boolean" }
+          }
+        },
+        "thresholdMappings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "thresholdType": {
+                "type": "string",
+                "enum": ["budget", "schedule", "safety", "design"]
+              },
+              "thresholdValue": { "type": "number" },
+              "requiredLevel": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    "validationRules": {
+      "type": "array",
+      "description": "Post-extraction validation rules",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string" },
+          "rule": { "type": "string" },
+          "errorMessage": { "type": "string" }
+        }
+      }
+    },
+    "aiPromptHints": {
+      "type": "object",
+      "description": "Hints for AI-assisted extraction",
+      "properties": {
+        "partyIdentification": { "type": "string" },
+        "financialExtraction": { "type": "string" },
+        "governanceExtraction": { "type": "string" }
+      }
+    },
+    "supportedVersions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Contract version years this template supports"
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    },
+    "extractionRule": {
+      "type": "object",
+      "properties": {
+        "articleReference": {
+          "type": "string",
+          "description": "Article/section where this data typically appears"
+        },
+        "regexPatterns": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "aiExtractionPrompt": { "type": "string" },
+        "requiredFields": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "optionalFields": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "defaultValues": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

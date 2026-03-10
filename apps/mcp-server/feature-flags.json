@@ -1,0 +1,48 @@
+{
+  "mcp": {
+    "enabled": true,
+    "version": "1.0.0-alpha",
+    "description": "Model Context Protocol Server - Strategic AI Agent Integration",
+    "environments": ["development", "staging", "production"],
+    "agents": [
+      "dev-*",
+      "compliance",
+      "performance",
+      "procurement",
+      "ci-resolver",
+      "build-optimizer",
+      "error-analyzer",
+      "workflow-enhancer"
+    ],
+    "bypass_ci": true,
+    "alpha_phase": true,
+    "operational_features": {
+      "ci_integration": {
+        "enabled": true,
+        "auto_pr_fixes": true,
+        "build_error_analysis": true,
+        "workflow_optimization": true
+      },
+      "deployment_gates": {
+        "enabled": true,
+        "health_checks": true,
+        "readiness_validation": true,
+        "rollback_automation": false
+      },
+      "monitoring": {
+        "enabled": true,
+        "metrics_collection": true,
+        "health_endpoints": true,
+        "alert_integration": false
+      }
+    },
+    "updated": "2025-09-09T21:00:00.000Z"
+  },
+  "agent_mcp_integration": true,
+  "mcp_health_monitoring": true,
+  "mcp_metrics_collection": true,
+  "mcp_auto_recovery": true,
+  "mcp_rate_limiting": true,
+  "mcp_security_enhanced": true,
+  "mcp_operational_ready": true
+}

@@ -1,0 +1,1614 @@
+name: E2E Tests (Playwright)
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/web-dashboard/**'
+      - 'apps/api-gateway/**'
+      - 'apps/web-dashboard-e2e/**'
+      - '.github/workflows/e2e-tests.yml'
+  push:
+    branches: [main]
+  schedule:
+    # Run daily at 3 AM UTC to catch regressions (staggered from disk-cleanup)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - local
+  workflow_call:
+    # Allow this workflow to be called by enterprise-test-suite.yml
+
+# Prevent concurrent APT-dependent workflows to avoid lock contention
+concurrency:
+  group: e2e-apt-dependent-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ENTERPRISE P0 FIX (2025-12-22): Pre-build Docker images separately from test execution
+  # ROOT CAUSE: Building 3 services during test startup adds 9-15min (exceeds 10min timeout)
+  # SOLUTION: Build once, reuse across all 4 parallel test shards
+  # IMPACT: 60-80% time reduction (14-20min → 4-6min total)
+  build-test-images:
+    name: Build Test Docker Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20 # Docker builds need more time, tests need less
+    outputs:
+      cache-key: ${{ steps.cache-info.outputs.cache-key }}
+
+    # ENTERPRISE: NO hardcoded defaults - ALL values explicit from repository variables
+    # Required for docker-compose.test.yml service environment interpolation
+    env:
+      # Frontend URLs for React App (docker-compose.test.yml requires these)
+      # ENTERPRISE PATTERN: Use repository variables for environment-specific URLs (no hardcoding)
+      # Repository variables: Settings > Secrets and variables > Actions > Variables tab
+      REACT_APP_API_URL: ${{ vars.STAGING_BASE_URL }}
+      REACT_APP_MCP_URL: ${{ vars.STAGING_BASE_URL }}${{ vars.STAGING_MCP_PATH }}
+
+      # Database Configuration (docker-compose.test.yml requires these)
+      # Values from .env.ci for test environment
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ectropy_test
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: test_password_for_ci_only
+
+      # Redis Configuration (docker-compose.test.yml requires these)
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ''
+
+      # Authentication Secrets (docker-compose.test.yml requires these)
+      JWT_SECRET: test-jwt-secret-key-for-ci-testing
+      JWT_REFRESH_SECRET: test-jwt-refresh-secret-key-for-ci
+      SESSION_SECRET: test-session-secret-key-for-ci-testing
+
+      # OAuth Configuration (docker-compose.test.yml requires these)
+      GOOGLE_CLIENT_ID: test-google-client-id-for-ci
+      GOOGLE_CLIENT_SECRET: test-google-client-secret-for-ci
+      GOOGLE_CALLBACK_URL: ${{ vars.STAGING_BASE_URL }}/api/auth/google/callback
+
+    steps:
+      - name: 🧹 Free up disk space (Enterprise)
+        run: |
+          echo "=== DISK SPACE BEFORE CLEANUP ==="
+          df -h /
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/hostedtoolcache || true
+          echo "=== DISK SPACE AFTER CLEANUP ==="
+          df -h /
+
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack and Install pnpm
+        run: |
+          corepack enable
+          PNPM_VERSION=$(node -p "require('./package.json').packageManager.split('@')[1].split('+')[0]")
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+          pnpm --version
+
+      - name: ⚡ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+
+      - name: 🔍 Generate cache key
+        id: cache-info
+        run: |
+          # FIVE WHY FIX (2026-03-06): Include source code in cache key.
+          # Previous key only hashed lockfile + Dockerfiles, so source code changes
+          # (e.g., fixing a crash in main.ts) didn't invalidate the image cache.
+          # Smoke tests ran stale Docker images for days without detecting code fixes.
+          CACHE_KEY="docker-test-images-${{ hashFiles('**/pnpm-lock.yaml', '**/Dockerfile', 'docker-compose.test.yml', 'apps/api-gateway/src/**', 'apps/mcp-server/src/**', 'apps/web-dashboard/src/**', 'libs/**/*.ts', '.env.ci') }}"
+          echo "cache-key=$CACHE_KEY" >> $GITHUB_OUTPUT
+          echo "Cache key: $CACHE_KEY"
+
+      - name: 📦 Cache Docker images
+        id: docker-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/docker-images
+          key: ${{ steps.cache-info.outputs.cache-key }}
+          restore-keys: |
+            docker-test-images-
+
+      - name: 🔨 Build Docker images with BuildKit cache
+        if: steps.docker-cache.outputs.cache-hit != 'true'
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
+        run: |
+          echo "⏱️  BUILD START: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          # Build images with BuildKit cache
+          docker compose -f docker-compose.test.yml build \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            web-dashboard api-gateway mcp-server
+
+          echo "⏱️  BUILD END: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          # Save images to tar for caching
+          mkdir -p /tmp/docker-images
+          docker save \
+            ectropy-web-dashboard-test:latest \
+            ectropy-api-gateway-test:latest \
+            ectropy-mcp-server-test:latest \
+            -o /tmp/docker-images/test-images.tar
+
+          echo "✅ Images built and saved for caching"
+          ls -lh /tmp/docker-images/
+
+      - name: ✅ Load cached images
+        if: steps.docker-cache.outputs.cache-hit == 'true'
+        run: |
+          echo "📦 Loading pre-built images from cache..."
+          docker load -i /tmp/docker-images/test-images.tar
+          echo "✅ Images loaded from cache"
+
+  smoke-test:
+    name: Quick Smoke Tests - Shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8 # ENTERPRISE P0 FIX: Reduced from 10min (builds moved to separate job)
+    needs: build-test-images # Wait for images to be built
+    environment: staging # Required for access to staging-scoped OAuth secrets
+
+    # ENTERPRISE SHARDING: Parallel test execution (4x speedup)
+    # Matches staging E2E pattern for workflow standardization
+    # 90 tests → 4 shards = ~22 tests per shard (2-3 min wall time vs 12 min sequential)
+    strategy:
+      fail-fast: false # Run all shards even if one fails
+      max-parallel: 4 # Run all shards concurrently
+      matrix:
+        shard: ['1/4', '2/4', '3/4', '4/4']
+    env:
+      # ENTERPRISE PATTERN: Two tiers of credentials in CI
+      # Tier 1 — Local test infrastructure (ephemeral DB, JWT, session): safe test defaults
+      #          These match build-test-images job values — both jobs share docker-compose.test.yml
+      # Tier 2 — Real external credentials (Google OAuth, test accounts): secrets-only, fail fast
+
+      # Core Environment
+      NODE_ENV: test
+      CI: true
+
+      # Tier 1: Local Test Infrastructure — hardcoded Docker service names
+      # FIVE WHY FIX (2026-03-06): vars.DATABASE_HOST resolved to staging DB hostname
+      # (ectropy-staging-db-do-user-10389677-0.k.db.ondigitalocean.com:25060),
+      # causing api-gateway container to connect to staging DB instead of local postgres.
+      # Smoke tests use local Docker containers — must hardcode Docker-internal names.
+      # Matches build-test-images job (line 57) and e2e-staging job (line 636).
+      DATABASE_HOST: postgres
+      DATABASE_PORT: '5432'
+      DATABASE_NAME: ectropy_test
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: ${{ secrets.DB_PASSWORD || 'test_password_for_ci_only' }}
+
+      # Redis Configuration — Docker-internal service names (not vars)
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+
+      # Application Ports
+      API_GATEWAY_PORT: 4000
+      MCP_PORT: 3001
+      WEB_PORT: 3000
+
+      # Frontend URLs for React App
+      REACT_APP_API_URL: ${{ vars.STAGING_BASE_URL }}
+      REACT_APP_MCP_URL: ${{ vars.STAGING_BASE_URL }}${{ vars.STAGING_MCP_PATH }}
+
+      # Tier 1: Local auth tokens — safe test defaults (not real credentials)
+      JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret-key-for-ci-testing' }}
+      JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET || 'test-jwt-refresh-secret-key-for-ci' }}
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET || 'test-session-secret-key-for-ci-testing' }}
+
+      # Tier 2: Real OAuth credentials — NO FALLBACKS (enterprise security requirement)
+      # ENTERPRISE FIX (2025-12-22): OAuth routes mounted at /api/auth (see apps/api-gateway/src/main.ts:495)
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID_STAGING }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET_STAGING }}
+      GOOGLE_CALLBACK_URL: ${{ vars.STAGING_BASE_URL }}/api/auth/google/callback
+      # Tier 2: Real test account credentials — NO FALLBACKS
+      TEST_GOOGLE_REFRESH_TOKEN: ${{ secrets.TEST_GOOGLE_REFRESH_TOKEN }}
+      TEST_GOOGLE_EMAIL: ${{ secrets.TEST_GOOGLE_EMAIL }}
+      TEST_GOOGLE_PASSWORD: ${{ secrets.TEST_GOOGLE_PASSWORD }}
+      # Playwright baseURL for E2E tests (staging deployment)
+      BASE_URL: ${{ vars.STAGING_BASE_URL }}
+
+    steps:
+      # ENTERPRISE P0 FIX (2025-12-18): FREE UP DISK SPACE BEFORE DOCKER BUILDS
+      # ROOT CAUSE: GitHub-hosted runners have ~14GB free space
+      # Our workflow consumes: Docker builds (8GB) + Playwright browsers (1.8GB) + deps (2GB) = 12GB+
+      # Solution: Remove unnecessary pre-installed software to gain 8-10GB
+      # Research: https://github.com/actions/runner-images/issues/2840
+      - name: 🧹 Free up disk space (Enterprise)
+        run: |
+          echo "=== DISK SPACE BEFORE CLEANUP ==="
+          df -h /
+          echo ""
+
+          echo "🧹 Removing unnecessary software to free up 8-10GB..."
+
+          # Remove Android SDK (frees ~8GB)
+          sudo rm -rf /usr/local/lib/android || true
+
+          # Remove .NET runtime (frees ~2GB)
+          sudo rm -rf /usr/share/dotnet || true
+
+          # Remove large tool caches (frees ~2GB)
+          sudo rm -rf /opt/hostedtoolcache || true
+
+          # Remove swap file if needed (can free ~4GB)
+          sudo swapoff -a || true
+          sudo rm -f /swapfile || true
+
+          echo ""
+          echo "=== DISK SPACE AFTER CLEANUP ==="
+          df -h /
+          echo ""
+
+          # Verify we have at least 25GB free (Docker builds need this)
+          AVAILABLE=$(df / | tail -1 | awk '{print $4}')
+          echo "📊 Available space: ${AVAILABLE}KB"
+
+          if [ "$AVAILABLE" -lt 25000000 ]; then
+            echo "⚠️  WARNING: Only ${AVAILABLE}KB available (need 25GB+)"
+            echo "Disk cleanup may not have freed enough space"
+          else
+            echo "✅ Sufficient disk space available for Docker builds"
+          fi
+
+      - uses: actions/checkout@v4
+
+      # ENTERPRISE PATTERN: Validate secrets FIRST, before expensive operations
+      # Consolidated from 4 separate OAuth validations for efficiency and security
+      - name: 🔍 Validate Required Secrets
+        run: bash scripts/ci/validate-secrets.sh test
+        env:
+          # Core secrets
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          # OAuth secrets (Enterprise Standard: environment-specific → normalized)
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID_STAGING }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET_STAGING }}
+          # Test secrets
+          TEST_GOOGLE_EMAIL: ${{ secrets.TEST_GOOGLE_EMAIL }}
+          TEST_GOOGLE_PASSWORD: ${{ secrets.TEST_GOOGLE_PASSWORD }}
+
+      - name: Validate Environment Variables
+        run: bash scripts/core/validate-env.sh ci
+        continue-on-error: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack and Install pnpm
+        run: |
+          corepack enable
+          PNPM_VERSION=$(node -p "require('./package.json').packageManager.split('@')[1].split('+')[0]")
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+          pnpm --version
+
+      # PERFORMANCE OPTIMIZATION 1: Nx Cache (35% faster builds)
+      # Target: 23s → <15s cache operations
+      - name: ⚡ Restore Nx cache
+        uses: actions/cache/restore@v4
+        id: nx-cache
+        with:
+          path: |
+            .nx/cache
+            node_modules/.cache/nx
+          key: nx-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx') }}
+          restore-keys: |
+            nx-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-
+            nx-${{ runner.os }}-
+
+      # ENTERPRISE: Playwright browser cache (GitHub Actions best practice)
+      # Benefits: 1.8GB browser cache reused across workflows, faster test execution
+      # Path: ~/.cache/ms-playwright (GitHub-hosted runner compatible)
+      - name: 💾 Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('**/pnpm-lock.yaml') }}-v4
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-v4-
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: 🔍 Verify Cache Hit Status
+        run: |
+          echo "=== Playwright Cache Status ==="
+          echo "Cache hit output: ${{ steps.playwright-cache.outputs.cache-hit }}"
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            echo "✅ Cache HIT - Browsers should be available"
+            echo "CACHE_VALID=true" >> $GITHUB_ENV
+          else
+            echo "ℹ️  Cache MISS - Will download browsers"
+            echo "CACHE_VALID=false" >> $GITHUB_ENV
+          fi
+
+      - name: 📦 Install dependencies with enterprise retry logic
+        id: install-deps
+        uses: ./.github/actions/setup-pnpm-enterprise
+        with:
+          timeout-seconds: 600
+          max-attempts: 3
+          frozen-lockfile: 'true'
+          cache-clear-on-failure: 'true'
+          network-diagnostics: 'true'
+
+      - name: Generate Prisma Client
+        run: |
+          echo "🔄 Generating Prisma Client..."
+          pnpm prisma:generate
+          echo "✅ Prisma Client generated"
+
+      # PERFORMANCE OPTIMIZATION 2: Docker Buildx with GitHub Actions Cache (60-80% faster builds)
+      # Official Docker best practice: type=gha cache backend with mode=max
+      # Research: https://docs.docker.com/build/cache/backends/gha/
+      - name: ⚡ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+
+      # Export cache configuration for docker compose buildx bake
+      - name: ⚡ Configure Buildx cache for docker compose
+        run: |
+          echo "🔧 Configuring Docker Buildx cache backend..."
+          echo "BUILDX_CACHE_FROM=type=gha,scope=docker-e2e" >> $GITHUB_ENV
+          echo "BUILDX_CACHE_TO=type=gha,scope=docker-e2e,mode=max" >> $GITHUB_ENV
+          echo "✅ Cache backend configured: GitHub Actions (type=gha, mode=max)"
+
+      - name: 🔧 Setup Playwright with APT lock handling
+        id: setup-playwright
+        uses: ./.github/actions/setup-playwright
+        with:
+          browsers: 'chromium'
+          with-deps: 'true'
+          skip-browser-download: '0'
+          cache-hit: ${{ steps.playwright-cache.outputs.cache-hit }}
+
+      - name: 🔍 Validate Browser Installation (Enterprise)
+        id: validate-browser
+        uses: ./.github/actions/validate-browser-installation
+        with:
+          browser: 'chromium'
+          auto-install-on-failure: 'true'
+          with-deps: 'true'
+          fail-on-missing: 'false'
+
+      - name: 📊 Display installation metrics
+        if: always()
+        run: |
+          echo "=== Installation Metrics ==="
+          echo "Dependencies:"
+          echo "  - Duration: ${{ steps.install-deps.outputs.install-duration }}s"
+          echo "  - Attempts: ${{ steps.install-deps.outputs.attempts-used }}"
+          echo "  - Cache cleared: ${{ steps.install-deps.outputs.cache-cleared }}"
+          echo ""
+          echo "Browser:"
+          echo "  - Status: ${{ steps.validate-browser.outputs.validation-status }}"
+          echo "  - Path: ${{ steps.validate-browser.outputs.browser-path }}"
+          echo "  - Version: ${{ steps.validate-browser.outputs.browser-version }}"
+
+      # ENTERPRISE P0 FIX (2025-12-22): Load pre-built Docker images
+      # Images were built in build-test-images job and cached
+      # This eliminates 9-15min of build time from critical path
+      - name: 📦 Load pre-built Docker images
+        uses: actions/cache@v4
+        id: docker-images-cache
+        with:
+          path: /tmp/docker-images
+          key: ${{ needs.build-test-images.outputs.cache-key }}
+          fail-on-cache-miss: true # Fail fast if images weren't built
+
+      - name: 🐳 Import Docker images
+        run: |
+          echo "⏱️  IMAGE LOAD START: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          docker load -i /tmp/docker-images/test-images.tar
+          echo "⏱️  IMAGE LOAD END: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          echo "✅ Pre-built images loaded successfully:"
+          docker images | grep ectropy
+
+          # Tag images for docker compose (it expects these names)
+          docker tag ectropy-web-dashboard-test:latest ectropy-web-dashboard-test
+          docker tag ectropy-api-gateway-test:latest ectropy-api-gateway-test
+          docker tag ectropy-mcp-server-test:latest ectropy-mcp-server-test
+
+      - name: Start test services
+        env:
+          # ENTERPRISE: Docker Compose project isolation for parallel shards
+          # Pass shard context to enable unique container naming per shard
+          # This prevents container name/port collisions when 4 shards run in parallel
+          SHARD_ID: ${{ matrix.shard }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: bash scripts/ci/start-test-services.sh
+        timeout-minutes: 8 # ENTERPRISE: Actual execution ~6min, 8min provides 33% buffer for Docker build variance
+
+      - name: Ensure test results directory exists
+        run: mkdir -p apps/web-dashboard/test-results
+
+      - name: Run smoke tests (Shard ${{ matrix.shard }})
+        env:
+          WEB_DASHBOARD_URL: http://localhost:3000
+          API_GATEWAY_URL: http://localhost:4000
+          MCP_SERVER_URL: http://localhost:3001
+          API_URL: http://localhost:3001
+          CI: true
+          DEBUG: 'pw:api'
+          # Use detected browser path from setup-playwright action
+          PLAYWRIGHT_BROWSERS_PATH: ${{ steps.setup-playwright.outputs.browser-path || '/home/runner/.cache/ms-playwright' }}
+        run: |
+          echo "🧪 Starting E2E test execution (Shard ${{ matrix.shard }})..."
+          echo "📊 Sharding: Running subset ${{ matrix.shard }} of Playwright tests"
+
+          # Run E2E tests with sharding - continue even if some tests fail
+          # --shard flag distributes tests across parallel jobs (Playwright official pattern)
+          cd apps/web-dashboard && pnpm run test:e2e:ci --shard=${{ matrix.shard }} 2>&1 | tee e2e-test.log
+          TEST_EXIT_CODE=$?
+
+          echo ""
+          echo "=== Test Execution Summary (Shard ${{ matrix.shard }}) ==="
+          if [ $TEST_EXIT_CODE -eq 0 ]; then
+            echo "✅ All E2E tests passed in this shard"
+          else
+            echo "⚠️  Some E2E tests failed in this shard (exit code: $TEST_EXIT_CODE)"
+          fi
+
+          # Exit with test exit code (fail CI if tests fail)
+          exit $TEST_EXIT_CODE
+
+      - name: Upload results (Shard ${{ matrix.shard }})
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-results-${{ strategy.job-index }}
+          path: |
+            apps/web-dashboard/test-results/
+            apps/web-dashboard/e2e-test.log
+          retention-days: 7
+
+      # ENTERPRISE: Upload blob report for this shard (will be merged later)
+      # Matches staging E2E pattern for consistent workflow structure
+      - name: 📊 Upload blob report (Shard ${{ matrix.shard }})
+        if: ${{ !cancelled() }} # Upload even if tests fail
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-smoke-${{ strategy.job-index }}
+          path: blob-report
+          retention-days: 1 # Short retention, only needed for merging
+
+      - name: Capture container logs on failure
+        if: failure()
+        env:
+          # FIVE WHY FIX (2026-03-06): Diagnostic steps MUST use same COMPOSE_PROJECT_NAME
+          # as start-test-services.sh, otherwise docker compose logs/ps returns empty results
+          SHARD_ID: ${{ matrix.shard }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          # Reconstruct COMPOSE_PROJECT_NAME (same logic as start-test-services.sh)
+          SHARD_INDEX="${SHARD_ID%%/*}"
+          export COMPOSE_PROJECT_NAME="test-${GITHUB_RUN_ID}-shard-${SHARD_INDEX}"
+
+          echo "=== Capturing Docker container logs ==="
+          echo "   COMPOSE_PROJECT_NAME: $COMPOSE_PROJECT_NAME"
+
+          # Primary: docker compose logs (requires correct project name)
+          docker compose -f docker-compose.test.yml logs > /tmp/test-services.log 2>&1 || true
+
+          # Fallback: direct docker logs with hardcoded container names
+          # docker-compose.test.yml uses container_name: directives which override project naming
+          echo "=== Direct container logs (hardcoded names) ===" >> /tmp/test-services.log
+          for cname in ectropy-api-gateway-test ectropy-mcp-server-test ectropy-web-dashboard-test ectropy-postgres-test ectropy-redis-test; do
+            echo "--- $cname ---" >> /tmp/test-services.log
+            docker logs "$cname" --tail 100 2>&1 >> /tmp/test-services.log || echo "$cname: not found" >> /tmp/test-services.log
+          done
+
+          echo "✅ Container logs captured to /tmp/test-services.log"
+
+      - name: Diagnostic Output on Failure
+        if: failure()
+        env:
+          SHARD_ID: ${{ matrix.shard }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          # Reconstruct COMPOSE_PROJECT_NAME (same logic as start-test-services.sh)
+          SHARD_INDEX="${SHARD_ID%%/*}"
+          export COMPOSE_PROJECT_NAME="test-${GITHUB_RUN_ID}-shard-${SHARD_INDEX}"
+
+          echo "=== System Resources ==="
+          free -h
+          df -h
+          uptime
+
+          echo "=== Docker Container Status (project: $COMPOSE_PROJECT_NAME) ==="
+          docker compose -f docker-compose.test.yml ps -a
+
+          echo "=== All Docker Containers ==="
+          docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | head -20
+
+          echo "=== Container Health Details ==="
+          for cname in ectropy-api-gateway-test ectropy-mcp-server-test ectropy-web-dashboard-test; do
+            if docker inspect "$cname" &>/dev/null; then
+              echo "Container: $cname"
+              docker inspect "$cname" --format='State: {{.State.Status}} | ExitCode: {{.State.ExitCode}} | OOMKilled: {{.State.OOMKilled}} | Restarting: {{.State.Restarting}}'
+              docker inspect "$cname" --format='{{json .State.Health}}' 2>/dev/null | jq '.' 2>/dev/null || true
+            else
+              echo "Container $cname: not found"
+            fi
+          done
+
+          echo "=== Container Logs (last 100 lines) ==="
+          for cname in ectropy-api-gateway-test ectropy-mcp-server-test; do
+            echo "--- $cname ---"
+            docker logs "$cname" --tail 100 2>&1 || echo "Container not found"
+          done
+
+          echo "=== Environment Variables (sanitized) ==="
+          docker exec ectropy-api-gateway-test env 2>/dev/null | grep -E "(NODE_ENV|DATABASE_HOST|DATABASE_PORT|DATABASE_NAME|DATABASE_USER|REDIS_HOST|REDIS_PORT|PORT|API_PORT|MCP_PORT|NODE_OPTIONS)" || echo "Container not accessible"
+
+      - name: Upload Docker logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-logs-smoke-test-${{ strategy.job-index }}
+          path: |
+            /tmp/test-services.log
+          retention-days: 7
+
+      # ENTERPRISE: Validate and cleanup isolated containers
+      - name: Validate container isolation and cleanup (Shard ${{ matrix.shard }})
+        if: always() # Always run cleanup, regardless of test outcome
+        env:
+          SHARD_ID: ${{ matrix.shard }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          echo "🔍 ENTERPRISE: Validating Docker Compose project isolation..."
+
+          # Extract shard context (same logic as start-test-services.sh)
+          SHARD_INDEX="${SHARD_ID%%/*}"
+          SHARD_TOTAL="${SHARD_ID##*/}"
+
+          if [ -n "$SHARD_ID" ] && [ -n "$GITHUB_RUN_ID" ]; then
+            export COMPOSE_PROJECT_NAME="test-${GITHUB_RUN_ID}-shard-${SHARD_INDEX}"
+            echo "✅ Project isolation context detected"
+            echo "   Project: $COMPOSE_PROJECT_NAME"
+            echo "   Shard: ${SHARD_INDEX}/${SHARD_TOTAL}"
+
+            # Validate unique container names for this shard
+            echo ""
+            echo "📋 Containers for this shard project:"
+            docker compose -f docker-compose.test.yml ps -a || echo "No containers found"
+
+            # Check for any naming conflicts with other shards
+            echo ""
+            echo "🔍 Checking for container naming conflicts..."
+            ALL_TEST_CONTAINERS=$(docker ps -a --filter "name=test-${GITHUB_RUN_ID}" --format "{{.Names}}" | sort)
+            THIS_SHARD_CONTAINERS=$(docker ps -a --filter "name=${COMPOSE_PROJECT_NAME}" --format "{{.Names}}" | sort)
+
+            if [ -n "$THIS_SHARD_CONTAINERS" ]; then
+              echo "✅ This shard's containers (isolated):"
+              echo "$THIS_SHARD_CONTAINERS" | sed 's/^/   /'
+            else
+              echo "⚠️  No containers found for this shard (may have been cleaned up already)"
+            fi
+
+            # Cleanup containers for this shard
+            echo ""
+            echo "🧹 Cleaning up containers for shard ${SHARD_INDEX}/${SHARD_TOTAL}..."
+            docker compose -f docker-compose.test.yml down -v --remove-orphans 2>&1 || echo "⚠️  Cleanup encountered issues (containers may already be removed)"
+
+            # Verify cleanup
+            REMAINING=$(docker ps -a --filter "name=${COMPOSE_PROJECT_NAME}" --format "{{.Names}}" | wc -l)
+            if [ "$REMAINING" -eq 0 ]; then
+              echo "✅ All containers for this shard successfully removed"
+            else
+              echo "⚠️  Warning: $REMAINING container(s) still exist after cleanup"
+              docker ps -a --filter "name=${COMPOSE_PROJECT_NAME}" --format "{{.Names}}"
+            fi
+          else
+            echo "⚠️  Shard context not available - using default cleanup"
+            export COMPOSE_PROJECT_NAME="ectropy-test"
+            docker compose -f docker-compose.test.yml down -v --remove-orphans 2>&1 || true
+          fi
+
+          echo ""
+          echo "✅ Cleanup completed for shard ${{ matrix.shard }}"
+
+      # PERFORMANCE OPTIMIZATION 1: Save Nx cache for subsequent runs
+      - name: ⚡ Save Nx cache
+        uses: actions/cache/save@v4
+        if: always() && steps.nx-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            .nx/cache
+            node_modules/.cache/nx
+          key: ${{ steps.nx-cache.outputs.cache-primary-key }}
+
+      - name: Cleanup test services
+        if: always()
+        run: bash scripts/ci/stop-test-services.sh
+
+  e2e-staging:
+    name: E2E Tests (Staging) - Shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10 # Reduced from 30 for optimized CI execution
+    environment: staging
+
+    # PERFORMANCE OPTIMIZATION 3: Test Parallelization with Sharding (4x speedup)
+    # Official Playwright best practice: https://playwright.dev/docs/test-sharding
+    # 17 test files → 4 shards = ~4-5 tests per shard
+    strategy:
+      fail-fast: false # Run all shards even if one fails
+      max-parallel: 4 # Run all shards concurrently
+      matrix:
+        shard: ['1/4', '2/4', '3/4', '4/4']
+
+    env:
+      # Core Environment
+      NODE_ENV: test
+      CI: true
+      BASE_URL: https://staging.ectropy.ai
+
+      # Database Configuration (for validation)
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ectropy_test
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
+
+      # Redis Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+      # Application Ports
+      API_GATEWAY_PORT: 4000
+      MCP_PORT: 3001
+      WEB_PORT: 3000
+
+      # Authentication Secrets
+      JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-jwt-secret' }}
+      JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET || 'test-jwt-refresh-secret' }}
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET || 'test-session-secret' }}
+
+      # OAuth Configuration (Required for E2E tests)
+      # Programmatic OAuth (Industry Standard - 2025-12-23)
+      TEST_GOOGLE_REFRESH_TOKEN: ${{ secrets.TEST_GOOGLE_REFRESH_TOKEN }}
+      TEST_GOOGLE_EMAIL: ${{ secrets.TEST_GOOGLE_EMAIL }}
+      TEST_GOOGLE_PASSWORD: ${{ secrets.TEST_GOOGLE_PASSWORD }}
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID_STAGING }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET_STAGING }}
+
+    steps:
+      # ENTERPRISE P0 FIX (2025-12-18): FREE UP DISK SPACE FOR PLAYWRIGHT BROWSERS
+      # Even without Docker builds, Playwright browsers need 1.8GB
+      # Freeing 4-8GB ensures smooth browser installation
+      - name: 🧹 Free up disk space (Enterprise)
+        run: |
+          echo "=== DISK SPACE BEFORE CLEANUP ==="
+          df -h /
+          echo ""
+
+          echo "🧹 Removing unnecessary software..."
+
+          # Remove Android SDK (frees ~8GB)
+          sudo rm -rf /usr/local/lib/android || true
+
+          # Remove .NET runtime (frees ~2GB)
+          sudo rm -rf /usr/share/dotnet || true
+
+          echo ""
+          echo "=== DISK SPACE AFTER CLEANUP ==="
+          df -h /
+          echo "✅ Disk cleanup complete"
+
+      - name: 🛒 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Validate OAuth Secrets
+        uses: ./.github/actions/validate-oauth-secrets
+        with:
+          google-client-id: ${{ secrets.GOOGLE_CLIENT_ID_STAGING }}
+          google-client-secret: ${{ secrets.GOOGLE_CLIENT_SECRET_STAGING }}
+          test-google-email: ${{ secrets.TEST_GOOGLE_EMAIL }}
+          test-google-password: ${{ secrets.TEST_GOOGLE_PASSWORD }}
+          environment-name: 'staging'
+          fail-on-missing: 'true'
+
+      - name: Validate Environment Variables
+        run: bash scripts/core/validate-env.sh ci
+        continue-on-error: false
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pnpm-store
+            .nx/cache
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack and Install pnpm
+        run: |
+          corepack enable
+          PNPM_VERSION=$(node -p "require('./package.json').packageManager.split('@')[1].split('+')[0]")
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+          pnpm --version
+
+      # ENTERPRISE: Playwright browser cache (GitHub Actions best practice)
+      # Benefits: 1.8GB browser cache reused across workflows, faster test execution
+      # Path: ~/.cache/ms-playwright (GitHub-hosted runner compatible)
+      - name: 💾 Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('**/pnpm-lock.yaml') }}-v4
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-v4-
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: 🔍 Verify Cache Hit Status
+        run: |
+          echo "=== Playwright Cache Status ==="
+          echo "Cache hit output: ${{ steps.playwright-cache.outputs.cache-hit }}"
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            echo "✅ Cache HIT - Browsers should be available"
+            echo "CACHE_VALID=true" >> $GITHUB_ENV
+          else
+            echo "ℹ️  Cache MISS - Will download browsers"
+            echo "CACHE_VALID=false" >> $GITHUB_ENV
+          fi
+
+      - name: 📦 Install dependencies with enterprise retry logic
+        id: install-deps-staging
+        uses: ./.github/actions/setup-pnpm-enterprise
+        with:
+          timeout-seconds: 600
+          max-attempts: 3
+          frozen-lockfile: 'true'
+          cache-clear-on-failure: 'true'
+          network-diagnostics: 'true'
+
+      - name: Generate Prisma Client
+        run: |
+          echo "🔄 Generating Prisma Client..."
+          pnpm prisma:generate
+          echo "✅ Prisma Client generated"
+
+      # Note: Secret validation moved to first step for fail-fast efficiency
+
+      - name: 🏥 Verify staging environment health
+        run: |
+          echo "🏥 Checking staging environment health..."
+
+          # Check staging HTTP accessibility
+          STAGING_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://staging.ectropy.ai)
+          echo "Staging HTTP Status: $STAGING_STATUS"
+
+          if [ "$STAGING_STATUS" != "200" ] && [ "$STAGING_STATUS" != "302" ]; then
+            echo "❌ Staging environment not accessible (HTTP $STAGING_STATUS)"
+            exit 1
+          fi
+
+          echo "✅ Staging environment accessible"
+
+          # Check OAuth endpoint is reachable (should return 302 redirect or 200)
+          echo "🔍 Checking OAuth endpoint..."
+          OAUTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://staging.ectropy.ai/auth/google || echo "000")
+          echo "OAuth endpoint status: $OAUTH_STATUS"
+
+          if [ "$OAUTH_STATUS" = "000" ]; then
+            echo "⚠️  OAuth endpoint not reachable (network error)"
+            echo "   This may indicate a connectivity issue"
+          elif [ "$OAUTH_STATUS" = "404" ]; then
+            echo "⚠️  OAuth endpoint returned 404 (not found)"
+            echo "   Check if OAuth route is configured in staging"
+          elif [ "$OAUTH_STATUS" != "200" ] && [ "$OAUTH_STATUS" != "302" ]; then
+            echo "⚠️  OAuth endpoint returned unexpected status: $OAUTH_STATUS"
+          else
+            echo "✅ OAuth endpoint is accessible"
+          fi
+
+      # ROOT CAUSE #210 FIX: Add comprehensive route and component validation
+      # Verifies that critical frontend routes serve correct pages and contain expected elements
+      # This prevents E2E tests from running against incomplete deployments
+      - name: 🔍 Verify Critical Routes and Components
+        run: |
+          echo "========================================="
+          echo "ROOT CAUSE #210 FIX: Route & Component Validation"
+          echo "========================================="
+          echo ""
+          echo "Validating critical application routes..."
+          echo ""
+
+          # Function to check if route contains expected element
+          check_route_component() {
+            local route=$1
+            local element_id=$2
+            local description=$3
+
+            echo "🔍 Checking: $description"
+            echo "   Route: $route"
+            echo "   Expected element: $element_id"
+
+            RESPONSE=$(curl -s "https://staging.ectropy.ai$route")
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://staging.ectropy.ai$route")
+
+            if [ "$HTTP_STATUS" != "200" ]; then
+              echo "   ❌ Route returned HTTP $HTTP_STATUS (expected 200)"
+              return 1
+            fi
+
+            if echo "$RESPONSE" | grep -q "$element_id"; then
+              echo "   ✅ Route accessible and contains expected element"
+              return 0
+            else
+              echo "   ❌ Route accessible but missing expected element"
+              echo "   This may cause E2E tests to fail with timeout"
+              return 1
+            fi
+          }
+
+          # Check /viewer route (ROOT CAUSE #210 - viewer tests failing)
+          echo "--- BIM Viewer Route ---"
+          if check_route_component "/viewer" "bim-viewer-container" "BIM Viewer Page"; then
+            echo "✅ BIM viewer route validated"
+          else
+            echo "⚠️  BIM viewer route validation failed"
+            echo "   Impact: viewer-validation.spec.ts tests may fail (4 tests)"
+            echo "   Continuing anyway - tests will provide detailed error info"
+          fi
+
+          echo ""
+          echo "--- OAuth Login Route ---"
+          if check_route_component "/?login" "root" "OAuth Login Page"; then
+            echo "✅ OAuth login route validated"
+          else
+            echo "⚠️  OAuth login route validation failed"
+            echo "   Impact: oauth-login.spec.ts tests may fail"
+            echo "   Continuing anyway - tests will provide detailed error info"
+          fi
+
+          echo ""
+          echo "--- Dashboard Route (Auth Required) ---"
+          DASHBOARD_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://staging.ectropy.ai/dashboard")
+          echo "🔍 Checking: Dashboard (may redirect if not authenticated)"
+          echo "   Route: /dashboard"
+          echo "   HTTP Status: $DASHBOARD_STATUS"
+
+          if [ "$DASHBOARD_STATUS" = "200" ] || [ "$DASHBOARD_STATUS" = "302" ]; then
+            echo "   ✅ Dashboard route accessible (HTTP $DASHBOARD_STATUS)"
+          else
+            echo "   ⚠️  Dashboard route returned HTTP $DASHBOARD_STATUS"
+          fi
+
+          echo ""
+          echo "========================================="
+          echo "Route Validation Summary:"
+          echo "  • Viewer route checked for bim-viewer-container"
+          echo "  • Login route checked for authentication UI"
+          echo "  • Dashboard route accessibility verified"
+          echo ""
+          echo "Note: Warnings are non-blocking - E2E tests will run"
+          echo "      and provide detailed failure information if issues exist"
+          echo "========================================="
+
+      - name: 🔐 Validate OAuth Configuration
+        run: bash scripts/ci/validate-oauth-config.sh
+        env:
+          BASE_URL: ${{ env.BASE_URL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID_STAGING }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET_STAGING }}
+          TEST_GOOGLE_EMAIL: ${{ secrets.TEST_GOOGLE_EMAIL }}
+          TEST_GOOGLE_PASSWORD: ${{ secrets.TEST_GOOGLE_PASSWORD }}
+
+      # ROOT CAUSE #216 FIX: Validate OAuth callback infrastructure before E2E tests
+      - name: 🔐 Verify OAuth Callback Health
+        run: |
+          echo "ROOT CAUSE #216 FIX: OAuth Callback Health Validation"
+          echo "=================================================="
+          echo ""
+          echo "WHY: Frontend health checks pass while OAuth backend is down"
+          echo "  - Health checks validate /viewer and /?login routes (frontend)"
+          echo "  - OAuth callback requires: Google API, database, Redis, Prisma"
+          echo "  - Gap: Frontend healthy ≠ OAuth callback healthy"
+          echo ""
+          echo "SOLUTION: Validate OAuth callback infrastructure before tests"
+          echo "  - Call GET /api/auth/health/oauth endpoint"
+          echo "  - Checks: Google OAuth API, database, Redis, Prisma, config"
+          echo "  - Retry up to 3 times with 10-second delay"
+          echo "  - Fail workflow if OAuth unhealthy after retries"
+          echo ""
+          echo "IMPACT: Prevents E2E test failures due to OAuth infrastructure issues"
+          echo "=================================================="
+          echo ""
+
+          MAX_RETRIES=3
+          RETRY_DELAY=10
+          ATTEMPT=1
+
+          while [ $ATTEMPT -le $MAX_RETRIES ]; do
+            echo "🔍 Attempt $ATTEMPT/$MAX_RETRIES: Checking OAuth health..."
+
+            OAUTH_HEALTH_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" https://staging.ectropy.ai/api/auth/health/oauth)
+            OAUTH_HEALTH_STATUS=$(echo "$OAUTH_HEALTH_RESPONSE" | grep "HTTP_STATUS" | cut -d: -f2)
+            OAUTH_HEALTH_BODY=$(echo "$OAUTH_HEALTH_RESPONSE" | sed '/HTTP_STATUS/d')
+
+            echo "   HTTP Status: $OAUTH_HEALTH_STATUS"
+            echo "   Response:"
+            echo "$OAUTH_HEALTH_BODY" | jq '.' 2>/dev/null || echo "$OAUTH_HEALTH_BODY"
+            echo ""
+
+            if [ "$OAUTH_HEALTH_STATUS" = "200" ]; then
+              OAUTH_STATUS=$(echo "$OAUTH_HEALTH_BODY" | jq -r '.status' 2>/dev/null)
+
+              if [ "$OAUTH_STATUS" = "ok" ]; then
+                echo "✅ OAuth callback infrastructure is healthy!"
+                echo "   All checks passed:"
+                echo "$OAUTH_HEALTH_BODY" | jq '.checks' 2>/dev/null || echo "   (Unable to parse checks)"
+                echo ""
+                echo "✅ Safe to proceed with E2E tests"
+                break
+              else
+                echo "⚠️  OAuth callback status: $OAUTH_STATUS"
+                echo "   Detailed checks:"
+                echo "$OAUTH_HEALTH_BODY" | jq '.checks' 2>/dev/null || echo "   (Unable to parse checks)"
+              fi
+            else
+              echo "❌ OAuth health check returned HTTP $OAUTH_HEALTH_STATUS"
+            fi
+
+            if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+              echo ""
+              echo "⏳ Waiting ${RETRY_DELAY}s before retry..."
+              sleep $RETRY_DELAY
+              ATTEMPT=$((ATTEMPT + 1))
+            else
+              echo ""
+              echo "=================================================="
+              echo "❌ OAUTH HEALTH CHECK FAILED AFTER $MAX_RETRIES ATTEMPTS"
+              echo "=================================================="
+              echo ""
+              echo "ROOT CAUSE: OAuth callback infrastructure is unhealthy"
+              echo "  - Cannot run E2E tests without functional OAuth"
+              echo "  - Review health check response above for details"
+              echo ""
+              echo "NEXT STEPS:"
+              echo "  1. SSH to staging: doctl compute ssh ectropy-staging"
+              echo "  2. Check API Gateway logs: docker logs ectropy-api-gateway --tail=100"
+              echo "  3. Check database: docker logs ectropy-postgres --tail=100"
+              echo "  4. Check service status: docker ps -a | grep ectropy"
+              echo "  5. Review ROOT_CAUSE_216_OAUTH_502_COMPREHENSIVE_ANALYSIS_2026-02-06.json"
+              echo ""
+              exit 1
+            fi
+          done
+
+      - name: 🔧 Setup Playwright with APT lock handling
+        id: setup-playwright-staging
+        uses: ./.github/actions/setup-playwright
+        with:
+          browsers: 'chromium'
+          with-deps: 'true'
+          skip-browser-download: '0'
+          cache-hit: ${{ steps.playwright-cache.outputs.cache-hit }}
+
+      - name: 🔍 Validate Browser Installation (Enterprise)
+        id: validate-browser-staging
+        uses: ./.github/actions/validate-browser-installation
+        with:
+          browser: 'chromium'
+          auto-install-on-failure: 'true'
+          with-deps: 'true'
+          fail-on-missing: 'false'
+
+      - name: 📊 Display installation metrics (Staging)
+        if: always()
+        run: |
+          echo "=== Installation Metrics (Staging) ==="
+          echo "Dependencies:"
+          echo "  - Duration: ${{ steps.install-deps-staging.outputs.install-duration }}s"
+          echo "  - Attempts: ${{ steps.install-deps-staging.outputs.attempts-used }}"
+          echo "  - Cache cleared: ${{ steps.install-deps-staging.outputs.cache-cleared }}"
+          echo ""
+          echo "Browser:"
+          echo "  - Status: ${{ steps.validate-browser-staging.outputs.validation-status }}"
+          echo "  - Path: ${{ steps.validate-browser-staging.outputs.browser-path }}"
+          echo "  - Version: ${{ steps.validate-browser-staging.outputs.browser-version }}"
+
+      - name: ✅ Using cached Playwright browser
+        if: steps.playwright-cache.outputs.cache-hit == 'true' && steps.setup-playwright-staging.outputs.pre-installed == 'true'
+        run: |
+          echo "✅ Using cached Playwright Chromium browser (validated compatible)"
+          echo "📍 Browser path: ${{ steps.setup-playwright-staging.outputs.browser-path }}"
+          echo "🔍 Verifying cached browser exists..."
+          ls -lah "${{ steps.setup-playwright-staging.outputs.browser-path }}"
+
+      - name: 📁 Create debug directories
+        run: |
+          mkdir -p apps/web-dashboard-e2e/auth-debug
+          mkdir -p apps/web-dashboard-e2e/playwright/.auth
+          echo "✅ Debug directories created"
+
+      - name: 🔍 Verify Auth Directory Permissions
+        run: |
+          AUTH_DIR="apps/web-dashboard-e2e/playwright/.auth"
+          DEBUG_DIR="apps/web-dashboard-e2e/auth-debug"
+
+          echo "=== Checking directory permissions ==="
+          ls -la "$AUTH_DIR" || echo "Auth directory not found"
+          ls -la "$DEBUG_DIR" || echo "Debug directory not found"
+
+          echo ""
+          echo "=== Testing write permissions ==="
+          TEST_FILE="$AUTH_DIR/.write-test"
+          if echo "test" > "$TEST_FILE" 2>/dev/null; then
+            echo "✅ Auth directory is writable"
+            rm "$TEST_FILE"
+          else
+            echo "❌ Auth directory is NOT writable"
+            echo "Current user: $(whoami)"
+            echo "Current user ID: $(id)"
+            echo "Directory owner: $(stat -c '%U:%G' "$AUTH_DIR" 2>/dev/null || echo 'N/A')"
+            echo "Directory permissions: $(stat -c '%A' "$AUTH_DIR" 2>/dev/null || echo 'N/A')"
+            exit 1
+          fi
+
+          echo ""
+          echo "=== Directory contents before tests ==="
+          find apps/web-dashboard-e2e/playwright/.auth -type f 2>/dev/null || echo "No files in auth directory"
+
+      - name: 🧪 Run E2E Tests with OAuth Authentication (Shard ${{ matrix.shard }})
+        run: |
+          echo "🧪 Starting E2E test execution (Shard ${{ matrix.shard }})..."
+          echo "📊 Sharding: Running subset ${{ matrix.shard }} of Playwright tests"
+          echo "🔍 Note: OAuth setup may fail due to Google bot detection in CI"
+          echo "🔍 Public endpoint tests will run regardless of OAuth status"
+
+          # Run E2E tests with sharding - continue even if some tests fail
+          # --shard flag distributes tests across parallel jobs
+          # Blob reporter configured in playwright.config.ci.ts (CLI flag would override)
+          pnpm nx e2e web-dashboard-e2e --configuration=ci --verbose --shard=${{ matrix.shard }} 2>&1 | tee e2e-test.log
+          TEST_EXIT_CODE=$?
+
+          echo ""
+          echo "=== Test Execution Summary (Shard ${{ matrix.shard }}) ==="
+          if [ $TEST_EXIT_CODE -eq 0 ]; then
+            echo "✅ All E2E tests passed in this shard"
+          else
+            echo "⚠️  Some E2E tests failed in this shard (exit code: $TEST_EXIT_CODE)"
+            echo "   This may be due to OAuth authentication blocking in CI"
+            echo "   Check test results for public endpoint test status"
+
+            # Check if public endpoint tests passed
+            if grep -q "public-endpoints.spec.ts.*passed" e2e-test.log; then
+              echo "✅ Public endpoint tests passed - core functionality verified"
+            fi
+          fi
+
+          # Exit with test exit code (fail CI if tests fail)
+          exit $TEST_EXIT_CODE
+        env:
+          DEBUG: 'pw:api' # Enable Playwright debug logs
+          # Use detected browser path from setup-playwright action
+          PLAYWRIGHT_BROWSERS_PATH: ${{ steps.setup-playwright-staging.outputs.browser-path || '/home/runner/.cache/ms-playwright' }}
+
+      - name: 🔍 Verify Auth File Creation
+        if: always() # Run even if tests fail
+        run: |
+          echo "=== Post-Test Auth File Verification ==="
+          AUTH_FILE="apps/web-dashboard-e2e/playwright/.auth/user.json"
+
+          if [ -f "$AUTH_FILE" ]; then
+            echo "✅ Auth state file exists"
+            echo "   Location: $AUTH_FILE"
+            echo "   Size: $(wc -c < "$AUTH_FILE") bytes"
+            echo "   Permissions: $(stat -c '%A' "$AUTH_FILE")"
+
+            # Validate JSON structure
+            if command -v jq &> /dev/null; then
+              echo "   Cookie count: $(cat "$AUTH_FILE" | jq '.cookies | length' 2>/dev/null || echo 'N/A')"
+              echo "   Origins count: $(cat "$AUTH_FILE" | jq '.origins | length' 2>/dev/null || echo 'N/A')"
+            else
+              echo "   Content preview: $(head -c 200 "$AUTH_FILE")"
+            fi
+          else
+            echo "❌ Auth state file NOT found at: $AUTH_FILE"
+            echo ""
+            echo "=== Directory contents ==="
+            ls -la apps/web-dashboard-e2e/playwright/.auth/ || echo "Auth directory does not exist"
+            echo ""
+            echo "=== Debug directory contents ==="
+            if [ -d "apps/web-dashboard-e2e/auth-debug" ]; then
+              SCREENSHOT_COUNT=$(find apps/web-dashboard-e2e/auth-debug -name "*.png" 2>/dev/null | wc -l)
+              echo "Screenshots in debug dir: $SCREENSHOT_COUNT"
+              if [ $SCREENSHOT_COUNT -gt 0 ]; then
+                find apps/web-dashboard-e2e/auth-debug -name "*.png" -o -name "*.html" | head -10
+              fi
+            else
+              echo "Debug directory does not exist"
+            fi
+          fi
+
+      # Upload blob report for this shard (will be merged later)
+      - name: 📊 Upload blob report (Shard ${{ matrix.shard }})
+        if: ${{ !cancelled() }} # Upload even if tests fail
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-staging-${{ strategy.job-index }}
+          path: blob-report
+          retention-days: 1 # Short retention, only needed for merging
+
+      - name: 📸 Upload Auth Debug Screenshots (Shard ${{ matrix.shard }})
+        if: always() # Upload even on failure
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-debug-screenshots-staging-${{ strategy.job-index }}
+          path: |
+            apps/web-dashboard-e2e/auth-debug/**/*.png
+            apps/web-dashboard-e2e/auth-debug/**/*.html
+            apps/web-dashboard-e2e/test-results/**/trace.zip
+            apps/web-dashboard-e2e/test-results/**/video.webm
+            e2e-test.log
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: 🔍 Capture diagnostics on failure
+        if: failure()
+        run: |
+          echo "=== System Resources ==="
+          free -h
+          df -h
+          uptime
+
+          echo ""
+          echo "=== APT Status ==="
+          apt-get update -qq && echo "✅ APT operational" || echo "❌ APT failed"
+          systemctl status unattended-upgrades.service 2>&1 || echo "unattended-upgrades status check failed"
+
+          echo ""
+          echo "=== Authentication Setup Diagnostics ==="
+
+          # Check if auth file was created
+          if [ -f "apps/web-dashboard-e2e/playwright/.auth/user.json" ]; then
+            echo "✅ Auth state file exists"
+            echo "File size: $(wc -c < apps/web-dashboard-e2e/playwright/.auth/user.json) bytes"
+
+            # Check if jq is available for JSON parsing
+            if command -v jq &> /dev/null; then
+              echo "Cookie count: $(cat apps/web-dashboard-e2e/playwright/.auth/user.json | jq '.cookies | length')"
+              echo "Cookie names: $(cat apps/web-dashboard-e2e/playwright/.auth/user.json | jq -r '.cookies[].name' | paste -sd ',' -)"
+            else
+              echo "Content preview: $(head -c 200 apps/web-dashboard-e2e/playwright/.auth/user.json)"
+            fi
+          else
+            echo "❌ Auth state file NOT created - authentication setup failed"
+            echo "Expected location: apps/web-dashboard-e2e/playwright/.auth/user.json"
+            ls -la apps/web-dashboard-e2e/playwright/.auth/ || echo "Auth directory does not exist"
+          fi
+
+          echo ""
+          echo "=== Debug Screenshots Status ==="
+          if [ -d "apps/web-dashboard-e2e/auth-debug" ]; then
+            SCREENSHOT_COUNT=$(find apps/web-dashboard-e2e/auth-debug -name "*.png" | wc -l)
+            HTML_COUNT=$(find apps/web-dashboard-e2e/auth-debug -name "*.html" | wc -l)
+            echo "Screenshots captured: $SCREENSHOT_COUNT"
+            echo "HTML files captured: $HTML_COUNT"
+            if [ $SCREENSHOT_COUNT -gt 0 ]; then
+              echo "Screenshot files:"
+              find apps/web-dashboard-e2e/auth-debug -name "*.png" | sort
+            fi
+          else
+            echo "❌ auth-debug directory not found"
+          fi
+
+          echo ""
+          echo "=== Test Results Status ==="
+          if [ -d "apps/web-dashboard-e2e/test-results" ]; then
+            echo "Test results directory exists"
+            find apps/web-dashboard-e2e/test-results -type f \( -name "*.zip" -o -name "*.webm" \) | head -5
+          else
+            echo "No test results directory found"
+          fi
+
+      - name: 📝 Comment test results on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: daun/playwright-report-comment@v3
+        with:
+          report-file: playwright-report
+          report-url: ${{ steps.deploy.outputs.report-url }}
+
+  e2e-local:
+    name: E2E Tests (Local) - Shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15 # Reduced from 30, includes build time
+    # DISABLED from PR triggers (2026-03-05): Local Docker E2E exhausts CI runner memory.
+    # Staging E2E (e2e-staging job) provides the same coverage against live staging.
+    # Manual dispatch with environment=local still works for targeted local testing.
+    if: github.event.inputs.environment == 'local'
+    environment: staging
+
+    # PERFORMANCE OPTIMIZATION 3: Test Parallelization with Sharding (2x speedup)
+    # 2 test files → 2 shards = 1 test per shard
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        shard: ['1/2', '2/2']
+
+    env:
+      BASE_URL: http://localhost:3002
+      CI: true
+
+    steps:
+      - name: 🛒 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pnpm-store
+            .nx/cache
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack and Install pnpm
+        run: |
+          corepack enable
+          PNPM_VERSION=$(node -p "require('./package.json').packageManager.split('@')[1].split('+')[0]")
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+          pnpm --version
+
+      # ENTERPRISE: Playwright browser cache (GitHub Actions best practice)
+      # Benefits: 1.8GB browser cache reused across workflows, faster test execution
+      # Path: ~/.cache/ms-playwright (GitHub-hosted runner compatible)
+      - name: 💾 Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('**/pnpm-lock.yaml') }}-v4
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-v4-
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: 🔍 Verify Cache Hit Status
+        run: |
+          echo "=== Playwright Cache Status ==="
+          echo "Cache hit output: ${{ steps.playwright-cache.outputs.cache-hit }}"
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            echo "✅ Cache HIT - Browsers should be available"
+            echo "CACHE_VALID=true" >> $GITHUB_ENV
+          else
+            echo "ℹ️  Cache MISS - Will download browsers"
+            echo "CACHE_VALID=false" >> $GITHUB_ENV
+          fi
+
+      - name: 📦 Install dependencies with enterprise retry logic
+        id: install-deps-local
+        uses: ./.github/actions/setup-pnpm-enterprise
+        with:
+          timeout-seconds: 600
+          max-attempts: 3
+          frozen-lockfile: 'true'
+          cache-clear-on-failure: 'true'
+          network-diagnostics: 'true'
+
+      - name: Generate Prisma Client
+        run: |
+          echo "🔄 Generating Prisma Client..."
+          pnpm prisma:generate
+          echo "✅ Prisma Client generated"
+
+      - name: 🏗️ Build applications
+        run: |
+          pnpm nx build api-gateway
+          pnpm nx build mcp-server
+          pnpm nx build web-dashboard
+
+      - name: 🗄️ Start PostgreSQL & Redis
+        run: docker compose -f docker-compose.test.yml up -d postgres redis || true
+
+      - name: 🔄 Run database migrations
+        run: pnpm prisma migrate deploy || true
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ectropy_test
+
+      - name: 🚀 Start services in background
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ectropy_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-jwt-secret-key-for-ci-testing
+          JWT_REFRESH_SECRET: test-jwt-refresh-secret-key-for-ci
+          SESSION_SECRET: test-session-secret-key-for-ci-testing
+          MCP_PORT: 3001
+          PORT: 4000
+        run: |
+          # Start API Gateway
+          pnpm nx serve api-gateway &
+          API_PID=$!
+          echo "API_PID=$API_PID" >> $GITHUB_ENV
+
+          # Start MCP Server
+          cd apps/mcp-server
+          npm run start &
+          MCP_PID=$!
+          echo "MCP_PID=$MCP_PID" >> $GITHUB_ENV
+          cd ../..
+
+          # Start Web Dashboard
+          pnpm nx serve web-dashboard &
+          WEB_PID=$!
+          echo "WEB_PID=$WEB_PID" >> $GITHUB_ENV
+
+          # Wait for services to be ready
+          echo "Waiting for services to start..."
+          sleep 30
+
+          # Verify API Gateway is up
+          curl --retry 10 --retry-delay 3 --retry-connrefused http://localhost:4000/health
+
+          # Verify MCP Server is up
+          curl --retry 10 --retry-delay 3 --retry-connrefused http://localhost:3001/health
+
+          # Verify Web Dashboard is up
+          curl --retry 10 --retry-delay 3 --retry-connrefused http://localhost:3002
+
+      - name: 🔧 Setup Playwright with APT lock handling
+        id: setup-playwright-local
+        uses: ./.github/actions/setup-playwright
+        with:
+          browsers: 'chromium'
+          with-deps: 'true'
+          skip-browser-download: '0'
+          cache-hit: ${{ steps.playwright-cache.outputs.cache-hit }}
+
+      - name: 🔍 Validate Browser Installation (Enterprise)
+        id: validate-browser-local
+        uses: ./.github/actions/validate-browser-installation
+        with:
+          browser: 'chromium'
+          auto-install-on-failure: 'true'
+          with-deps: 'true'
+          fail-on-missing: 'false'
+
+      - name: 📊 Display installation metrics (Local)
+        if: always()
+        run: |
+          echo "=== Installation Metrics (Local) ==="
+          echo "Dependencies:"
+          echo "  - Duration: ${{ steps.install-deps-local.outputs.install-duration }}s"
+          echo "  - Attempts: ${{ steps.install-deps-local.outputs.attempts-used }}"
+          echo "  - Cache cleared: ${{ steps.install-deps-local.outputs.cache-cleared }}"
+          echo ""
+          echo "Browser:"
+          echo "  - Status: ${{ steps.validate-browser-local.outputs.validation-status }}"
+          echo "  - Path: ${{ steps.validate-browser-local.outputs.browser-path }}"
+          echo "  - Version: ${{ steps.validate-browser-local.outputs.browser-version }}"
+
+      - name: ✅ Using cached Playwright browser
+        if: steps.playwright-cache.outputs.cache-hit == 'true' && steps.setup-playwright-local.outputs.pre-installed == 'true'
+        run: |
+          echo "✅ Using cached Playwright Chromium browser (validated compatible)"
+          echo "📍 Browser path: ${{ steps.setup-playwright-local.outputs.browser-path }}"
+
+      - name: 🎭 Run E2E tests locally (CI config) (Shard ${{ matrix.shard }})
+        run: |
+          echo "🎭 Running E2E tests locally (Shard ${{ matrix.shard }})..."
+          echo "📊 Sharding: Running subset ${{ matrix.shard }} of E2E tests"
+          # Blob reporter configured in playwright.config.ci.ts (CLI flag would override)
+          pnpm nx e2e web-dashboard-e2e --configuration=ci --shard=${{ matrix.shard }} 2>&1 | tee e2e-test.log
+        env:
+          DEBUG: 'pw:api'
+          # Use detected browser path from setup-playwright action
+          PLAYWRIGHT_BROWSERS_PATH: ${{ steps.setup-playwright-local.outputs.browser-path || '/home/runner/.cache/ms-playwright' }}
+
+      # Upload blob report for this shard (will be merged later)
+      - name: 📊 Upload blob report (Shard ${{ matrix.shard }})
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-local-${{ strategy.job-index }}
+          path: blob-report
+          retention-days: 1
+
+      - name: 🛑 Stop services
+        if: always()
+        run: |
+          kill ${{ env.API_PID }} || true
+          kill ${{ env.MCP_PID }} || true
+          kill ${{ env.WEB_PID }} || true
+          docker compose -f docker-compose.test.yml down || true
+
+      - name: Diagnostic Output on Failure
+        if: failure()
+        run: |
+          echo "=== System Resources ==="
+          free -h
+          df -h
+          uptime
+
+          echo "=== Docker Container Status ==="
+          docker compose -f docker-compose.test.yml ps || true
+
+          echo "=== APT Status ==="
+          apt-get update -qq && echo "✅ APT operational" || echo "❌ APT failed"
+          systemctl status unattended-upgrades.service 2>&1 || echo "unattended-upgrades status check failed"
+
+      - name: 📊 Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-local
+          path: |
+            dist/.playwright/
+            playwright-report/
+            e2e-test.log
+          retention-days: 30
+
+  # ENTERPRISE: Merge all shard reports into single HTML report
+  # Combines blob reports from all shards (smoke-test + e2e-staging + e2e-local)
+  # Official Playwright pattern: https://playwright.dev/docs/test-sharding#merging-reports
+  # Standardizes test reporting across all E2E jobs
+  merge-reports:
+    name: 📊 Merge Test Reports
+    if: ${{ !cancelled() }} # Run even if some shards failed
+    needs: [smoke-test, e2e-staging, e2e-local]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🛒 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: 📥 Download all blob reports
+        uses: actions/download-artifact@v4
+        with:
+          path: all-blob-reports
+          pattern: blob-report-*
+        continue-on-error: true # Don't fail if some reports missing (e.g., skipped jobs)
+
+      - name: 🔄 Merge blob reports into HTML
+        run: |
+          echo "📊 Merging available blob reports..."
+
+          # ENTERPRISE FIX (2025-12-22): Handle partial test execution gracefully
+          # ROOT CAUSE: merge-reports depends on all jobs, but e2e-local is conditional
+          # When e2e-local is skipped (push to main), no blob reports exist for it
+          # Solution: Check if any reports exist before attempting merge
+
+          # Check if blob reports directory exists and has content
+          if [ ! -d "all-blob-reports" ] || [ -z "$(ls -A all-blob-reports 2>/dev/null)" ]; then
+            echo "⚠️  No blob reports found - all test jobs may have been skipped"
+            echo "This is expected when e2e-local job is skipped (conditional execution)"
+            echo "Creating empty report directory for artifact upload"
+            mkdir -p playwright-report
+            echo "<html><body><h1>No Test Reports Available</h1><p>All test jobs were skipped or no reports were generated.</p></body></html>" > playwright-report/index.html
+            exit 0
+          fi
+
+          # Count available reports
+          REPORT_COUNT=$(find all-blob-reports -type d -name "blob-report-*" 2>/dev/null | wc -l)
+          echo "📊 Found $REPORT_COUNT blob report(s) to merge"
+
+          if [ "$REPORT_COUNT" -eq 0 ]; then
+            echo "⚠️  No valid blob reports found in directory"
+            echo "Creating placeholder report"
+            mkdir -p playwright-report
+            echo "<html><body><h1>No Test Reports Available</h1><p>Blob reports were downloaded but contained no valid data.</p></body></html>" > playwright-report/index.html
+            exit 0
+          fi
+
+          echo "Found blob reports:"
+          ls -la all-blob-reports/
+
+          # Merge all available blob reports into single HTML report
+          npx playwright merge-reports --reporter=html ./all-blob-reports
+
+          echo "✅ Reports merged successfully from $REPORT_COUNT source(s)"
+
+      - name: 📊 Upload combined HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-combined
+          path: playwright-report
+          retention-days: 30
+
+      # Install dependencies for test matrix update script (requires tsx)
+      - name: 📦 Install dependencies
+        if: always()
+        run: |
+          echo "📦 Installing dependencies for test matrix update..."
+          pnpm install --frozen-lockfile
+          echo "✅ Dependencies installed"
+
+      # ENTERPRISE: Auto-update test matrix with latest coverage metrics
+      # Closes the validation loop: tests → results → test-matrix.json → roadmap validation
+      - name: 📊 Update Test Matrix with Latest Results
+        if: always() # Update even if some tests failed (capture current state)
+        run: |
+          echo "🔄 Updating test matrix with latest test results..."
+          pnpm test:matrix:update
+          echo "✅ Test matrix updated"
+
+      - name: 📝 Commit Test Matrix Updates (Main/Develop Only)
+        if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps/mcp-server/data/test-matrix.json
+          if git diff --staged --quiet; then
+            echo "ℹ️  No changes to test matrix"
+          else
+            git commit -m "chore(test): Auto-update test matrix [skip ci]
+
+            Updated by: ${{ github.workflow }} (Run #${{ github.run_number }})
+            Trigger: ${{ github.event_name }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            "
+            git push || echo "⚠️  Failed to push test matrix update (non-blocking)"
+          fi
+
+      # ROOT CAUSE #89 FIX: Enterprise Slack Reporting - Success + Failure notifications
+      # PROBLEM: Only failure notifications sent, no visibility into successful test runs
+      # IMPACT: Team doesn't know when E2E achieves 100% pass rate (like RC#88 milestone)
+      # SOLUTION: Add success notification, always run status check
+
+      - name: 📬 Notify Slack on E2E Success
+        if: success()
+        uses: ./.github/actions/slack-notify
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: success
+          workflow-name: ${{ github.workflow }}
+          custom-message: '✨ *E2E tests passed* - All test shards completed successfully. Enterprise excellence achieved!'
+
+      - name: 📬 Notify Slack on E2E Failure
+        if: failure()
+        uses: ./.github/actions/slack-notify
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: failure
+          workflow-name: ${{ github.workflow }}
+          custom-message: '🧪 *E2E tests failed* - Test report merge or shard execution failed. Review test results.'

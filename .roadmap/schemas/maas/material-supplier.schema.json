@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:maas:material-supplier",
+  "title": "Material Supplier",
+  "description": "Material supplier in MaaS (Material as a Service) architecture - includes traditional suppliers and carbon credit providers",
+  "type": "object",
+  "required": ["id", "name", "type"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^SUPPLIER-[0-9]{4}-[0-9]{4,}$",
+      "description": "Unique supplier identifier"
+    },
+    "name": {
+      "type": "string",
+      "description": "Supplier company name"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "TRADITIONAL_MATERIAL",
+        "CARBON_CREDIT",
+        "PREFAB_ASSEMBLY",
+        "SPECIALTY"
+      ],
+      "description": "Supplier category"
+    },
+    "materialCategories": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "MasterFormat divisions/categories supplied"
+    },
+    "contact": {
+      "type": "object",
+      "properties": {
+        "primaryContact": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" }
+      }
+    },
+    "carbonMetadata": {
+      "type": "object",
+      "description": "Carbon-specific metadata for carbon credit suppliers",
+      "properties": {
+        "creditTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "soil_carbon",
+              "redd_plus",
+              "arr",
+              "renewable_energy",
+              "methane_capture"
+            ]
+          }
+        },
+        "verificationStandards": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "priceRange": {
+          "type": "object",
+          "properties": {
+            "min": { "type": "number" },
+            "max": { "type": "number" },
+            "currency": { "type": "string", "default": "USD" }
+          }
+        },
+        "availableVolume": {
+          "type": "number",
+          "description": "Tons CO2e available"
+        }
+      }
+    },
+    "epd": {
+      "type": "object",
+      "description": "Environmental Product Declaration data",
+      "properties": {
+        "hasEPD": { "type": "boolean" },
+        "epdDatabase": {
+          "type": "string",
+          "enum": ["EC3", "2050_MATERIALS", "PROPRIETARY"]
+        },
+        "averageGWP": {
+          "type": "number",
+          "description": "Average GWP across products (kgCO2e/unit)"
+        }
+      }
+    },
+    "leadTime": {
+      "type": "object",
+      "properties": {
+        "standard": {
+          "type": "number",
+          "description": "Standard lead time in days"
+        },
+        "rush": { "type": "number", "description": "Rush lead time in days" },
+        "minimumOrderQuantity": { "type": "string" }
+      }
+    },
+    "certifications": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Industry certifications (ISO, MBE, WBE, etc.)"
+    },
+    "rating": {
+      "type": "object",
+      "properties": {
+        "quality": { "type": "number", "minimum": 0, "maximum": 5 },
+        "delivery": { "type": "number", "minimum": 0, "maximum": 5 },
+        "service": { "type": "number", "minimum": 0, "maximum": 5 }
+      }
+    }
+  }
+}

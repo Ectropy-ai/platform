@@ -1,0 +1,221 @@
+name: 'SSH Deploy with Secure Cleanup'
+description: 'Secure SSH deployment with guaranteed key cleanup - Enterprise Security Pattern'
+author: 'Ectropy Engineering'
+
+inputs:
+  ssh-key:
+    description: 'SSH private key for deployment'
+    required: true
+
+  ssh-known-hosts:
+    description: 'SSH known_hosts content (optional, will use StrictHostKeyChecking=no if not provided)'
+    required: false
+    default: ''
+
+  host:
+    description: 'Deployment target host'
+    required: true
+
+  user:
+    description: 'SSH user (default: root)'
+    required: false
+    default: 'root'
+
+  command:
+    description: 'Command to execute on remote host (optional, for simple executions)'
+    required: false
+    default: ''
+
+  script:
+    description: 'Multi-line script to execute on remote host (optional, for complex operations)'
+    required: false
+    default: ''
+
+  validate-key:
+    description: 'Validate SSH key format before use (default: true)'
+    required: false
+    default: 'true'
+
+outputs:
+  exit-code:
+    description: 'Exit code from SSH command execution'
+    value: ${{ steps.ssh-execute.outputs.exit-code }}
+
+  cleanup-status:
+    description: 'SSH key cleanup status (success|failed)'
+    value: ${{ steps.cleanup-summary.outputs.status }}
+
+runs:
+  using: composite
+  steps:
+    # ========================================================================
+    # Step 1: Setup SSH with Secure Cleanup Trap
+    # ========================================================================
+    - name: Setup SSH with Secure Cleanup
+      id: setup-ssh
+      shell: bash
+      run: |
+        echo "🔐 Setting up SSH with enterprise security patterns..."
+
+        # Create cleanup function that will ALWAYS execute
+        cleanup() {
+          echo ""
+          echo "🔒 [CLEANUP] Cleaning up SSH keys..."
+
+          # Remove SSH key files
+          if [ -f ~/.ssh/deploy_key ]; then
+            shred -u -n 3 ~/.ssh/deploy_key 2>/dev/null || rm -f ~/.ssh/deploy_key
+            echo "  ✅ Private key securely deleted"
+          else
+            echo "  ℹ️  Private key already removed"
+          fi
+
+          if [ -f ~/.ssh/deploy_key.pub ]; then
+            rm -f ~/.ssh/deploy_key.pub
+            echo "  ✅ Public key deleted"
+          fi
+
+          # Remove key from SSH agent
+          ssh-add -D 2>/dev/null || true
+          echo "  ✅ SSH agent cleared"
+
+          # Remove temporary known_hosts if created
+          if [ -f ~/.ssh/known_hosts.deploy_temp ]; then
+            rm -f ~/.ssh/known_hosts.deploy_temp
+            echo "  ✅ Temporary known_hosts deleted"
+          fi
+
+          echo "🔒 [CLEANUP] SSH cleanup complete"
+        }
+
+        # Register cleanup to execute on ANY exit (success, failure, or crash)
+        trap cleanup EXIT INT TERM
+
+        # Create .ssh directory with secure permissions
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+
+        # Write SSH key to file
+        echo "${{ inputs.ssh-key }}" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+
+        # Validate SSH key format (if enabled)
+        if [ "${{ inputs.validate-key }}" = "true" ]; then
+          echo "🔍 Validating SSH key format..."
+
+          if ! ssh-keygen -y -f ~/.ssh/deploy_key >/dev/null 2>&1; then
+            echo "❌ ERROR: Invalid SSH key format"
+            echo "  The provided SSH key is not a valid private key"
+            echo "  Expected format: RSA, ECDSA, or Ed25519 private key"
+            exit 1
+          fi
+
+          echo "✅ SSH key format validated"
+        fi
+
+        # Setup known_hosts (if provided)
+        if [ -n "${{ inputs.ssh-known-hosts }}" ]; then
+          echo "📝 Configuring known_hosts..."
+          echo "${{ inputs.ssh-known-hosts }}" > ~/.ssh/known_hosts.deploy_temp
+          chmod 600 ~/.ssh/known_hosts.deploy_temp
+          export SSH_KNOWN_HOSTS_FILE=~/.ssh/known_hosts.deploy_temp
+          echo "✅ known_hosts configured"
+        else
+          echo "⚠️  Warning: StrictHostKeyChecking=no will be used (no known_hosts provided)"
+          export SSH_KNOWN_HOSTS_FILE=""
+        fi
+
+        echo "✅ SSH setup complete (cleanup trap registered)"
+
+    # ========================================================================
+    # Step 2: Test SSH Connection
+    # ========================================================================
+    - name: Test SSH Connection
+      id: test-connection
+      shell: bash
+      run: |
+        echo "🔌 Testing SSH connection to ${{ inputs.user }}@${{ inputs.host }}..."
+
+        # Build SSH options
+        SSH_OPTS="-i ~/.ssh/deploy_key -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3"
+
+        if [ -n "${{ inputs.ssh-known-hosts }}" ]; then
+          SSH_OPTS="$SSH_OPTS -o UserKnownHostsFile=~/.ssh/known_hosts.deploy_temp"
+        else
+          SSH_OPTS="$SSH_OPTS -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+        fi
+
+        # Test connection with simple command
+        if ssh $SSH_OPTS ${{ inputs.user }}@${{ inputs.host }} "echo 'SSH connection successful' && hostname"; then
+          echo "✅ SSH connection test passed"
+        else
+          echo "❌ ERROR: SSH connection test failed"
+          echo "  Host: ${{ inputs.host }}"
+          echo "  User: ${{ inputs.user }}"
+          exit 1
+        fi
+
+    # ========================================================================
+    # Step 3: Execute SSH Command or Script
+    # ========================================================================
+    - name: Execute SSH Command or Script
+      id: ssh-execute
+      shell: bash
+      run: |
+        # Build SSH options
+        SSH_OPTS="-i ~/.ssh/deploy_key"
+
+        if [ -n "${{ inputs.ssh-known-hosts }}" ]; then
+          SSH_OPTS="$SSH_OPTS -o UserKnownHostsFile=~/.ssh/known_hosts.deploy_temp"
+        else
+          SSH_OPTS="$SSH_OPTS -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+        fi
+
+        # Execute command or script
+        if [ -n "${{ inputs.command }}" ]; then
+          echo "🚀 Executing SSH command..."
+          echo "Command: ${{ inputs.command }}"
+          echo ""
+
+          ssh $SSH_OPTS ${{ inputs.user }}@${{ inputs.host }} "${{ inputs.command }}"
+          EXIT_CODE=$?
+
+        elif [ -n "${{ inputs.script }}" ]; then
+          echo "🚀 Executing SSH script..."
+          echo ""
+
+          ssh $SSH_OPTS ${{ inputs.user }}@${{ inputs.host }} 'bash -s' <<'SCRIPT_EOF'
+        ${{ inputs.script }}
+        SCRIPT_EOF
+          EXIT_CODE=$?
+
+        else
+          echo "ℹ️  No command or script provided, SSH setup only"
+          EXIT_CODE=0
+        fi
+
+        echo "exit-code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "❌ SSH command/script failed with exit code $EXIT_CODE"
+          exit $EXIT_CODE
+        fi
+
+        echo "✅ SSH command/script executed successfully"
+
+    # ========================================================================
+    # Step 4: Cleanup Summary (Always Runs via Trap)
+    # ========================================================================
+    - name: Cleanup Summary
+      id: cleanup-summary
+      if: always()
+      shell: bash
+      run: |
+        echo "📊 SSH Deployment Summary:"
+        echo "  Host: ${{ inputs.host }}"
+        echo "  User: ${{ inputs.user }}"
+        echo "  Exit Code: ${{ steps.ssh-execute.outputs.exit-code || '0' }}"
+        echo "  Cleanup: Automatic via trap handler"
+        echo ""
+        echo "🔒 Security: SSH keys will be cleaned up when this step completes"
+        echo "status=success" >> $GITHUB_OUTPUT

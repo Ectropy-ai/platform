@@ -1,0 +1,317 @@
+// Platform Database Schema
+// Database: ectropy_platform (DigitalOcean Managed PostgreSQL)
+// Purpose: Global platform metadata - model catalog, tenant registry, user authentication, database connections
+// Tenant Scoping: No tenant_id - global data accessible to all
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma/client-platform"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PLATFORM_DATABASE_URL")
+}
+
+// ============================================================================
+// MODEL CATALOG - Global shared library of demo models
+// ============================================================================
+
+model ModelCatalog {
+  id                  String   @id @default(uuid()) @db.Uuid
+  buildingType        String   @unique @map("building_type") @db.VarChar(100)
+  displayName         String   @map("display_name") @db.VarChar(255)
+  description         String?  @db.Text
+  iconUrl             String?  @map("icon_url") @db.VarChar(500)
+  ifcFilePath         String   @map("ifc_file_path") @db.VarChar(500)
+  speckleStreamId     String?  @map("speckle_stream_id") @db.VarChar(255)
+  speckleObjectId     String?  @map("speckle_object_id") @db.VarChar(255)
+  metadata            Json     @default("{}") @db.JsonB
+  elementCount        Int?     @map("element_count")
+  estimatedBudgetUsd  Decimal? @map("estimated_budget_usd") @db.Decimal(12, 2)
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([buildingType], map: "idx_model_catalog_building_type")
+  @@index([isActive], map: "idx_model_catalog_is_active")
+  @@map("model_catalog")
+}
+
+// ============================================================================
+// TENANT REGISTRY - Single source of truth for all tenants across all databases
+// ============================================================================
+
+enum TenantTier {
+  trial
+  paid_shared
+  enterprise
+
+  @@map("tenant_tier")
+}
+
+enum DatabaseType {
+  shared_trials
+  shared_paid
+  dedicated
+
+  @@map("database_type")
+}
+
+enum TenantStatus {
+  active
+  expired
+  suspended
+  migrating
+  archived
+
+  @@map("tenant_status")
+}
+
+model TenantRegistry {
+  id                   String            @id @default(uuid()) @db.Uuid
+  name                 String            @db.VarChar(255)
+  slug                 String            @unique @db.VarChar(100)
+  tier                 TenantTier
+  databaseType         DatabaseType      @map("database_type")
+  databaseName         String            @map("database_name") @db.VarChar(100)
+  databaseConnectionId String?           @map("database_connection_id") @db.Uuid
+  status               TenantStatus      @default(active)
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  trialExpiresAt       DateTime?         @map("trial_expires_at") @db.Timestamptz(6)
+  subscriptionTier     String?           @map("subscription_tier") @db.VarChar(50)
+  maxProjects          Int               @default(3) @map("max_projects")
+  maxUsers             Int               @default(5) @map("max_users")
+  maxStorageGb         Int               @default(1) @map("max_storage_gb")
+  metadata             Json              @default("{}") @db.JsonB
+
+  // Relation to database connection
+  databaseConnection   DatabaseConnection? @relation(fields: [databaseConnectionId], references: [id])
+
+  @@index([slug], map: "idx_tenant_registry_slug")
+  @@index([tier], map: "idx_tenant_registry_tier")
+  @@index([status], map: "idx_tenant_registry_status")
+  @@index([databaseName], map: "idx_tenant_registry_database_name")
+  @@map("tenant_registry")
+}
+
+// ============================================================================
+// DATABASE CONNECTIONS - Dynamic connection pool metadata
+// ============================================================================
+
+enum ConnectionType {
+  shared
+  dedicated
+
+  @@map("connection_type")
+}
+
+model DatabaseConnection {
+  id                 String         @id @default(uuid()) @db.Uuid
+  databaseName       String         @unique @map("database_name") @db.VarChar(100)
+  connectionType     ConnectionType @map("connection_type")
+  host               String         @db.VarChar(255)
+  port               Int            @default(25060)
+  username           String         @db.VarChar(100)
+  passwordSecretName String         @map("password_secret_name") @db.VarChar(255)
+  sslMode            String         @default("require") @map("ssl_mode") @db.VarChar(50)
+  poolSize           Int            @default(10) @map("pool_size")
+  maxConnections     Int            @default(100) @map("max_connections")
+  isActive           Boolean        @default(true) @map("is_active")
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  metadata           Json           @default("{}") @db.JsonB
+
+  // Reverse relation to tenant registry
+  tenants            TenantRegistry[]
+
+  @@index([databaseName], map: "idx_database_connections_name")
+  @@index([isActive], map: "idx_database_connections_active")
+  @@map("database_connections")
+}
+
+// ============================================================================
+// USER - OAuth identity (cross-tenant)
+// ============================================================================
+
+model User {
+  id               String    @id @default(uuid()) @db.Uuid
+  email            String    @unique @db.VarChar(255)
+  fullName         String?   @map("full_name") @db.VarChar(255)
+  provider         String    @default("google") @db.VarChar(50)
+  providerId       String?   @map("provider_id") @db.VarChar(255)
+  tenantId         String?   @map("tenant_id") @db.Uuid
+  defaultTenantId  String?   @map("default_tenant_id") @db.Uuid
+  isAuthorized     Boolean   @default(false) @map("is_authorized")
+  isPlatformAdmin  Boolean   @default(false) @map("is_platform_admin")
+  authorizedAt     DateTime? @map("authorized_at") @db.Timestamptz(6)
+  lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  metadata         Json      @default("{}") @db.JsonB
+
+  @@index([email], map: "idx_users_email")
+  @@index([tenantId], map: "idx_users_tenant_id")
+  @@index([isAuthorized], map: "idx_users_is_authorized")
+  @@index([isPlatformAdmin], map: "idx_users_is_platform_admin")
+  @@map("users")
+}
+
+// ============================================================================
+// TENANT - Simplified tenant model for database package compatibility
+// ============================================================================
+
+model Tenant {
+  id               String        @id @default(uuid()) @db.Uuid
+  name             String        @db.VarChar(255)
+  slug             String        @unique @db.VarChar(100)
+  databaseTier     String        @default("SHARED_TRIALS") @map("database_tier") @db.VarChar(50)
+  status           String        @default("ACTIVE") @db.VarChar(50)
+  trialExpiresAt   DateTime?     @map("trial_expires_at") @db.Timestamptz(6)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  apiKeys          ApiKey[]
+  oauthConnections OAuthConnection[]
+
+  @@index([slug], map: "idx_tenants_slug")
+  @@index([status], map: "idx_tenants_status")
+  @@map("tenants")
+}
+
+// ============================================================================
+// API KEYS - Programmatic access authentication
+// ============================================================================
+
+model ApiKey {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  name        String    @db.VarChar(255)
+  keyHash     String    @unique @map("key_hash") @db.VarChar(255)
+  prefix      String    @db.VarChar(10)
+  scopes      String[]  @default([]) @db.VarChar(100)
+  active      Boolean   @default(true)
+  expiresAt   DateTime? @map("expires_at") @db.Timestamptz(6)
+  lastUsedAt  DateTime? @map("last_used_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  // Relations
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "idx_api_keys_tenant_id")
+  @@index([userId], map: "idx_api_keys_user_id")
+  @@index([keyHash], map: "idx_api_keys_key_hash")
+  @@index([active], map: "idx_api_keys_active")
+  @@map("api_keys")
+}
+
+// ============================================================================
+// OAUTH CONNECTIONS - OAuth flow state and sessions
+// ============================================================================
+
+model OAuthConnection {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String?   @map("tenant_id") @db.Uuid
+  userId        String?   @map("user_id") @db.Uuid
+  provider      String    @db.VarChar(50)
+  providerId    String    @map("provider_id") @db.VarChar(255)
+  state         String?   @unique @db.VarChar(255)
+  accessToken   String?   @map("access_token") @db.Text
+  refreshToken  String?   @map("refresh_token") @db.Text
+  expiresAt     DateTime? @map("expires_at") @db.Timestamptz(6)
+  scope         String?   @db.Text
+  metadata      Json      @default("{}") @db.JsonB
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId], map: "idx_oauth_connections_tenant_id")
+  @@index([userId], map: "idx_oauth_connections_user_id")
+  @@index([provider], map: "idx_oauth_connections_provider")
+  @@index([state], map: "idx_oauth_connections_state")
+  @@map("oauth_connections")
+}
+
+// ============================================================================
+// BILLING SUBSCRIPTIONS - Stripe integration
+// ============================================================================
+
+model BillingSubscription {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  stripeCustomerId    String    @unique @map("stripe_customer_id") @db.VarChar(255)
+  stripeSubscriptionId String?  @unique @map("stripe_subscription_id") @db.VarChar(255)
+  status              String    @db.VarChar(50) // active, canceled, past_due, etc.
+  plan                String    @db.VarChar(50) // starter, professional, enterprise
+  interval            String    @db.VarChar(20) // month, year
+  currentPeriodStart  DateTime  @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd    DateTime  @map("current_period_end") @db.Timestamptz(6)
+  cancelAtPeriodEnd   Boolean   @default(false) @map("cancel_at_period_end")
+  canceledAt          DateTime? @map("canceled_at") @db.Timestamptz(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  metadata            Json      @default("{}") @db.JsonB
+
+  @@index([tenantId], map: "idx_billing_subscriptions_tenant_id")
+  @@index([status], map: "idx_billing_subscriptions_status")
+  @@map("billing_subscriptions")
+}
+
+// ============================================================================
+// AUDIT LOGS - Platform-level events
+// ============================================================================
+
+// ============================================================================
+// ENTERPRISE AUDIT LOG - Blockchain-style tamper-evident audit trail
+// ============================================================================
+// COMPLIANCE: SOC2-CC6.1, GDPR-Article30, HIPAA-164.312
+// FEATURES: Cryptographic hash chaining, immutable records, chain integrity verification
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+
+  // Enterprise Audit Fields
+  eventHash     String   @map("event_hash") @db.VarChar(64) // SHA-256 hash for tamper detection
+  eventType     String   @map("event_type") @db.VarChar(100) // Enum: AUTH_LOGIN_SUCCESS, RESOURCE_CREATED, etc.
+  previousHash  String?  @map("previous_hash") @db.VarChar(64) // Hash of previous event (blockchain-style chaining)
+
+  // Actor & Resource Context
+  actorId       String?  @map("actor_id") @db.Uuid // Who performed the action (userId)
+  userId        String?  @map("user_id") @db.Uuid // Legacy field (maps to actorId)
+  tenantId      String?  @map("tenant_id") @db.Uuid
+  resourceType  String?  @map("resource_type") @db.VarChar(100) // e.g., "Project", "User", "Model"
+  resourceId    String?  @map("resource_id") @db.Uuid
+
+  // Legacy Fields (backward compatibility)
+  action        String   @db.VarChar(100) // Legacy: use eventType instead
+  resource      String   @db.VarChar(100) // Legacy: use resourceType instead
+
+  // Event Data & Metadata
+  eventData     Json     @default("{}") @map("event_data") @db.JsonB // Structured event details
+  details       Json     @default("{}") @db.JsonB // Legacy field (use eventData instead)
+
+  // Request Context
+  sourceIp      String?  @map("source_ip") @db.VarChar(45)
+  ipAddress     String?  @map("ip_address") @db.VarChar(45) // Legacy field (maps to sourceIp)
+  userAgent     String?  @map("user_agent") @db.Text
+  sessionId     String?  @map("session_id") @db.VarChar(255)
+  requestId     String?  @map("request_id") @db.VarChar(255) // Correlation ID for distributed tracing
+
+  // Timestamps
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([eventHash], map: "idx_audit_logs_event_hash")
+  @@index([eventType], map: "idx_audit_logs_event_type")
+  @@index([actorId], map: "idx_audit_logs_actor_id")
+  @@index([userId], map: "idx_audit_logs_user_id")
+  @@index([tenantId], map: "idx_audit_logs_tenant_id")
+  @@index([resourceType, resourceId], map: "idx_audit_logs_resource")
+  @@index([action], map: "idx_audit_logs_action")
+  @@index([createdAt], map: "idx_audit_logs_created_at")
+  @@index([previousHash], map: "idx_audit_logs_previous_hash")
+  @@map("audit_logs")
+}

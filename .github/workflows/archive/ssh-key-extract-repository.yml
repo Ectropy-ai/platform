@@ -1,0 +1,73 @@
+name: SSH Key Extract - Repository Level
+
+on:
+  workflow_dispatch: # Manual trigger only
+
+permissions:
+  contents: read
+
+jobs:
+  extract-ssh-key:
+    name: Extract Repository SSH Key Value
+    runs-on: ubuntu-latest
+    # NOTE: Uses repository secrets (not environment-scoped)
+    # Purpose: Extract DO_SSH_PRIVATE_KEY to update production environment DO_SSH_KEY
+
+    steps:
+      - name: Extract SSH Private Key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+        run: |
+          echo "=== SSH Private Key Extraction ==="
+          echo "Source: Repository-level secret DO_SSH_PRIVATE_KEY"
+          echo "Created: 2026-01-26 04:27:03Z"
+          echo "Updated: 2026-01-26 04:27:15Z"
+          echo ""
+          echo "Purpose: Copy this value to production environment secret DO_SSH_KEY"
+          echo ""
+          echo "=== BEGIN SSH PRIVATE KEY ==="
+          echo "$SSH_PRIVATE_KEY"
+          echo "=== END SSH PRIVATE KEY ==="
+          echo ""
+          echo "Next Steps:"
+          echo "1. Copy the SSH private key from logs above"
+          echo "2. Navigate to: https://github.com/luhtech/Ectropy/settings/environments"
+          echo "3. Select 'production' environment"
+          echo "4. Update secret 'DO_SSH_KEY' with copied value"
+          echo "5. Re-run terraform-secrets-extract-production.yml workflow"
+          echo "6. Validate terraform.tfvars has actual SSH key (not PLACEHOLDER)"
+
+      - name: Validation
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+        run: |
+          # Validate SSH key format
+          if echo "$SSH_PRIVATE_KEY" | grep -q "BEGIN.*PRIVATE KEY"; then
+            echo "✅ SSH key format validated (contains BEGIN PRIVATE KEY)"
+          else
+            echo "❌ ERROR: SSH key does not appear to be valid format"
+            exit 1
+          fi
+
+          # Validate not placeholder
+          if echo "$SSH_PRIVATE_KEY" | grep -q "PLACEHOLDER"; then
+            echo "❌ ERROR: SSH key contains PLACEHOLDER value"
+            exit 1
+          fi
+
+          echo "✅ SSH key validation passed"
+
+      - name: Summary
+        run: |
+          echo "## ✅ Repository SSH Key Extracted" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Source:** Repository secret \`DO_SSH_PRIVATE_KEY\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Destination:** Production environment secret \`DO_SSH_KEY\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Manual Steps Required:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Copy SSH key from workflow logs (step: Extract SSH Private Key)" >> $GITHUB_STEP_SUMMARY
+          echo "2. Update production environment secret via GitHub UI" >> $GITHUB_STEP_SUMMARY
+          echo "3. Re-run terraform secrets extraction workflow" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Pattern:** Repository secret → Manual copy → Production environment secret → Terraform GitOps" >> $GITHUB_STEP_SUMMARY
+          echo "**ROOT CAUSE #173:** Production environment DO_SSH_KEY contains placeholder value" >> $GITHUB_STEP_SUMMARY

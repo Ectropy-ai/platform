@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:paas:pay-application",
+  "title": "Pay Application (AIA G702)",
+  "description": "Monthly payment application following AIA G702/G703 format",
+  "type": "object",
+  "required": [
+    "id",
+    "contractId",
+    "applicationNumber",
+    "periodEnd",
+    "lineItems"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^PA-[0-9]{4}-[0-9]{4,}$",
+      "description": "Unique payment application identifier"
+    },
+    "contractId": {
+      "type": "string",
+      "description": "Parent contract reference"
+    },
+    "applicationNumber": {
+      "type": "number",
+      "minimum": 1,
+      "description": "Sequential application number"
+    },
+    "periodEnd": {
+      "type": "string",
+      "format": "date",
+      "description": "End of payment period"
+    },
+    "lineItems": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/G703LineItem" },
+      "description": "Schedule of values line items (G703)"
+    },
+    "retainage": {
+      "$ref": "#/definitions/RetainageCalculation",
+      "description": "Retainage withholding calculation"
+    },
+    "changeOrders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "changeOrderId": { "type": "string" },
+          "description": { "type": "string" },
+          "amount": { "type": "number" },
+          "approved": { "type": "boolean" }
+        }
+      }
+    },
+    "totalAmount": { "type": "number" },
+    "previousPayments": { "type": "number" },
+    "currentPayment": { "type": "number" },
+    "balanceToFinish": { "type": "number" },
+    "status": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "SUBMITTED",
+        "UNDER_REVIEW",
+        "APPROVED",
+        "REJECTED",
+        "PAID"
+      ]
+    },
+    "submittedDate": { "type": "string", "format": "date-time" },
+    "approvedDate": { "type": "string", "format": "date-time" },
+    "paidDate": { "type": "string", "format": "date-time" },
+    "lienWaivers": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Attached lien waiver IDs"
+    }
+  },
+  "definitions": {
+    "G703LineItem": {
+      "type": "object",
+      "required": ["itemNumber", "description", "scheduledValue"],
+      "properties": {
+        "itemNumber": { "type": "string" },
+        "description": { "type": "string" },
+        "scheduledValue": { "type": "number" },
+        "workCompletedPrevious": { "type": "number" },
+        "workCompletedThisPeriod": { "type": "number" },
+        "materialsStoredPrevious": { "type": "number" },
+        "materialsStoredThisPeriod": { "type": "number" },
+        "totalCompletedAndStored": { "type": "number" },
+        "percentComplete": { "type": "number", "minimum": 0, "maximum": 100 },
+        "balanceToFinish": { "type": "number" },
+        "retainagePercent": { "type": "number" }
+      }
+    },
+    "RetainageCalculation": {
+      "type": "object",
+      "properties": {
+        "retainagePercent": {
+          "type": "number",
+          "description": "Contract retainage percentage"
+        },
+        "totalRetainageHeld": { "type": "number" },
+        "retainageThisPeriod": { "type": "number" },
+        "retainageReleased": { "type": "number" },
+        "currentRetainageBalance": { "type": "number" }
+      }
+    }
+  }
+}

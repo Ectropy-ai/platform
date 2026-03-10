@@ -1,0 +1,122 @@
+{
+  "name": "staging",
+  "description": "Staging environment configuration for Ectropy Platform",
+  "environment": {
+    "NODE_ENV": "staging",
+    "PORT": "4000",
+    "LOG_LEVEL": "info"
+  },
+  "database": {
+    "host": "staging-db.ectropy.internal",
+    "port": 5432,
+    "name": "ectropy_staging",
+    "maxConnections": 20,
+    "ssl": true,
+    "backup": {
+      "enabled": true,
+      "schedule": "0 2 * * *",
+      "retentionDays": 7
+    }
+  },
+  "redis": {
+    "host": "staging-redis.ectropy.internal",
+    "port": 6379,
+    "maxMemory": "512mb",
+    "keyPrefix": "ectropy:staging:",
+    "persistence": true
+  },
+  "security": {
+    "rateLimiting": {
+      "max": 500,
+      "windowMs": 900000
+    },
+    "jwt": {
+      "expiresIn": "15m",
+      "refreshExpiresIn": "24h",
+      "issuer": "ectropy-staging",
+      "audience": "ectropy-staging-users"
+    },
+    "cors": {
+      "origins": [
+        "https://staging.ectropy.com",
+        "https://staging-api.ectropy.com"
+      ]
+    },
+    "ssl": {
+      "enabled": true,
+      "enforceHttps": true
+    }
+  },
+  "speckle": {
+    "serverUrl": "https://speckle-staging.ectropy.com",
+    "frontendUrl": "https://staging-viewer.ectropy.com",
+    "fileSizeLimit": 1000,
+    "timeout": 1800
+  },
+  "monitoring": {
+    "enabled": true,
+    "healthCheck": {
+      "enabled": true,
+      "interval": 30000
+    },
+    "metrics": {
+      "enabled": true,
+      "port": 9090
+    },
+    "logging": {
+      "level": "info",
+      "format": "json",
+      "fileRotation": true
+    }
+  },
+  "features": {
+    "demoMode": false,
+    "debugMode": false,
+    "maintenanceMode": false,
+    "newUserRegistration": true,
+    "emailVerification": true
+  },
+  "deployment": {
+    "version": "staging",
+    "replicas": 2,
+    "resources": {
+      "requests": {
+        "cpu": "500m",
+        "memory": "1Gi"
+      },
+      "limits": {
+        "cpu": "1",
+        "memory": "2Gi"
+      }
+    },
+    "readinessProbe": {
+      "path": "/health",
+      "port": 4000,
+      "initialDelaySeconds": 30,
+      "periodSeconds": 10
+    },
+    "livenessProbe": {
+      "path": "/health",
+      "port": 4000,
+      "initialDelaySeconds": 60,
+      "periodSeconds": 30
+    }
+  },
+  "secrets": {
+    "note": "Secrets are loaded from environment variables and Kubernetes secrets",
+    "required": [
+      "DB_PASSWORD",
+      "REDIS_PASSWORD",
+      "JWT_SECRET",
+      "JWT_REFRESH_SECRET",
+      "SESSION_SECRET",
+      "ENCRYPTION_KEY",
+      "SPECKLE_SESSION_SECRET"
+    ],
+    "validation": {
+      "minPasswordLength": 32,
+      "requireSpecialChars": true,
+      "secretStrengthCheck": true
+    }
+  }
+}

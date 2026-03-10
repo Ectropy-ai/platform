@@ -1,0 +1,24 @@
+# =============================================================================
+# GRAFANA DASHBOARD PROVISIONING - ROOT CAUSE #91 FIX
+# =============================================================================
+#
+# PROBLEM: Dashboards not auto-loading in Grafana despite provisioning config
+# ROOT CAUSE: Path mismatch between docker-compose volume mount and provisioning path
+#   - docker-compose.monitoring.yml mounts to: /etc/grafana/provisioning/dashboards
+#   - This config was pointing to: /var/lib/grafana/dashboards (wrong path)
+# SOLUTION: Update path to match actual docker-compose volume mount location
+# PATTERN: Enterprise Grafana auto-provisioning (Google SRE, Netflix, Datadog)
+#
+# =============================================================================
+
+apiVersion: 1
+
+providers:
+  - name: 'ectropy'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30 # Scan for dashboard changes every 30s
+    allowUiUpdates: true # Allow manual edits in UI
+    options:
+      # ROOT CAUSE #91 FIX: Changed from /var/lib/grafana/dashboards to match docker-compose mount
+      path: /etc/grafana/provisioning/dashboards

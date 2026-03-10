@@ -1,0 +1,103 @@
+name: 🚀 Simple Feature Request
+description: Quick feature request for AI agents to implement
+title: '[Feature]: '
+labels: ['feature', 'agent-ready']
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Quick Feature Request
+        Create a simple feature request that AI agents can implement automatically.
+
+        **Perfect for:**
+        - UI component additions
+        - Page updates
+        - Small feature enhancements
+        - Bug fixes
+
+        **Time to complete this form:** ~30 seconds
+
+  - type: input
+    id: feature-name
+    attributes:
+      label: Feature Name
+      description: One-line description of what you want to build
+      placeholder: 'Dark mode toggle'
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-to-build
+    attributes:
+      label: What to Build
+      description: Explain in 1-3 sentences what you want
+      placeholder: |
+        Add toggle switch to settings page. Click switches theme light/dark. 
+        Save preference to localStorage.
+    validations:
+      required: true
+
+  - type: textarea
+    id: files-to-change
+    attributes:
+      label: Files to Change
+      description: List the files that need to be modified (best guess is fine)
+      placeholder: |
+        - apps/web-dashboard/src/pages/SettingsPage.tsx
+        - apps/web-dashboard/src/theme/ectropy-theme.tsx
+    validations:
+      required: true
+
+  - type: textarea
+    id: done-when
+    attributes:
+      label: Done When
+      description: What are the success criteria? (3-5 items)
+      placeholder: |
+        - [ ] Toggle visible on /settings
+        - [ ] Click switches theme
+        - [ ] Preference persists on reload
+        - [ ] Mobile friendly
+        - [ ] Tests passing
+    validations:
+      required: true
+
+  - type: input
+    id: branch-name
+    attributes:
+      label: Branch Name
+      description: Branch name for this feature (kebab-case)
+      placeholder: 'feature/dark-mode-toggle'
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: requirements
+    attributes:
+      label: Requirements
+      description: Confirm these requirements
+      options:
+        - label: This follows Ectropy enterprise standards (no shortcuts)
+          required: true
+        - label: I will test the preview deployment before merging
+          required: true
+        - label: I will review the code changes (or trust CI if tests pass)
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        ## What Happens Next?
+
+        1. **Agent sees this issue** → Creates branch
+        2. **Agent writes code** → Following enterprise standards
+        3. **Agent runs tests** → Ensures quality
+        4. **Agent creates PR** → With preview link & screenshots
+        5. **You review** → 2 minutes on mobile or desktop
+        6. **You merge** → Feature deployed automatically
+
+        **Total time:** ~2-3 minutes 🚀

@@ -1,0 +1,134 @@
+# AI Agent Configuration for Ectropy Platform
+agents:
+  update_frequency: every_4_hours
+  report_channel: '#ectropy-ai-agents'
+  escalation_time: 8_hours
+  max_concurrent_tasks: 3
+
+  # Agent coordination settings
+  coordination:
+    task_assignment: 'first_available'
+    conflict_resolution: 'priority_based'
+    status_sync_interval: '30_minutes'
+
+  # Performance thresholds
+  thresholds:
+    build_time_limit: 180
+    test_coverage_minimum: 80
+    response_time_p95: 200
+    memory_usage_limit: '512MB'
+
+  # Agent-specific configurations
+  agent_configs:
+    AI_AGENT_001:
+      task: '1.1-fix-mcp-build-path'
+      priority: 'critical'
+      estimated_hours: 4
+      dependencies: []
+
+    AI_AGENT_002:
+      task: '1.2-fix-api-gateway-jest'
+      priority: 'high'
+      estimated_hours: 6
+      dependencies: []
+
+    AI_AGENT_003:
+      task: '1.3-implement-secrets-scanning'
+      priority: 'critical'
+      estimated_hours: 3
+      dependencies: []
+
+    AI_AGENT_004:
+      task: '2.1-setup-playwright-e2e'
+      priority: 'medium'
+      estimated_hours: 8
+      dependencies: ['1.2']
+
+    AI_AGENT_005:
+      task: '2.2-add-visual-regression'
+      priority: 'medium'
+      estimated_hours: 6
+      dependencies: ['2.1']
+
+    AI_AGENT_006:
+      task: '2.3-performance-testing'
+      priority: 'medium'
+      estimated_hours: 6
+      dependencies: ['2.1']
+
+    AI_AGENT_007:
+      task: '3.1-mcp-agent-framework'
+      priority: 'high'
+      estimated_hours: 12
+      dependencies: ['1.1']
+
+    AI_AGENT_008:
+      task: '3.2-semantic-search'
+      priority: 'medium'
+      estimated_hours: 8
+      dependencies: ['3.1']
+
+    AI_AGENT_009:
+      task: '3.3-document-processing'
+      priority: 'high'
+      estimated_hours: 12
+      dependencies: ['3.1']
+
+    AI_AGENT_010:
+      task: '4.1-monitoring-stack'
+      priority: 'critical'
+      estimated_hours: 8
+      dependencies: ['3.1']
+
+    AI_AGENT_011:
+      task: '4.2-security-hardening'
+      priority: 'critical'
+      estimated_hours: 10
+      dependencies: ['1.3']
+
+    AI_AGENT_012:
+      task: '4.3-load-balancing'
+      priority: 'high'
+      estimated_hours: 8
+      dependencies: ['4.1']
+
+  # Command definitions
+  commands:
+    status: 'grep $AGENT_ID docs/development/ROADMAP_AI_AGENTS.md'
+    blockers: 'gh issue list --label blocked --assignee $AGENT_ID'
+    help: 'gh issue create --label help-wanted --assignee $AGENT_ID'
+    progress: 'bash scripts/ai-agents/update-progress.sh $AGENT_ID $STATUS'
+    validate: 'bash scripts/ai-agents/validate-task.sh $AGENT_ID'
+
+  # Communication protocols
+  communication:
+    success_notification: 'slack_webhook'
+    error_notification: 'slack_webhook + email'
+    daily_report: 'github_comment'
+    weekly_summary: 'github_issue'
+
+  # Quality gates
+  quality_gates:
+    pre_merge:
+      - 'pnpm lint'
+      - 'pnpm test --coverage'
+      - 'pnpm nx affected:build'
+      - 'bash scripts/security/validate-no-secrets.sh'
+
+    pre_deployment:
+      - 'pnpm nx e2e'
+      - 'pnpm audit:security'
+      - 'docker build -t test .'
+
+  # Rollback procedures
+  rollback:
+    auto_rollback_on_failure: true
+    rollback_window: '2_hours'
+    rollback_command: 'git revert HEAD --no-edit && git push'
+
+  # Monitoring and alerts
+  monitoring:
+    health_check_url: '/api/health'
+    alert_on_failure: true
+    metric_collection: true
+    log_level: 'info'

@@ -1,0 +1,232 @@
+name: 'Setup pnpm with Enterprise Retry Logic'
+description: 'Installs pnpm dependencies with industry-standard timeout, retry, and diagnostic capabilities'
+author: 'Ectropy Platform Team'
+
+# Enterprise-grade dependency installation based on:
+# - GitHub Actions best practices (2024-2025)
+# - pnpm official CI/CD documentation
+# - AWS DevOps Blog: Self-hosted runners at scale
+# - 99.9% reliability target
+
+inputs:
+  timeout-seconds:
+    description: 'Timeout per installation attempt (seconds)'
+    required: false
+    default: '600' # 10 minutes per industry standard
+  max-attempts:
+    description: 'Maximum retry attempts'
+    required: false
+    default: '3'
+  frozen-lockfile:
+    description: 'Use --frozen-lockfile flag (recommended for CI)'
+    required: false
+    default: 'true'
+  cache-clear-on-failure:
+    description: 'Clear pnpm cache after second failure'
+    required: false
+    default: 'true'
+  network-diagnostics:
+    description: 'Run network diagnostics on timeout'
+    required: false
+    default: 'true'
+
+outputs:
+  install-duration:
+    description: 'Total installation duration in seconds'
+    value: ${{ steps.install.outputs.duration }}
+  attempts-used:
+    description: 'Number of attempts required for success'
+    value: ${{ steps.install.outputs.attempts }}
+  cache-cleared:
+    description: 'Whether cache was cleared during process'
+    value: ${{ steps.install.outputs.cache-cleared }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 📊 Pre-flight validation
+      shell: bash
+      run: |
+        echo "::group::Pre-flight System Validation"
+        echo "🔍 Validating environment for pnpm installation..."
+
+        # Verify Node.js is available
+        if ! command -v node >/dev/null 2>&1; then
+          echo "❌ ERROR: Node.js not found. Run setup-node action first."
+          exit 1
+        fi
+
+        # Verify pnpm is available
+        if ! command -v pnpm >/dev/null 2>&1; then
+          echo "❌ ERROR: pnpm not found. Enable corepack or install pnpm."
+          exit 1
+        fi
+
+        # Check disk space (require at least 5GB)
+        if [ "$RUNNER_OS" = "Linux" ] || [ "$RUNNER_OS" = "macOS" ]; then
+          available=$(df -BG . | tail -1 | awk '{print $4}' | sed 's/G//')
+          if [ "$available" -lt 5 ]; then
+            echo "⚠️  WARNING: Low disk space: ${available}GB available (5GB recommended)"
+          else
+            echo "✅ Disk space: ${available}GB available"
+          fi
+        fi
+
+        # Display versions
+        echo "Node.js version: $(node --version)"
+        echo "pnpm version: $(pnpm --version)"
+        echo "OS: $RUNNER_OS"
+
+        echo "::endgroup::"
+
+    - name: ⚙️  Configure pnpm retry settings
+      shell: bash
+      run: |
+        echo "::group::Configure pnpm Enterprise Settings"
+        echo "🔧 Configuring pnpm for enterprise-grade reliability..."
+
+        # Enterprise retry configuration (based on pnpm docs + industry standards)
+        pnpm config set fetch-retries 5
+        pnpm config set fetch-retry-mintimeout 10000  # 10 seconds
+        pnpm config set fetch-retry-maxtimeout 60000  # 60 seconds
+        pnpm config set network-timeout 300000        # 5 minutes
+
+        # Verify configuration
+        echo "✅ pnpm configuration:"
+        pnpm config list --json | grep -E "(fetch-retries|fetch-retry|network-timeout)" || true
+
+        echo "::endgroup::"
+
+    - name: 📦 Install dependencies with retry logic
+      id: install
+      shell: bash
+      run: |
+        echo "::group::Enterprise Dependency Installation"
+
+        max_attempts=${{ inputs.max-attempts }}
+        timeout_seconds=${{ inputs.timeout-seconds }}
+        cache_cleared="false"
+        start_time=$(date +%s)
+
+        # Determine lockfile flag
+        lockfile_flag=""
+        if [ "${{ inputs.frozen-lockfile }}" = "true" ]; then
+          lockfile_flag="--frozen-lockfile"
+          echo "🔒 Using frozen lockfile (CI mode)"
+        fi
+
+        # Retry loop with exponential backoff
+        for attempt in $(seq 1 $max_attempts); do
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🔄 Dependency installation attempt $attempt of $max_attempts"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Timeout: ${timeout_seconds}s"
+          echo "Command: pnpm install $lockfile_flag"
+          echo ""
+
+          attempt_start=$(date +%s)
+
+          # Execute with timeout
+          if timeout $timeout_seconds pnpm install $lockfile_flag; then
+            attempt_duration=$(($(date +%s) - attempt_start))
+            total_duration=$(($(date +%s) - start_time))
+
+            echo ""
+            echo "✅ SUCCESS: Dependencies installed in ${attempt_duration}s"
+            echo "   Total duration: ${total_duration}s"
+            echo "   Attempts used: $attempt"
+
+            # Set outputs
+            echo "duration=$total_duration" >> $GITHUB_OUTPUT
+            echo "attempts=$attempt" >> $GITHUB_OUTPUT
+            echo "cache-cleared=$cache_cleared" >> $GITHUB_OUTPUT
+
+            # Display summary
+            echo ""
+            echo "📊 Installation Summary:"
+            pnpm list --depth=0 | head -20 || true
+
+            echo "::endgroup::"
+            exit 0
+          fi
+
+          # Installation failed
+          attempt_duration=$(($(date +%s) - attempt_start))
+          echo "❌ Attempt $attempt failed after ${attempt_duration}s"
+
+          # Check if timeout occurred
+          if [ $attempt_duration -ge $timeout_seconds ]; then
+            echo "⏱️  Installation timed out"
+
+            # Run network diagnostics
+            if [ "${{ inputs.network-diagnostics }}" = "true" ] && [ $attempt -lt $max_attempts ]; then
+              echo ""
+              echo "🔍 Running network diagnostics..."
+
+              # Test registry connectivity
+              if timeout 5 curl -s https://registry.npmjs.org > /dev/null; then
+                echo "✅ npm registry reachable"
+              else
+                echo "⚠️  npm registry unreachable or slow"
+              fi
+
+              # Test DNS resolution
+              if timeout 2 nslookup registry.npmjs.org > /dev/null 2>&1; then
+                echo "✅ DNS resolution working"
+              else
+                echo "⚠️  DNS resolution issues"
+              fi
+            fi
+          fi
+
+          # Determine if we should retry
+          if [ $attempt -lt $max_attempts ]; then
+            # Calculate exponential backoff: 10s, 30s, 90s, ...
+            wait_time=$((10 * 3 ** (attempt - 1)))
+            if [ $wait_time -gt 120 ]; then
+              wait_time=120  # Cap at 2 minutes
+            fi
+
+            echo ""
+            echo "⏳ Waiting ${wait_time}s before retry..."
+
+            # Clear cache on second failure (if enabled)
+            if [ $attempt -eq 2 ] && [ "${{ inputs.cache-clear-on-failure }}" = "true" ]; then
+              echo ""
+              echo "🧹 Clearing pnpm cache to recover from potential corruption..."
+              pnpm store prune || true
+              cache_cleared="true"
+              echo "✅ Cache cleared"
+            fi
+
+            sleep $wait_time
+          else
+            # All attempts exhausted
+            total_duration=$(($(date +%s) - start_time))
+
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "❌ FAILURE: All $max_attempts attempts failed"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "Total duration: ${total_duration}s"
+            echo "Cache cleared: $cache_cleared"
+            echo ""
+            echo "📋 Troubleshooting suggestions:"
+            echo "  1. Check network connectivity to https://registry.npmjs.org"
+            echo "  2. Verify pnpm-lock.yaml is not corrupted"
+            echo "  3. Check runner disk space: df -h"
+            echo "  4. Review pnpm configuration: pnpm config list"
+            echo "  5. Try clearing pnpm store manually: pnpm store prune"
+            echo ""
+            echo "🔍 Last pnpm config:"
+            pnpm config list || true
+
+            echo "::endgroup::"
+            exit 1
+          fi
+        done
+
+branding:
+  icon: 'package'
+  color: 'blue'

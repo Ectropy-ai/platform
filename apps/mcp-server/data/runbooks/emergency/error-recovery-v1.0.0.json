@@ -1,0 +1,1014 @@
+{
+  "version": "1.0.0",
+  "environment": "all",
+  "runbookType": "emergency",
+  "metadata": {
+    "catalogId": "emergency-runbook-v1-0-0",
+    "name": "Emergency Error Recovery",
+    "type": "emergency",
+    "purpose": "Comprehensive emergency error recovery framework providing graceful error handling, automated recovery strategies, and rollback procedures for critical system failures",
+    "maintainer": "DevOps Team",
+    "author": "Enterprise DevOps",
+    "created": "2025-11-16T00:00:00Z",
+    "lastUpdated": "2025-11-16T00:00:00Z",
+    "estimatedDuration": "15 minutes",
+    "complexity": "critical",
+    "priority": "critical",
+    "relatedDocuments": [
+      "scripts/deployment/error-recovery.sh",
+      "docs/TROUBLESHOOTING.md",
+      "evidence/production-readiness-assessment-2025-11-14.md"
+    ],
+    "sourceFile": "scripts/deployment/error-recovery.sh",
+    "conversionDate": "2025-11-16T00:00:00Z",
+    "schemaVersion": "1.0.0"
+  },
+  "executiveSummary": {
+    "description": "Enterprise-grade emergency recovery runbook that provides systematic error detection, categorization, and recovery strategies. Implements retry logic, automated rollback procedures, error context preservation, and graceful degradation for production environments.",
+    "status": "READY",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "CRITICAL",
+    "keyChanges": [
+      "Multi-strategy error recovery (retry, rollback, skip, fail)",
+      "Automated error context preservation and logging",
+      "Rollback script detection and execution",
+      "Graceful degradation patterns",
+      "Production-safe error handling with audit trail",
+      "Service health validation post-recovery",
+      "Emergency contact escalation procedures"
+    ],
+    "prerequisites": [
+      "System monitoring and logging infrastructure operational",
+      "Rollback scripts prepared in /tmp directory",
+      "Error logging and alerting configured",
+      "Administrative access to affected systems",
+      "Communication channels established for incident management"
+    ],
+    "impact": {
+      "systems": [
+        "All production services",
+        "API Gateway",
+        "Database Layer",
+        "Container Infrastructure",
+        "Message Queue Systems",
+        "File Storage Services"
+      ],
+      "downtime": "Varies by error severity - 0 to 30 minutes",
+      "rollbackTime": "5 to 15 minutes depending on recovery strategy"
+    }
+  },
+  "preFlightChecks": [
+    {
+      "id": "monitoring-active",
+      "order": 1,
+      "category": "infrastructure",
+      "name": "Monitoring Systems Active",
+      "description": "Verify system monitoring and logging infrastructure is operational",
+      "command": "docker ps --filter name=monitoring --format '{{.Status}}'",
+      "expectedResult": "Monitoring containers running",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "All monitoring containers show 'Up' status",
+      "onFailure": {
+        "action": "warn",
+        "message": "Monitoring systems offline - recovery visibility limited"
+      }
+    },
+    {
+      "id": "logging-accessible",
+      "order": 2,
+      "category": "infrastructure",
+      "name": "Logging Infrastructure",
+      "description": "Verify logging system is accessible and accepting logs",
+      "command": "test -d /var/log && echo 'OK' || echo 'FAIL'",
+      "expectedResult": "OK",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Log directory accessible",
+      "onFailure": {
+        "action": "warn",
+        "message": "Logging infrastructure unavailable - error context may be lost"
+      }
+    },
+    {
+      "id": "rollback-scripts-available",
+      "order": 3,
+      "category": "configuration",
+      "name": "Rollback Scripts Present",
+      "description": "Check if rollback scripts are available in /tmp directory",
+      "command": "ls /tmp/rollback-*.sh 2>/dev/null | wc -l",
+      "expectedResult": "One or more rollback scripts present",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "validationLogic": "Count >= 1 rollback scripts",
+      "onFailure": {
+        "action": "warn",
+        "message": "No rollback scripts found - manual intervention may be required"
+      }
+    },
+    {
+      "id": "disk-space-sufficient",
+      "order": 4,
+      "category": "infrastructure",
+      "name": "Disk Space Available",
+      "description": "Verify sufficient disk space for error logs and recovery operations",
+      "command": "df -h / | tail -1 | awk '{print $5}' | sed 's/%//'",
+      "expectedResult": "Disk usage < 90%",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Disk usage percentage < 90",
+      "onFailure": {
+        "action": "abort",
+        "message": "Insufficient disk space - clean up before recovery"
+      }
+    },
+    {
+      "id": "network-connectivity",
+      "order": 5,
+      "category": "infrastructure",
+      "name": "Network Connectivity",
+      "description": "Verify network connectivity for external service recovery",
+      "command": "ping -c 1 8.8.8.8 > /dev/null 2>&1 && echo 'OK' || echo 'FAIL'",
+      "expectedResult": "OK",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "validationLogic": "Ping succeeds",
+      "onFailure": {
+        "action": "warn",
+        "message": "Network connectivity issues - external dependencies may fail"
+      }
+    },
+    {
+      "id": "backup-verification",
+      "order": 6,
+      "category": "dependencies",
+      "name": "Recent Backup Available",
+      "description": "Verify recent backup exists for critical data",
+      "command": "find /backups -name '*.sql' -mtime -1 | wc -l",
+      "expectedResult": "At least one backup from last 24 hours",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Backup file count >= 1",
+      "onFailure": {
+        "action": "warn",
+        "message": "No recent backup found - data loss risk if rollback required"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Error Detection and Classification",
+      "description": "Identify and classify the error based on exit code, context, and system state",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Capture Error Context",
+          "description": "Capture error code, source location, and system state at time of failure",
+          "command": "echo \"Error: $? from ${BASH_SOURCE[0]##*/}:${LINENO}\" | tee -a /var/log/error-recovery.log",
+          "purpose": "Preserve error context for analysis and recovery decision",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0"
+          },
+          "onFailure": {
+            "action": "retry",
+            "maxRetries": 1,
+            "message": "Failed to capture error context - attempting retry"
+          }
+        },
+        {
+          "step": "1.2",
+          "name": "Determine Error Severity",
+          "description": "Classify error as INFO, WARNING, ERROR, or CRITICAL based on exit code and context",
+          "commands": [
+            "if [ $ERROR_CODE -eq 0 ]; then echo 'INFO'; elif [ $ERROR_CODE -lt 10 ]; then echo 'WARNING'; elif [ $ERROR_CODE -lt 100 ]; then echo 'ERROR'; else echo 'CRITICAL'; fi"
+          ],
+          "purpose": "Categorize error for appropriate recovery strategy selection",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "Severity level (INFO/WARNING/ERROR/CRITICAL)",
+          "validation": {
+            "type": "output",
+            "criteria": "Returns valid severity level"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Cannot determine error severity - manual intervention required"
+          }
+        },
+        {
+          "step": "1.3",
+          "name": "Log Error Details",
+          "description": "Write comprehensive error details to structured log",
+          "command": "log_error \"Error occurred\" \"{\\\"error_code\\\": $ERROR_CODE, \\\"context\\\": \\\"$ERROR_CONTEXT\\\", \\\"strategy\\\": \\\"$RECOVERY_STRATEGY\\\"}\"",
+          "purpose": "Create audit trail and enable post-incident analysis",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": "Log entry written to file"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Warning: Error logging failed - continuing with recovery"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Recovery Strategy Selection",
+      "description": "Select and prepare appropriate recovery strategy based on error classification",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Evaluate Recovery Options",
+          "description": "Analyze available recovery strategies: retry, rollback, skip, or fail",
+          "commands": [
+            "echo \"Evaluating recovery strategies for: $ERROR_CONTEXT\"",
+            "echo \"Available strategies: retry, rollback, skip, fail\""
+          ],
+          "purpose": "Determine feasible recovery approaches",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "List of applicable strategies",
+          "onFailure": {
+            "action": "abort",
+            "message": "Cannot evaluate recovery options"
+          }
+        },
+        {
+          "step": "2.2",
+          "name": "Select Recovery Strategy",
+          "description": "Choose recovery strategy based on error type and system state",
+          "command": "RECOVERY_STRATEGY=${RECOVERY_STRATEGY:-$STRATEGY_FAIL}; echo \"Selected strategy: $RECOVERY_STRATEGY\"",
+          "purpose": "Determine recovery approach",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "Selected strategy name",
+          "validation": {
+            "type": "output",
+            "criteria": "Returns one of: retry, rollback, skip, fail"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Invalid recovery strategy selected"
+          }
+        },
+        {
+          "step": "2.3",
+          "name": "Prepare Recovery Environment",
+          "description": "Set up necessary environment variables and validate preconditions",
+          "commands": [
+            "export ERROR_RECOVERY_MODE=true",
+            "export RECOVERY_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "mkdir -p /tmp/recovery-logs"
+          ],
+          "purpose": "Initialize recovery execution environment",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to prepare recovery environment"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Execute Recovery Strategy",
+      "description": "Execute the selected recovery strategy with monitoring and validation",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Strategy: Retry Operation",
+          "description": "Attempt to retry the failed operation with exponential backoff",
+          "commands": [
+            "if [ \"$RECOVERY_STRATEGY\" = \"retry\" ]; then",
+            "  log_info \"Attempting retry for $ERROR_CONTEXT\"",
+            "  for attempt in 1 2 3; do",
+            "    sleep $((2 ** $attempt))",
+            "    if retry_operation; then exit 0; fi",
+            "  done",
+            "  log_error \"All retry attempts failed\"",
+            "  exit 1",
+            "fi"
+          ],
+          "purpose": "Retry transient failures with backoff",
+          "required": false,
+          "automatable": true,
+          "timeout": "120s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Successful retry returns 0"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "rollbackStep": "4.1",
+            "message": "Retry strategy failed - initiating rollback"
+          }
+        },
+        {
+          "step": "3.2",
+          "name": "Strategy: Rollback Changes",
+          "description": "Execute rollback script to revert changes",
+          "commands": [
+            "if [ \"$RECOVERY_STRATEGY\" = \"rollback\" ]; then",
+            "  log_info \"Initiating rollback for $ERROR_CONTEXT\"",
+            "  perform_rollback \"$ERROR_CONTEXT\"",
+            "fi"
+          ],
+          "purpose": "Revert system to last known good state",
+          "required": false,
+          "automatable": true,
+          "timeout": "300s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Rollback completes successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Rollback failed - manual intervention required immediately"
+          }
+        },
+        {
+          "step": "3.3",
+          "name": "Strategy: Skip and Continue",
+          "description": "Log warning and continue execution for non-critical errors",
+          "commands": [
+            "if [ \"$RECOVERY_STRATEGY\" = \"skip\" ]; then",
+            "  log_warn \"Skipping failed operation: $ERROR_CONTEXT\"",
+            "  exit 0",
+            "fi"
+          ],
+          "purpose": "Allow graceful degradation for non-critical failures",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Skip completes successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Skip strategy failed unexpectedly"
+          }
+        },
+        {
+          "step": "3.4",
+          "name": "Strategy: Fail Fast",
+          "description": "Log critical error and abort execution",
+          "commands": [
+            "if [ \"$RECOVERY_STRATEGY\" = \"fail\" ]; then",
+            "  log_fatal \"Unrecoverable error in $ERROR_CONTEXT\"",
+            "  exit 1",
+            "fi"
+          ],
+          "purpose": "Prevent cascade failures in critical situations",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": [0, 1],
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Fail strategy executes cleanly"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Critical failure - system in unknown state"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Rollback Execution",
+      "description": "Execute rollback procedures to restore system to stable state",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Locate Rollback Script",
+          "description": "Find appropriate rollback script for the failed context",
+          "command": "ROLLBACK_SCRIPT=\"/tmp/rollback-${ERROR_CONTEXT}.sh\"; test -f \"$ROLLBACK_SCRIPT\" && echo \"Found: $ROLLBACK_SCRIPT\" || echo \"Not found\"",
+          "purpose": "Identify rollback procedure",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "Found: /tmp/rollback-*.sh",
+          "validation": {
+            "type": "fileExists",
+            "criteria": "Rollback script exists"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "No rollback script found for context - manual rollback required"
+          }
+        },
+        {
+          "step": "4.2",
+          "name": "Validate Rollback Script",
+          "description": "Verify rollback script is executable and syntactically valid",
+          "commands": [
+            "test -x \"$ROLLBACK_SCRIPT\" || chmod +x \"$ROLLBACK_SCRIPT\"",
+            "bash -n \"$ROLLBACK_SCRIPT\""
+          ],
+          "purpose": "Ensure rollback script is safe to execute",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Script is valid and executable"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Rollback script validation failed - manual review required"
+          }
+        },
+        {
+          "step": "4.3",
+          "name": "Execute Rollback",
+          "description": "Run rollback script with error handling",
+          "command": "bash \"$ROLLBACK_SCRIPT\" 2>&1 | tee -a /var/log/rollback-$(date +%s).log",
+          "purpose": "Restore system to previous state",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Rollback script exits successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Rollback execution failed - critical manual intervention required"
+          },
+          "relatedFiles": [
+            "/tmp/rollback-*.sh",
+            "/var/log/rollback-*.log"
+          ]
+        },
+        {
+          "step": "4.4",
+          "name": "Log Rollback Completion",
+          "description": "Record rollback success and create incident report",
+          "commands": [
+            "log_info \"Rollback completed successfully for $ERROR_CONTEXT\"",
+            "echo \"Rollback timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)\" >> /var/log/rollback-$(date +%s).log"
+          ],
+          "purpose": "Document rollback for audit and analysis",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "skip",
+            "message": "Warning: Failed to log rollback completion"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Post-Recovery Validation",
+      "description": "Verify system health and stability after recovery",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "5.1",
+          "name": "Check Service Health",
+          "description": "Verify critical services are running and responding",
+          "commands": [
+            "docker ps --filter health=healthy --format '{{.Names}}' | wc -l",
+            "curl -s http://localhost:4000/health || echo 'Health check failed'"
+          ],
+          "purpose": "Confirm system stability post-recovery",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedOutput": "All critical services healthy",
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "Health endpoints return 200"
+          },
+          "onFailure": {
+            "action": "retry",
+            "maxRetries": 3,
+            "message": "Service health check failed - retrying"
+          }
+        },
+        {
+          "step": "5.2",
+          "name": "Validate Database Connectivity",
+          "description": "Test database connections and query execution",
+          "command": "docker exec postgres pg_isready -U ectropy_user -d ectropy_db",
+          "purpose": "Ensure database layer is operational",
+          "required": true,
+          "automatable": true,
+          "timeout": "15s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Database ready and accepting connections"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Database not responding after recovery"
+          }
+        },
+        {
+          "step": "5.3",
+          "name": "Test API Endpoints",
+          "description": "Execute smoke tests on critical API endpoints",
+          "commands": [
+            "curl -s http://localhost:4000/api/v1/health | jq -r '.status'",
+            "curl -s http://localhost:3001/health | jq -r '.status'"
+          ],
+          "purpose": "Verify API layer functionality",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedOutput": "healthy",
+          "validation": {
+            "type": "output",
+            "criteria": "All health checks return 'healthy'"
+          },
+          "onFailure": {
+            "action": "retry",
+            "maxRetries": 2,
+            "message": "API health checks failing - retrying"
+          }
+        },
+        {
+          "step": "5.4",
+          "name": "Generate Recovery Report",
+          "description": "Create comprehensive recovery report for incident log",
+          "commands": [
+            "cat > /var/log/recovery-report-$(date +%s).json <<EOF",
+            "{",
+            "  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",",
+            "  \"error_code\": \"$ERROR_CODE\",",
+            "  \"error_context\": \"$ERROR_CONTEXT\",",
+            "  \"recovery_strategy\": \"$RECOVERY_STRATEGY\",",
+            "  \"status\": \"completed\",",
+            "  \"services_healthy\": true",
+            "}",
+            "EOF"
+          ],
+          "purpose": "Document recovery for post-incident review",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "skip",
+            "message": "Recovery report generation failed - recovery still successful"
+          }
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "healthChecks": [
+      {
+        "service": "API Gateway",
+        "endpoint": "http://localhost:4000/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "expectedBody": {
+          "status": "healthy"
+        },
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "MCP Server",
+        "endpoint": "http://localhost:3001/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "expectedBody": {
+          "status": "healthy"
+        },
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "Web Dashboard",
+        "endpoint": "http://localhost:3000",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "PostgreSQL",
+        "endpoint": "tcp://localhost:5432",
+        "method": "GET",
+        "expectedStatus": 0,
+        "timeout": "5s",
+        "critical": true
+      }
+    ],
+    "smokeTests": [
+      {
+        "test": "API Gateway responds to health checks",
+        "endpoint": "http://localhost:4000/health",
+        "expectedBehavior": "Returns 200 with healthy status",
+        "priority": "P0"
+      },
+      {
+        "test": "Database accepts connections",
+        "endpoint": "tcp://localhost:5432",
+        "expectedBehavior": "Connection successful",
+        "priority": "P0"
+      },
+      {
+        "test": "Service containers running",
+        "endpoint": "docker ps",
+        "expectedBehavior": "All critical containers show 'Up' status",
+        "priority": "P0"
+      }
+    ],
+    "performanceThresholds": [
+      {
+        "metric": "API Response Time",
+        "threshold": "< 200ms",
+        "measurement": "p95 latency"
+      },
+      {
+        "metric": "Database Query Time",
+        "threshold": "< 100ms",
+        "measurement": "average query execution"
+      },
+      {
+        "metric": "Container Memory Usage",
+        "threshold": "< 80%",
+        "measurement": "container memory percentage"
+      }
+    ]
+  },
+  "rollback": {
+    "supported": true,
+    "estimatedTime": "5 minutes",
+    "dataLossRisk": "minimal",
+    "triggerConditions": [
+      "Recovery strategy explicitly set to 'rollback'",
+      "Retry attempts exhausted without success",
+      "Critical service failure detected",
+      "Data integrity validation fails",
+      "Manual rollback initiated by operator"
+    ],
+    "decisionMaker": "Automated based on error severity or manual by DevOps Lead",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Identify Rollback Script",
+        "command": "ROLLBACK_SCRIPT=\"/tmp/rollback-${ERROR_CONTEXT}.sh\"",
+        "purpose": "Locate context-specific rollback procedure",
+        "required": true
+      },
+      {
+        "step": 2,
+        "name": "Validate Script Integrity",
+        "command": "test -f \"$ROLLBACK_SCRIPT\" && bash -n \"$ROLLBACK_SCRIPT\"",
+        "purpose": "Ensure rollback script is valid and safe",
+        "required": true
+      },
+      {
+        "step": 3,
+        "name": "Execute Rollback",
+        "command": "bash \"$ROLLBACK_SCRIPT\" 2>&1 | tee -a /var/log/rollback.log",
+        "purpose": "Revert system to previous stable state",
+        "required": true
+      },
+      {
+        "step": 4,
+        "name": "Verify Rollback Success",
+        "command": "curl -s http://localhost:4000/health && docker ps --filter health=healthy",
+        "purpose": "Confirm system restoration",
+        "required": true
+      },
+      {
+        "step": 5,
+        "name": "Log Rollback Completion",
+        "command": "log_info \"Rollback completed for $ERROR_CONTEXT\"",
+        "purpose": "Create audit trail",
+        "required": true
+      }
+    ],
+    "verification": {
+      "healthCheck": "http://localhost:4000/health",
+      "expectedStatus": 200,
+      "successCriteria": "All services healthy and database connectivity restored"
+    }
+  },
+  "monitoring": {
+    "duration": "24 hours post-recovery",
+    "keyMetrics": [
+      {
+        "metric": "Error Rate",
+        "threshold": "< 1%",
+        "alertOn": "Error rate > 1%",
+        "severity": "warning"
+      },
+      {
+        "metric": "Service Availability",
+        "threshold": "99.9%",
+        "alertOn": "Availability < 99.9%",
+        "severity": "critical"
+      },
+      {
+        "metric": "API Response Time",
+        "threshold": "< 200ms p95",
+        "alertOn": "p95 latency > 500ms",
+        "severity": "warning"
+      },
+      {
+        "metric": "Database Connection Pool",
+        "threshold": "< 80% utilization",
+        "alertOn": "Pool utilization > 80%",
+        "severity": "warning"
+      },
+      {
+        "metric": "Memory Usage",
+        "threshold": "< 85%",
+        "alertOn": "Memory usage > 85%",
+        "severity": "critical"
+      }
+    ],
+    "alertThresholds": [
+      {
+        "condition": "Repeated errors in same context within 1 hour",
+        "severity": "critical",
+        "action": "Escalate to DevOps Lead",
+        "escalation": "Page on-call engineer after 3 occurrences"
+      },
+      {
+        "condition": "Rollback execution failure",
+        "severity": "critical",
+        "action": "Immediate escalation to senior DevOps",
+        "escalation": "Emergency incident declared"
+      },
+      {
+        "condition": "Service health check failures post-recovery",
+        "severity": "critical",
+        "action": "Re-initiate recovery procedure",
+        "escalation": "Alert DevOps team in Slack #incidents"
+      }
+    ],
+    "dashboards": [
+      "Grafana: System Health Overview",
+      "Grafana: Error Recovery Metrics",
+      "Kibana: Error Recovery Logs",
+      "Prometheus: Service Availability"
+    ]
+  },
+  "successCriteria": [
+    {
+      "criterion": "Error context successfully captured and logged",
+      "status": "REQUIRED",
+      "validation": "Error details written to structured log"
+    },
+    {
+      "criterion": "Recovery strategy selected and executed",
+      "status": "REQUIRED",
+      "validation": "One of: retry, rollback, skip, fail executed successfully"
+    },
+    {
+      "criterion": "All service health checks passing",
+      "status": "REQUIRED",
+      "validation": "Health endpoints return 200 OK"
+    },
+    {
+      "criterion": "Database connectivity restored",
+      "status": "REQUIRED",
+      "validation": "pg_isready returns success"
+    },
+    {
+      "criterion": "No cascade failures detected",
+      "status": "REQUIRED",
+      "validation": "No additional errors in 5 minute window"
+    },
+    {
+      "criterion": "Recovery audit trail created",
+      "status": "REQUIRED",
+      "validation": "Recovery report generated with timestamp and outcome"
+    },
+    {
+      "criterion": "System performance within thresholds",
+      "status": "RECOMMENDED",
+      "validation": "API response time < 200ms, error rate < 1%"
+    },
+    {
+      "criterion": "Monitoring alerts cleared",
+      "status": "RECOMMENDED",
+      "validation": "No active alerts related to recovered services"
+    }
+  ],
+  "mcpIntegration": {
+    "queryableFields": [
+      "environment",
+      "runbookType",
+      "metadata.catalogId",
+      "metadata.complexity",
+      "metadata.priority",
+      "executiveSummary.riskAssessment",
+      "phases[].name",
+      "rollback.supported",
+      "rollback.estimatedTime"
+    ],
+    "supportedQueries": [
+      {
+        "query": "What recovery strategies are available?",
+        "returns": "retry (with exponential backoff), rollback (restore previous state), skip (graceful degradation), fail (abort execution)",
+        "purpose": "Recovery strategy overview"
+      },
+      {
+        "query": "How do I handle a critical error in production?",
+        "returns": "Execute emergency error recovery runbook: capture context, select strategy (usually rollback for critical errors), execute rollback, validate system health",
+        "purpose": "Emergency response guidance"
+      },
+      {
+        "query": "Where are rollback scripts stored?",
+        "returns": "/tmp/rollback-{context}.sh - scripts must be prepared before deployment",
+        "purpose": "Rollback script location"
+      },
+      {
+        "query": "What happens if rollback fails?",
+        "returns": "Manual intervention required immediately - escalate to senior DevOps, declare emergency incident, follow disaster recovery procedures",
+        "purpose": "Rollback failure handling"
+      },
+      {
+        "query": "How long does emergency recovery take?",
+        "returns": "Typically 5-15 minutes depending on strategy: retry (2-5 min), rollback (5-10 min), skip (immediate), fail (immediate)",
+        "purpose": "Time estimation for recovery"
+      },
+      {
+        "query": "What post-recovery checks are performed?",
+        "returns": "Service health checks, database connectivity test, API endpoint smoke tests, performance threshold validation, monitoring alert verification",
+        "purpose": "Post-recovery validation"
+      },
+      {
+        "query": "When should I use retry vs rollback?",
+        "returns": "Retry: transient network/API failures, rate limits. Rollback: critical failures, data integrity issues, deployment problems, persistent errors",
+        "purpose": "Strategy selection guidance",
+        "args": ["error_type", "severity"]
+      }
+    ],
+    "decisionSupport": [
+      "Automated error classification guides recovery strategy selection",
+      "Rollback script availability determines feasibility of automated recovery",
+      "System health validation prevents premature recovery completion",
+      "Retry with exponential backoff prevents thundering herd",
+      "Graceful degradation via skip strategy maintains partial service",
+      "Fail-fast prevents cascade failures in critical paths",
+      "Comprehensive logging enables root cause analysis",
+      "Post-recovery monitoring catches regression early"
+    ],
+    "architectureAlignment": {
+      "routingConfig": "Supports all services - API Gateway, MCP Server, Web Dashboard, Databases",
+      "portAllocation": "Validates health on standard ports (3000, 3001, 4000, 5432)",
+      "oauthConfig": "N/A - emergency recovery focuses on infrastructure"
+    }
+  },
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "ERROR_RECOVERY_MODE",
+        "description": "Flag indicating system is in recovery mode",
+        "example": "true",
+        "required": false,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "RECOVERY_TIMESTAMP",
+        "description": "ISO 8601 timestamp when recovery was initiated",
+        "example": "2025-11-16T12:30:00Z",
+        "required": false,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "ERROR_CODE",
+        "description": "Exit code from failed operation",
+        "example": "1",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "ERROR_CONTEXT",
+        "description": "Context string identifying failure location",
+        "example": "deployment-database-migration",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "RECOVERY_STRATEGY",
+        "description": "Selected recovery strategy (retry/rollback/skip/fail)",
+        "example": "rollback",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "ROLLBACK_SCRIPT",
+        "description": "Path to rollback script for current context",
+        "example": "/tmp/rollback-database-migration.sh",
+        "required": false,
+        "environment": "all",
+        "secret": false
+      }
+    ]
+  },
+  "knownIssues": [
+    {
+      "id": "KI-ERR-001",
+      "title": "Rollback scripts may not exist for all contexts",
+      "severity": "HIGH",
+      "impact": "Automated rollback unavailable - manual intervention required",
+      "mitigation": "Pre-create rollback scripts for critical operations during deployment planning",
+      "action": "Create rollback script templates for common failure scenarios",
+      "priority": "P1"
+    },
+    {
+      "id": "KI-ERR-002",
+      "title": "Retry strategy may cause thundering herd on external APIs",
+      "severity": "MEDIUM",
+      "impact": "Exponential backoff mitigates but doesn't eliminate risk",
+      "mitigation": "Use circuit breaker pattern with retry strategy",
+      "action": "Implement jitter in retry backoff calculations",
+      "priority": "P2"
+    },
+    {
+      "id": "KI-ERR-003",
+      "title": "Log disk space exhaustion during high error volume",
+      "severity": "MEDIUM",
+      "impact": "Recovery logging may fail, losing audit trail",
+      "mitigation": "Log rotation configured with 100MB limit per file",
+      "action": "Monitor disk space and implement log compression",
+      "priority": "P2"
+    },
+    {
+      "id": "KI-ERR-004",
+      "title": "Database rollback may require manual transaction handling",
+      "severity": "CRITICAL",
+      "impact": "Automated rollback cannot undo committed transactions",
+      "mitigation": "Use database migrations with explicit down() functions",
+      "action": "Implement transaction-level rollback scripts",
+      "priority": "P0"
+    },
+    {
+      "id": "KI-ERR-005",
+      "title": "Network partition may prevent health check validation",
+      "severity": "HIGH",
+      "impact": "Post-recovery validation may fail despite successful recovery",
+      "mitigation": "Multiple health check endpoints with timeout handling",
+      "action": "Implement local health checks in addition to HTTP",
+      "priority": "P1"
+    }
+  ]
+}

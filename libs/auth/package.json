@@ -1,0 +1,54 @@
+{
+  "name": "@ectropy/auth",
+  "version": "1.0.0",
+  "description": "Authentication and authorization services for Ectropy platform",
+  "type": "module",
+  "main": "./index.js",
+  "module": "./index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./index.js",
+      "types": "./src/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "nx build @ectropy/auth",
+    "dev": "nx build @ectropy/auth --watch",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.3",
+    "bcryptjs": "^3.0.2",
+    "speakeasy": "^2.0.0",
+    "qrcode": "^1.5.4",
+    "ioredis": "^5.8.2",
+    "joi": "^17.13.3",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/speakeasy": "^2.0.10",
+    "@types/qrcode": "^1.5.5",
+    "@types/express": "^4.17.21",
+    "eslint": "^9.31.0",
+    "jest": "^30.0.4",
+    "prettier": "^3.6.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "keywords": [
+    "auth",
+    "jwt",
+    "rbac",
+    "2fa",
+    "session",
+    "security"
+  ],
+  "author": "Ectropy Team",
+  "license": "MIT"
+}

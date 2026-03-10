@@ -1,0 +1,173 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:g704-certificate",
+  "title": "G704 Certificate of Substantial Completion Schema",
+  "description": "AIA G704 Certificate of Substantial Completion with digital signatures",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "certificateId",
+    "projectRef",
+    "closeoutRef",
+    "substantialCompletionDate",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:g704-certificate:G704-[0-9]{4}-[0-9]{4}$"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:g704-certificate"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "certificateId": {
+      "type": "string",
+      "pattern": "^G704-[0-9]{4}-[0-9]{4}$"
+    },
+    "projectRef": { "$ref": "#/$defs/urn" },
+    "closeoutRef": { "$ref": "#/$defs/urn" },
+    "contractRef": { "$ref": "#/$defs/urn" },
+    "status": {
+      "type": "string",
+      "enum": ["DRAFT", "PENDING_SIGNATURES", "EXECUTED", "SUPERSEDED"]
+    },
+    "projectInfo": {
+      "type": "object",
+      "properties": {
+        "projectName": { "type": "string" },
+        "projectAddress": { "type": "string" },
+        "contractDate": { "type": "string", "format": "date" },
+        "contractSum": { "type": "number" }
+      }
+    },
+    "substantialCompletionDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of Substantial Completion"
+    },
+    "punchListSummary": {
+      "type": "object",
+      "properties": {
+        "attached": { "type": "boolean" },
+        "itemCount": { "type": "integer" },
+        "completionDeadline": { "type": "string", "format": "date" },
+        "retainageHeld": { "type": "number" }
+      }
+    },
+    "responsibilityTransfers": {
+      "type": "object",
+      "description": "Transfer dates for various responsibilities",
+      "properties": {
+        "insuranceTransferDate": { "type": "string", "format": "date" },
+        "utilitiesTransferDate": { "type": "string", "format": "date" },
+        "securityTransferDate": { "type": "string", "format": "date" },
+        "maintenanceTransferDate": { "type": "string", "format": "date" }
+      }
+    },
+    "warrantyCommencement": {
+      "type": "object",
+      "properties": {
+        "startDate": { "type": "string", "format": "date" },
+        "generalWarrantyPeriod": { "type": "integer", "description": "Months" },
+        "specialWarranties": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "system": { "type": "string" },
+              "period": { "type": "integer" },
+              "expirationDate": { "type": "string", "format": "date" }
+            }
+          }
+        }
+      }
+    },
+    "signatures": {
+      "type": "object",
+      "properties": {
+        "contractor": {
+          "$ref": "#/$defs/signature"
+        },
+        "architect": {
+          "$ref": "#/$defs/signature"
+        },
+        "owner": {
+          "$ref": "#/$defs/signature"
+        }
+      }
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "PUNCH_LIST",
+              "CONSENT_OF_SURETY",
+              "LIEN_RELEASES",
+              "OTHER"
+            ]
+          },
+          "filename": { "type": "string" },
+          "storageUri": { "type": "string", "format": "uri" }
+        }
+      }
+    },
+    "generatedDocument": {
+      "type": "object",
+      "properties": {
+        "pdfUri": { "type": "string", "format": "uri" },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "sha256Hash": { "type": "string" }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "executedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    },
+    "signature": {
+      "type": "object",
+      "properties": {
+        "partyRef": { "$ref": "#/$defs/urn" },
+        "signerName": { "type": "string" },
+        "signerTitle": { "type": "string" },
+        "signedAt": { "type": "string", "format": "date-time" },
+        "signatureHash": { "type": "string" },
+        "ipAddress": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,251 @@
+# 📊 PROMETHEUS MONITORING - ENTERPRISE OBSERVABILITY
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: ectropy-production
+  annotations:
+    security.ectropy.io/monitoring-tier: 'enterprise'
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'ectropy-federated-platform'
+        environment: 'production'
+
+    rule_files:
+      - "ectropy_alerts.yml"
+
+    scrape_configs:
+      # Your Enhanced API Gateway metrics
+      - job_name: 'ectropy-api-gateway'
+        static_configs:
+          - targets: ['ectropy-api-gateway-service:4000']
+        metrics_path: '/metrics'
+        scrape_interval: 30s
+        honor_labels: true
+        params:
+          format: ['prometheus']
+      
+      # Speckle Server metrics
+      - job_name: 'speckle-server'
+        static_configs:
+          - targets: ['speckle-server-service:3000']
+        metrics_path: '/metrics'
+        scrape_interval: 30s
+      
+      # DAO Governance metrics
+      - job_name: 'dao-governance'
+        static_configs:
+          - targets: ['dao-governance-service:3001']
+        metrics_path: '/metrics'
+        scrape_interval: 30s
+      
+      # Manufacturer API metrics
+      - job_name: 'manufacturer-api'
+        static_configs:
+          - targets: ['manufacturer-api-service:3002']
+        metrics_path: '/metrics'
+        scrape_interval: 30s
+      
+      # AI Agents metrics
+      - job_name: 'ai-agents'
+        static_configs:
+          - targets: ['ai-agents-service:3003']
+        metrics_path: '/metrics'
+        scrape_interval: 30s
+      
+      # Kubernetes cluster metrics
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+              - ectropy-production
+        relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+          action: keep
+          regex: true
+
+  ectropy_alerts.yml: |
+    groups:
+    - name: ectropy.rules
+      rules:
+      # API Gateway performance alerts
+      - alert: HighAPIGatewayLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="ectropy-api-gateway"}[5m])) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          component: api-gateway
+        annotations:
+          summary: "High API Gateway latency detected"
+          description: "95th percentile latency is {{ $value }}s"
+      
+      # API Gateway error rate
+      - alert: HighAPIGatewayErrorRate
+        expr: rate(http_requests_total{job="ectropy-api-gateway",status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          component: api-gateway
+        annotations:
+          summary: "High API Gateway error rate"
+          description: "Error rate is {{ $value }} errors per second"
+      
+      # BIM file processing alerts
+      - alert: LargeBIMFileProcessing
+        expr: increase(speckle_file_upload_size_bytes[5m]) > 1000000000  # 1GB
+        for: 1m
+        labels:
+          severity: info
+          component: speckle
+        annotations:
+          summary: "Large BIM file being processed"
+          description: "File size: {{ $value }} bytes"
+      
+      # DAO governance alerts
+      - alert: FailedGovernanceVote
+        expr: increase(dao_vote_failures_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: dao-governance
+        annotations:
+          summary: "DAO governance vote failure"
+          description: "{{ $value }} vote failures in the last 5 minutes"
+      
+      # Database performance alerts
+      - alert: HighDatabaseConnections
+        expr: pg_stat_database_numbackends{datname="ectropy_federated_platform"} > 180
+        for: 2m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database connection count"
+          description: "{{ $value }} connections to database"
+      
+      # Pod resource alerts
+      - alert: HighPodMemoryUsage
+        expr: (container_memory_working_set_bytes{namespace="ectropy-production"} / container_spec_memory_limit_bytes{namespace="ectropy-production"}) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: kubernetes
+        annotations:
+          summary: "High pod memory usage"
+          description: "Pod {{ $labels.pod }} is using {{ $value | humanizePercentage }} of memory limit"
+      
+      # Security alerts
+      - alert: SecurityViolationDetected
+        expr: increase(security_violations_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Security violation detected"
+          description: "{{ $value }} security violations in the last 5 minutes"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-pvc
+  namespace: ectropy-production
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: ectropy-production
+  labels:
+    app: prometheus
+    component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      serviceAccountName: ectropy-service-account
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+        runAsNonRoot: true
+      containers:
+        - name: prometheus
+          image: prom/prometheus:latest
+          ports:
+            - containerPort: 9090
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus/prometheus.yml
+              subPath: prometheus.yml
+            - name: prometheus-rules
+              mountPath: /etc/prometheus/ectropy_alerts.yml
+              subPath: ectropy_alerts.yml
+            - name: prometheus-storage
+              mountPath: /prometheus
+          args:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--storage.tsdb.path=/prometheus'
+            - '--web.console.libraries=/etc/prometheus/console_libraries'
+            - '--web.console.templates=/etc/prometheus/consoles'
+            - '--storage.tsdb.retention.time=30d'
+            - '--web.enable-lifecycle'
+            - '--web.enable-admin-api'
+          resources:
+            requests:
+              memory: '2Gi'
+              cpu: '1'
+            limits:
+              memory: '4Gi'
+              cpu: '2'
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+        - name: prometheus-rules
+          configMap:
+            name: prometheus-config
+        - name: prometheus-storage
+          persistentVolumeClaim:
+            claimName: prometheus-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+  namespace: ectropy-production
+  labels:
+    app: prometheus
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - port: 9090
+      targetPort: 9090
+      name: web
+  type: ClusterIP

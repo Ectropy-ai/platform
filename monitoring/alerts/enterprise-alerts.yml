@@ -1,0 +1,96 @@
+groups:
+  - name: ectropy.enterprise.critical
+    rules:
+      - alert: DeploymentFailure
+        expr: deployment_success == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Deployment failure detected"
+          description: "Deployment {{ $labels.deployment_id }} has failed"
+
+      - alert: StagingEnvironmentDown
+        expr: up{job="staging"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Staging environment is down"
+          description: "Staging environment at https://staging.ectropy.dev is not responding"
+
+      - alert: CriticalSecurityVulnerability
+        expr: vulnerabilities_critical > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical security vulnerability detected"
+          description: "{{ $value }} critical vulnerabilities found in dependencies"
+
+      - alert: HighMemoryUsage
+        expr: memory_usage_bytes{type="heap_used"} / memory_usage_bytes{type="heap_total"} > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+
+  - name: ectropy.enterprise.performance
+    rules:
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API latency detected"
+          description: "95th percentile latency is {{ $value }}s"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status_code=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }}"
+
+      - alert: BuildPerformanceDegradation
+        expr: build_duration_seconds > 300
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Build performance degradation"
+          description: "Build time is {{ $value }}s (threshold: 300s)"
+
+  - name: ectropy.enterprise.business
+    rules:
+      - alert: SpeckleIntegrationDown
+        expr: speckle_server_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Speckle BIM integration is down"
+          description: "Speckle server is not responding, affecting BIM collaboration"
+
+      - alert: LowProjectActivity
+        expr: rate(active_projects_total[1h]) < 0.1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low project activity detected"
+          description: "Project creation rate has dropped below normal levels"
+
+      - alert: IFCProcessingBacklog
+        expr: ifc_processing_queue_length > 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "IFC processing backlog detected"
+          description: "{{ $value }} IFC files are queued for processing"

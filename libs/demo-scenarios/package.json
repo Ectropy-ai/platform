@@ -1,0 +1,68 @@
+{
+  "name": "@ectropy/demo-scenarios",
+  "version": "1.0.0",
+  "description": "Enterprise synthetic demo data generation and scenario playback for Ectropy construction platform",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./types": {
+      "import": "./dist/types/index.js",
+      "types": "./dist/types/index.d.ts"
+    },
+    "./scenarios": {
+      "import": "./dist/scenarios/index.js",
+      "types": "./dist/scenarios/index.d.ts"
+    },
+    "./generators": {
+      "import": "./dist/generators/index.js",
+      "types": "./dist/generators/index.d.ts"
+    },
+    "./personas": {
+      "import": "./dist/personas/index.js",
+      "types": "./dist/personas/index.d.ts"
+    }
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src/**/*.ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "uuid": "^9.0.1",
+    "date-fns": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^10.0.0",
+    "eslint": "^8.57.1",
+    "prettier": "^3.0.0",
+    "typescript": "^5.8.3",
+    "vitest": "^1.6.0"
+  },
+  "peerDependencies": {
+    "@prisma/client": "^5.0.0"
+  },
+  "keywords": [
+    "demo",
+    "synthetic-data",
+    "construction",
+    "bim",
+    "scenarios",
+    "enterprise"
+  ],
+  "author": "Ectropy Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/luhtech/Ectropy.git",
+    "directory": "libs/demo-scenarios"
+  }
+}

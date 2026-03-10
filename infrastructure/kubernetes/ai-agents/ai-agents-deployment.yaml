@@ -1,0 +1,336 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ectropy-ai
+  labels:
+    ectropy.io/component: ai-agents
+    ectropy.io/deployment-type: enterprise
+    ectropy.io/security-level: enhanced
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: compliance-ai-agent
+  namespace: ectropy-ai
+  labels:
+    app: compliance-ai-agent
+    ectropy.io/service: ai-compliance
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: compliance-ai-agent
+  template:
+    metadata:
+      labels:
+        app: compliance-ai-agent
+        ectropy.io/service: ai-compliance
+    spec:
+      serviceAccountName: ectropy-ai-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+        - name: compliance-agent
+          image: node:20
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: NODE_ENV
+              value: 'production'
+            - name: PORT
+              value: '3003'
+            - name: LOG_LEVEL
+              value: 'info'
+            - name: AI_MODEL_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: ai-credentials
+                  key: model-endpoint
+            - name: COMPLIANCE_RULES_URL
+              value: 'https://ectropy.io/api/compliance/rules'
+            - name: POSTGRES_HOST
+              value: 'postgresql-service.ectropy-production.svc.cluster.local'
+            - name: REDIS_URL
+              value: 'redis://redis-service.ectropy-production:6379'
+          ports:
+            - containerPort: 3003
+              name: http
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: '512Mi'
+              cpu: '250m'
+            limits:
+              memory: '1Gi'
+              cpu: '500m'
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: app-cache
+              mountPath: /app/.cache
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: app-cache
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: compliance-ai-service
+  namespace: ectropy-ai
+  labels:
+    app: compliance-ai-agent
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3003
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: compliance-ai-agent
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: predictive-analytics-agent
+  namespace: ectropy-ai
+  labels:
+    app: predictive-analytics-agent
+    ectropy.io/service: ai-analytics
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: predictive-analytics-agent
+  template:
+    metadata:
+      labels:
+        app: predictive-analytics-agent
+        ectropy.io/service: ai-analytics
+    spec:
+      serviceAccountName: ectropy-ai-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+        - name: analytics-agent
+          image: python:3.11-slim
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: PYTHONUNBUFFERED
+              value: '1'
+            - name: PORT
+              value: '5000'
+            - name: LOG_LEVEL
+              value: 'INFO'
+            - name: ML_MODEL_PATH
+              value: '/models'
+            - name: POSTGRES_HOST
+              value: 'postgresql-service.ectropy-production.svc.cluster.local'
+            - name: REDIS_URL
+              value: 'redis://redis-service.ectropy-production:6379'
+          ports:
+            - containerPort: 5000
+              name: http
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: '1Gi'
+              cpu: '500m'
+            limits:
+              memory: '2Gi'
+              cpu: '1000m'
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: models
+              mountPath: /models
+            - name: app-cache
+              mountPath: /app/.cache
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: models
+          persistentVolumeClaim:
+            claimName: ml-models-pvc
+        - name: app-cache
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: predictive-analytics-service
+  namespace: ectropy-ai
+  labels:
+    app: predictive-analytics-agent
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5000
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: predictive-analytics-agent
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ml-models-pvc
+  namespace: ectropy-ai
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ectropy-ai-service-account
+  namespace: ectropy-ai
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: ectropy-ai
+  name: ectropy-ai-role
+rules:
+  - apiGroups: ['']
+    resources: ['pods', 'services', 'configmaps']
+    verbs: ['get', 'list', 'watch']
+  - apiGroups: ['apps']
+    resources: ['deployments']
+    verbs: ['get', 'list', 'watch']
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ectropy-ai-rolebinding
+  namespace: ectropy-ai
+subjects:
+  - kind: ServiceAccount
+    name: ectropy-ai-service-account
+    namespace: ectropy-ai
+roleRef:
+  kind: Role
+  name: ectropy-ai-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ai-credentials
+  namespace: ectropy-ai
+type: Opaque
+data:
+  model-endpoint: BASE64_API_ENDPOINT_PLACEHOLDER # https://api.openai.com/v1
+  api-key: '' # Add your API key here (base64 encoded)
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: compliance-ai-pdb
+  namespace: ectropy-ai
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: compliance-ai-agent
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: compliance-ai-hpa
+  namespace: ectropy-ai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: compliance-ai-agent
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

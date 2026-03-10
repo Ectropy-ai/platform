@@ -1,0 +1,251 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "workflow-registry.schema.json",
+  "title": "GitHub Actions Workflow Registry Schema",
+  "description": "Schema for documenting and categorizing GitHub Actions workflows following luh-tech schema-first patterns",
+  "type": "object",
+  "required": [
+    "$schema",
+    "version",
+    "lastUpdated",
+    "metadata",
+    "categories",
+    "workflows"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Reference to this schema"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the registry"
+    },
+    "lastUpdated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of last update"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["totalActive", "totalArchived", "slackEnabled"],
+      "properties": {
+        "totalActive": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of active workflows"
+        },
+        "totalArchived": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of archived workflows"
+        },
+        "slackEnabled": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Count of workflows with Slack notifications"
+        },
+        "enterprise": {
+          "type": "boolean",
+          "description": "Whether workflows follow enterprise patterns"
+        }
+      }
+    },
+    "namingConventions": {
+      "type": "object",
+      "description": "Naming standards for workflow files",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "Naming pattern description"
+        },
+        "prefixes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Category prefixes and their meanings"
+        }
+      }
+    },
+    "categories": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/category"
+      },
+      "description": "Workflow categories"
+    },
+    "workflows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/workflow"
+      },
+      "description": "Array of workflow definitions"
+    }
+  },
+  "definitions": {
+    "category": {
+      "type": "object",
+      "required": ["description", "purpose"],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "sla": {
+          "type": "string",
+          "description": "Expected completion time"
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "required": ["file", "name", "category", "purpose", "triggers"],
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+\\.yml$",
+          "description": "Workflow filename (kebab-case)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable workflow name"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category key from categories object"
+        },
+        "purpose": {
+          "type": "string",
+          "description": "One-line purpose description"
+        },
+        "triggers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "push",
+              "pull_request",
+              "schedule",
+              "workflow_dispatch",
+              "workflow_run",
+              "workflow_call"
+            ]
+          },
+          "description": "Event triggers"
+        },
+        "schedule": {
+          "type": "string",
+          "description": "Cron expression if scheduled"
+        },
+        "pathFilters": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Path filters that trigger the workflow"
+        },
+        "slack": {
+          "type": "boolean",
+          "description": "Whether Slack notifications are enabled"
+        },
+        "timeout": {
+          "type": "string",
+          "description": "Expected completion time"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "deprecated", "archived"],
+          "default": "active"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Other workflows this depends on"
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Artifacts or outputs produced"
+        },
+        "failureMode": {
+          "type": "string",
+          "enum": ["fail", "warn", "skip"],
+          "default": "fail",
+          "description": "How workflow handles failures: fail (red), warn (yellow), skip (green with message)"
+        },
+        "skipConditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Conditions under which workflow should skip gracefully"
+        },
+        "externalDependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "External systems workflow depends on (may cause failures if unavailable)"
+        },
+        "expectedOutcome": {
+          "type": "string",
+          "description": "What a successful (green) result means for this workflow"
+        },
+        "metricsConfig": {
+          "type": "object",
+          "description": "Metrics pipeline configuration for this workflow",
+          "properties": {
+            "pipelineRef": {
+              "type": "string",
+              "description": "Reference to metrics-pipeline.json workflow definition"
+            },
+            "collectsFrom": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Data source IDs this workflow collects from"
+            },
+            "reportsTo": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Destination IDs this workflow reports to"
+            }
+          }
+        }
+      }
+    }
+  },
+  "normalizationRules": {
+    "type": "object",
+    "description": "Rules for workflow result interpretation",
+    "properties": {
+      "greenMeansSuccess": {
+        "type": "string",
+        "description": "Definition of what green/success means"
+      },
+      "yellowMeansWarning": {
+        "type": "string",
+        "description": "Definition of what yellow/warning means"
+      },
+      "redMeansFailure": {
+        "type": "string",
+        "description": "Definition of what red/failure means"
+      },
+      "skipBehavior": {
+        "type": "string",
+        "description": "How skipped workflows should be displayed"
+      }
+    }
+  }
+}

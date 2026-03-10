@@ -1,0 +1,437 @@
+{
+  "$schema": "https://luhtech.dev/schemas/feature.schema.json",
+  "$id": "urn:luhtech:ectropy:feature:phone-agent",
+  "schemaVersion": "1.0.0",
+  "meta": {
+    "ventureId": "ectropy",
+    "createdAt": "2026-01-07T20:00:00Z",
+    "lastUpdated": "2026-01-23T04:25:00Z",
+    "author": "erik",
+    "sourceDoc": ".roadmap/features/eil/phone-agent/FEATURE.json"
+  },
+  "feature": {
+    "id": "phone-agent",
+    "name": "Phone Agent Service (SMS/Voice)",
+    "description": "Zero-friction field data capture via SMS and voice channels using Twilio integration with multi-turn conversation support",
+    "status": "IN_PROGRESS",
+    "priority": "critical",
+    "targetRelease": "2026-03-15",
+    "parent": "seppa-agent"
+  },
+  "businessValue": {
+    "problem": "Construction software adoption rates <30% for mobile apps",
+    "solution": "SMS-first approach achieving >95% adoption",
+    "metrics": {
+      "adoptionRate": {
+        "mobileApp": "<30%",
+        "sms": ">95%",
+        "improvement": "3x+"
+      },
+      "dataCaptureTime": {
+        "mobileApp": "45s",
+        "sms": "8s",
+        "improvement": "5.6x faster"
+      },
+      "trainingRequired": { "mobileApp": "Yes", "sms": "No" },
+      "offlineSupport": { "mobileApp": "Limited", "sms": "Always (queued)" }
+    }
+  },
+  "architecture": {
+    "service": {
+      "serviceId": "phone-agent-service",
+      "name": "Phone Agent Service",
+      "port": 4007,
+      "technology": "Node.js + Express + TypeScript + Twilio SDK",
+      "description": "SMS/Voice channel handling, conversation state machine"
+    },
+    "channels": [
+      {
+        "channel": "SMS",
+        "provider": "Twilio",
+        "status": "Implemented",
+        "authorityLevels": "0-3"
+      },
+      {
+        "channel": "Voice",
+        "provider": "Twilio",
+        "status": "Implemented",
+        "authorityLevels": "0-3"
+      },
+      {
+        "channel": "Teams",
+        "provider": "Microsoft Bot Framework",
+        "status": "Post-Pilot",
+        "authorityLevels": "2-6"
+      },
+      {
+        "channel": "Slack",
+        "provider": "Slack API",
+        "status": "Post-Pilot",
+        "authorityLevels": "2-6"
+      }
+    ],
+    "conversationStateMachine": {
+      "states": [
+        {
+          "state": "IDLE",
+          "description": "Awaiting inbound message",
+          "transitionsTo": ["IDENTIFY_USER"]
+        },
+        {
+          "state": "IDENTIFY_USER",
+          "description": "Match phone → user → project",
+          "transitionsTo": ["CLASSIFY_INTENT", "ERROR"]
+        },
+        {
+          "state": "CLASSIFY_INTENT",
+          "description": "Determine user's goal",
+          "transitionsTo": ["EXTRACT_ENTITIES"]
+        },
+        {
+          "state": "EXTRACT_ENTITIES",
+          "description": "Pull voxel, zone, values from message",
+          "transitionsTo": ["COLLECT_DATA", "VALIDATE"]
+        },
+        {
+          "state": "COLLECT_DATA",
+          "description": "Multi-turn: request missing fields",
+          "transitionsTo": ["VALIDATE"]
+        },
+        {
+          "state": "VALIDATE",
+          "description": "Check authority, data completeness",
+          "transitionsTo": ["CONFIRM", "ESCALATE"]
+        },
+        {
+          "state": "CONFIRM",
+          "description": "Request user confirmation",
+          "transitionsTo": ["EXECUTE", "IDLE"]
+        },
+        {
+          "state": "EXECUTE",
+          "description": "Call appropriate tool(s)",
+          "transitionsTo": ["RESPOND"]
+        },
+        {
+          "state": "RESPOND",
+          "description": "Format and send response",
+          "transitionsTo": ["IDLE"]
+        }
+      ]
+    }
+  },
+  "roleMapping": [
+    {
+      "role": "Field Worker",
+      "authorityLevel": 0,
+      "primaryChannel": "SMS",
+      "backupChannel": "Voice",
+      "interactions": "Report completion, request decision, photo capture"
+    },
+    {
+      "role": "Foreman",
+      "authorityLevel": 1,
+      "primaryChannel": "SMS",
+      "backupChannel": "Teams",
+      "interactions": "Approve minor decisions, crew coordination"
+    },
+    {
+      "role": "Superintendent",
+      "authorityLevel": 2,
+      "primaryChannel": "Teams",
+      "backupChannel": "Voice",
+      "interactions": "Review field decisions, trade coordination"
+    },
+    {
+      "role": "Project Manager",
+      "authorityLevel": 3,
+      "primaryChannel": "Teams/Email",
+      "backupChannel": "SMS",
+      "interactions": "Approve decisions, schedule changes"
+    },
+    {
+      "role": "Architect",
+      "authorityLevel": 4,
+      "primaryChannel": "Email",
+      "backupChannel": "Teams",
+      "interactions": "Design clarifications, RFI responses"
+    },
+    {
+      "role": "Owner",
+      "authorityLevel": 5,
+      "primaryChannel": "Email",
+      "backupChannel": "Phone",
+      "interactions": "Major approvals, scope changes"
+    },
+    {
+      "role": "Inspector",
+      "authorityLevel": 6,
+      "primaryChannel": "Teams",
+      "backupChannel": "Phone",
+      "interactions": "Inspection scheduling, compliance"
+    }
+  ],
+  "schemas": [
+    {
+      "name": "sms-message.schema.json",
+      "path": ".roadmap/schemas/eil/sms-message.schema.json",
+      "purpose": "Inbound/outbound SMS message format"
+    },
+    {
+      "name": "sms-conversation.schema.json",
+      "path": ".roadmap/schemas/eil/sms-conversation.schema.json",
+      "purpose": "Multi-turn conversation state tracking"
+    },
+    {
+      "name": "phone-agent-config.schema.json",
+      "path": ".roadmap/schemas/eil/phone-agent-config.schema.json",
+      "purpose": "Per-project phone agent configuration"
+    }
+  ],
+  "deliverable": {
+    "id": "p5b-d24",
+    "$id": "urn:luhtech:ectropy:deliverable:p5b-d24",
+    "name": "Phone Agent Service MVP",
+    "targetDate": "2026-03-15",
+    "estimatedHours": 120,
+    "status": "in_progress",
+    "successCriteria": [
+      "Twilio webhook integration operational",
+      "User identity resolution from phone number → user → project",
+      "Multi-turn SMS conversation state machine implemented",
+      "Intent classification >85% accuracy",
+      "<3s P95 SMS round-trip latency",
+      "Photo attachment handling (MMS)",
+      "160-char aware response formatting"
+    ],
+    "interfaces": {
+      "smsWebhook": {
+        "endpoint": "POST /api/phone/v1/webhooks/twilio/sms",
+        "input": "Twilio SMS webhook payload",
+        "output": "TwiML response or empty 200",
+        "security": "Twilio signature validation"
+      },
+      "voiceWebhook": {
+        "endpoint": "POST /api/phone/v1/webhooks/twilio/voice",
+        "input": "Twilio Voice webhook payload",
+        "output": "TwiML voice instructions",
+        "security": "Twilio signature validation"
+      },
+      "sendSms": {
+        "endpoint": "POST /api/phone/v1/send",
+        "input": {
+          "to": "E.164 phone",
+          "body": "string",
+          "mediaUrl": "optional"
+        },
+        "output": { "messageId": "string", "status": "queued" }
+      },
+      "conversationStatus": {
+        "endpoint": "GET /api/phone/v1/conversations/:sessionId",
+        "output": { "state": "enum", "history": "array", "context": "object" }
+      }
+    }
+  },
+  "implementation": {
+    "phases": [
+      {
+        "phase": 0,
+        "name": "Foundation",
+        "week": 1,
+        "status": "complete",
+        "tasks": [
+          "Service scaffold",
+          "Twilio account setup",
+          "Webhook endpoints"
+        ],
+        "evidence": {
+          "services": [
+            "apps/mcp-server/src/services/phone-agent/types.ts",
+            "apps/mcp-server/src/services/phone-agent/index.ts"
+          ],
+          "routes": [
+            "apps/mcp-server/src/routes/phone-agent.routes.ts"
+          ]
+        }
+      },
+      {
+        "phase": 1,
+        "name": "SMS Core",
+        "weeks": "2-3",
+        "status": "complete",
+        "tasks": [
+          "Inbound/outbound handling",
+          "User identification",
+          "Basic responses"
+        ],
+        "evidence": {
+          "services": [
+            "apps/mcp-server/src/services/phone-agent/twilio-client.ts",
+            "apps/mcp-server/src/services/phone-agent/user-resolver.ts",
+            "apps/mcp-server/src/services/phone-agent/phone-agent.service.ts"
+          ],
+          "features": [
+            "E.164 phone number validation and formatting",
+            "Twilio webhook signature validation (HMAC-SHA1)",
+            "SMS send/receive with status callbacks",
+            "User-to-phone registration and lookup"
+          ]
+        }
+      },
+      {
+        "phase": 2,
+        "name": "Intent & RAG",
+        "weeks": "4-5",
+        "status": "complete",
+        "tasks": [
+          "Intent classification",
+          "Entity extraction",
+          "RAG context integration"
+        ],
+        "evidence": {
+          "services": [
+            "apps/mcp-server/src/services/phone-agent/intent-classifier.ts"
+          ],
+          "features": [
+            "7 user intent types for construction context",
+            "Rule-based classification with Claude API fallback",
+            "Entity extraction (voxelId, decisionId, trade, amount, date, status)",
+            "Confidence thresholds per intent type"
+          ],
+          "tests": [
+            "apps/mcp-server/src/__tests__/unit/phone-agent/intent-classifier.test.ts"
+          ]
+        }
+      },
+      {
+        "phase": 3,
+        "name": "Multi-Turn",
+        "week": 6,
+        "status": "complete",
+        "tasks": [
+          "State machine implementation",
+          "Photo handling",
+          "Confirmation flows"
+        ],
+        "evidence": {
+          "services": [
+            "apps/mcp-server/src/services/phone-agent/conversation-state-machine.ts"
+          ],
+          "features": [
+            "9-state conversation state machine",
+            "Redis-backed session storage with in-memory fallback",
+            "MMS/photo attachment handling",
+            "SMS segmentation (160-char standard, 70-char unicode)",
+            "Multi-segment response formatting"
+          ],
+          "tests": [
+            "apps/mcp-server/src/__tests__/unit/phone-agent/conversation-state-machine.test.ts",
+            "apps/mcp-server/src/__tests__/unit/phone-agent/types.test.ts"
+          ]
+        }
+      },
+      {
+        "phase": 4,
+        "name": "Voice",
+        "week": 7,
+        "status": "complete",
+        "tasks": ["Voice webhooks", "Transcription", "TwiML generation"],
+        "evidence": {
+          "services": [
+            "apps/mcp-server/src/services/phone-agent/voice-processor.ts"
+          ],
+          "features": [
+            "Twilio voice webhooks (inbound, gather, confirm, status)",
+            "STT via Twilio speech recognition",
+            "TTS with Polly voices",
+            "TwiML generation for conversation flows",
+            "Voice session management"
+          ]
+        }
+      },
+      {
+        "phase": 5,
+        "name": "Teams/Slack",
+        "week": 8,
+        "status": "planned",
+        "tasks": ["Bot framework integration", "Rich message formatting"]
+      }
+    ],
+    "totalHours": 300,
+    "completedPhases": 5,
+    "totalPhases": 6
+  },
+  "evidence": {
+    "implementation": {
+      "date": "2026-01-23",
+      "completedMilestones": [
+        "PA-M0: Foundation - Service scaffold, types, webhook endpoints",
+        "PA-M1: SMS Core - Twilio integration, user resolution, basic flows",
+        "PA-M2: Intent & RAG - Classification, entity extraction, confidence scoring",
+        "PA-M3: Multi-Turn - State machine, session management, confirmation flows",
+        "PA-M4: Voice - STT/TTS, voice webhooks, TwiML generation"
+      ],
+      "services": [
+        {
+          "path": "apps/mcp-server/src/services/phone-agent/types.ts",
+          "purpose": "Core types, constants, E.164 utilities, SMS segmentation",
+          "lines": 505
+        },
+        {
+          "path": "apps/mcp-server/src/services/phone-agent/twilio-client.ts",
+          "purpose": "Twilio API integration, webhook validation, SMS/Voice",
+          "lines": 450
+        },
+        {
+          "path": "apps/mcp-server/src/services/phone-agent/conversation-state-machine.ts",
+          "purpose": "Multi-turn conversation session management",
+          "lines": 450
+        },
+        {
+          "path": "apps/mcp-server/src/services/phone-agent/intent-classifier.ts",
+          "purpose": "AI-powered intent classification and entity extraction",
+          "lines": 350
+        },
+        {
+          "path": "apps/mcp-server/src/services/phone-agent/user-resolver.ts",
+          "purpose": "Phone-to-user resolution and escalation targets",
+          "lines": 350
+        },
+        {
+          "path": "apps/mcp-server/src/services/phone-agent/voice-processor.ts",
+          "purpose": "STT/TTS capabilities and voice session management",
+          "lines": 450
+        },
+        {
+          "path": "apps/mcp-server/src/services/phone-agent/phone-agent.service.ts",
+          "purpose": "Main service orchestrator integrating all components",
+          "lines": 550
+        }
+      ],
+      "routes": [
+        {
+          "path": "apps/mcp-server/src/routes/phone-agent.routes.ts",
+          "endpoints": 15,
+          "purpose": "REST API for SMS/Voice webhooks, conversation management, health"
+        }
+      ],
+      "tests": {
+        "total": 113,
+        "passing": 113,
+        "files": [
+          "apps/mcp-server/src/__tests__/unit/phone-agent/types.test.ts",
+          "apps/mcp-server/src/__tests__/unit/phone-agent/intent-classifier.test.ts",
+          "apps/mcp-server/src/__tests__/unit/phone-agent/conversation-state-machine.test.ts"
+        ]
+      }
+    }
+  },
+  "graphMetadata": {
+    "inEdges": [
+      "urn:luhtech:ectropy:feature:seppa-agent",
+      "urn:luhtech:ectropy:deliverable:p5b-d21",
+      "urn:luhtech:ectropy:deliverable:p5b-d22"
+    ],
+    "outEdges": ["urn:luhtech:ectropy:deliverable:p5b-d24"]
+  }
+}

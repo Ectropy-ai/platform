@@ -1,0 +1,2 @@
+# Terraform-generated files containing secrets (created during terraform apply)
+.terraform-generated/

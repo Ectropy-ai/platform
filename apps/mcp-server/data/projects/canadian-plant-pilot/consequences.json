@@ -1,0 +1,200 @@
+[
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0001",
+    "$schema": "https://luhtech.dev/schemas/pm/consequence.schema.json",
+    "schemaVersion": "3.0.0",
+    "consequenceId": "CONSQ-2026-0001",
+    "title": "COST INCREASE - MINOR",
+    "category": "COST_INCREASE",
+    "severity": "MINOR",
+    "sourceDecision": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0001",
+    "budgetDelta": 4350,
+    "scheduleDelta": 0,
+    "affectedZones": ["ZONE-D"],
+    "status": "REALIZED",
+    "timestamps": {
+      "createdAt": "2026-03-08T12:23:13.535Z",
+      "realizedAt": "2026-03-08T12:23:13.535Z"
+    },
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0001"],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0002",
+    "$schema": "https://luhtech.dev/schemas/pm/consequence.schema.json",
+    "schemaVersion": "3.0.0",
+    "consequenceId": "CONSQ-2026-0002",
+    "title": "REWORK REQUIRED - MINOR",
+    "category": "REWORK_REQUIRED",
+    "severity": "MINOR",
+    "sourceDecision": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0004",
+    "budgetDelta": 3958,
+    "scheduleDelta": 1,
+    "affectedZones": ["ZONE-B"],
+    "status": "REALIZED",
+    "timestamps": {
+      "createdAt": "2026-02-18T15:05:34.781Z",
+      "realizedAt": "2026-02-18T15:05:34.781Z"
+    },
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0004"],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0003",
+    "$schema": "https://luhtech.dev/schemas/pm/consequence.schema.json",
+    "schemaVersion": "3.0.0",
+    "consequenceId": "CONSQ-2026-0003",
+    "title": "COST INCREASE - MINOR",
+    "category": "COST_INCREASE",
+    "severity": "MINOR",
+    "sourceDecision": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0006",
+    "budgetDelta": 4627,
+    "scheduleDelta": 0,
+    "affectedZones": ["ZONE-A"],
+    "status": "REALIZED",
+    "timestamps": {
+      "createdAt": "2026-04-07T03:54:32.727Z",
+      "realizedAt": "2026-04-07T03:54:32.727Z"
+    },
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0006"],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0004",
+    "$schema": "https://luhtech.dev/schemas/pm/consequence.schema.json",
+    "schemaVersion": "3.0.0",
+    "consequenceId": "CONSQ-2026-0004",
+    "title": "SCHEDULE DELAY - MINOR",
+    "category": "SCHEDULE_DELAY",
+    "severity": "MINOR",
+    "sourceDecision": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0007",
+    "budgetDelta": 679,
+    "scheduleDelta": 1,
+    "affectedZones": ["ZONE-B"],
+    "status": "REALIZED",
+    "timestamps": {
+      "createdAt": "2026-04-30T18:11:34.532Z",
+      "realizedAt": "2026-04-30T18:11:34.532Z"
+    },
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0007"],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0005",
+    "$schema": "https://luhtech.dev/schemas/pm/consequence.schema.json",
+    "schemaVersion": "3.0.0",
+    "consequenceId": "CONSQ-2026-0005",
+    "title": "REWORK REQUIRED - MINOR",
+    "category": "REWORK_REQUIRED",
+    "severity": "MINOR",
+    "sourceDecision": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0018",
+    "budgetDelta": 1762,
+    "scheduleDelta": 2,
+    "affectedZones": ["ZONE-D"],
+    "status": "REALIZED",
+    "timestamps": {
+      "createdAt": "2026-04-02T11:15:59.328Z",
+      "realizedAt": "2026-04-02T11:15:59.328Z"
+    },
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0018"],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0006",
+    "$schema": "https://luhtech.dev/schemas/pm/consequence.schema.json",
+    "schemaVersion": "3.0.0",
+    "consequenceId": "CONSQ-2026-0006",
+    "title": "COST INCREASE - MINOR",
+    "category": "COST_INCREASE",
+    "severity": "MINOR",
+    "sourceDecision": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0025",
+    "budgetDelta": 2954,
+    "scheduleDelta": 0,
+    "affectedZones": ["ZONE-D"],
+    "status": "REALIZED",
+    "timestamps": {
+      "createdAt": "2026-04-13T01:55:44.379Z",
+      "realizedAt": "2026-04-13T01:55:44.379Z"
+    },
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0025"],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0007",
+    "$schema": "https://luhtech.dev/schemas/pm/consequence.schema.json",
+    "schemaVersion": "3.0.0",
+    "consequenceId": "CONSQ-2026-0007",
+    "title": "REWORK REQUIRED - MINOR",
+    "category": "REWORK_REQUIRED",
+    "severity": "MINOR",
+    "sourceDecision": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0046",
+    "budgetDelta": 4688,
+    "scheduleDelta": 1,
+    "affectedZones": ["ZONE-D"],
+    "status": "REALIZED",
+    "timestamps": {
+      "createdAt": "2026-02-20T09:48:28.466Z",
+      "realizedAt": "2026-02-20T09:48:28.466Z"
+    },
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0046"],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0008",
+    "$schema": "https://luhtech.dev/schemas/pm/consequence.schema.json",
+    "schemaVersion": "3.0.0",
+    "consequenceId": "CONSQ-2026-0008",
+    "title": "SCHEDULE DELAY - MINOR",
+    "category": "SCHEDULE_DELAY",
+    "severity": "MINOR",
+    "sourceDecision": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0047",
+    "budgetDelta": 1970,
+    "scheduleDelta": 1,
+    "affectedZones": ["ZONE-A"],
+    "status": "REALIZED",
+    "timestamps": {
+      "createdAt": "2026-02-11T20:47:21.613Z",
+      "realizedAt": "2026-02-11T20:47:21.613Z"
+    },
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0047"],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:consequence:CONSQ-2026-0009",
+    "$schema": "https://luhtech.dev/schemas/pm/consequence.schema.json",
+    "schemaVersion": "3.0.0",
+    "consequenceId": "CONSQ-2026-0009",
+    "title": "COST INCREASE - MINOR",
+    "category": "COST_INCREASE",
+    "severity": "MINOR",
+    "sourceDecision": "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0049",
+    "budgetDelta": 2770,
+    "scheduleDelta": 0,
+    "affectedZones": ["ZONE-A"],
+    "status": "REALIZED",
+    "timestamps": {
+      "createdAt": "2026-03-27T00:17:56.030Z",
+      "realizedAt": "2026-03-27T00:17:56.030Z"
+    },
+    "graphMetadata": {
+      "inEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0049"],
+      "outEdges": []
+    }
+  }
+]

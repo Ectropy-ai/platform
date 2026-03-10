@@ -1,0 +1,30 @@
+#!/bin/bash
+set -e
+
+echo "🔒 Pre-Commit Security Gate - Enterprise Validation"
+echo "================================================="
+
+# BLOCKER: Hardcoded secrets check
+echo "🚨 CRITICAL: Scanning for hardcoded secrets..."
+if node scripts/validate-no-secrets.js >/dev/null 2>&1; then
+  echo "✅ No hardcoded secrets detected"
+else
+  echo "❌ CRITICAL: Hardcoded secrets detected"
+  echo "   Fix secrets before committing"
+  exit 1
+fi
+
+# HIGH: Token placeholder check
+echo "🔍 HIGH: Checking for token placeholders..."
+if grep -r "placeholder.*token\|token.*placeholder" apps/api-gateway/src/main.ts 2>/dev/null | grep -v "SECURITY:" | grep -v "comment"; then
+  echo "❌ HIGH: Token placeholders detected"
+  echo "   Remove placeholder tokens before committing"
+  exit 1
+else
+  echo "✅ No token placeholders found"
+fi
+
+echo ""
+echo "🎉 Security gate passed - safe to commit"
+echo "   All critical security violations resolved"
+exit 0

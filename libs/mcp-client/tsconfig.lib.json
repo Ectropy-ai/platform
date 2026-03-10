@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "outDir": "../../dist/libs/mcp-client",
+    "declaration": true,
+    "types": ["node"],
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["**/*.ts"],
+  "exclude": [
+    "dist",
+    "dist/**/*",
+    "jest.config.ts",
+    "vitest.config.ts",
+    "**/*.spec.ts",
+    "**/*.test.ts"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist/out-tsc",
+    "module": "ESNext",
+    "types": ["node", "jest"],
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": false,
+    "strict": true,
+    "noEmit": true
+  },
+  "include": [
+    "jest.config.ts",
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.d.ts",
+    "tests/**/*.test.ts",
+    "tests/**/*.spec.ts",
+    "types/**/*.d.ts",
+    "../../jest.setup.js",
+    "../../__mocks__/**/*"
+  ]
+}

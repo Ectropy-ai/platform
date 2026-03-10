@@ -1,0 +1,25 @@
+{
+  "name": "ectropy-validation",
+  "displayName": "Ectropy Validation Tools",
+  "version": "1.0.0",
+  "description": "MCP tools for validating code changes in Ectropy platform",
+  "configuration": {
+    "serverConfig": ".github/copilot/mcp-servers.json",
+    "bootstrapScript": ".github/scripts/bootstrap-mcp.sh",
+    "requiredServices": ["postgres", "redis"],
+    "healthCheck": {
+      "url": "http://localhost:3001/health",
+      "timeout": 30000,
+      "retries": 3
+    }
+  },
+  "tools": [
+    "health_check",
+    "validate_work_plan",
+    "get_guidance",
+    "check_strategy",
+    "analyze_model",
+    "semantic_search",
+    "get_agent_status"
+  ]
+}

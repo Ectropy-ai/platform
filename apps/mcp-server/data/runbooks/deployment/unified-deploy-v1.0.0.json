@@ -1,0 +1,1331 @@
+{
+  "version": "1.0.0",
+  "environment": "all",
+  "runbookType": "deployment",
+  "metadata": {
+    "catalogId": "unified-deployment-runbook-v1-0-0",
+    "name": "Unified Deployment Orchestration",
+    "type": "deployment",
+    "purpose": "Master orchestration script for all environment deployments with TypeScript mode selection and enterprise-grade validation",
+    "maintainer": "infrastructure-team",
+    "author": "DevOps Team",
+    "created": "2025-11-16T18:00:00Z",
+    "lastUpdated": "2025-11-16T18:00:00Z",
+    "estimatedDuration": "30 minutes",
+    "complexity": "high",
+    "priority": "critical",
+    "relatedDocuments": [
+      "scripts/deployment/unified-deploy.sh",
+      "apps/mcp-server/data/routing-architecture.json",
+      "tsconfig.enterprise-standard.json",
+      "tsconfig.staging.json"
+    ],
+    "sourceFile": "scripts/deployment/unified-deploy.sh",
+    "conversionDate": "2025-11-16T18:00:00Z",
+    "schemaVersion": "1.0.0"
+  },
+  "executiveSummary": {
+    "description": "Comprehensive deployment orchestration supporting multiple TypeScript strictness modes (permissive, intermediate, staging, production) and environment-specific configurations. Includes pre-flight validation, automated builds, Docker orchestration, health monitoring, and rollback capabilities.",
+    "status": "READY",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "MEDIUM",
+    "keyChanges": [
+      "Multi-mode TypeScript compilation support (permissive/intermediate/staging/production)",
+      "Environment-specific Docker Compose orchestration",
+      "Automated health check validation with 60-attempt retry logic",
+      "Comprehensive pre-flight prerequisite checking",
+      "Automated backup creation before deployment",
+      "Infrastructure-first deployment strategy (databases before apps)"
+    ],
+    "prerequisites": [
+      "Docker daemon running",
+      "Docker Compose available (legacy or plugin)",
+      "Node.js and pnpm installed",
+      "curl available for health checks",
+      "Appropriate TypeScript configuration files present",
+      "Environment files configured (.env.{mode}.example)",
+      "Network ports available (3000 for dev, 4000 for staging)"
+    ],
+    "impact": {
+      "systems": [
+        "api-gateway",
+        "mcp-server",
+        "web-dashboard",
+        "postgres",
+        "redis",
+        "qdrant",
+        "minio",
+        "speckle-services"
+      ],
+      "downtime": "5-10 minutes during deployment",
+      "rollbackTime": "5 minutes"
+    }
+  },
+  "preFlightChecks": [
+    {
+      "id": "check-docker-cli",
+      "order": 1,
+      "category": "infrastructure",
+      "name": "Validate Docker CLI available",
+      "description": "Ensure docker command is installed and in PATH",
+      "command": "command -v docker",
+      "expectedResult": "Path to docker binary",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates docker is available",
+      "onFailure": {
+        "action": "abort",
+        "message": "docker is not installed or not in PATH. Install Docker before proceeding."
+      }
+    },
+    {
+      "id": "check-node-cli",
+      "order": 2,
+      "category": "infrastructure",
+      "name": "Validate Node.js available",
+      "description": "Ensure node command is installed and in PATH",
+      "command": "command -v node",
+      "expectedResult": "Path to node binary",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates node is available",
+      "onFailure": {
+        "action": "abort",
+        "message": "node is not installed or not in PATH. Install Node.js before proceeding."
+      }
+    },
+    {
+      "id": "check-pnpm-cli",
+      "order": 3,
+      "category": "infrastructure",
+      "name": "Validate pnpm available",
+      "description": "Ensure pnpm package manager is installed",
+      "command": "command -v pnpm",
+      "expectedResult": "Path to pnpm binary",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates pnpm is available",
+      "onFailure": {
+        "action": "abort",
+        "message": "pnpm is not installed or not in PATH. Install pnpm before proceeding."
+      }
+    },
+    {
+      "id": "check-curl-cli",
+      "order": 4,
+      "category": "infrastructure",
+      "name": "Validate curl available",
+      "description": "Ensure curl is available for health checks",
+      "command": "command -v curl",
+      "expectedResult": "Path to curl binary",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates curl is available",
+      "onFailure": {
+        "action": "abort",
+        "message": "curl is not installed or not in PATH. Install curl before proceeding."
+      }
+    },
+    {
+      "id": "check-docker-compose",
+      "order": 5,
+      "category": "infrastructure",
+      "name": "Validate Docker Compose available",
+      "description": "Check for docker-compose legacy command or docker compose plugin",
+      "command": "command -v docker-compose || docker compose version",
+      "expectedResult": "Docker Compose version output",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Either legacy docker-compose or docker compose plugin must be available",
+      "onFailure": {
+        "action": "abort",
+        "message": "docker-compose is not installed and docker compose plugin is not available. Install Docker Compose before proceeding."
+      }
+    },
+    {
+      "id": "check-docker-daemon",
+      "order": 6,
+      "category": "infrastructure",
+      "name": "Validate Docker daemon running",
+      "description": "Ensure Docker daemon is operational",
+      "command": "docker info",
+      "expectedResult": "Docker system information",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates Docker daemon is running",
+      "onFailure": {
+        "action": "abort",
+        "message": "Docker daemon is not running. Start Docker daemon before proceeding."
+      }
+    },
+    {
+      "id": "check-package-json",
+      "order": 7,
+      "category": "configuration",
+      "name": "Validate package.json exists",
+      "description": "Ensure project root has package.json",
+      "command": "test -f package.json",
+      "expectedResult": "File exists",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "Exit code 0 indicates file exists",
+      "onFailure": {
+        "action": "abort",
+        "message": "package.json not found in project root. Verify working directory."
+      }
+    },
+    {
+      "id": "check-typescript-config",
+      "order": 8,
+      "category": "configuration",
+      "name": "Validate TypeScript configuration",
+      "description": "Ensure appropriate TypeScript config file exists for selected mode",
+      "command": "test -f tsconfig.enterprise-standard.json || test -f tsconfig.staging.json",
+      "expectedResult": "Configuration file exists",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "validationLogic": "At least one TypeScript configuration must exist",
+      "onFailure": {
+        "action": "abort",
+        "message": "TypeScript configuration not found. Ensure tsconfig files are present."
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Pre-Deployment Validation",
+      "description": "Validate all prerequisites and project structure before deployment",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Validate required tools",
+          "description": "Check that docker, node, pnpm, and curl are available",
+          "command": "for tool in docker node pnpm curl; do command -v $tool || exit 1; done",
+          "purpose": "Ensure all required CLI tools are installed",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code must be 0"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Required tools missing. Install docker, node, pnpm, and curl."
+          }
+        },
+        {
+          "step": "1.2",
+          "name": "Check Docker Compose availability",
+          "description": "Verify either docker-compose legacy or docker compose plugin is available",
+          "command": "command -v docker-compose &> /dev/null || docker compose version &> /dev/null",
+          "purpose": "Ensure Docker Compose is available for orchestration",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Either command succeeds"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Docker Compose not available. Install docker-compose or use Docker with compose plugin."
+          }
+        },
+        {
+          "step": "1.3",
+          "name": "Validate Docker daemon",
+          "description": "Ensure Docker daemon is running and accessible",
+          "command": "docker info",
+          "purpose": "Check Docker daemon status",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Docker info returns success"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Docker daemon is not running. Start Docker and retry."
+          }
+        },
+        {
+          "step": "1.4",
+          "name": "Validate project structure",
+          "description": "Check that package.json exists in project root",
+          "command": "test -f package.json",
+          "purpose": "Verify we're in the correct project directory",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": "package.json must exist"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "package.json not found. Verify working directory is project root."
+          }
+        },
+        {
+          "step": "1.5",
+          "name": "Validate TypeScript configuration",
+          "description": "Ensure TypeScript config file exists for selected mode",
+          "command": "test -f $(get_typescript_config $TYPESCRIPT_MODE)",
+          "purpose": "Verify TypeScript configuration is available",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": "TypeScript config must exist for mode"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "TypeScript configuration not found for selected mode."
+          },
+          "relatedFiles": [
+            "tsconfig.enterprise-standard.json",
+            "tsconfig.staging.json"
+          ]
+        },
+        {
+          "step": "1.6",
+          "name": "Check environment template",
+          "description": "Verify environment template exists for deployment mode",
+          "command": "test -f .env.${DEPLOYMENT_MODE}.example",
+          "purpose": "Validate environment configuration availability",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": "Environment template should exist"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Environment template not found, but deployment can continue."
+          }
+        },
+        {
+          "step": "1.7",
+          "name": "Validate TypeScript build",
+          "description": "Run TypeScript type checking for selected mode",
+          "command": "pnpm run type-check:${TYPESCRIPT_MODE}",
+          "purpose": "Ensure code compiles without TypeScript errors",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "TypeScript compilation must succeed"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "TypeScript validation failed. Fix type errors before deploying."
+          }
+        },
+        {
+          "step": "1.8",
+          "name": "Check network ports",
+          "description": "Verify required ports are available",
+          "command": "! netstat -tuln 2>/dev/null | grep -q ':${PORT} '",
+          "purpose": "Ensure deployment ports are not in use",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Port should not be in use"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Port is already in use. Deployment may fail or require port change."
+          }
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Backup Creation",
+      "description": "Create deployment backup for rollback capability",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Create backup of Docker Compose file",
+          "description": "Backup current compose configuration",
+          "command": "cp ${COMPOSE_FILE} ${COMPOSE_FILE}.backup.${TIMESTAMP}",
+          "purpose": "Enable quick rollback to previous configuration",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": "Backup file must be created"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Backup creation failed, but deployment can continue."
+          }
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Application Build",
+      "description": "Build application with selected TypeScript mode",
+      "estimatedDuration": "10 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Clean previous builds (if force rebuild)",
+          "description": "Remove previous build artifacts if FORCE_REBUILD=true",
+          "commands": [
+            "pnpm run clean",
+            "rm -rf node_modules/.cache"
+          ],
+          "purpose": "Ensure fresh build without cached artifacts",
+          "required": false,
+          "automatable": true,
+          "timeout": "120s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Clean command succeeds"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Clean failed, but build can continue."
+          }
+        },
+        {
+          "step": "3.2",
+          "name": "Install dependencies",
+          "description": "Install npm dependencies with frozen lockfile",
+          "command": "pnpm install --frozen-lockfile --silent",
+          "purpose": "Ensure consistent dependency versions",
+          "required": true,
+          "automatable": true,
+          "timeout": "600s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "pnpm install must succeed"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Dependency installation failed. Check network and pnpm-lock.yaml."
+          }
+        },
+        {
+          "step": "3.3",
+          "name": "Build with permissive TypeScript",
+          "description": "Build application using permissive TypeScript configuration",
+          "command": "pnpm run build",
+          "purpose": "Compile application for permissive or intermediate mode",
+          "required": true,
+          "automatable": true,
+          "timeout": "600s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Build must complete successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Build failed. Check TypeScript errors and dependencies."
+          },
+          "relatedFiles": [
+            "tsconfig.enterprise-standard.json"
+          ]
+        },
+        {
+          "step": "3.4",
+          "name": "Build with staging/strict TypeScript",
+          "description": "Build application using strict TypeScript configuration",
+          "command": "pnpm run build:staging",
+          "purpose": "Compile application for staging or strict mode",
+          "required": true,
+          "automatable": true,
+          "timeout": "600s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Build must complete successfully with strict checks"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Strict build failed. Fix TypeScript errors before deploying to staging."
+          },
+          "relatedFiles": [
+            "tsconfig.staging.json"
+          ]
+        },
+        {
+          "step": "3.5",
+          "name": "Build with production TypeScript",
+          "description": "Build application using production TypeScript configuration",
+          "command": "pnpm run build:production",
+          "purpose": "Compile application for production with optimizations",
+          "required": true,
+          "automatable": true,
+          "timeout": "600s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Production build must complete successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Production build failed. Fix errors before deploying to production."
+          },
+          "relatedFiles": [
+            "tsconfig.enterprise-standard.json"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Docker Environment Preparation",
+      "description": "Prepare Docker environment for deployment",
+      "estimatedDuration": "3 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Validate Docker Compose file exists",
+          "description": "Ensure compose file for deployment mode exists",
+          "command": "test -f ${COMPOSE_FILE}",
+          "purpose": "Verify compose configuration is available",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": "Compose file must exist"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Docker Compose file not found for selected mode."
+          },
+          "relatedFiles": [
+            "docker-compose.dev.yml",
+            "docker-compose.staging.yml",
+            "docker-compose.production.yml"
+          ]
+        },
+        {
+          "step": "4.2",
+          "name": "Stop existing deployment",
+          "description": "Gracefully stop running containers",
+          "command": "${DOCKER_COMPOSE_CMD} -f ${COMPOSE_FILE} down --volumes --remove-orphans",
+          "purpose": "Clean up existing deployment before starting new one",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "All containers stopped successfully"
+          },
+          "onFailure": {
+            "action": "retry",
+            "message": "Failed to stop containers. Retrying..."
+          }
+        },
+        {
+          "step": "4.3",
+          "name": "Prune Docker resources",
+          "description": "Remove unused Docker resources",
+          "command": "docker system prune -f",
+          "purpose": "Free up disk space and remove dangling resources",
+          "required": false,
+          "automatable": true,
+          "timeout": "120s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Prune completes successfully"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Prune failed, but deployment can continue."
+          }
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Service Deployment",
+      "description": "Deploy services using Docker Compose",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "5.1",
+          "name": "Set deployment environment variables",
+          "description": "Export environment variables for Docker Compose",
+          "commands": [
+            "export NODE_ENV=${ENV_MODE}",
+            "export TYPESCRIPT_MODE=${TYPESCRIPT_MODE}",
+            "export DEPLOYMENT_MODE=${DEPLOYMENT_MODE}"
+          ],
+          "purpose": "Configure runtime environment for containers",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "maxRetries": 10,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Variables exported successfully"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Failed to set environment variables."
+          }
+        },
+        {
+          "step": "5.2",
+          "name": "Start core infrastructure services",
+          "description": "Deploy postgres and redis first (infrastructure-first strategy)",
+          "command": "${DOCKER_COMPOSE_CMD} -f ${COMPOSE_FILE} up -d postgres redis",
+          "purpose": "Ensure databases are ready before application services",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "Postgres and Redis containers healthy"
+          },
+          "onFailure": {
+            "action": "skip",
+            "rollbackStep": "4.2",
+            "message": "Infrastructure services failed to start."
+          }
+        },
+        {
+          "step": "5.3",
+          "name": "Wait for databases to initialize",
+          "description": "Allow 20 seconds for database initialization",
+          "command": "sleep 20",
+          "purpose": "Ensure databases are fully ready before starting apps",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Wait completes"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Wait interrupted, but deployment continues."
+          }
+        },
+        {
+          "step": "5.4",
+          "name": "Deploy all application services",
+          "description": "Start all services with build",
+          "command": "${DOCKER_COMPOSE_CMD} -f ${COMPOSE_FILE} up -d --build",
+          "purpose": "Build and start all application containers",
+          "required": true,
+          "automatable": true,
+          "timeout": "900s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "All services start successfully"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "rollbackStep": "4.2",
+            "message": "Application services failed to start. Initiating rollback."
+          }
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Health Check Validation",
+      "description": "Wait for services to be healthy and validate deployment",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "6.1",
+          "name": "Wait for API Gateway health",
+          "description": "Retry health check up to 60 times with 10s intervals",
+          "command": "for i in {1..60}; do curl -sf http://localhost:${PORT}/health && break || sleep 10; done",
+          "purpose": "Ensure API Gateway is healthy before proceeding",
+          "required": true,
+          "automatable": true,
+          "timeout": "600s",
+          "retryable": false,
+          "maxRetries": 10,
+          "expectedStatus": [200],
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "Health endpoint returns 200 OK"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Health check timeout, but deployment may still be starting."
+          }
+        },
+        {
+          "step": "6.2",
+          "name": "Fallback: Check if API Gateway responds",
+          "description": "If /health fails, try root endpoint",
+          "command": "curl -sf http://localhost:${PORT}/",
+          "purpose": "Alternative check if health endpoint not available",
+          "required": false,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": [200],
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "Root endpoint accessible"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "API Gateway not responding on root endpoint either."
+          }
+        }
+      ]
+    },
+    {
+      "phase": 7,
+      "name": "Deployment Validation",
+      "description": "Validate deployment success and test endpoints",
+      "estimatedDuration": "3 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "7.1",
+          "name": "Check container status",
+          "description": "Count running vs total containers",
+          "command": "${DOCKER_COMPOSE_CMD} -f ${COMPOSE_FILE} ps --services --filter 'status=running'",
+          "purpose": "Verify all containers are running",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "All expected services should be running"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Some containers not running. Check logs."
+          }
+        },
+        {
+          "step": "7.2",
+          "name": "Test health endpoint",
+          "description": "Verify health endpoint is accessible",
+          "command": "curl -sf http://localhost:${PORT}/health",
+          "purpose": "Validate API Gateway health check",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": [200],
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "Returns 200 OK"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Health endpoint not accessible."
+          }
+        },
+        {
+          "step": "7.3",
+          "name": "Test root endpoint",
+          "description": "Verify root endpoint is accessible",
+          "command": "curl -sf http://localhost:${PORT}/",
+          "purpose": "Validate application is serving requests",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": [200],
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "Returns 200 OK"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Root endpoint not accessible. Application may still be starting."
+          }
+        }
+      ]
+    },
+    {
+      "phase": 8,
+      "name": "Deployment Report Generation",
+      "description": "Generate comprehensive deployment summary",
+      "estimatedDuration": "1 minute",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "8.1",
+          "name": "Generate deployment summary",
+          "description": "Display deployment configuration and access URLs",
+          "command": "echo 'Deployment completed. Check logs for details.'",
+          "purpose": "Provide deployment summary to operator",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Summary generated"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "Summary generation failed, but deployment succeeded."
+          }
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "healthChecks": [
+      {
+        "service": "api-gateway",
+        "endpoint": "http://localhost:3000/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "api-gateway",
+        "endpoint": "http://localhost:3000/",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": false
+      }
+    ],
+    "smokeTests": [
+      {
+        "test": "API Gateway responds to health check",
+        "endpoint": "http://localhost:${PORT}/health",
+        "expectedBehavior": "Returns 200 OK with health status",
+        "priority": "P0"
+      },
+      {
+        "test": "Application root endpoint accessible",
+        "endpoint": "http://localhost:${PORT}/",
+        "expectedBehavior": "Returns 200 OK",
+        "priority": "P0"
+      },
+      {
+        "test": "All containers running",
+        "endpoint": "docker ps",
+        "expectedBehavior": "All services show 'Up' status",
+        "priority": "P0"
+      }
+    ],
+    "performanceThresholds": [
+      {
+        "metric": "Health check response time",
+        "threshold": "< 500ms",
+        "measurement": "curl response time to /health"
+      },
+      {
+        "metric": "Container startup time",
+        "threshold": "< 60s",
+        "measurement": "Time from docker up to healthy state"
+      }
+    ],
+    "dataIntegrity": [
+      {
+        "check": "No data loss during deployment",
+        "validation": "Volumes preserved if not using --volumes flag",
+        "expected": "All existing data intact"
+      }
+    ]
+  },
+  "rollback": {
+    "supported": true,
+    "estimatedTime": "5 minutes",
+    "dataLossRisk": "minimal",
+    "triggerConditions": [
+      "Health checks fail after 60 attempts (10 minutes)",
+      "Containers fail to start",
+      "Critical service errors in logs",
+      "TypeScript build failures",
+      "Docker Compose errors"
+    ],
+    "decisionMaker": "DevOps Lead or Technical Lead",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Stop failed deployment",
+        "command": "${DOCKER_COMPOSE_CMD} -f ${COMPOSE_FILE} down",
+        "purpose": "Halt current deployment",
+        "required": true
+      },
+      {
+        "step": 2,
+        "name": "Restore backup configuration",
+        "command": "cp ${COMPOSE_FILE}.backup.${TIMESTAMP} ${COMPOSE_FILE}",
+        "purpose": "Revert to previous compose configuration",
+        "required": true
+      },
+      {
+        "step": 3,
+        "name": "Restart previous deployment",
+        "command": "${DOCKER_COMPOSE_CMD} -f ${COMPOSE_FILE} up -d",
+        "purpose": "Start previous stable version",
+        "required": true
+      },
+      {
+        "step": 4,
+        "name": "Verify rollback health",
+        "command": "curl -sf http://localhost:${PORT}/health",
+        "purpose": "Confirm rollback successful",
+        "required": true
+      }
+    ],
+    "verification": {
+      "healthCheck": "http://localhost:${PORT}/health",
+      "expectedStatus": 200,
+      "successCriteria": "All containers healthy and health endpoint returns 200"
+    }
+  },
+  "monitoring": {
+    "duration": "First 24 hours critical, then ongoing",
+    "keyMetrics": [
+      {
+        "metric": "Container health status",
+        "threshold": "All containers 'Up'",
+        "alertOn": "Any container restart or exit",
+        "severity": "critical"
+      },
+      {
+        "metric": "API response time",
+        "threshold": "< 500ms",
+        "alertOn": "> 1000ms for 5 minutes",
+        "severity": "warning"
+      },
+      {
+        "metric": "Error rate in logs",
+        "threshold": "< 1%",
+        "alertOn": "> 5% error rate",
+        "severity": "critical"
+      },
+      {
+        "metric": "Memory usage",
+        "threshold": "< 80%",
+        "alertOn": "> 90% for 5 minutes",
+        "severity": "warning"
+      },
+      {
+        "metric": "CPU usage",
+        "threshold": "< 70%",
+        "alertOn": "> 90% for 5 minutes",
+        "severity": "warning"
+      }
+    ],
+    "alertThresholds": [
+      {
+        "condition": "Health check fails 3 consecutive times",
+        "severity": "critical",
+        "action": "Investigate immediately, consider rollback",
+        "escalation": "Page on-call engineer"
+      },
+      {
+        "condition": "Container restarts > 0",
+        "severity": "warning",
+        "action": "Check container logs for crash reason",
+        "escalation": "Notify DevOps team"
+      },
+      {
+        "condition": "Build failure",
+        "severity": "critical",
+        "action": "Abort deployment, fix build errors",
+        "escalation": "Notify development team"
+      }
+    ],
+    "dashboards": [
+      "docker compose ps - container status",
+      "docker compose logs -f - live logs",
+      "docker stats - resource usage",
+      "curl http://localhost:${PORT}/health - health status"
+    ]
+  },
+  "successCriteria": [
+    {
+      "criterion": "All required tools available (docker, node, pnpm, curl)",
+      "status": "REQUIRED",
+      "validation": "Pre-flight checks pass"
+    },
+    {
+      "criterion": "TypeScript compilation succeeds for selected mode",
+      "status": "REQUIRED",
+      "validation": "pnpm run type-check:${MODE} returns exit code 0"
+    },
+    {
+      "criterion": "Application build completes successfully",
+      "status": "REQUIRED",
+      "validation": "pnpm run build returns exit code 0"
+    },
+    {
+      "criterion": "All containers start and reach healthy state",
+      "status": "REQUIRED",
+      "validation": "docker compose ps shows all services 'Up'"
+    },
+    {
+      "criterion": "API Gateway health endpoint returns 200",
+      "status": "REQUIRED",
+      "validation": "curl http://localhost:${PORT}/health returns 200"
+    },
+    {
+      "criterion": "No critical errors in container logs",
+      "status": "REQUIRED",
+      "validation": "docker logs shows no ERROR or FATAL messages"
+    },
+    {
+      "criterion": "Backup created successfully",
+      "status": "RECOMMENDED",
+      "validation": "Backup file exists in project directory"
+    },
+    {
+      "criterion": "Deployment completes within estimated time",
+      "status": "OPTIONAL",
+      "validation": "Total time < 30 minutes"
+    }
+  ],
+  "mcpIntegration": {
+    "queryableFields": [
+      "phases",
+      "environmentVariables",
+      "healthChecks",
+      "rollback",
+      "deploymentModes",
+      "typescriptModes",
+      "preFlightChecks",
+      "successCriteria"
+    ],
+    "supportedQueries": [
+      {
+        "query": "getDeploymentPhases",
+        "returns": "Array of deployment phases with steps",
+        "purpose": "Retrieve ordered deployment steps for execution"
+      },
+      {
+        "query": "getDeploymentMode",
+        "args": ["mode"],
+        "returns": "Configuration for specific deployment mode",
+        "purpose": "Get environment, strictness, config file, compose file, and port for mode"
+      },
+      {
+        "query": "getTypescriptConfig",
+        "args": ["mode"],
+        "returns": "TypeScript configuration file path",
+        "purpose": "Determine which tsconfig to use for given mode"
+      },
+      {
+        "query": "getHealthChecks",
+        "returns": "Array of health check endpoints and criteria",
+        "purpose": "Validate service health after deployment"
+      },
+      {
+        "query": "getRollbackProcedure",
+        "returns": "Rollback steps and trigger conditions",
+        "purpose": "Execute rollback if deployment fails"
+      },
+      {
+        "query": "getPreFlightChecks",
+        "returns": "Array of prerequisite validation checks",
+        "purpose": "Validate environment before deployment"
+      },
+      {
+        "query": "getEnvironmentVariables",
+        "returns": "Required environment variables for deployment",
+        "purpose": "Validate environment configuration"
+      }
+    ],
+    "decisionSupport": [
+      "Recommend TypeScript mode based on environment (permissive for dev, strict for staging/production)",
+      "Suggest rollback if health checks fail after max attempts",
+      "Validate port availability before deployment",
+      "Determine infrastructure-first deployment order",
+      "Calculate estimated deployment time based on phases"
+    ],
+    "architectureAlignment": {
+      "routingConfig": "apps/mcp-server/data/routing-architecture.json",
+      "portAllocation": "routing-architecture.json#/portAllocationMatrix/all",
+      "oauthConfig": "routing-architecture.json#/oauthConfiguration"
+    }
+  },
+  "knownIssues": [
+    {
+      "id": "issue-1",
+      "title": "Health check may timeout on slow systems",
+      "severity": "Low",
+      "impact": "Warning displayed but deployment may succeed",
+      "mitigation": "Script continues and validates with fallback endpoints",
+      "action": "Monitor container logs to verify actual status",
+      "priority": "P2"
+    },
+    {
+      "id": "issue-2",
+      "title": "Port conflicts if previous deployment not cleaned",
+      "severity": "Medium",
+      "impact": "Deployment may fail if ports in use",
+      "mitigation": "Script runs 'docker compose down' before deployment",
+      "action": "Manually stop conflicting services if needed",
+      "priority": "P1"
+    },
+    {
+      "id": "issue-3",
+      "title": "TypeScript strict mode may fail on legacy code",
+      "severity": "Medium",
+      "impact": "Build fails in staging/production modes",
+      "mitigation": "Use permissive or intermediate mode for development",
+      "action": "Fix TypeScript errors before deploying to staging",
+      "priority": "P1"
+    }
+  ],
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "DEPLOYMENT_MODE",
+        "description": "Deployment mode (permissive, intermediate, staging, production)",
+        "example": "staging",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "TYPESCRIPT_MODE",
+        "description": "TypeScript strictness mode (permissive, intermediate, staging, production)",
+        "example": "intermediate",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "DRY_RUN",
+        "description": "Dry run mode (true/false) - shows commands without executing",
+        "example": "false",
+        "required": false,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "FORCE_REBUILD",
+        "description": "Force rebuild from scratch (true/false)",
+        "example": "false",
+        "required": false,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "NODE_ENV",
+        "description": "Node environment (development, staging, production)",
+        "example": "staging",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "DATABASE_URL",
+        "description": "PostgreSQL connection string",
+        "example": "postgresql://user:password@postgres:5432/ectropy",
+        "required": true,
+        "environment": "all",
+        "secret": true
+      },
+      {
+        "name": "REDIS_URL",
+        "description": "Redis connection string",
+        "example": "redis://redis:6379",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "JWT_SECRET",
+        "description": "JWT signing secret",
+        "example": "your_jwt_secret_minimum_32_characters",
+        "required": true,
+        "environment": "all",
+        "secret": true,
+        "minimumLength": 32
+      }
+    ]
+  },
+  "deploymentModes": {
+    "permissive": {
+      "environment": "development",
+      "strictness": "standard",
+      "typescriptConfig": "tsconfig.enterprise-standard.json",
+      "composeFile": "docker-compose.dev.yml",
+      "port": 3000,
+      "description": "Development mode with permissive TypeScript for rapid iteration"
+    },
+    "intermediate": {
+      "environment": "development",
+      "strictness": "standard",
+      "typescriptConfig": "tsconfig.enterprise-standard.json",
+      "composeFile": "docker-compose.dev.yml",
+      "port": 3000,
+      "description": "Development mode with intermediate TypeScript checks"
+    },
+    "staging": {
+      "environment": "staging",
+      "strictness": "strict",
+      "typescriptConfig": "tsconfig.staging.json",
+      "composeFile": "docker-compose.staging.yml",
+      "port": 4000,
+      "description": "Staging environment with strict TypeScript validation"
+    },
+    "production": {
+      "environment": "production",
+      "strictness": "strict",
+      "typescriptConfig": "tsconfig.enterprise-standard.json",
+      "composeFile": "docker-compose.production.yml",
+      "port": 3000,
+      "description": "Production environment with strict TypeScript and optimizations"
+    }
+  },
+  "loggingFunctions": {
+    "log": {
+      "description": "Standard timestamped log message to console and file",
+      "format": "YYYY-MM-DD HH:MM:SS - message",
+      "output": "both console and log file"
+    },
+    "header": {
+      "description": "Section header with visual separator",
+      "format": "======== MESSAGE ========",
+      "color": "white/bold",
+      "output": "both console and log file"
+    },
+    "info": {
+      "description": "Informational message",
+      "format": "[INFO] message",
+      "color": "blue",
+      "output": "both console and log file"
+    },
+    "success": {
+      "description": "Success confirmation message",
+      "format": "[SUCCESS] message",
+      "color": "green",
+      "output": "both console and log file"
+    },
+    "warning": {
+      "description": "Warning message for non-critical issues",
+      "format": "[WARNING] message",
+      "color": "yellow",
+      "output": "both console and log file"
+    },
+    "error": {
+      "description": "Error message for critical failures",
+      "format": "[ERROR] message",
+      "color": "red",
+      "output": "both console and log file"
+    }
+  },
+  "configurationManagement": {
+    "getDeploymentConfig": {
+      "description": "Returns space-separated configuration for deployment mode",
+      "parameters": ["mode"],
+      "returns": "environment strictness tsconfig compose_file port",
+      "examples": {
+        "permissive": "development standard tsconfig.enterprise-standard.json docker-compose.dev.yml 3000",
+        "staging": "staging strict tsconfig.staging.json docker-compose.staging.yml 4000",
+        "production": "production strict tsconfig.enterprise-standard.json docker-compose.production.yml 3000"
+      }
+    },
+    "getTypescriptConfig": {
+      "description": "Returns TypeScript config file path for mode",
+      "parameters": ["mode"],
+      "returns": "tsconfig file path",
+      "examples": {
+        "permissive": "tsconfig.enterprise-standard.json",
+        "intermediate": "tsconfig.enterprise-standard.json",
+        "staging": "tsconfig.staging.json",
+        "production": "tsconfig.enterprise-standard.json"
+      }
+    },
+    "getDockerComposeCmd": {
+      "description": "Determines which docker compose command to use",
+      "returns": "docker-compose or docker compose",
+      "logic": "Checks for legacy docker-compose, falls back to docker compose plugin"
+    }
+  }
+}

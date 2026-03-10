@@ -1,0 +1,960 @@
+{
+  "version": "1.0.0",
+  "environment": "production",
+  "runbookType": "deployment",
+  "metadata": {
+    "catalogId": "terraform-production-deploy-v1-0-0",
+    "name": "Terraform-Aligned Production Deployment",
+    "type": "deployment",
+    "purpose": "Enterprise Terraform-managed blue-green deployment with GitHub Workflow orchestration and DigitalOcean load balancer integration",
+    "maintainer": "DevOps Team",
+    "author": "Ectropy Infrastructure Team",
+    "created": "2025-12-15T00:00:00Z",
+    "lastUpdated": "2025-12-15T00:00:00Z",
+    "estimatedDuration": "45 minutes",
+    "complexity": "high",
+    "priority": "critical",
+    "relatedDocuments": [
+      "infrastructure/terraform/*.tf",
+      ".github/workflows/deploy-production.yml",
+      "apps/mcp-server/data/runbooks/deployment/blue-green-deploy-full-v1.0.0.json",
+      "docs/INFRASTRUCTURE_CATALOG.md"
+    ],
+    "schemaVersion": "1.0.0"
+  },
+  "executiveSummary": {
+    "description": "Complete Terraform-managed production deployment workflow integrating Infrastructure as Code, GitHub Actions workflows, and DigitalOcean load balancer orchestration for zero-downtime blue-green deployments",
+    "status": "READY_FOR_PRODUCTION",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "LOW",
+    "keyChanges": [
+      "Terraform provisions and validates production infrastructure",
+      "GitHub Variables populated from Terraform outputs",
+      "GitHub Workflow (deploy-production.yml) orchestrates application deployment",
+      "DigitalOcean load balancer updated via Terraform for traffic cutover",
+      "Complete state validation at each phase",
+      "Automated rollback capability at infrastructure and application layers"
+    ],
+    "prerequisites": [
+      "Terraform v1.0+ installed with DigitalOcean provider configured",
+      "GitHub CLI (gh) authenticated with repository access",
+      "DigitalOcean API token configured (DIGITALOCEAN_ACCESS_TOKEN)",
+      "Terraform state backend configured (DigitalOcean Spaces)",
+      "Production droplets deployed via Terraform (blue and green)",
+      "GitHub repository secrets configured",
+      "SSH access to production droplets"
+    ],
+    "impact": {
+      "systems": [
+        "Terraform infrastructure state",
+        "DigitalOcean droplets (production-blue, production-green)",
+        "DigitalOcean load balancer (ectropy-production-lb-v2)",
+        "GitHub Variables (PROD_BLUE_IP, PROD_GREEN_IP)",
+        "GitHub Workflows (deploy-production.yml)",
+        "Application services (api-gateway, mcp-server, web-dashboard)"
+      ],
+      "downtime": "Zero - load balancer cutover is seamless",
+      "rollbackTime": "5-10 minutes (automated)"
+    }
+  },
+  "terraformAlignment": {
+    "infrastructureManagement": {
+      "droplets": {
+        "blue": {
+          "terraformResource": "digitalocean_droplet.production_blue",
+          "ipAddress": "161.35.226.36",
+          "status": "managed_by_terraform",
+          "role": "standby_deployment_target"
+        },
+        "green": {
+          "terraformResource": "digitalocean_droplet.production_green",
+          "ipAddress": "143.198.231.147",
+          "status": "managed_by_terraform",
+          "role": "active_primary"
+        }
+      },
+      "loadBalancer": {
+        "terraformResource": "digitalocean_loadbalancer.production",
+        "name": "ectropy-production-lb-v2",
+        "healthCheck": {
+          "protocol": "http",
+          "port": 80,
+          "path": "/lb-health",
+          "checkIntervalSeconds": 10,
+          "responseTimeoutSeconds": 5,
+          "unhealthyThreshold": 3,
+          "healthyThreshold": 5
+        },
+        "backendPool": "managed_via_terraform"
+      },
+      "stateManagement": {
+        "backend": "digitalocean_spaces",
+        "bucket": "ectropy-terraform-state",
+        "key": "production/terraform.tfstate",
+        "region": "nyc3"
+      }
+    },
+    "githubIntegration": {
+      "variables": {
+        "PROD_BLUE_IP": {
+          "source": "terraform output prod_blue_ip",
+          "usage": "deploy-production.yml workflow",
+          "updateFrequency": "on_infrastructure_change"
+        },
+        "PROD_GREEN_IP": {
+          "source": "terraform output prod_green_ip",
+          "usage": "deploy-production.yml workflow",
+          "updateFrequency": "on_infrastructure_change"
+        }
+      },
+      "secrets": {
+        "DIGITALOCEAN_ACCESS_TOKEN": "DigitalOcean API token for deployment",
+        "PROD_SSH_PRIVATE_KEY": "SSH key for production droplet access"
+      }
+    }
+  },
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Pre-Deployment Infrastructure Validation",
+      "description": "Validate Terraform state and infrastructure readiness",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Verify Terraform state backend connectivity",
+          "command": "cd infrastructure/terraform && terraform init",
+          "purpose": "Ensure Terraform can access remote state in DigitalOcean Spaces",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Terraform init must succeed"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Cannot access Terraform state backend"
+          }
+        },
+        {
+          "step": "1.2",
+          "name": "Validate Terraform plan has no drift",
+          "command": "terraform plan -detailed-exitcode",
+          "purpose": "Ensure infrastructure matches declared state (no unexpected changes)",
+          "required": true,
+          "automatable": true,
+          "timeout": "120s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0 = no changes, 2 = changes detected (fail)"
+          },
+          "onFailure": {
+            "action": "warn",
+            "message": "Infrastructure drift detected - review before deployment"
+          }
+        },
+        {
+          "step": "1.3",
+          "name": "Verify production droplets are healthy",
+          "commands": [
+            "doctl compute droplet get production-blue --format ID,Status,PublicIPv4",
+            "doctl compute droplet get production-green --format ID,Status,PublicIPv4"
+          ],
+          "purpose": "Confirm both blue and green droplets are active",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Both droplets must show Status=active"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Production droplets are not healthy"
+          }
+        },
+        {
+          "step": "1.4",
+          "name": "Check load balancer health",
+          "command": "doctl compute load-balancer get ectropy-production-lb-v2 --format ID,Status,IP",
+          "purpose": "Verify load balancer is operational",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Load balancer Status must be active"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Load balancer is not healthy"
+          }
+        },
+        {
+          "step": "1.5",
+          "name": "Validate GitHub Variables match Terraform outputs",
+          "commands": [
+            "terraform output -json > /tmp/tf-outputs.json",
+            "gh variable list | grep PROD_BLUE_IP",
+            "gh variable list | grep PROD_GREEN_IP"
+          ],
+          "purpose": "Ensure GitHub workflow has correct IP addresses",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "comparison",
+            "criteria": "GitHub Variables must match Terraform outputs"
+          },
+          "onFailure": {
+            "action": "execute_sync",
+            "message": "GitHub Variables out of sync - executing sync step"
+          }
+        },
+        {
+          "step": "1.6",
+          "name": "Sync GitHub Variables from Terraform (if needed)",
+          "commands": [
+            "gh variable set PROD_BLUE_IP --body \"$(terraform output -raw prod_blue_ip)\"",
+            "gh variable set PROD_GREEN_IP --body \"$(terraform output -raw prod_green_ip)\""
+          ],
+          "purpose": "Update GitHub Variables to match current Terraform state",
+          "required": false,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Variables updated successfully"
+          },
+          "onFailure": {
+            "action": "warn",
+            "message": "Failed to sync GitHub Variables - manual intervention required"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Determine Active and Standby Colors",
+      "description": "Query load balancer to identify current active droplet and standby target",
+      "estimatedDuration": "2 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Query load balancer backend pool",
+          "command": "doctl compute load-balancer get ectropy-production-lb-v2 --format ForwardingRules,HealthCheck | jq .forwarding_rules[].droplet_ids[]",
+          "purpose": "Identify which droplet is currently receiving production traffic",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Returns droplet ID currently in backend pool"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Cannot determine active droplet"
+          }
+        },
+        {
+          "step": "2.2",
+          "name": "Map droplet ID to color (blue or green)",
+          "command": "doctl compute droplet list --format ID,Name | grep production",
+          "purpose": "Determine if blue or green is active",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "logic",
+            "criteria": "Active color identified, standby color is the opposite"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Cannot map droplet to blue/green color"
+          }
+        },
+        {
+          "step": "2.3",
+          "name": "Set deployment variables",
+          "commands": [
+            "export ACTIVE_COLOR=$(determine_active_color)",
+            "export STANDBY_COLOR=$(determine_standby_color)",
+            "export STANDBY_DROPLET_IP=$(get_droplet_ip $STANDBY_COLOR)"
+          ],
+          "purpose": "Configure deployment target (standby droplet)",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "variables",
+            "criteria": "ACTIVE_COLOR, STANDBY_COLOR, STANDBY_DROPLET_IP all set"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to set deployment variables"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "GitHub Workflow Execution - Application Deployment",
+      "description": "Trigger and monitor deploy-production.yml workflow to deploy application to standby droplet",
+      "estimatedDuration": "20 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Trigger deploy-production.yml workflow",
+          "command": "gh workflow run deploy-production.yml --ref main --field target_color=$STANDBY_COLOR",
+          "purpose": "Start GitHub Actions workflow to deploy to standby droplet",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Workflow triggered successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to trigger deployment workflow"
+          },
+          "relatedFiles": [".github/workflows/deploy-production.yml"]
+        },
+        {
+          "step": "3.2",
+          "name": "Monitor workflow execution",
+          "command": "gh run watch $(gh run list --workflow=deploy-production.yml --limit 1 --json databaseId -q '.[0].databaseId')",
+          "purpose": "Track deployment progress and wait for completion",
+          "required": true,
+          "automatable": true,
+          "timeout": "1200s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "workflowStatus",
+            "criteria": "Workflow must complete with success status"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Deployment workflow failed - check workflow logs"
+          }
+        },
+        {
+          "step": "3.3",
+          "name": "Verify standby droplet health after deployment",
+          "command": "curl -sf http://${STANDBY_DROPLET_IP}/lb-health",
+          "purpose": "Confirm standby droplet is serving traffic and healthy",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 10,
+          "retryInterval": "10s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "HTTP 200 response from /lb-health endpoint"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Standby droplet failed health check after deployment"
+          }
+        },
+        {
+          "step": "3.4",
+          "name": "Execute smoke tests on standby droplet",
+          "commands": [
+            "curl -sf http://${STANDBY_DROPLET_IP}/health | jq .status",
+            "curl -sf http://${STANDBY_DROPLET_IP}/api/health | jq .service",
+            "curl -sf http://${STANDBY_DROPLET_IP}/ | grep -q 'Ectropy'"
+          ],
+          "purpose": "Validate application endpoints before traffic cutover",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "smokeTests",
+            "criteria": "All smoke tests must pass"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Smoke tests failed on standby droplet"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Terraform-Managed Load Balancer Cutover",
+      "description": "Update load balancer backend pool via Terraform to switch traffic to standby droplet",
+      "estimatedDuration": "10 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Update Terraform load balancer configuration",
+          "commands": [
+            "cd infrastructure/terraform",
+            "# Update load balancer backend to point to standby droplet",
+            "terraform taint digitalocean_loadbalancer.production",
+            "terraform apply -target=digitalocean_loadbalancer.production -auto-approve"
+          ],
+          "purpose": "Modify load balancer backend pool to route traffic to newly deployed droplet",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "terraformApply",
+            "criteria": "Terraform apply completes successfully with 1 resource changed"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "rollbackPhase": 6,
+            "message": "Terraform apply failed - load balancer not updated"
+          },
+          "notes": [
+            "This step updates the load balancer's backend pool",
+            "Traffic is seamlessly transitioned from active to standby droplet",
+            "Health checks ensure only healthy backends receive traffic"
+          ]
+        },
+        {
+          "step": "4.2",
+          "name": "Wait for load balancer to recognize new backend",
+          "command": "sleep 30",
+          "purpose": "Allow load balancer health checks to validate new backend",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "timer",
+            "criteria": "Wait completes"
+          },
+          "onFailure": {
+            "action": "continue",
+            "message": "Wait interrupted but proceeding"
+          }
+        },
+        {
+          "step": "4.3",
+          "name": "Verify load balancer health check status",
+          "command": "doctl compute load-balancer get ectropy-production-lb-v2 --format HealthCheck | jq .health_check",
+          "purpose": "Confirm load balancer is successfully routing to new backend",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 5,
+          "retryInterval": "10s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "healthCheck",
+            "criteria": "Health check shows healthy status for new backend"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "rollbackPhase": 6,
+            "message": "Load balancer health check failed for new backend"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Post-Cutover Production Validation",
+      "description": "Verify production is serving traffic from new deployment",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "5.1",
+          "name": "Test production URL via load balancer",
+          "command": "curl -sf https://ectropy.ai/lb-health",
+          "purpose": "Verify production load balancer is responding",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 5,
+          "retryInterval": "10s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "Production URL returns HTTP 200"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "rollbackPhase": 6,
+            "message": "Production health check FAILED - initiating rollback"
+          }
+        },
+        {
+          "step": "5.2",
+          "name": "Execute production smoke tests",
+          "commands": [
+            "curl -sf https://ectropy.ai/health | jq .status",
+            "curl -sf https://ectropy.ai/api/health | jq .service",
+            "curl -sf https://ectropy.ai/ | grep -q 'Ectropy'"
+          ],
+          "purpose": "Validate all production endpoints after cutover",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "smokeTests",
+            "criteria": "All smoke tests pass"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "rollbackPhase": 6,
+            "message": "Production smoke tests failed - initiating rollback"
+          }
+        },
+        {
+          "step": "5.3",
+          "name": "Monitor error rates for 5 minutes",
+          "command": "# Monitor logs and health endpoints for anomalies",
+          "purpose": "Observe production behavior under real traffic",
+          "required": true,
+          "automatable": false,
+          "timeout": "300s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "monitoring",
+            "criteria": "No significant error rate increase, latency within normal range"
+          },
+          "onFailure": {
+            "action": "rollback",
+            "rollbackPhase": 6,
+            "message": "Production showing elevated errors - initiating rollback"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Rollback Procedure (If Needed)",
+      "description": "Automated rollback to revert load balancer to previous backend",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": false,
+      "triggeredBy": "failure_in_phases_4_or_5",
+      "steps": [
+        {
+          "step": "6.1",
+          "name": "Revert Terraform load balancer configuration",
+          "commands": [
+            "cd infrastructure/terraform",
+            "terraform apply -target=digitalocean_loadbalancer.production -auto-approve"
+          ],
+          "purpose": "Revert load balancer backend to previous active droplet",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "terraformApply",
+            "criteria": "Terraform revert completes successfully"
+          },
+          "onFailure": {
+            "action": "manual_intervention",
+            "message": "CRITICAL: Automated rollback failed - manual intervention required"
+          }
+        },
+        {
+          "step": "6.2",
+          "name": "Verify rollback health",
+          "command": "curl -sf https://ectropy.ai/lb-health",
+          "purpose": "Confirm production is back to stable state",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 5,
+          "retryInterval": "10s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "Production health check succeeds"
+          },
+          "onFailure": {
+            "action": "escalate",
+            "message": "CRITICAL: Rollback verification failed - escalate to on-call"
+          }
+        },
+        {
+          "step": "6.3",
+          "name": "Document rollback reason",
+          "command": "# Create incident log with failure details",
+          "purpose": "Capture root cause for post-mortem analysis",
+          "required": true,
+          "automatable": false,
+          "timeout": "60s",
+          "expectedStatus": 0
+        }
+      ]
+    },
+    {
+      "phase": 7,
+      "name": "Post-Deployment Terraform State Validation",
+      "description": "Confirm Terraform state reflects successful deployment",
+      "estimatedDuration": "3 minutes",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "7.1",
+          "name": "Run Terraform plan to confirm no drift",
+          "command": "cd infrastructure/terraform && terraform plan -detailed-exitcode",
+          "purpose": "Verify infrastructure state is consistent after deployment",
+          "required": true,
+          "automatable": true,
+          "timeout": "120s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Exit code 0 = no drift detected"
+          },
+          "onFailure": {
+            "action": "warn",
+            "message": "Infrastructure drift detected post-deployment - review recommended"
+          }
+        },
+        {
+          "step": "7.2",
+          "name": "Update infrastructure catalog",
+          "command": "# Update docs/INFRASTRUCTURE_CATALOG.md with deployment details",
+          "purpose": "Document current production state",
+          "required": true,
+          "automatable": false,
+          "timeout": "300s",
+          "expectedStatus": 0,
+          "relatedFiles": [
+            "docs/INFRASTRUCTURE_CATALOG.md",
+            "apps/mcp-server/data/infrastructure-catalog.json"
+          ]
+        },
+        {
+          "step": "7.3",
+          "name": "Tag Terraform state with deployment version",
+          "command": "# Optional: Tag Terraform state for rollback reference",
+          "purpose": "Create recovery point for future rollbacks",
+          "required": false,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "healthChecks": [
+      {
+        "service": "Production Load Balancer",
+        "endpoint": "https://ectropy.ai/lb-health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "Production API",
+        "endpoint": "https://ectropy.ai/api/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "Production Web Dashboard",
+        "endpoint": "https://ectropy.ai/",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "Standby Droplet (pre-cutover)",
+        "endpoint": "http://${STANDBY_DROPLET_IP}/lb-health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      }
+    ],
+    "terraformValidation": [
+      {
+        "check": "Terraform state backend accessible",
+        "command": "terraform init",
+        "expectedExitCode": 0,
+        "critical": true
+      },
+      {
+        "check": "No infrastructure drift before deployment",
+        "command": "terraform plan -detailed-exitcode",
+        "expectedExitCode": 0,
+        "critical": false
+      },
+      {
+        "check": "Terraform outputs match GitHub Variables",
+        "validation": "compare_terraform_outputs_with_github_vars",
+        "critical": true
+      }
+    ]
+  },
+  "rollback": {
+    "supported": true,
+    "automatable": true,
+    "estimatedTime": "5 minutes",
+    "dataLossRisk": "none",
+    "triggerConditions": [
+      "Standby droplet health check failure (Phase 3)",
+      "Smoke tests failure on standby (Phase 3)",
+      "Terraform load balancer apply failure (Phase 4)",
+      "Load balancer health check failure post-cutover (Phase 4)",
+      "Production health check failure (Phase 5)",
+      "Elevated error rates in production (Phase 5)"
+    ],
+    "decisionMaker": "Automated with manual escalation if rollback fails",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Revert Terraform load balancer backend",
+        "command": "terraform apply -target=digitalocean_loadbalancer.production -auto-approve",
+        "purpose": "Switch load balancer back to previous active droplet"
+      },
+      {
+        "step": 2,
+        "name": "Verify production health",
+        "command": "curl -sf https://ectropy.ai/lb-health",
+        "purpose": "Confirm rollback successful"
+      },
+      {
+        "step": 3,
+        "name": "Create incident log",
+        "command": "# Document rollback reason and failure analysis",
+        "purpose": "Capture details for post-mortem"
+      }
+    ]
+  },
+  "monitoring": {
+    "duration": "First 24 hours critical, ongoing monitoring",
+    "keyMetrics": [
+      {
+        "metric": "Load Balancer Health",
+        "threshold": "100% healthy backends",
+        "alertOn": "Any backend unhealthy",
+        "severity": "critical"
+      },
+      {
+        "metric": "API Response Time",
+        "threshold": "< 500ms p95",
+        "alertOn": "> 1000ms p95 for 5 minutes",
+        "severity": "warning"
+      },
+      {
+        "metric": "Error Rate",
+        "threshold": "< 0.5%",
+        "alertOn": "> 2% for 1 minute",
+        "severity": "critical"
+      },
+      {
+        "metric": "Infrastructure State Drift",
+        "threshold": "Zero drift",
+        "alertOn": "Terraform plan shows changes",
+        "severity": "warning"
+      }
+    ]
+  },
+  "successCriteria": [
+    {
+      "criterion": "Terraform state backend accessible",
+      "status": "REQUIRED",
+      "validation": "terraform init returns 0"
+    },
+    {
+      "criterion": "No infrastructure drift pre-deployment",
+      "status": "RECOMMENDED",
+      "validation": "terraform plan shows no changes"
+    },
+    {
+      "criterion": "GitHub Variables synced with Terraform outputs",
+      "status": "REQUIRED",
+      "validation": "PROD_BLUE_IP and PROD_GREEN_IP match Terraform"
+    },
+    {
+      "criterion": "GitHub workflow deployment succeeds",
+      "status": "REQUIRED",
+      "validation": "deploy-production.yml completes with success"
+    },
+    {
+      "criterion": "Standby droplet passes health checks",
+      "status": "REQUIRED",
+      "validation": "/lb-health returns 200"
+    },
+    {
+      "criterion": "Terraform load balancer cutover succeeds",
+      "status": "REQUIRED",
+      "validation": "terraform apply completes successfully"
+    },
+    {
+      "criterion": "Production health checks pass post-cutover",
+      "status": "REQUIRED",
+      "validation": "https://ectropy.ai/lb-health returns 200"
+    },
+    {
+      "criterion": "No elevated error rates in first 5 minutes",
+      "status": "REQUIRED",
+      "validation": "Error rate < 0.5%"
+    }
+  ],
+  "complianceAndAudit": {
+    "changeManagement": {
+      "approvalRequired": true,
+      "approvers": ["Technical Lead", "DevOps Lead"],
+      "changeTicket": "Required for production deployments",
+      "rollbackPlan": "Documented in Phase 6",
+      "impactAssessment": "Zero downtime, automated rollback available"
+    },
+    "auditTrail": {
+      "terraformStateLogs": "Preserved in DigitalOcean Spaces with versioning",
+      "githubWorkflowLogs": "Retained in GitHub Actions for 90 days",
+      "infrastructureLogs": "Load balancer and droplet logs in DigitalOcean",
+      "deploymentEvidence": "docs/evidence/production-deployment-*.json"
+    },
+    "soc2Compliance": {
+      "changeControl": "All changes via Terraform and GitHub workflows",
+      "accessControl": "GitHub secrets for credentials, no plaintext secrets",
+      "auditability": "Complete audit trail from Terraform to production",
+      "rollbackCapability": "Automated rollback within 5 minutes"
+    }
+  },
+  "knownIssues": [
+    {
+      "id": "KI-001",
+      "title": "Load balancer update may cause brief connection disruption",
+      "severity": "LOW",
+      "impact": "Existing connections may experience < 1s disruption during backend pool update",
+      "mitigation": "Load balancer health checks ensure only healthy backends receive traffic",
+      "action": "Monitor connection logs during cutover",
+      "priority": "P3"
+    },
+    {
+      "id": "KI-002",
+      "title": "Terraform state lock contention if multiple operators",
+      "severity": "MEDIUM",
+      "impact": "Concurrent Terraform operations will fail with state lock error",
+      "mitigation": "Coordinate deployments, use Terraform workspace locking",
+      "action": "Ensure only one deployment runs at a time",
+      "priority": "P2"
+    }
+  ],
+  "environmentVariables": {
+    "terraform": [
+      {
+        "name": "DIGITALOCEAN_ACCESS_TOKEN",
+        "description": "DigitalOcean API token for Terraform provider",
+        "required": true,
+        "secret": true
+      },
+      {
+        "name": "TF_STATE_BUCKET",
+        "description": "DigitalOcean Spaces bucket for Terraform state",
+        "example": "ectropy-terraform-state",
+        "required": true,
+        "secret": false
+      }
+    ],
+    "github": [
+      {
+        "name": "PROD_BLUE_IP",
+        "description": "Production blue droplet IP (from Terraform)",
+        "example": "161.35.226.36",
+        "required": true,
+        "secret": false
+      },
+      {
+        "name": "PROD_GREEN_IP",
+        "description": "Production green droplet IP (from Terraform)",
+        "example": "143.198.231.147",
+        "required": true,
+        "secret": false
+      },
+      {
+        "name": "DIGITALOCEAN_ACCESS_TOKEN",
+        "description": "DigitalOcean API token for deployment",
+        "required": true,
+        "secret": true
+      }
+    ]
+  },
+  "integrationPoints": {
+    "terraform": {
+      "resources": [
+        "digitalocean_droplet.production_blue",
+        "digitalocean_droplet.production_green",
+        "digitalocean_loadbalancer.production"
+      ],
+      "outputs": ["prod_blue_ip", "prod_green_ip", "load_balancer_ip"],
+      "stateBackend": "digitalocean_spaces://ectropy-terraform-state/production/terraform.tfstate"
+    },
+    "githubWorkflows": {
+      "deployProduction": ".github/workflows/deploy-production.yml",
+      "variables": ["PROD_BLUE_IP", "PROD_GREEN_IP"],
+      "secrets": ["DIGITALOCEAN_ACCESS_TOKEN", "PROD_SSH_PRIVATE_KEY"]
+    },
+    "digitalOcean": {
+      "loadBalancer": "ectropy-production-lb-v2",
+      "droplets": ["production-blue", "production-green"],
+      "spaces": "ectropy-terraform-state"
+    }
+  },
+  "mcpIntegration": {
+    "queryableFields": [
+      "terraformAlignment",
+      "phases",
+      "rollback",
+      "integrationPoints",
+      "successCriteria"
+    ],
+    "supportedQueries": [
+      {
+        "query": "How does Terraform coordinate with GitHub workflows?",
+        "returns": "Terraform outputs populate GitHub Variables, workflows use variables for deployment",
+        "purpose": "Explain infrastructure-to-deployment integration"
+      },
+      {
+        "query": "What is the production deployment process?",
+        "returns": "7-phase process: Terraform validation → GitHub workflow deployment → Load balancer cutover → Production validation",
+        "purpose": "High-level deployment overview"
+      },
+      {
+        "query": "How is rollback handled?",
+        "returns": "Automated Terraform revert of load balancer backend pool to previous droplet",
+        "purpose": "Explain rollback mechanism"
+      }
+    ]
+  }
+}

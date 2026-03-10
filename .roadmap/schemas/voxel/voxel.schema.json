@@ -1,0 +1,348 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ectropy://schemas/voxel/v2",
+  "title": "Voxel",
+  "description": "Spatial container for construction decisions - the 'decision surface' workers navigate through",
+  "type": "object",
+  "required": ["id", "projectId", "coordinates", "bounds"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^VOX-[A-Z0-9-]+$",
+      "description": "Unique voxel identifier (e.g., VOX-L2-MECH-047)"
+    },
+    "projectId": {
+      "type": "string"
+    },
+    "coordinates": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      },
+      "required": ["x", "y", "z"],
+      "description": "Center point of voxel in project coordinates"
+    },
+    "bounds": {
+      "type": "object",
+      "properties": {
+        "minX": { "type": "number" },
+        "maxX": { "type": "number" },
+        "minY": { "type": "number" },
+        "maxY": { "type": "number" },
+        "minZ": { "type": "number" },
+        "maxZ": { "type": "number" }
+      },
+      "required": ["minX", "maxX", "minY", "maxY", "minZ", "maxZ"],
+      "description": "Bounding box of the voxel"
+    },
+    "location": {
+      "type": "object",
+      "properties": {
+        "building": { "type": "string" },
+        "level": { "type": "string" },
+        "zone": { "type": "string" },
+        "room": { "type": "string" },
+        "gridReference": { "type": "string" }
+      },
+      "description": "Human-readable location"
+    },
+    "ifcElements": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "IFC element GUIDs contained in or touching this voxel"
+    },
+    "decisionSurface": {
+      "$ref": "#/definitions/DecisionSurface",
+      "description": "All decisions attached to this spatial location"
+    },
+    "workStatus": {
+      "$ref": "#/definitions/WorkStatus",
+      "description": "Current work state of this voxel"
+    },
+    "inspectionStatus": {
+      "$ref": "#/definitions/InspectionStatus",
+      "description": "Inspection state"
+    },
+    "adjacentVoxels": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "IDs of adjacent voxels for propagation"
+    }
+  },
+  "definitions": {
+    "DecisionSurface": {
+      "type": "object",
+      "description": "The accumulated decisions affecting this location - workers navigate through this",
+      "properties": {
+        "decisions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/AttachedDecision" },
+          "description": "All decisions attached to this voxel"
+        },
+        "toleranceOverrides": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ToleranceOverride" },
+          "description": "Pre-approved tolerance variances"
+        },
+        "preApprovals": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/PreApproval" },
+          "description": "Decisions that pre-authorize work variations"
+        },
+        "activeAlerts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/VoxelAlert" },
+          "description": "Current alerts workers should see on entry"
+        },
+        "acknowledgments": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Acknowledgment" },
+          "description": "Worker acknowledgments of decisions"
+        },
+        "decisionCount": {
+          "type": "integer",
+          "description": "Total number of attached decisions"
+        },
+        "unacknowledgedCount": {
+          "type": "integer",
+          "description": "Decisions requiring acknowledgment"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "AttachedDecision": {
+      "type": "object",
+      "required": ["decisionId", "attachmentType", "attachedAt"],
+      "properties": {
+        "decisionId": { 
+          "type": "string",
+          "description": "Reference to Decision entity"
+        },
+        "attachmentType": {
+          "type": "string",
+          "enum": ["PRIMARY", "AFFECTED", "ADJACENT", "DOWNSTREAM"],
+          "description": "How this decision relates to the voxel"
+        },
+        "attachedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "attachedBy": {
+          "type": "string",
+          "enum": ["SYSTEM", "USER", "AI"],
+          "description": "How the attachment was created"
+        },
+        "affectedTrades": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "summary": {
+          "type": "string",
+          "description": "Brief description for worker notification"
+        },
+        "requiresAcknowledgment": {
+          "type": "boolean",
+          "default": false
+        },
+        "acknowledged": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "ToleranceOverride": {
+      "type": "object",
+      "description": "Pre-approved tolerance variance at this location",
+      "required": ["id", "toleranceType", "approvedValue", "sourceDecisionId"],
+      "properties": {
+        "id": { "type": "string" },
+        "toleranceType": {
+          "type": "string",
+          "enum": ["WALL_FLATNESS", "CEILING_HEIGHT", "FLOOR_LEVEL", "PROTRUSION", "GAP", "ALIGNMENT", "FINISH_QUALITY", "EQUIPMENT_CLEARANCE", "PIPE_SLOPE", "DUCT_SIZE"]
+        },
+        "standardValue": {
+          "type": "object",
+          "properties": {
+            "value": { "type": "number" },
+            "unit": { "type": "string" },
+            "direction": { "type": "string", "enum": ["+", "-", "±"] }
+          },
+          "description": "What the spec requires"
+        },
+        "approvedValue": {
+          "type": "object",
+          "properties": {
+            "value": { "type": "number" },
+            "unit": { "type": "string" },
+            "direction": { "type": "string", "enum": ["+", "-", "±"] }
+          },
+          "description": "What is pre-approved for this location"
+        },
+        "sourceDecisionId": { "type": "string", "description": "Decision that authorized this variance" },
+        "approvedBy": { "type": "string" },
+        "approvalDate": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "rationale": { "type": "string", "description": "The WHY - why this variance is acceptable" },
+        "applicableTrades": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Which trades this applies to"
+        }
+      }
+    },
+    "PreApproval": {
+      "type": "object",
+      "description": "Decision that authorizes future work variations without escalation",
+      "properties": {
+        "id": { "type": "string" },
+        "scope": { "type": "string", "description": "What this pre-approval covers" },
+        "conditions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Conditions that must be met to use this pre-approval"
+        },
+        "validFrom": { "type": "string", "format": "date-time" },
+        "validUntil": { "type": "string", "format": "date-time" },
+        "sourceDecisionId": { "type": "string" },
+        "authorityLevel": { "type": "string", "description": "Level that pre-authorized this" },
+        "applicableTrades": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "usageCount": {
+          "type": "integer",
+          "default": 0,
+          "description": "How many times this pre-approval has been used"
+        }
+      }
+    },
+    "VoxelAlert": {
+      "type": "object",
+      "description": "Alert shown to workers entering this voxel",
+      "required": ["id", "priority", "title", "message"],
+      "properties": {
+        "id": { "type": "string" },
+        "priority": { "type": "string", "enum": ["INFO", "WARNING", "CRITICAL"] },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "sourceDecisionId": { "type": "string" },
+        "targetTrades": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Only show to these trades (empty = all)"
+        },
+        "requiresAcknowledgment": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "acknowledgedBy": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "Acknowledgment": {
+      "type": "object",
+      "description": "Worker acknowledgment of a decision at this voxel",
+      "required": ["id", "decisionId", "workerId", "timestamp"],
+      "properties": {
+        "id": { "type": "string" },
+        "decisionId": { "type": "string" },
+        "workerId": { "type": "string" },
+        "workerName": { "type": "string" },
+        "workerTrade": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "method": {
+          "type": "string",
+          "enum": ["APP_TAP", "SMS_REPLY", "VOICE", "AR_GESTURE"],
+          "description": "How the acknowledgment was captured"
+        },
+        "location": {
+          "type": "object",
+          "properties": {
+            "gps": {
+              "type": "object",
+              "properties": {
+                "lat": { "type": "number" },
+                "lng": { "type": "number" },
+                "accuracy": { "type": "number" }
+              }
+            },
+            "uwb": {
+              "type": "object",
+              "properties": {
+                "x": { "type": "number" },
+                "y": { "type": "number" },
+                "z": { "type": "number" },
+                "accuracy": { "type": "number" }
+              }
+            }
+          },
+          "description": "Verified location at time of acknowledgment"
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "WorkStatus": {
+      "type": "object",
+      "properties": {
+        "currentPhase": {
+          "type": "string",
+          "enum": ["NOT_STARTED", "ROUGH", "FINISH", "COMPLETE", "REWORK", "PUNCH_LIST"]
+        },
+        "activeTrades": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Trades currently working in this voxel"
+        },
+        "scheduledTrades": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "trade": { "type": "string" },
+              "taskId": { "type": "string" },
+              "startDate": { "type": "string", "format": "date" },
+              "endDate": { "type": "string", "format": "date" }
+            }
+          }
+        },
+        "percentComplete": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "InspectionStatus": {
+      "type": "object",
+      "properties": {
+        "roughInspection": {
+          "type": "object",
+          "properties": {
+            "status": { "type": "string", "enum": ["NOT_SCHEDULED", "SCHEDULED", "PASSED", "FAILED", "CONDITIONAL"] },
+            "date": { "type": "string", "format": "date" },
+            "inspectionId": { "type": "string" }
+          }
+        },
+        "finalInspection": {
+          "type": "object",
+          "properties": {
+            "status": { "type": "string", "enum": ["NOT_SCHEDULED", "SCHEDULED", "PASSED", "FAILED", "CONDITIONAL"] },
+            "date": { "type": "string", "format": "date" },
+            "inspectionId": { "type": "string" }
+          }
+        },
+        "decisionsReviewed": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Decision IDs inspector has reviewed and validated"
+        },
+        "readyForInspection": { 
+          "type": "boolean",
+          "description": "All required decisions are attached and acknowledged"
+        }
+      }
+    }
+  }
+}

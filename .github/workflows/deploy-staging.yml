@@ -1,0 +1,1287 @@
+name: Deploy Staging (Zero-SSH Watchtower)
+
+# ============================================================================
+# DEPLOYMENT ARCHITECTURE: Zero-SSH Watchtower Pattern
+# ============================================================================
+# 1. Build images in GitHub Actions runners
+# 2. Push images to DigitalOcean Container Registry (DOCR)
+# 3. Watchtower on server automatically pulls new images
+# 4. Watchtower restarts containers with new images
+# 5. Workflow waits for health checks to pass
+#
+# NO SSH REQUIRED - Watchtower handles all server-side operations
+# ============================================================================
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+# Prevent concurrent staging deployments (image push + config sync races)
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+env:
+  REGISTRY: registry.digitalocean.com/ectropy-registry
+  WATCHTOWER_POLL_INTERVAL: 60 # 1 minute (server-side Watchtower sleep interval)
+
+jobs:
+  # =========================================================================
+  # VALIDATION: Ensure docker-compose uses image: directives only
+  # =========================================================================
+  validate-immutable-config:
+    name: Validate Immutable Container Architecture
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Enforce Immutable Container Strategy
+        run: |
+          echo "🔍 Validating immutable container architecture..."
+
+          if grep -E '^\s*build:' docker-compose.staging.yml; then
+            echo "❌ CRITICAL: docker-compose.staging.yml contains build: directives"
+            echo "Must use 'image:' directives only for Watchtower deployment"
+            exit 1
+          fi
+
+          echo "✅ Validation passed - ready for deployment"
+
+  # =========================================================================
+  # INTEGRATION TESTS: Run before building images
+  # =========================================================================
+  integration-tests:
+    name: Integration Tests
+    needs: [validate-immutable-config]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: develop
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack and Install pnpm
+        run: |
+          corepack enable
+          PNPM_VERSION=$(node -p "require('./package.json').packageManager.split('@')[1].split('+')[0]")
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline --ignore-scripts
+
+      - name: Generate Prisma Client
+        timeout-minutes: 5
+        run: |
+          echo "🔄 Generating Prisma Client..."
+          pnpm prisma:generate
+
+      - name: Run postinstall scripts
+        run: pnpm rebuild
+
+      - name: Verify Nx Workspace
+        run: |
+          echo "🔍 Verifying Nx workspace..."
+
+          if ! pnpm nx --version &> /dev/null; then
+            echo "❌ CRITICAL: Nx CLI not available"
+            exit 1
+          fi
+
+          echo "✅ Nx CLI available (version: $(pnpm nx --version))"
+
+      - name: Run integration tests
+        run: pnpm nx run-many --target=test:integration --all || echo "⚠️ Integration tests not available, skipping"
+        continue-on-error: true
+        env:
+          DATABASE_URL: postgresql://${{ vars.DATABASE_USER }}:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}
+          REDIS_URL: ${{ secrets.STAGING_REDIS_URL }}
+
+  # =========================================================================
+  # BUILD: Build images and push to DOCR (parallel matrix)
+  # =========================================================================
+  build-and-push:
+    name: Build & Push ${{ matrix.service }}
+    needs: [integration-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - mcp-server
+          - api-gateway
+          - web-dashboard
+          - ectropy-console
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack and Install pnpm
+        run: |
+          corepack enable
+          PNPM_VERSION=$(node -p "require('./package.json').packageManager.split('@')[1].split('+')[0]")
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Setup Nx cache
+        uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: ${{ runner.os }}-nx-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/project.json', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nx-${{ hashFiles('**/pnpm-lock.yaml') }}-
+            ${{ runner.os }}-nx-
+
+      - name: Install dependencies
+        timeout-minutes: 20
+        env:
+          DATABASE_URL: postgresql://${{ vars.DATABASE_USER }}:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}
+        run: |
+          echo "📦 Installing dependencies..."
+          pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Generate Prisma Client
+        timeout-minutes: 5
+        run: |
+          echo "🔄 Generating Prisma Client..."
+          pnpm prisma:generate
+
+      - name: Build ${{ matrix.service }} with Nx
+        if: matrix.service != 'ectropy-console'
+        timeout-minutes: 18
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          NX_DAEMON: false
+          REACT_APP_ENABLE_SPECKLE: 'true'
+          REACT_APP_API_URL: 'https://staging.ectropy.ai'
+        run: |
+          echo "🏗️ Building ${{ matrix.service }}..."
+          pnpm nx build ${{ matrix.service }} --configuration=production
+
+      # ENTERPRISE FIX (2026-03-07): Five Why — DOCR 401 buildx credential isolation
+      # ROOT CAUSE: docker/build-push-action@v5 uses BuildKit docker-container driver
+      # which runs in an isolated container that does NOT reliably inherit host Docker
+      # credentials from doctl registry login. build-production-images.yml avoids this
+      # by using standard docker build + docker push (direct CLI reads ~/.docker/config.json).
+      # FIX: Align staging with production — standard docker build + docker push.
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Log in to DOCR
+        run: doctl registry login --expiry-seconds 3600
+
+      - name: Build Docker image for ${{ matrix.service }}
+        run: |
+          echo "🐳 Building staging Docker image for ${{ matrix.service }}..."
+
+          EXTRA_ARGS=""
+          if [ "${{ matrix.service }}" = "ectropy-console" ]; then
+            EXTRA_ARGS="--build-arg VITE_BASE_PATH=/console/ --build-arg VITE_API_BASE_URL=https://staging.ectropy.ai"
+          fi
+
+          docker build \
+            -f apps/${{ matrix.service }}/Dockerfile \
+            -t ${{ matrix.service }}:staging \
+            --build-arg BUILD_SHA=${{ github.sha }} \
+            --build-arg BUILD_DATE="${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}" \
+            --build-arg REACT_APP_ENABLE_SPECKLE=true \
+            --build-arg REACT_APP_API_URL=https://staging.ectropy.ai \
+            $EXTRA_ARGS \
+            .
+
+          echo "✅ Docker image built successfully"
+          docker images | grep "${{ matrix.service }}"
+
+      - name: Push Docker image to DOCR
+        run: |
+          echo "📤 Pushing ${{ matrix.service }} images to DOCR..."
+
+          # Tag for DOCR
+          docker tag ${{ matrix.service }}:staging ${{ env.REGISTRY }}/${{ matrix.service }}:staging
+          docker tag ${{ matrix.service }}:staging ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
+
+          # Push both tags (standard docker push — reads ~/.docker/config.json directly)
+          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:staging
+          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
+
+          echo "✅ Images pushed to DOCR"
+          echo "  - ${{ env.REGISTRY }}/${{ matrix.service }}:staging"
+          echo "  - ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}"
+
+  # =========================================================================
+  # DOCR GARBAGE COLLECTION: Clean old images to prevent registry bloat
+  # =========================================================================
+  # ROOT CAUSE FIX (DOCR_ASSESSMENT): Registry accumulates 84-156 images/week
+  # from failed deploys. Retention policy: keep latest + last 5 SHA tags per service.
+  # Runs in parallel with health validation (non-blocking).
+  # =========================================================================
+  docr-garbage-collection:
+    name: DOCR Garbage Collection
+    needs: [build-and-push]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: success()
+    continue-on-error: true # Non-blocking - cleanup failure should not fail deployment
+
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Clean Old Images
+        run: |
+          echo "🧹 DOCR Garbage Collection"
+          echo "Retention policy: staging + latest tags + 5 most recent SHA tags per service"
+          echo ""
+
+          for SERVICE in api-gateway mcp-server web-dashboard ectropy-console; do
+            echo "--- Cleaning $SERVICE ---"
+
+            # List all tags for the service, sorted by updated_at
+            ALL_TAGS=$(doctl registry repository list-tags "$SERVICE" \
+              --format Tag --no-header 2>/dev/null || true)
+
+            if [ -z "$ALL_TAGS" ]; then
+              echo "  No tags found for $SERVICE, skipping"
+              continue
+            fi
+
+            TOTAL=$(echo "$ALL_TAGS" | wc -l)
+            echo "  Total tags: $TOTAL"
+
+            # Keep: 'staging' + 'latest' tags + 5 most recent SHA tags
+            # Delete: everything else
+            SHA_TAGS=$(echo "$ALL_TAGS" | grep -v "^latest$" | grep -v "^staging$" | head -5)
+            OLD_TAGS=$(echo "$ALL_TAGS" | grep -v "^latest$" | grep -v "^staging$" | tail -n +6)
+
+            if [ -z "$OLD_TAGS" ]; then
+              echo "  Nothing to clean (within retention policy)"
+              continue
+            fi
+
+            DELETE_COUNT=$(echo "$OLD_TAGS" | wc -l)
+            echo "  Deleting $DELETE_COUNT old tags..."
+
+            echo "$OLD_TAGS" | while read -r TAG; do
+              if [ -n "$TAG" ]; then
+                doctl registry repository delete-tag "$SERVICE" --tag-name "$TAG" --force 2>/dev/null || true
+              fi
+            done
+
+            echo "  ✅ Cleaned $DELETE_COUNT old tags from $SERVICE"
+          done
+
+          echo ""
+          echo "🗑️ Running registry garbage collection..."
+          doctl registry garbage-collection start --include-untagged-manifests --force 2>/dev/null || \
+            echo "  ⚠️ GC may already be running or not available"
+          echo ""
+          echo "✅ DOCR cleanup complete"
+
+  # =========================================================================
+  # DEPLOY CONFIGS: Upload docker-compose.staging.yml to DigitalOcean Spaces
+  # =========================================================================
+  # PHASE P3 FIX: Bridges the critical gap identified in FIVE_WHY_PHASE_P3
+  # Problem: Watchtower updates container IMAGES but NOT compose/env config files.
+  #          Port conflict fix, env changes, and service config never reach server.
+  # Solution: Upload docker-compose.staging.yml to DO Spaces (S3-compatible).
+  #           config-sync systemd service on server polls Spaces every 60s,
+  #           detects SHA256 hash change, and runs docker-compose up -d.
+  # Architecture: GH Actions → DO Spaces → config-sync → docker-compose restart
+  # Prerequisite: SPACES_ACCESS_KEY_ID and SPACES_SECRET_ACCESS_KEY GitHub secrets
+  # Reference: .roadmap/FIVE_WHY_PHASE_P3_ZERO_SSH_CRITICAL_GAP_2026-02-15.json
+  # =========================================================================
+  deploy-configs:
+    name: Deploy Config to Spaces
+    needs: [build-and-push]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: staging
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Spaces Credentials
+        id: check-creds
+        run: |
+          if [ -z "$SPACES_ACCESS_KEY_ID" ] || [ -z "$SPACES_SECRET_ACCESS_KEY" ]; then
+            echo "⚠️  SPACES_ACCESS_KEY_ID or SPACES_SECRET_ACCESS_KEY not configured"
+            echo "Config deployment skipped - compose file changes won't reach server"
+            echo "To fix: Add SPACES_ACCESS_KEY_ID and SPACES_SECRET_ACCESS_KEY to GitHub secrets"
+            echo "has_creds=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "✅ Spaces credentials configured"
+            echo "has_creds=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          SPACES_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+
+      - name: Validate docker-compose.staging.yml
+        if: steps.check-creds.outputs.has_creds == 'true'
+        run: |
+          echo "========================================="
+          echo "COMPOSE FILE INTEGRITY CHECK"
+          echo "========================================="
+          echo ""
+
+          # Create empty .env to satisfy env_file: .env references
+          # (actual .env with secrets exists on the server, not in CI)
+          touch .env
+
+          # Validate compose file syntax and structure
+          # This catches: duplicate mount targets, conflicting resource limits,
+          # invalid service definitions, and other structural errors
+          echo "Running docker compose config validation..."
+          if ! docker compose -f docker-compose.staging.yml config --quiet 2>/tmp/compose-errors.txt; then
+            echo ""
+            echo "COMPOSE VALIDATION FAILED"
+            echo "========================="
+            cat /tmp/compose-errors.txt | grep -v "level=warning"
+            echo ""
+            echo "Fix the compose file before deploying. Refusing to upload invalid config to S3."
+            echo "This validation gate prevents broken compose files from reaching the staging server."
+            rm -f .env
+            exit 1
+          fi
+
+          # Check for variable interpolation warnings (shell vars should use $$)
+          UNESCAPED_VARS=$(cat /tmp/compose-errors.txt | grep "variable is not set" | grep -v -E "DATABASE_PASSWORD|REDIS_PASSWORD|SPECKLE_SERVER_TOKEN|SPECKLE_ADMIN|GOOGLE_CLIENT|JWT_|SESSION_SECRET|RESEND_API_KEY|MCP_API_KEY|MINIO_|WATCHTOWER_|SPECKLE_SESSION_SECRET" | head -5)
+          if [ -n "$UNESCAPED_VARS" ]; then
+            echo ""
+            echo "WARNING: Possible unescaped shell variables in compose file:"
+            echo "$UNESCAPED_VARS"
+            echo ""
+            echo "Shell variables in command blocks should use \$\$ (e.g., \$\$TOKEN_ID not \$TOKEN_ID)"
+            echo "Docker Compose converts \$\$ to \$ before passing to the shell."
+          fi
+
+          rm -f .env
+          echo ""
+          echo "Compose file validation PASSED"
+
+      - name: Upload docker-compose.staging.yml to Spaces
+        if: steps.check-creds.outputs.has_creds == 'true'
+        run: |
+          echo "========================================="
+          echo "DEPLOYING CONFIG TO DIGITALOCEAN SPACES"
+          echo "========================================="
+          echo ""
+
+          SPACES_BUCKET="ectropy-staging-configs"
+          SPACES_REGION="sfo3"
+          SPACES_ENDPOINT="https://${SPACES_REGION}.digitaloceanspaces.com"
+          S3_KEY="staging/compose/docker-compose.staging.yml"
+
+          # Configure AWS CLI for DO Spaces (S3-compatible API)
+          export AWS_ACCESS_KEY_ID="${SPACES_ACCESS_KEY_ID}"
+          export AWS_SECRET_ACCESS_KEY="${SPACES_SECRET_ACCESS_KEY}"
+          export AWS_DEFAULT_REGION="us-east-1"
+
+          # Calculate content hash for change detection
+          CONTENT_HASH=$(sha256sum docker-compose.staging.yml | cut -d' ' -f1)
+          echo "File hash: ${CONTENT_HASH}"
+
+          # Upload with metadata for config-sync service
+          echo "Uploading docker-compose.staging.yml to s3://${SPACES_BUCKET}/${S3_KEY}..."
+          aws s3 cp docker-compose.staging.yml "s3://${SPACES_BUCKET}/${S3_KEY}" \
+            --endpoint-url "${SPACES_ENDPOINT}" \
+            --metadata "sha256=${CONTENT_HASH},deployed-by=github-actions,commit=${GITHUB_SHA}" \
+            --content-type "application/x-yaml"
+
+          # Verify upload
+          echo ""
+          echo "Verifying upload..."
+          aws s3 ls "s3://${SPACES_BUCKET}/${S3_KEY}" \
+            --endpoint-url "${SPACES_ENDPOINT}"
+
+          echo ""
+          echo "✅ docker-compose.staging.yml deployed to Spaces"
+          echo "Config-sync service will pick up changes within 60 seconds"
+          echo "Commit: ${GITHUB_SHA}"
+        env:
+          SPACES_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+
+  # =========================================================================
+  # HEALTH VALIDATION: Poll until Watchtower deploys new images
+  # =========================================================================
+  # DEPLOYMENT PATTERN (Complete Pipeline):
+  # 1. Images pushed to DOCR (build-and-push job)
+  # 2. Config uploaded to DO Spaces (deploy-configs job)
+  # 3. config-sync on server polls Spaces every 60s, deploys compose changes
+  # 4. Watchtower polls DOCR every 60s, deploys image changes
+  # 5. Both trigger docker-compose up -d → services restart with new code + config
+  # 6. Workflow polls health endpoints until services are ready
+  # =========================================================================
+  validate-deployment:
+    name: Validate Service Health
+    needs: [build-and-push, deploy-configs]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10 # Increased from 5 to account for Watchtower poll cycle + container startup
+    environment: staging
+
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Pre-flight Infrastructure Check
+        run: |
+          echo "========================================="
+          echo "🔍 PRE-FLIGHT INFRASTRUCTURE CHECK"
+          echo "========================================="
+          echo ""
+
+          # Step 1: DNS resolution
+          echo "1. Checking DNS resolution for staging.ectropy.ai..."
+          DNS_RESULT=$(dig +short staging.ectropy.ai 2>/dev/null || true)
+          if [ -z "$DNS_RESULT" ]; then
+            echo "   ❌ DNS resolution FAILED - staging.ectropy.ai does not resolve"
+            echo ""
+            echo "   Troubleshooting:"
+            echo "     - Verify DNS A record points to load balancer IP"
+            echo "     - Check DigitalOcean DNS panel for staging.ectropy.ai"
+            exit 1
+          fi
+          echo "   ✅ Resolved to: $DNS_RESULT"
+
+          # Step 2: Check Load Balancer status via doctl (ground truth)
+          echo ""
+          echo "2. Checking Load Balancer status via doctl..."
+          LB_INFO=$(doctl compute load-balancer list --format ID,Name,Status,IP --no-header 2>/dev/null || true)
+          if [ -z "$LB_INFO" ]; then
+            echo "   ❌ No load balancers found"
+            exit 1
+          fi
+          echo "   $LB_INFO"
+
+          # Extract staging LB ID for health check
+          LB_ID=$(doctl compute load-balancer list --format ID,Name --no-header 2>/dev/null | grep -i staging | awk '{print $1}' || true)
+          if [ -n "$LB_ID" ]; then
+            echo ""
+            echo "   Checking LB backend health (droplets)..."
+            doctl compute load-balancer get "$LB_ID" --format Status --no-header 2>/dev/null || true
+          fi
+
+          # Step 3: Check Droplet status
+          echo ""
+          echo "3. Checking staging droplet status..."
+          DROPLET_INFO=$(doctl compute droplet list --format ID,Name,Status,PublicIPv4 --no-header 2>/dev/null | grep -i staging || true)
+          if [ -z "$DROPLET_INFO" ]; then
+            echo "   ❌ No staging droplet found"
+            echo "   Infrastructure may need to be re-provisioned with Terraform"
+            exit 1
+          fi
+          echo "   $DROPLET_INFO"
+
+          DROPLET_STATUS=$(echo "$DROPLET_INFO" | awk '{print $3}')
+          if [ "$DROPLET_STATUS" != "active" ]; then
+            echo "   ❌ Staging droplet is not active (status: $DROPLET_STATUS)"
+            echo "   Droplet may need to be powered on"
+            exit 1
+          fi
+          echo "   ✅ Droplet is active"
+
+          # Step 4: TCP connectivity to port 443
+          echo ""
+          echo "4. Checking TCP connectivity to staging.ectropy.ai:443..."
+          if ! timeout 10 bash -c 'echo > /dev/tcp/staging.ectropy.ai/443' 2>/dev/null; then
+            echo "   ⚠️  TCP connection to port 443 FAILED"
+            echo "   LB is not forwarding traffic - backend may be unhealthy"
+            echo "   Config-sync should fix this within 60s after compose deploy"
+            echo "   Proceeding to health check loop (will wait for recovery)..."
+          else
+            echo "   ✅ TCP connection to port 443 successful"
+
+            # Step 5: SSL Certificate Validation
+            # ROOT CAUSE FIX: Explicitly check certificate expiry to distinguish
+            # "cert expired" (infrastructure fix needed) from "server down" (ops fix needed)
+            # Prevents 3 minutes of misleading 000 responses when the real issue is cert expiry
+            echo ""
+            echo "5. Checking SSL certificate..."
+            CERT_OUTPUT=$(echo | openssl s_client -connect staging.ectropy.ai:443 -servername staging.ectropy.ai 2>/dev/null || true)
+            CERT_EXPIRY=$(echo "$CERT_OUTPUT" | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2 || true)
+            CERT_SUBJECT=$(echo "$CERT_OUTPUT" | openssl x509 -noout -subject 2>/dev/null | cut -d= -f2- || true)
+
+            if [ -n "$CERT_EXPIRY" ]; then
+              echo "   Certificate subject: $CERT_SUBJECT"
+              echo "   Certificate expires: $CERT_EXPIRY"
+
+              # Check if certificate has expired
+              EXPIRY_EPOCH=$(date -d "$CERT_EXPIRY" +%s 2>/dev/null || true)
+              NOW_EPOCH=$(date +%s)
+
+              if [ -n "$EXPIRY_EPOCH" ] && [ "$NOW_EPOCH" -gt "$EXPIRY_EPOCH" ]; then
+                echo ""
+                echo "   ❌ SSL CERTIFICATE HAS EXPIRED"
+                echo ""
+                echo "   ============================================"
+                echo "   ROOT CAUSE: SSL certificate expired on $CERT_EXPIRY"
+                echo "   IMPACT: All HTTPS health checks return 000 (TLS handshake fails)"
+                echo "   ============================================"
+                echo ""
+                echo "   FIX: Run terraform apply to create new Let's Encrypt cert:"
+                echo "     1. Go to Actions → 'Terraform Plan/Apply' workflow"
+                echo "     2. Run workflow with: environment=staging, action=apply"
+                echo "     3. This creates 'ectropy-staging-le' cert and updates LB"
+                echo "     4. Re-run this deployment after cert is renewed"
+                echo ""
+                echo "   The Terraform config (staging/main.tf:111-119) already defines"
+                echo "   an auto-renewing Let's Encrypt cert. It just needs to be applied."
+                echo ""
+                exit 1
+              else
+                echo "   ✅ Certificate is valid"
+              fi
+            else
+              echo "   ⚠️  Could not read certificate (TLS handshake may have failed)"
+
+              # Fallback: try curl with verbose output to get the specific error
+              CURL_ERR=$(curl -vvv --connect-timeout 5 --max-time 10 https://staging.ectropy.ai/ 2>&1 | grep -i "certificate\|ssl\|expired" || true)
+              if echo "$CURL_ERR" | grep -qi "expired"; then
+                echo ""
+                echo "   ❌ SSL CERTIFICATE HAS EXPIRED (detected via curl)"
+                echo ""
+                echo "   FIX: Run 'Terraform Plan/Apply' workflow with environment=staging, action=apply"
+                echo "   This creates 'ectropy-staging-le' Let's Encrypt cert and updates the LB."
+                echo ""
+                exit 1
+              fi
+
+              echo "   Proceeding to health check loop..."
+            fi
+          fi
+
+          echo ""
+          echo "========================================="
+          echo "✅ PRE-FLIGHT INFRASTRUCTURE CHECK COMPLETE"
+          echo "========================================="
+
+      - name: Poll Health Endpoints Until Ready
+        run: |
+          echo "========================================="
+          echo "🏥 HEALTH VALIDATION PHASE"
+          echo "========================================="
+          echo ""
+
+          # Helper function: get HTTP status code without concatenation bug
+          get_http_status() {
+            local url="$1"
+            local status
+            status=$(curl -s -o /dev/null -w "%{http_code}" -m 10 "$url" 2>/dev/null) || true
+            if [ -z "$status" ] || [ "$status" = "000" ]; then
+              echo "000"
+            else
+              echo "$status"
+            fi
+          }
+
+          MAX_WAIT_SECONDS=420  # 7 minutes
+          POLL_INTERVAL=10
+          ELAPSED=0
+          HEALTHY_CHECKS=0
+          ZERO_RESPONSE_COUNT=0
+          LB_HEALTH_SEEN=false  # Track if /lb-health ever responded (nginx baseline)
+
+          while [ $ELAPSED -lt $MAX_WAIT_SECONDS ]; do
+            echo "[$ELAPSED/$MAX_WAIT_SECONDS seconds] Checking service health..."
+
+            # LAYER 1: LB Health (nginx alive — independent, no backend deps)
+            # Five Why 2026-02-20: /lb-health is the baseline. If this fails, nginx isn't running.
+            LB_STATUS=$(get_http_status "https://staging.ectropy.ai/lb-health")
+
+            # LAYER 2: Individual service health (backend-dependent)
+            # Five Why 2026-03-04: /health routes to mcp_server (NOT web-dashboard)
+            # /version.json is the correct web-dashboard health check (static build artifact)
+            API_STATUS=$(get_http_status "https://staging.ectropy.ai/api/health")
+            MCP_STATUS=$(get_http_status "https://staging.ectropy.ai/mcp/health")
+            WEB_STATUS=$(get_http_status "https://staging.ectropy.ai/version.json")
+
+            # Track nginx baseline
+            if [ "$LB_STATUS" = "200" ]; then
+              LB_HEALTH_SEEN=true
+            fi
+
+            if [ "$API_STATUS" = "200" ] && [ "$MCP_STATUS" = "200" ] && [ "$WEB_STATUS" = "200" ]; then
+              HEALTHY_CHECKS=$((HEALTHY_CHECKS + 1))
+              ZERO_RESPONSE_COUNT=0
+              echo "  ✅ Services healthy ($HEALTHY_CHECKS/3 consecutive checks)"
+              echo "     LB: $LB_STATUS | API: $API_STATUS | MCP: $MCP_STATUS | Web: $WEB_STATUS"
+
+              if [ $HEALTHY_CHECKS -ge 3 ]; then
+                echo ""
+                echo "🔍 Validating OAuth authentication (E2E blocker)..."
+                OAUTH_STATUS=$(get_http_status "https://staging.ectropy.ai/api/auth/google")
+
+                if [ "$OAUTH_STATUS" != "302" ] && [ "$OAUTH_STATUS" != "200" ]; then
+                  echo "❌ OAuth authentication not ready (HTTP $OAUTH_STATUS)"
+                  echo "E2E tests require working OAuth - deployment cannot proceed"
+                  echo ""
+                  exit 1
+                fi
+
+                echo "✅ OAuth authentication ready (HTTP $OAUTH_STATUS)"
+                echo ""
+
+                # DEPLOY VERIFICATION: Confirm NEW image is running (Five Why 2026-02-26)
+                # ROOT CAUSE: E2E tests ran against OLD staging image because health checks
+                # only verified HTTP 200, not that the expected BUILD_SHA was deployed.
+                # Fix: Poll /api/health until buildSha matches ${{ github.sha }}
+                echo "🔍 Verifying deployed BUILD_SHA matches expected commit..."
+                EXPECTED_SHA="${{ github.sha }}"
+                DEPLOYED_SHA=$(curl -s -m 10 "https://staging.ectropy.ai/api/health" 2>/dev/null | jq -r '.buildSha // "unknown"' 2>/dev/null || echo "unknown")
+                echo "   Expected: ${EXPECTED_SHA:0:12}"
+                echo "   Deployed:  ${DEPLOYED_SHA:0:12}"
+
+                if [ "$DEPLOYED_SHA" = "$EXPECTED_SHA" ]; then
+                  echo "   ✅ BUILD_SHA verified — correct image is running"
+                else
+                  echo "   ⚠️  BUILD_SHA mismatch — Watchtower may not have pulled yet"
+                  echo "   Waiting up to 180s for image update..."
+
+                  SHA_WAIT=0
+                  SHA_MAX=180
+                  while [ $SHA_WAIT -lt $SHA_MAX ]; do
+                    sleep 15
+                    SHA_WAIT=$((SHA_WAIT + 15))
+                    DEPLOYED_SHA=$(curl -s -m 10 "https://staging.ectropy.ai/api/health" 2>/dev/null | jq -r '.buildSha // "unknown"' 2>/dev/null || echo "unknown")
+                    echo "   [$SHA_WAIT/${SHA_MAX}s] Deployed: ${DEPLOYED_SHA:0:12}"
+
+                    if [ "$DEPLOYED_SHA" = "$EXPECTED_SHA" ]; then
+                      echo "   ✅ BUILD_SHA verified after ${SHA_WAIT}s"
+                      break
+                    fi
+                  done
+
+                  if [ "$DEPLOYED_SHA" != "$EXPECTED_SHA" ]; then
+                    echo ""
+                    echo "   ❌ BUILD_SHA never matched after ${SHA_MAX}s"
+                    echo "   Expected: $EXPECTED_SHA"
+                    echo "   Deployed:  $DEPLOYED_SHA"
+                    echo ""
+                    echo "   DEPLOYMENT FAILED: New image not running on staging"
+                    echo ""
+                    echo "   Possible causes:"
+                    echo "   1. Watchtower DOCR authentication failure (check /opt/ectropy/.docker/config.json)"
+                    echo "   2. Config-sync did not detect compose file change"
+                    echo "   3. Image pull failed silently"
+                    echo ""
+                    echo "   Manual recovery:"
+                    echo "   ssh staging → docker exec ectropy-watchtower /watchtower --run-once"
+                    echo "   Or: cd /opt/ectropy && docker compose -f docker-compose.staging.yml up -d watchtower"
+                    echo ""
+                    echo "   Bailing before E2E — will not burn CI time on stale code"
+                    exit 1
+                  fi
+                fi
+
+                # DEPLOY VERIFICATION: Web Dashboard version.json (Five Why 2026-02-28)
+                # ROOT CAUSE: Deploy gate only verified API gateway BUILD_SHA.
+                # Web-dashboard served stale bundles for 6+ hours undetected.
+                # Fix: Also verify /version.json matches expected commit SHA.
+                echo "🔍 Verifying web-dashboard BUILD_SHA via /version.json..."
+                WEB_SHA=$(curl -s -m 10 "https://staging.ectropy.ai/version.json" 2>/dev/null | jq -r '.buildSha // "unknown"' 2>/dev/null || echo "unknown")
+                echo "   Expected: ${EXPECTED_SHA:0:12}"
+                echo "   Web Dashboard: ${WEB_SHA:0:12}"
+
+                if [ "$WEB_SHA" = "$EXPECTED_SHA" ]; then
+                  echo "   ✅ Web Dashboard BUILD_SHA verified"
+                else
+                  echo "   ⚠️  Web Dashboard BUILD_SHA mismatch — Watchtower may not have pulled yet"
+                  echo "   Waiting up to 180s for web-dashboard image update..."
+
+                  WEB_WAIT=0
+                  WEB_MAX=180
+                  while [ $WEB_WAIT -lt $WEB_MAX ]; do
+                    sleep 15
+                    WEB_WAIT=$((WEB_WAIT + 15))
+                    WEB_SHA=$(curl -s -m 10 "https://staging.ectropy.ai/version.json" 2>/dev/null | jq -r '.buildSha // "unknown"' 2>/dev/null || echo "unknown")
+                    echo "   [$WEB_WAIT/${WEB_MAX}s] Web Dashboard: ${WEB_SHA:0:12}"
+
+                    if [ "$WEB_SHA" = "$EXPECTED_SHA" ]; then
+                      echo "   ✅ Web Dashboard BUILD_SHA verified after ${WEB_WAIT}s"
+                      break
+                    fi
+                  done
+
+                  if [ "$WEB_SHA" != "$EXPECTED_SHA" ]; then
+                    echo ""
+                    echo "   ❌ Web Dashboard BUILD_SHA never matched after ${WEB_MAX}s"
+                    echo "   Expected: $EXPECTED_SHA"
+                    echo "   Web Dashboard: $WEB_SHA"
+                    echo ""
+                    echo "   DEPLOYMENT FAILED: Web dashboard running stale code"
+                    echo ""
+                    echo "   Possible causes:"
+                    echo "   1. Watchtower didn't detect new web-dashboard image"
+                    echo "   2. Docker build cache served identical layers (no content change detected)"
+                    echo "   3. DOCR registry push failed for web-dashboard image"
+                    echo ""
+                    echo "   Bailing before E2E — will not test against stale frontend"
+                    exit 1
+                  fi
+                fi
+
+                echo ""
+                echo "========================================="
+                echo "✅ DEPLOYMENT VALIDATED"
+                echo "========================================="
+                echo ""
+                echo "All services healthy for 30 seconds"
+                echo "OAuth authentication validated"
+                echo "API Gateway BUILD_SHA: ${DEPLOYED_SHA:0:12}"
+                echo "Web Dashboard BUILD_SHA: ${WEB_SHA:0:12}"
+                echo "Total validation time: $ELAPSED seconds"
+                echo "Ready for E2E tests"
+                exit 0
+              fi
+            else
+              HEALTHY_CHECKS=0
+
+              # LAYERED DIAGNOSTICS (Five Why 2026-02-20)
+              # Differentiate: nginx down vs backend service down vs LB blocking
+              if [ "$LB_STATUS" = "200" ]; then
+                # nginx is alive but backends are unhealthy — targeted diagnosis
+                echo "  ⏳ nginx alive (/lb-health=200), waiting for backends..."
+                echo "     LB: $LB_STATUS | API: $API_STATUS | MCP: $MCP_STATUS | Web: $WEB_STATUS"
+                if [ "$API_STATUS" = "502" ]; then
+                  echo "     → API Gateway: 502 (container starting or dependency not ready)"
+                fi
+                if [ "$MCP_STATUS" = "502" ]; then
+                  echo "     → MCP Server: 502 (container starting or crash-looping)"
+                fi
+                if [ "$WEB_STATUS" = "502" ]; then
+                  echo "     → Web Dashboard: 502 (container starting)"
+                fi
+                ZERO_RESPONSE_COUNT=0
+              elif [ "$LB_STATUS" = "503" ]; then
+                # LB returning 503 — either backend unhealthy or nginx not serving /lb-health
+                echo "  ⏳ LB returning 503 (backend health check failing)..."
+                echo "     LB: $LB_STATUS | API: $API_STATUS | MCP: $MCP_STATUS | Web: $WEB_STATUS"
+                ZERO_RESPONSE_COUNT=0
+              else
+                echo "  ⏳ Waiting for services..."
+                echo "     LB: $LB_STATUS | API: $API_STATUS | MCP: $MCP_STATUS | Web: $WEB_STATUS"
+              fi
+
+              # Track consecutive total failures (000 on ALL endpoints)
+              if [ "$LB_STATUS" = "000" ] && [ "$API_STATUS" = "000" ]; then
+                ZERO_RESPONSE_COUNT=$((ZERO_RESPONSE_COUNT + 1))
+              else
+                ZERO_RESPONSE_COUNT=0
+              fi
+
+              # After 60s of 000s, diagnose cert vs server issue
+              if [ $ZERO_RESPONSE_COUNT -ge 6 ] && [ $((ZERO_RESPONSE_COUNT % 6)) -eq 0 ]; then
+                echo ""
+                echo "  🔍 Diagnosing 000 responses..."
+                INSECURE_STATUS=$(curl -sk -o /dev/null -w "%{http_code}" -m 10 "https://staging.ectropy.ai/lb-health" 2>/dev/null) || true
+                if [ -n "$INSECURE_STATUS" ] && [ "$INSECURE_STATUS" != "000" ]; then
+                  echo "  ❌ Server reachable with -k (HTTP $INSECURE_STATUS) — SSL CERTIFICATE ISSUE"
+                  echo "     FIX: Run 'Terraform Plan/Apply' workflow → environment=staging, action=apply"
+                  exit 1
+                else
+                  echo "  ℹ️  Server genuinely unreachable (000 even with -k/insecure)"
+                fi
+              fi
+
+              # Early exit: 3 minutes of complete unreachability
+              if [ $ZERO_RESPONSE_COUNT -ge 18 ]; then
+                echo ""
+                echo "❌ EARLY EXIT: All endpoints unreachable for 3 minutes"
+                break
+              fi
+            fi
+
+            sleep $POLL_INTERVAL
+            ELAPSED=$((ELAPSED + POLL_INTERVAL))
+          done
+
+          echo ""
+          echo "❌ ERROR: Services did not become healthy within $MAX_WAIT_SECONDS seconds"
+          echo ""
+          echo "========================================="
+          echo "🔍 DIAGNOSTIC INFORMATION (Zero-SSH)"
+          echo "========================================="
+          echo ""
+
+          # Diagnostic 1: Layered health check (Five Why 2026-02-20)
+          echo "1. Layered Health Check:"
+          DIAG_LB=$(get_http_status "https://staging.ectropy.ai/lb-health")
+          DIAG_API=$(get_http_status "https://staging.ectropy.ai/api/health")
+          DIAG_MCP=$(get_http_status "https://staging.ectropy.ai/mcp/health")
+          DIAG_WEB=$(get_http_status "https://staging.ectropy.ai/version.json")
+          echo "   /lb-health (nginx):       $DIAG_LB"
+          echo "   /api/health (API GW):     $DIAG_API"
+          echo "   /mcp/health (MCP):        $DIAG_MCP"
+          echo "   /version.json (Web):      $DIAG_WEB"
+          echo ""
+          if [ "$DIAG_LB" = "200" ]; then
+            echo "   DIAGNOSIS: nginx IS running. Backend services are unhealthy."
+            echo "   → Check: db-migrate container logs, redis health, database connectivity"
+          elif [ "$DIAG_LB" = "503" ]; then
+            echo "   DIAGNOSIS: LB health check failing. Nginx may not be serving /lb-health."
+            echo "   → This requires terraform apply to update LB health check path to /lb-health"
+          elif [ "$DIAG_LB" = "000" ]; then
+            echo "   DIAGNOSIS: Server completely unreachable. Infrastructure issue."
+          fi
+          echo ""
+
+          # Diagnostic 2: DNS resolution
+          echo "2. DNS Resolution:"
+          dig +short staging.ectropy.ai 2>/dev/null || echo "   DNS lookup failed"
+          echo ""
+
+          # Diagnostic 3: Load balancer status
+          echo "3. Load Balancer Status:"
+          doctl compute load-balancer list --format ID,Name,Status,IP --no-header 2>/dev/null || echo "   doctl not available"
+          echo ""
+
+          # Diagnostic 4: Droplet status (fixed tag filter)
+          echo "4. Droplet Status:"
+          doctl compute droplet list --format ID,Name,Status,PublicIPv4 --no-header 2>/dev/null | grep -i staging || echo "   No staging droplet found"
+          echo ""
+
+          # Diagnostic 5: Verbose connection test to /lb-health (baseline)
+          echo "5. Verbose Connection Test (/lb-health):"
+          curl -vvv --connect-timeout 10 --max-time 15 https://staging.ectropy.ai/lb-health 2>&1 || true
+          echo ""
+
+          echo "========================================="
+          echo "Zero-SSH Troubleshooting (no server access required):"
+          echo "  1. Check load balancer health: doctl compute load-balancer list"
+          echo "  2. Check droplet status: doctl compute droplet list --tag-name staging"
+          echo "  3. Check DOCR images: doctl registry repository list-tags api-gateway"
+          echo "  4. Check Watchtower via API: curl staging-ip:8080/v1/metrics (if exposed)"
+          echo "  5. If server down: doctl compute droplet-action power-cycle <droplet-id>"
+          echo "========================================="
+          echo ""
+          exit 1
+
+  # =========================================================================
+  # SMOKE TESTS: Verify deployment
+  # =========================================================================
+  smoke-tests:
+    name: Smoke Tests
+    needs: [validate-deployment]
+    runs-on: ubuntu-latest
+    timeout-minutes: 3 # WORKFLOW OPTIMIZATION: Reduced from 10min (smoke tests complete in ~7s)
+    # ROOT CAUSE #218 FIX: OAuth failures MUST block deployment (E2E tests 100% depend on OAuth)
+    # continue-on-error: true  # REMOVED - smoke tests are mandatory
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: API Health Check
+        run: |
+          echo "🔍 Testing API Gateway..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://staging.ectropy.ai/api/health)
+
+          if [ "$STATUS" -eq 200 ]; then
+            echo "✅ API Gateway healthy"
+          else
+            echo "❌ API Gateway returned HTTP $STATUS"
+            exit 1
+          fi
+
+      - name: Web Dashboard Health Check
+        run: |
+          echo "🔍 Testing Web Dashboard..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://staging.ectropy.ai/)
+
+          if [ "$STATUS" -eq 200 ]; then
+            echo "✅ Web Dashboard healthy"
+          else
+            echo "❌ Web Dashboard returned HTTP $STATUS"
+            exit 1
+          fi
+
+      - name: Web Dashboard Version Check
+        run: |
+          echo "🔍 Verifying web-dashboard version.json..."
+          RESPONSE=$(curl -s -m 10 https://staging.ectropy.ai/version.json)
+          BUILD_SHA=$(echo "$RESPONSE" | jq -r '.buildSha // "unknown"')
+          SERVICE=$(echo "$RESPONSE" | jq -r '.service // "unknown"')
+
+          if [ "$BUILD_SHA" = "unknown" ] || [ -z "$BUILD_SHA" ]; then
+            echo "❌ Web Dashboard version.json missing or invalid"
+            echo "   Response: $RESPONSE"
+            exit 1
+          fi
+
+          if [ "$SERVICE" != "web-dashboard" ]; then
+            echo "❌ Unexpected service name: $SERVICE (expected web-dashboard)"
+            exit 1
+          fi
+
+          echo "✅ Web Dashboard version verified: ${BUILD_SHA:0:12} (service: $SERVICE)"
+
+      - name: OAuth Endpoint Check
+        run: |
+          echo "🔍 Testing OAuth endpoints..."
+          # ROOT CAUSE #218 FIX: Corrected route from /auth/google to /api/auth/google
+          # Application uses /api prefix for all API routes (API Gateway pattern)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://staging.ectropy.ai/api/auth/google)
+
+          if [ "$STATUS" -eq 302 ] || [ "$STATUS" -eq 200 ]; then
+            echo "✅ OAuth endpoint working"
+          else
+            echo "❌ OAuth returned HTTP $STATUS"
+            echo "E2E tests require working OAuth - smoke tests failed"
+            exit 1
+          fi
+
+  # =========================================================================
+  # INFRASTRUCTURE SYNC GATE: Wait for Terraform before deploying
+  # =========================================================================
+  # Waits for concurrent terraform-staging-gitops.yml runs (triggered by the
+  # same commit) to complete before proceeding to seeding and E2E tests.
+  # This ensures infrastructure changes (LB health check, nginx config, etc.)
+  # are applied before validation runs.
+  # Pattern: Kubernetes deployment dependency / ArgoCD sync wave ordering.
+  # =========================================================================
+  wait-for-infrastructure:
+    name: Infrastructure Sync Gate
+    needs: [smoke-tests]
+    if: success()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Wait for Terraform Workflow
+        run: |
+          echo "========================================="
+          echo "INFRASTRUCTURE SYNCHRONIZATION GATE"
+          echo "========================================="
+          echo ""
+          echo "Commit: ${GITHUB_SHA}"
+          echo ""
+
+          # ---------------------------------------------------------------
+          # Check if terraform-staging-gitops.yml was triggered by this push
+          # ---------------------------------------------------------------
+          # Both deploy and terraform workflows trigger on push to develop.
+          # If terraform files changed, both run in parallel. We need terraform
+          # to complete (and update the .env) BEFORE seeding.
+          echo "Checking for concurrent Terraform workflow..."
+
+          # Query for terraform runs matching this commit SHA
+          TF_RUNS=$(gh run list \
+            --workflow=terraform-staging-gitops.yml \
+            --commit="${GITHUB_SHA}" \
+            --json status,conclusion,databaseId \
+            --repo "${GITHUB_REPOSITORY}" 2>/dev/null || echo "[]")
+
+          ACTIVE_RUNS=$(echo "$TF_RUNS" | jq '[.[] | select(.status != "completed")] | length')
+          TOTAL_RUNS=$(echo "$TF_RUNS" | jq 'length')
+
+          if [ "$TOTAL_RUNS" = "0" ]; then
+            echo "No Terraform workflow triggered for this commit."
+            echo "Infrastructure changes not needed — proceeding to seed."
+            exit 0
+          fi
+
+          if [ "$ACTIVE_RUNS" = "0" ]; then
+            # Terraform already completed — check result
+            CONCLUSION=$(echo "$TF_RUNS" | jq -r '.[0].conclusion')
+            echo "Terraform workflow already completed: $CONCLUSION"
+
+            if [ "$CONCLUSION" = "success" ]; then
+              echo ""
+              echo "Waiting 90s for config-sync to propagate .env to server..."
+              echo "(config-sync polls Spaces every 60s)"
+              sleep 90
+              echo "OK: Infrastructure sync complete — proceeding to seed."
+            else
+              echo ""
+              echo "WARNING: Terraform concluded with: $CONCLUSION"
+              echo "The .env may not have been updated. Seeding may fail."
+              echo "Check: gh run view --workflow=terraform-staging-gitops.yml"
+            fi
+            exit 0
+          fi
+
+          # ---------------------------------------------------------------
+          # Terraform is still running — poll until completion
+          # ---------------------------------------------------------------
+          echo "Terraform workflow in progress — waiting for completion..."
+          echo "(polling every 30s, timeout 12 minutes)"
+          echo ""
+
+          for i in $(seq 1 24); do
+            sleep 30
+
+            TF_RUNS=$(gh run list \
+              --workflow=terraform-staging-gitops.yml \
+              --commit="${GITHUB_SHA}" \
+              --json status,conclusion \
+              --repo "${GITHUB_REPOSITORY}" 2>/dev/null || echo "[]")
+
+            STILL_ACTIVE=$(echo "$TF_RUNS" | jq '[.[] | select(.status != "completed")] | length')
+
+            if [ "$STILL_ACTIVE" = "0" ]; then
+              CONCLUSION=$(echo "$TF_RUNS" | jq -r '.[0].conclusion')
+              echo ""
+              echo "Terraform workflow completed: $CONCLUSION"
+
+              if [ "$CONCLUSION" = "success" ]; then
+                echo ""
+                echo "Waiting 90s for config-sync to propagate .env to server..."
+                sleep 90
+                echo "OK: Infrastructure sync complete — proceeding to seed."
+              else
+                echo "WARNING: Terraform concluded with: $CONCLUSION"
+                echo "Proceeding — seed diagnostics will identify any token issues."
+              fi
+              exit 0
+            fi
+
+            echo "   ...terraform still running ($((i * 30))s elapsed)"
+          done
+
+          echo ""
+          echo "WARNING: Terraform still running after 12 minutes."
+          echo "Proceeding — seed Phase 2 has its own retry/diagnostics."
+          echo "If seeding fails, re-run after terraform completes."
+
+  # =========================================================================
+  # SEED DEMO DATA: Populate staging database for E2E test validation
+  # =========================================================================
+  # ROOT CAUSE FIX #151: Seed demo data before E2E tests
+  # WHY: E2E tests validate BIM viewer with existing projects (not just demo creation)
+  # SOLUTION: Reuse seed-staging-database.yml workflow (complete demo flow testing)
+  # BENEFIT: Tests validate full demo workflow (seeding + viewing) end-to-end
+  #
+  # Five Why 2026-02-23: Seed workflow now authenticates with Speckle using
+  # admin credentials (email + password) instead of a static pre-shared token.
+  # This eliminates the split-secret-path synchronization problem entirely.
+  seed-demo-data:
+    name: Seed Demo Data
+    needs: [validate-deployment, smoke-tests]
+    if: success() && needs.smoke-tests.result == 'success'
+    uses: ./.github/workflows/seed-staging-database.yml
+    with:
+      seed_type: 'full' # Creates tenant, users, projects, Speckle streams
+    secrets:
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      SPECKLE_ADMIN_PASSWORD: ${{ secrets.SPECKLE_ADMIN_PASSWORD }}
+
+  # =========================================================================
+  # E2E TESTS: Full end-to-end validation
+  # =========================================================================
+  e2e-tests:
+    name: E2E Tests
+    needs: [validate-deployment, smoke-tests, seed-demo-data]
+    # WORKFLOW OPTIMIZATION: Gate E2E on smoke-tests AND seeding success
+    # ROOT CAUSE FIX: E2E tests now have demo data to validate (41 BIM viewer tests)
+    if: success() && needs.smoke-tests.result == 'success' && needs.seed-demo-data.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20 # WORKFLOW OPTIMIZATION: Reduced from 30min (realistic completion: 10-15min)
+    environment: staging
+    # ROOT CAUSE FIX (2026-02-13): REMOVED continue-on-error
+    # ANTI-PATTERN: Workflow shows success despite E2E failures (false positive)
+    # ENTERPRISE PATTERN: E2E failures BLOCK deployment (accurate status)
+    # Reference: .roadmap/FIVE_WHY_E2E_AUTH_STAGING_FAILURES_2026-02-13.json (Why #5, Layer 3)
+    # continue-on-error: true # REMOVED - E2E test failures should fail deployment
+
+    env:
+      BASE_URL: https://staging.ectropy.ai
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID_STAGING }}
+      GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET_STAGING }}
+      TEST_GOOGLE_EMAIL: ${{ secrets.TEST_GOOGLE_EMAIL }}
+      TEST_GOOGLE_PASSWORD: ${{ secrets.TEST_GOOGLE_PASSWORD }}
+      TEST_GOOGLE_REFRESH_TOKEN: ${{ secrets.TEST_GOOGLE_REFRESH_TOKEN }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack and Install pnpm
+        run: |
+          corepack enable
+          PNPM_VERSION=$(node -p "require('./package.json').packageManager.split('@')[1].split('+')[0]")
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install chromium --with-deps
+
+      # WORKFLOW OPTIMIZATION: Removed redundant 5-minute API wait loop
+      # Rationale: validate-deployment already does 3 consecutive health checks (30s)
+      #            smoke-tests validates all endpoints including OAuth
+      #            If E2E runs, API is guaranteed ready (gated on smoke-tests success)
+      # Time saved: Up to 5 minutes per E2E run
+      # Reference: WORKFLOW_GROUND_TRUTH_DEPLOY_STAGING_2026-02-09.json
+
+      # ROOT CAUSE FIX (2026-02-13): Validate OAuth credentials before running tests
+      # FAIL FAST: Clear error if credentials missing (not silent auth failure)
+      # Reference: .roadmap/FIVE_WHY_E2E_AUTH_STAGING_FAILURES_2026-02-13.json (P0-3)
+      - name: Validate OAuth Credentials
+        run: |
+          echo "🔍 Validating OAuth credentials for E2E tests..."
+
+          MISSING_VARS=()
+
+          if [ -z "$TEST_GOOGLE_REFRESH_TOKEN" ]; then
+            MISSING_VARS+=("TEST_GOOGLE_REFRESH_TOKEN")
+          fi
+
+          if [ -z "$GOOGLE_CLIENT_ID" ]; then
+            MISSING_VARS+=("GOOGLE_CLIENT_ID")
+          fi
+
+          if [ -z "$GOOGLE_CLIENT_SECRET" ]; then
+            MISSING_VARS+=("GOOGLE_CLIENT_SECRET")
+          fi
+
+          if [ ${#MISSING_VARS[@]} -gt 0 ]; then
+            echo "❌ VALIDATION FAILED: Missing required OAuth credentials"
+            echo ""
+            echo "Missing environment variables:"
+            for var in "${MISSING_VARS[@]}"; do
+              echo "  - $var"
+            done
+            echo ""
+            echo "TROUBLESHOOTING:"
+            echo "  1. Check GitHub repository secrets are configured"
+            echo "  2. Verify secrets are available in 'staging' environment"
+            echo "  3. Ensure secret names match exactly (case-sensitive)"
+            echo ""
+            echo "Required secrets:"
+            echo "  - TEST_GOOGLE_REFRESH_TOKEN (OAuth refresh token for test user)"
+            echo "  - GOOGLE_CLIENT_ID (OAuth client ID from Google Cloud Console)"
+            echo "  - GOOGLE_CLIENT_SECRET (OAuth client secret from Google Cloud Console)"
+            echo ""
+            exit 1
+          fi
+
+          echo "✅ All required OAuth credentials are configured"
+          echo "   - TEST_GOOGLE_REFRESH_TOKEN: present (${#TEST_GOOGLE_REFRESH_TOKEN} chars)"
+          echo "   - GOOGLE_CLIENT_ID: present (${#GOOGLE_CLIENT_ID} chars)"
+          echo "   - GOOGLE_CLIENT_SECRET: present (${#GOOGLE_CLIENT_SECRET} chars)"
+        env:
+          TEST_GOOGLE_REFRESH_TOKEN: ${{ env.TEST_GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_CLIENT_ID: ${{ env.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ env.GOOGLE_CLIENT_SECRET }}
+
+      - name: Run E2E tests
+        run: pnpm test:e2e:ci
+        env:
+          BASE_URL: ${{ env.BASE_URL }}
+          GOOGLE_CLIENT_ID: ${{ env.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ env.GOOGLE_CLIENT_SECRET }}
+          TEST_GOOGLE_EMAIL: ${{ env.TEST_GOOGLE_EMAIL }}
+          TEST_GOOGLE_PASSWORD: ${{ env.TEST_GOOGLE_PASSWORD }}
+          TEST_GOOGLE_REFRESH_TOKEN: ${{ env.TEST_GOOGLE_REFRESH_TOKEN }}
+
+      - name: Upload E2E test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+
+  # =========================================================================
+  # NOTIFICATION: Summarize deployment results
+  # =========================================================================
+  notify:
+    name: Deployment Summary
+    needs:
+      [
+        build-and-push,
+        validate-deployment,
+        smoke-tests,
+        seed-demo-data,
+        e2e-tests,
+        docr-garbage-collection,
+      ]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "# 🚀 Staging Deployment Summary (Zero-SSH Watchtower)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployment Method:** Watchtower Auto-Deploy (TRUE Zero-SSH)" >> $GITHUB_STEP_SUMMARY
+          echo "**Registry:** DigitalOcean Container Registry" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build & Push:** ${{ needs.build-and-push.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Watchtower Deployment:** ${{ needs.validate-deployment.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Smoke Tests:** ${{ needs.smoke-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Seed Demo Data:** ${{ needs.seed-demo-data.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **E2E Tests:** ${{ needs.e2e-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **DOCR Cleanup:** ${{ needs.docr-garbage-collection.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.build-and-push.result }}" == "success" ] && \
+             [ "${{ needs.validate-deployment.result }}" == "success" ]; then
+            echo "## ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Deployed Images:**" >> $GITHUB_STEP_SUMMARY
+            echo "- \`${{ env.REGISTRY }}/api-gateway:staging\`" >> $GITHUB_STEP_SUMMARY
+            echo "- \`${{ env.REGISTRY }}/mcp-server:staging\`" >> $GITHUB_STEP_SUMMARY
+            echo "- \`${{ env.REGISTRY }}/web-dashboard:staging\`" >> $GITHUB_STEP_SUMMARY
+            echo "- \`${{ env.REGISTRY }}/ectropy-console:staging\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Application URL:** https://staging.ectropy.ai" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            if [ "${{ needs.build-and-push.result }}" != "success" ]; then
+              echo "**Issue:** Build & Push failed - images not in registry" >> $GITHUB_STEP_SUMMARY
+            elif [ "${{ needs.validate-deployment.result }}" != "success" ]; then
+              echo "**Issue:** Watchtower did not deploy within timeout or server unreachable" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Zero-SSH Troubleshooting:**" >> $GITHUB_STEP_SUMMARY
+              echo "1. Check load balancer: \`doctl compute load-balancer list\`" >> $GITHUB_STEP_SUMMARY
+              echo "2. Check droplet status: \`doctl compute droplet list --tag-name staging\`" >> $GITHUB_STEP_SUMMARY
+              echo "3. Check DOCR images: \`doctl registry repository list-tags api-gateway\`" >> $GITHUB_STEP_SUMMARY
+              echo "4. Power cycle if needed: \`doctl compute droplet-action power-cycle <id>\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi

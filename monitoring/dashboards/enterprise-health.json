@@ -1,0 +1,189 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Ectropy Enterprise Health Monitor",
+    "description": "Comprehensive enterprise health monitoring for AECO industry platform",
+    "tags": ["ectropy", "health", "enterprise", "aeco"],
+    "timezone": "browser",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "refresh": "1m",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Repository Health Score",
+        "type": "gauge",
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "repository_health_score",
+            "legendFormat": "Health Score"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "yellow", "value": 70 },
+                { "color": "green", "value": 90 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Security Posture Score",
+        "type": "gauge",
+        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+        "targets": [
+          {
+            "expr": "security_posture_score",
+            "legendFormat": "Security Score"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "yellow", "value": 80 },
+                { "color": "green", "value": 95 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Performance Score",
+        "type": "gauge",
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+        "targets": [
+          {
+            "expr": "performance_score",
+            "legendFormat": "Performance Score"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "yellow", "value": 70 },
+                { "color": "green", "value": 85 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Build Performance",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "build_duration_seconds",
+            "legendFormat": "Build Time (s)"
+          },
+          {
+            "expr": "test_duration_seconds",
+            "legendFormat": "Test Time (s)"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Security Vulnerabilities",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+        "targets": [
+          {
+            "expr": "vulnerabilities_critical",
+            "legendFormat": "Critical"
+          },
+          {
+            "expr": "vulnerabilities_high",
+            "legendFormat": "High"
+          },
+          {
+            "expr": "vulnerabilities_medium",
+            "legendFormat": "Medium"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "MCP Latency (p95)",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\\\"mcp-server\\\"}[5m]))",
+            "legendFormat": "p95 latency"
+          }
+        ],
+        "yAxes": [{ "label": "Seconds", "min": 0 }]
+      },
+      {
+        "id": 7,
+        "title": "MCP Error Rate",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\\\"mcp-server\\\",status=~\\\"5..\\\"}[5m]) / rate(http_requests_total{job=\\\"mcp-server\\\"}[5m]) * 100",
+            "legendFormat": "5xx %"
+          }
+        ],
+        "yAxes": [{ "label": "Percent", "min": 0 }]
+      },
+      {
+        "id": 8,
+        "title": "Cache Hit Rate",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+        "targets": [
+          {
+            "expr": "redis_keyspace_hits / (redis_keyspace_hits + redis_keyspace_misses) * 100",
+            "legendFormat": "Hit rate %"
+          }
+        ],
+        "yAxes": [{ "label": "Percent", "min": 0, "max": 100 }]
+      },
+      {
+        "id": 9,
+        "title": "CPU Load (1m)",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
+        "targets": [
+          { "expr": "process_cpu_load", "legendFormat": "load" }
+        ],
+        "yAxes": [{ "label": "Load", "min": 0 }]
+      },
+      {
+        "id": 10,
+        "title": "Redis Memory Usage",
+        "type": "graph",
+        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 24 },
+        "targets": [
+          { "expr": "redis_memory_usage_bytes", "legendFormat": "bytes" }
+        ],
+        "yAxes": [{ "label": "Bytes", "min": 0 }]
+      }
+    ]
+  }
+}

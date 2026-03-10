@@ -1,0 +1,1495 @@
+name: Deploy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      skip_preflight:
+        description: 'Skip pre-flight checks (not recommended)'
+        required: false
+        type: boolean
+        default: false
+      deployment_mode:
+        description: 'Deployment scope'
+        required: true
+        type: choice
+        default: 'full'
+        options:
+          - full
+          - core-only
+          - speckle-only
+          - application-only
+          - nginx-only
+      confirm_deployment:
+        description: 'Type DEPLOY to confirm'
+        required: true
+        type: string
+
+env:
+  DEPLOYMENT_TIMEOUT: 600
+  HEALTH_CHECK_TIMEOUT: 60
+  HEALTH_CHECK_RETRIES: 10
+  BACKUP_DIR: backups/deployment
+
+# Enterprise Security: Explicit least-privilege permissions
+# READ + DEPLOY: Infrastructure deployment needs read Terraform and deploy
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  validate-confirmation:
+    name: 🔐 Validate Deployment Confirmation
+    runs-on: ubuntu-latest
+    outputs:
+      confirmed: ${{ steps.check.outputs.confirmed }}
+    steps:
+      - name: ✅ Check confirmation input
+        id: check
+        run: |
+          if [ "${{ github.event.inputs.confirm_deployment }}" != "DEPLOY" ]; then
+            echo "❌ Deployment not confirmed. Input must be exactly 'DEPLOY'"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Ensure you typed DEPLOY in all capitals"
+            echo "  - Do not include quotes or extra spaces"
+            exit 1
+          fi
+          echo "✅ Deployment confirmed for ${{ github.event.inputs.environment }} environment"
+          echo "confirmed=true" >> $GITHUB_OUTPUT
+
+  pre-flight-checks:
+    name: 🚦 Pre-Flight Infrastructure Validation
+    runs-on: ubuntu-latest
+    needs: validate-confirmation
+    if: github.event.inputs.skip_preflight != 'true'
+    outputs:
+      docker_available: ${{ steps.docker.outputs.available }}
+      compose_available: ${{ steps.compose.outputs.available }}
+      tools_available: ${{ steps.tools.outputs.available }}
+      ports_available: ${{ steps.ports.outputs.available }}
+      resources_sufficient: ${{ steps.resources.outputs.sufficient }}
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐳 Check Docker daemon
+        id: docker
+        timeout-minutes: 2
+        run: |
+          if docker info > /dev/null 2>&1; then
+            docker_version=$(docker --version)
+            echo "✅ Docker daemon is running ($docker_version)"
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Docker daemon is not running"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Start Docker Desktop or Docker Engine"
+            echo "  - Verify Docker service is enabled: sudo systemctl start docker"
+            echo "  - Check Docker status: docker info"
+            exit 1
+          fi
+
+      - name: 🔧 Check Docker Compose
+        id: compose
+        timeout-minutes: 1
+        run: |
+          if docker compose version > /dev/null 2>&1; then
+            compose_version=$(docker compose version)
+            echo "✅ Docker Compose is available ($compose_version)"
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Docker Compose is not available"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Install Docker Compose v2+"
+            echo "  - Verify installation: docker compose version"
+            exit 1
+          fi
+
+      - name: 🛠️ Check required tools
+        id: tools
+        timeout-minutes: 1
+        run: |
+          missing_tools=""
+          for tool in curl jq wget; do
+            if command -v $tool > /dev/null 2>&1; then
+              echo "✅ $tool is available"
+            else
+              echo "❌ $tool is not installed"
+              missing_tools="$missing_tools $tool"
+            fi
+          done
+
+          if [ -n "$missing_tools" ]; then
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Install missing tools: sudo apt-get install$missing_tools"
+            exit 1
+          fi
+          echo "available=true" >> $GITHUB_OUTPUT
+
+      - name: 📁 Verify Docker Compose file exists
+        timeout-minutes: 1
+        run: |
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          if [ ! -f "$COMPOSE_FILE" ]; then
+            echo "❌ Docker Compose file not found: $COMPOSE_FILE"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Verify the environment name is correct"
+            echo "  - Check if file exists in repository root"
+            echo "  - Available compose files:"
+            ls -1 docker-compose*.yml 2>/dev/null || echo "    No compose files found"
+            exit 1
+          fi
+          echo "✅ Compose file found: $COMPOSE_FILE"
+
+      - name: 🔍 Validate Docker Compose configuration
+        timeout-minutes: 2
+        run: |
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          if docker compose -f "$COMPOSE_FILE" config > /dev/null 2>&1; then
+            echo "✅ Docker Compose configuration is valid"
+          else
+            echo "❌ Docker Compose configuration has errors"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Run locally: docker compose -f $COMPOSE_FILE config"
+            echo "  - Check for syntax errors in YAML"
+            echo "  - Verify environment variable references"
+            exit 1
+          fi
+
+      - name: 📝 Check environment configuration
+        continue-on-error: true
+        timeout-minutes: 1
+        run: |
+          if [ -f ".env.local" ] || [ -f ".env.${{ github.event.inputs.environment }}" ]; then
+            echo "✅ Environment configuration file found"
+          else
+            echo "⚠️ No environment file found (.env.local or .env.${{ github.event.inputs.environment }})"
+            echo ""
+            echo "📋 Note: Services will use default values from docker-compose.yml"
+            echo "  - This may be acceptable for development environments"
+            echo "  - Production deployments should have explicit configuration"
+          fi
+
+      - name: 🔌 Check critical port availability
+        id: ports
+        timeout-minutes: 2
+        continue-on-error: true
+        run: |
+          echo "🔍 Checking critical port availability..."
+
+          # Critical ports for Ectropy infrastructure
+          PORTS=(3000 4000 5432 6379 8080 9000 9001)
+          PORTS_IN_USE=""
+
+          for port in "${PORTS[@]}"; do
+            if netstat -tuln 2>/dev/null | grep -q ":$port " || ss -tuln 2>/dev/null | grep -q ":$port "; then
+              echo "⚠️ Port $port is in use"
+              PORTS_IN_USE="$PORTS_IN_USE $port"
+            else
+              echo "✅ Port $port is available"
+            fi
+          done
+
+          if [ -n "$PORTS_IN_USE" ]; then
+            echo ""
+            echo "⚠️ Ports in use:$PORTS_IN_USE"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Stop conflicting services on these ports"
+            echo "  - Find process using port: lsof -i :PORT or netstat -tlnp | grep :PORT"
+            echo "  - Update docker compose port mappings if needed"
+            echo ""
+            echo "📋 Port allocation:"
+            echo "  - 3000: Web Dashboard / Speckle Server"
+            echo "  - 4000: API Gateway"
+            echo "  - 5432: PostgreSQL"
+            echo "  - 6379: Redis"
+            echo "  - 8080: Speckle Frontend"
+            echo "  - 9000: MinIO S3 API"
+            echo "  - 9001: MinIO Console"
+            echo "available=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ All critical ports are available"
+            echo "available=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 💾 Check system resources
+        id: resources
+        timeout-minutes: 1
+        continue-on-error: true
+        run: |
+          # Check available memory (at least 4GB free)
+          available_mem=$(free -g | awk '/^Mem:/{print $7}')
+          total_mem=$(free -g | awk '/^Mem:/{print $2}')
+
+          echo "💾 System Memory: ${available_mem}GB available / ${total_mem}GB total"
+
+          if [ "$available_mem" -lt 4 ]; then
+            echo "⚠️ Low available memory (${available_mem}GB < 4GB recommended)"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Close unnecessary applications"
+            echo "  - Increase Docker Desktop memory limit"
+            echo "  - Consider deploying with reduced services (core-only mode)"
+            echo "sufficient=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Sufficient memory available"
+            echo "sufficient=true" >> $GITHUB_OUTPUT
+          fi
+
+          # Check disk space (at least 20GB free)
+          available_disk=$(df -BG . | awk 'NR==2 {print $4}' | sed 's/G//')
+          disk_usage=$(df -h . | awk 'NR==2 {print $5}')
+
+          echo "💿 Disk Space: ${available_disk}GB available, ${disk_usage} used"
+
+          if [ "$available_disk" -lt 20 ]; then
+            echo "⚠️ Low disk space (${available_disk}GB < 20GB recommended)"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Free up disk space"
+            echo "  - Clean Docker system: docker system prune -a"
+            echo "  - Remove unused volumes: docker volume prune"
+          fi
+
+      - name: 📊 Generate pre-flight report
+        run: |
+          echo "## 🚦 Pre-Flight Checks Summary"
+          echo ""
+          echo "**Environment:** ${{ github.event.inputs.environment }}"
+          echo "**Deployment Mode:** ${{ github.event.inputs.deployment_mode }}"
+          echo "**Timestamp:** $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          echo ""
+          echo "### ✅ Checks Passed"
+          echo "- Docker Daemon: ${{ steps.docker.outputs.available }}"
+          echo "- Docker Compose: ${{ steps.compose.outputs.available }}"
+          echo "- Required Tools: ${{ steps.tools.outputs.available }}"
+          echo ""
+          echo "### ⚠️ Warnings"
+          echo "- Port Availability: ${{ steps.ports.outputs.available }}"
+          echo "- System Resources: ${{ steps.resources.outputs.sufficient }}"
+          echo ""
+          echo "✅ Pre-flight validation complete"
+
+  create-pre-deployment-snapshot:
+    name: 📸 Create Pre-Deployment Safety Snapshot
+    runs-on: ubuntu-latest
+    needs: [validate-confirmation, pre-flight-checks]
+    if: |
+      always() &&
+      needs.validate-confirmation.result == 'success' &&
+      (needs.pre-flight-checks.result == 'success' || github.event.inputs.skip_preflight == 'true')
+    outputs:
+      snapshot_name: ${{ steps.create.outputs.name }}
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📝 Create snapshot name
+        id: create
+        run: |
+          SNAPSHOT="pre-deploy-$(date +%Y%m%d-%H%M%S)-${{ github.event.inputs.environment }}"
+          echo "Creating safety snapshot: $SNAPSHOT"
+          echo "name=$SNAPSHOT" >> $GITHUB_OUTPUT
+
+      - name: 📂 Create backup directory
+        run: |
+          mkdir -p "${{ env.BACKUP_DIR }}/${{ steps.create.outputs.name }}"
+          echo "✅ Backup directory created"
+
+      - name: 🐳 Capture current container states
+        continue-on-error: true
+        run: |
+          SNAPSHOT="${{ steps.create.outputs.name }}"
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          docker compose -f "$COMPOSE_FILE" ps --format json > "${{ env.BACKUP_DIR }}/$SNAPSHOT/container_states.json" 2>/dev/null || echo '[]' > "${{ env.BACKUP_DIR }}/$SNAPSHOT/container_states.json"
+
+          echo "✅ Container states captured"
+
+      - name: 🖼️ Capture current Docker images
+        continue-on-error: true
+        run: |
+          SNAPSHOT="${{ steps.create.outputs.name }}"
+
+          docker images --format json | jq 'select(.Repository | contains("ectropy"))' > "${{ env.BACKUP_DIR }}/$SNAPSHOT/current_images.json" 2>/dev/null || echo '[]' > "${{ env.BACKUP_DIR }}/$SNAPSHOT/current_images.json"
+
+          echo "✅ Docker images captured"
+
+      - name: ⚙️ Backup configuration files
+        run: |
+          SNAPSHOT="${{ steps.create.outputs.name }}"
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          [ -f .env ] && cp .env "${{ env.BACKUP_DIR }}/$SNAPSHOT/env_backup" || true
+          [ -f .env.local ] && cp .env.local "${{ env.BACKUP_DIR }}/$SNAPSHOT/env_local_backup" || true
+          [ -f "$COMPOSE_FILE" ] && cp "$COMPOSE_FILE" "${{ env.BACKUP_DIR }}/$SNAPSHOT/compose_backup.yml" || true
+
+          echo "✅ Configuration files backed up"
+
+      - name: 📋 Create snapshot metadata
+        run: |
+          SNAPSHOT="${{ steps.create.outputs.name }}"
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          cat > "${{ env.BACKUP_DIR }}/$SNAPSHOT/metadata.json" <<EOF
+          {
+            "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "environment": "${{ github.event.inputs.environment }}",
+            "deployment_mode": "${{ github.event.inputs.deployment_mode }}",
+            "git_commit": "$(git rev-parse HEAD 2>/dev/null || echo 'unknown')",
+            "git_branch": "$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')",
+            "snapshot_name": "$SNAPSHOT",
+            "compose_file": "$COMPOSE_FILE",
+            "snapshot_type": "pre-deployment",
+            "triggered_by": "${{ github.actor }}"
+          }
+          EOF
+
+          echo "✅ Snapshot metadata created"
+
+  phase-1-core-infrastructure:
+    name: 🗄️ Phase 1 - Core Infrastructure Deployment
+    runs-on: ubuntu-latest
+    needs: create-pre-deployment-snapshot
+    if: |
+      github.event.inputs.deployment_mode == 'full' ||
+      github.event.inputs.deployment_mode == 'core-only'
+    outputs:
+      postgres_healthy: ${{ steps.postgres_health.outputs.healthy }}
+      redis_healthy: ${{ steps.redis_health.outputs.healthy }}
+      speckle_db_created: ${{ steps.speckle_db.outputs.created }}
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🎯 Phase 1 Start
+        run: |
+          echo "## 🗄️ Phase 1: Core Infrastructure Deployment"
+          echo ""
+          echo "**Estimated Duration:** 5 minutes"
+          echo "**Critical Path:** Yes"
+          echo ""
+          echo "📋 Services to deploy:"
+          echo "  - PostgreSQL database"
+          echo "  - Redis cache"
+          echo "  - Speckle database initialization"
+          echo ""
+          echo "⏱️ Started at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+      - name: 🚀 Step 1.1 - Start PostgreSQL database
+        id: start_postgres
+        timeout-minutes: 3
+        run: |
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          echo "🚀 Starting PostgreSQL container..."
+          docker compose -f "$COMPOSE_FILE" up -d postgres
+
+          if [ $? -eq 0 ]; then
+            echo "✅ PostgreSQL container started successfully"
+          else
+            echo "❌ Failed to start PostgreSQL"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Check Docker logs: docker logs ectropy-postgres-1"
+            echo "  - Verify port 5432 is available"
+            echo "  - Check Docker Compose file syntax"
+            exit 1
+          fi
+
+      - name: ⏳ Step 1.2 - Wait for PostgreSQL initialization
+        id: postgres_health
+        timeout-minutes: 2
+        run: |
+          echo "⏳ Waiting for PostgreSQL to accept connections (max 60 seconds)..."
+
+          max_attempts=12
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            if docker exec ectropy-postgres-1 pg_isready -U postgres > /dev/null 2>&1; then
+              echo "✅ PostgreSQL is ready and accepting connections"
+              echo "healthy=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            attempt=$((attempt + 1))
+            echo "⏳ Attempt $attempt/$max_attempts - PostgreSQL not ready yet, waiting 5 seconds..."
+            sleep 5
+          done
+
+          echo "❌ PostgreSQL failed to initialize within 60 seconds"
+          echo ""
+          echo "🔍 Troubleshooting:"
+          echo "  - Check logs: docker logs ectropy-postgres-1"
+          echo "  - Verify database initialization scripts"
+          echo "  - Check available disk space"
+          echo "  - Increase timeout if needed for slower systems"
+          exit 1
+
+      - name: 🚀 Step 1.3 - Start Redis cache
+        id: start_redis
+        timeout-minutes: 2
+        run: |
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          echo "🚀 Starting Redis container..."
+          docker compose -f "$COMPOSE_FILE" up -d redis
+
+          if [ $? -eq 0 ]; then
+            echo "✅ Redis container started successfully"
+          else
+            echo "❌ Failed to start Redis"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Check Docker logs: docker logs ectropy-redis-1"
+            echo "  - Verify port 6379 is available"
+            echo "  - Check Redis configuration"
+            exit 1
+          fi
+
+      - name: 🔍 Step 1.4 - Verify Redis health
+        id: redis_health
+        timeout-minutes: 1
+        run: |
+          echo "⏳ Waiting for Redis to initialize (5 seconds)..."
+          sleep 5
+
+          echo "🔍 Testing Redis connectivity..."
+
+          max_attempts=3
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            if docker exec ectropy-redis-1 redis-cli ping 2>/dev/null | grep -q "PONG"; then
+              echo "✅ Redis is responding correctly (PONG received)"
+              echo "healthy=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            attempt=$((attempt + 1))
+            echo "⏳ Attempt $attempt/$max_attempts - Redis not responding, retrying..."
+            sleep 3
+          done
+
+          echo "❌ Redis health check failed after $max_attempts attempts"
+          echo ""
+          echo "🔍 Troubleshooting:"
+          echo "  - Check logs: docker logs ectropy-redis-1"
+          echo "  - Verify Redis is running: docker ps | grep redis"
+          echo "  - Test manually: docker exec ectropy-redis-1 redis-cli ping"
+          exit 1
+
+      - name: 🗄️ Step 1.5 - Create Speckle database
+        id: speckle_db
+        timeout-minutes: 1
+        continue-on-error: true
+        run: |
+          echo "🗄️ Creating Speckle database..."
+
+          docker exec ectropy-postgres-1 psql -U postgres -c 'CREATE DATABASE speckle'
+          exit_code=$?
+
+          if [ $exit_code -eq 0 ]; then
+            echo "✅ Speckle database created successfully"
+            echo "created=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ Database creation failed (may already exist)"
+
+            # Verify database exists
+            if docker exec ectropy-postgres-1 psql -U postgres -lqt | cut -d \| -f 1 | grep -qw speckle; then
+              echo "✅ Speckle database already exists, continuing..."
+              echo "created=true" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Speckle database does not exist and creation failed"
+              exit 1
+            fi
+          fi
+
+      - name: 📊 Step 1.6 - Check migration status
+        continue-on-error: true
+        timeout-minutes: 1
+        run: |
+          echo "📊 Checking database migration status..."
+
+          if docker exec ectropy-postgres-1 psql -U postgres -d ectropy_dev -c '\dt speckle*' 2>/dev/null | grep -q speckle; then
+            echo "✅ Speckle tables found in database"
+          else
+            echo "⚠️ No Speckle tables found - migrations may be needed"
+            echo ""
+            echo "📋 Next steps:"
+            echo "  - Run migration script after deployment"
+            echo "  - See Phase 4 post-deployment instructions"
+          fi
+
+      - name: 🎯 Phase 1 Complete
+        run: |
+          echo "## ✅ Phase 1 Complete: Core Infrastructure"
+          echo ""
+          echo "**Services deployed:**"
+          echo "  - ✅ PostgreSQL: ${{ steps.postgres_health.outputs.healthy }}"
+          echo "  - ✅ Redis: ${{ steps.redis_health.outputs.healthy }}"
+          echo "  - ✅ Speckle DB: ${{ steps.speckle_db.outputs.created }}"
+          echo ""
+          echo "⏱️ Completed at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+  phase-2-speckle-platform:
+    name: 🏗️ Phase 2 - Speckle BIM Platform Deployment
+    runs-on: ubuntu-latest
+    needs: phase-1-core-infrastructure
+    if: |
+      github.event.inputs.deployment_mode == 'full' ||
+      github.event.inputs.deployment_mode == 'speckle-only'
+    outputs:
+      minio_healthy: ${{ steps.minio_health.outputs.healthy }}
+      speckle_server_healthy: ${{ steps.speckle_server_health.outputs.healthy }}
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🎯 Phase 2 Start
+        run: |
+          echo "## 🏗️ Phase 2: Speckle BIM Platform Deployment"
+          echo ""
+          echo "**Estimated Duration:** 7 minutes"
+          echo "**Critical Path:** Yes"
+          echo ""
+          echo "📋 Services to deploy:"
+          echo "  - MinIO S3 storage"
+          echo "  - Speckle Server (GraphQL API)"
+          echo "  - Speckle Frontend (Web UI)"
+          echo "  - Speckle support services (preview, webhook, fileimport)"
+          echo ""
+          echo "⏱️ Started at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+      - name: 🚀 Step 2.1 - Start MinIO S3 storage
+        id: start_minio
+        timeout-minutes: 2
+        run: |
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          echo "🚀 Starting MinIO container..."
+          docker compose -f "$COMPOSE_FILE" up -d minio
+
+          if [ $? -eq 0 ]; then
+            echo "✅ MinIO container started successfully"
+          else
+            echo "❌ Failed to start MinIO"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Check Docker logs: docker logs ectropy-minio-1"
+            echo "  - Verify ports 9000 and 9001 are available"
+            echo "  - Check MINIO_ROOT_USER and MINIO_ROOT_PASSWORD env vars"
+            exit 1
+          fi
+
+      - name: ⏳ Step 2.2 - Wait for MinIO health
+        id: minio_health
+        timeout-minutes: 2
+        run: |
+          echo "⏳ Waiting for MinIO to become healthy (max 60 seconds)..."
+
+          max_attempts=12
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -f -s http://localhost:9000/minio/health/live > /dev/null 2>&1; then
+              echo "✅ MinIO is healthy and accepting requests"
+              echo "healthy=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            attempt=$((attempt + 1))
+            echo "⏳ Attempt $attempt/$max_attempts - MinIO not ready yet, waiting 5 seconds..."
+            sleep 5
+          done
+
+          echo "❌ MinIO health check failed after 60 seconds"
+          echo ""
+          echo "🔍 Troubleshooting:"
+          echo "  - Check logs: docker logs ectropy-minio-1"
+          echo "  - Verify MinIO is running: docker ps | grep minio"
+          echo "  - Test health endpoint: curl http://localhost:9000/minio/health/live"
+          exit 1
+
+      - name: 🚀 Step 2.3 - Start Speckle Server (GraphQL API)
+        id: start_speckle_server
+        timeout-minutes: 3
+        run: |
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          echo "🚀 Starting Speckle Server container..."
+          docker compose -f "$COMPOSE_FILE" up -d speckle-server
+
+          if [ $? -eq 0 ]; then
+            echo "✅ Speckle Server container started successfully"
+          else
+            echo "❌ Failed to start Speckle Server"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Check Docker logs: docker logs ectropy-speckle-server-1"
+            echo "  - Verify PostgreSQL is running and accessible"
+            echo "  - Check SPECKLE_SERVER_URL environment variable"
+            echo "  - Verify port 3000 is available (or configured port)"
+            exit 1
+          fi
+
+      - name: ⏳ Step 2.4 - Wait for Speckle Server initialization
+        id: speckle_server_health
+        timeout-minutes: 2
+        continue-on-error: true
+        run: |
+          echo "⏳ Waiting 30 seconds for Speckle Server to initialize..."
+          sleep 30
+
+          echo "🔍 Testing Speckle Server readiness..."
+
+          max_attempts=12
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            # Try readiness endpoint inside container
+            if docker exec ectropy-speckle-server-1 wget -q -O - http://localhost:3000/readiness > /dev/null 2>&1; then
+              echo "✅ Speckle Server is ready (migrations complete)"
+              echo "healthy=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            # Fallback: check if server is responding at all
+            if curl -f -s http://localhost:3000 > /dev/null 2>&1; then
+              echo "✅ Speckle Server is responding (may still be initializing)"
+              echo "healthy=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            attempt=$((attempt + 1))
+            echo "⏳ Attempt $attempt/$max_attempts - Speckle Server not ready, waiting 5 seconds..."
+            sleep 5
+          done
+
+          echo "⚠️ Speckle Server may still be initializing"
+          echo ""
+          echo "🔍 Troubleshooting:"
+          echo "  - Check logs: docker logs ectropy-speckle-server-1"
+          echo "  - Monitor migration progress in logs"
+          echo "  - Verify database connection is working"
+          echo "  - First-time initialization can take 90+ seconds"
+
+      - name: 🚀 Step 2.5 - Start Speckle Frontend (Web UI)
+        id: start_speckle_frontend
+        timeout-minutes: 2
+        run: |
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          echo "🚀 Starting Speckle Frontend container..."
+          docker compose -f "$COMPOSE_FILE" up -d speckle-frontend
+
+          if [ $? -eq 0 ]; then
+            echo "✅ Speckle Frontend container started successfully (port 8080)"
+          else
+            echo "❌ Failed to start Speckle Frontend"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Check Docker logs: docker logs ectropy-speckle-frontend-1"
+            echo "  - Verify port 8080 is available"
+            echo "  - Check Speckle Server connectivity"
+            exit 1
+          fi
+
+      - name: 🚀 Step 2.6 - Start Speckle support services
+        id: start_speckle_services
+        timeout-minutes: 3
+        run: |
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          echo "🚀 Starting Speckle support services..."
+          docker compose -f "$COMPOSE_FILE" up -d speckle-preview speckle-webhook speckle-fileimport
+
+          if [ $? -eq 0 ]; then
+            echo "✅ Speckle support services started successfully"
+            echo "  - Preview service: BIM model preview generation"
+            echo "  - Webhook service: Event notifications"
+            echo "  - File import service: CAD/BIM file processing"
+          else
+            echo "⚠️ Some Speckle support services may have failed to start"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Check logs: docker compose -f $COMPOSE_FILE logs speckle-preview speckle-webhook speckle-fileimport"
+            echo "  - Verify Speckle Server and MinIO are running"
+            echo "  - These services are non-critical, deployment can continue"
+          fi
+
+      - name: 🎯 Phase 2 Complete
+        run: |
+          echo "## ✅ Phase 2 Complete: Speckle BIM Platform"
+          echo ""
+          echo "**Services deployed:**"
+          echo "  - ✅ MinIO S3: ${{ steps.minio_health.outputs.healthy }}"
+          echo "  - ✅ Speckle Server: ${{ steps.speckle_server_health.outputs.healthy }}"
+          echo "  - ✅ Speckle Frontend: Started"
+          echo "  - ✅ Support Services: Started"
+          echo ""
+          echo "⏱️ Completed at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+  phase-3-application-services:
+    name: 🚀 Phase 3 - Ectropy Application Services
+    runs-on: ubuntu-latest
+    needs: [phase-1-core-infrastructure, phase-2-speckle-platform]
+    if: |
+      always() &&
+      (needs.phase-1-core-infrastructure.result == 'success' || github.event.inputs.deployment_mode == 'application-only') &&
+      (needs.phase-2-speckle-platform.result == 'success' || needs.phase-2-speckle-platform.result == 'skipped' || github.event.inputs.deployment_mode == 'application-only') &&
+      (github.event.inputs.deployment_mode == 'full' || github.event.inputs.deployment_mode == 'application-only')
+    outputs:
+      api_gateway_healthy: ${{ steps.api_health.outputs.healthy }}
+      mcp_server_healthy: ${{ steps.mcp_health.outputs.healthy }}
+      web_dashboard_healthy: ${{ steps.web_health.outputs.healthy }}
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🎯 Phase 3 Start
+        run: |
+          echo "## 🚀 Phase 3: Ectropy Application Services"
+          echo ""
+          echo "**Estimated Duration:** 5 minutes"
+          echo "**Critical Path:** Yes"
+          echo ""
+          echo "📋 Services to deploy:"
+          echo "  - API Gateway (REST API)"
+          echo "  - MCP Server (AI Integration)"
+          echo "  - Web Dashboard (React Frontend)"
+          echo ""
+          echo "⏱️ Started at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+      - name: 🚀 Step 3.1 - Start API Gateway
+        id: start_api
+        timeout-minutes: 2
+        run: |
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          echo "🚀 Starting API Gateway container..."
+          docker compose -f "$COMPOSE_FILE" up -d api-gateway
+
+          if [ $? -eq 0 ]; then
+            echo "✅ API Gateway container started successfully"
+          else
+            echo "❌ Failed to start API Gateway"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Check Docker logs: docker logs ectropy-api-gateway-1"
+            echo "  - Verify PostgreSQL and Redis are running"
+            echo "  - Check port 4000 is available"
+            echo "  - Verify database connection string"
+            exit 1
+          fi
+
+      - name: ⏳ Step 3.2 - Verify API Gateway health
+        id: api_health
+        timeout-minutes: 2
+        run: |
+          echo "⏳ Waiting for API Gateway to become ready..."
+
+          max_attempts=${{ env.HEALTH_CHECK_RETRIES }}
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -f -s http://localhost:4000/health > /dev/null 2>&1; then
+              echo "✅ API Gateway is healthy and accepting requests"
+              echo "healthy=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            attempt=$((attempt + 1))
+            echo "⏳ Attempt $attempt/$max_attempts - API Gateway not ready, waiting 6 seconds..."
+            sleep 6
+          done
+
+          echo "⚠️ API Gateway health check timeout"
+          echo ""
+          echo "🔍 Troubleshooting:"
+          echo "  - Check logs: docker logs ectropy-api-gateway-1"
+          echo "  - Verify database connectivity"
+          echo "  - Check environment variables"
+          echo "  - Test manually: curl http://localhost:4000/health"
+
+      - name: 🚀 Step 3.3 - Start MCP Server
+        id: start_mcp
+        timeout-minutes: 2
+        run: |
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          echo "🚀 Starting MCP Server container..."
+          docker compose -f "$COMPOSE_FILE" up -d mcp-server
+
+          if [ $? -eq 0 ]; then
+            echo "✅ MCP Server container started successfully"
+          else
+            echo "❌ Failed to start MCP Server"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Check Docker logs: docker logs ectropy-mcp-server-1"
+            echo "  - Verify port 3001 is available"
+            echo "  - Check MCP Server configuration"
+            exit 1
+          fi
+
+      - name: ⏳ Step 3.4 - Verify MCP Server health
+        id: mcp_health
+        timeout-minutes: 2
+        continue-on-error: true
+        run: |
+          echo "⏳ Waiting for MCP Server to become ready..."
+
+          max_attempts=${{ env.HEALTH_CHECK_RETRIES }}
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -f -s http://localhost:3001/health > /dev/null 2>&1; then
+              echo "✅ MCP Server is healthy and operational"
+              echo "healthy=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            attempt=$((attempt + 1))
+            echo "⏳ Attempt $attempt/$max_attempts - MCP Server not ready, waiting 6 seconds..."
+            sleep 6
+          done
+
+          echo "⚠️ MCP Server may still be starting"
+          echo ""
+          echo "📋 Note: MCP Server is non-critical for core functionality"
+
+      - name: 🚀 Step 3.5 - Start Web Dashboard
+        id: start_web
+        timeout-minutes: 3
+        run: |
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          echo "🚀 Starting Web Dashboard container..."
+          docker compose -f "$COMPOSE_FILE" up -d web-dashboard
+
+          if [ $? -eq 0 ]; then
+            echo "✅ Web Dashboard container started successfully"
+          else
+            echo "❌ Failed to start Web Dashboard"
+            echo ""
+            echo "🔍 Troubleshooting:"
+            echo "  - Check Docker logs: docker logs ectropy-web-dashboard-1"
+            echo "  - Verify port 3000 is available"
+            echo "  - Check React build configuration"
+            exit 1
+          fi
+
+      - name: ⏳ Step 3.6 - Verify Web Dashboard health
+        id: web_health
+        timeout-minutes: 2
+        run: |
+          echo "⏳ Waiting 10 seconds for Web Dashboard to initialize..."
+          sleep 10
+
+          echo "🔍 Testing Web Dashboard availability..."
+
+          max_attempts=${{ env.HEALTH_CHECK_RETRIES }}
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -f -s http://localhost:3000 > /dev/null 2>&1; then
+              echo "✅ Web Dashboard is accessible and serving content"
+              echo "healthy=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            attempt=$((attempt + 1))
+            echo "⏳ Attempt $attempt/$max_attempts - Web Dashboard not ready, waiting 7 seconds..."
+            sleep 7
+          done
+
+          echo "⚠️ Web Dashboard may still be building"
+          echo ""
+          echo "🔍 Troubleshooting:"
+          echo "  - Check logs: docker logs ectropy-web-dashboard-1"
+          echo "  - First-time builds can take several minutes"
+          echo "  - Verify all static assets are building correctly"
+
+      - name: 🎯 Phase 3 Complete
+        run: |
+          echo "## ✅ Phase 3 Complete: Application Services"
+          echo ""
+          echo "**Services deployed:**"
+          echo "  - ✅ API Gateway: ${{ steps.api_health.outputs.healthy }}"
+          echo "  - ✅ MCP Server: ${{ steps.mcp_health.outputs.healthy }}"
+          echo "  - ✅ Web Dashboard: ${{ steps.web_health.outputs.healthy }}"
+          echo ""
+          echo "⏱️ Completed at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+  phase-nginx-deployment:
+    name: 🔧 Nginx Configuration Deployment
+    runs-on: ubuntu-latest
+    needs: [validate-confirmation, create-pre-deployment-snapshot]
+    if: |
+      github.event.inputs.deployment_mode == 'nginx-only'
+    outputs:
+      nginx_deployed: ${{ steps.deploy_nginx.outputs.deployed }}
+      nginx_validated: ${{ steps.verify_nginx.outputs.validated }}
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🎯 Nginx Deployment Start
+        run: |
+          echo "## 🔧 Nginx Configuration Deployment"
+          echo ""
+          echo "**Target Environment:** ${{ github.event.inputs.environment }}"
+          echo "**Deployment Mode:** nginx-only"
+          echo ""
+          echo "📋 Deployment scope:"
+          echo "  - Nginx reverse proxy configuration"
+          echo "  - SSL/TLS certificate validation"
+          echo "  - Upstream routing rules"
+          echo "  - Health check endpoints"
+          echo ""
+          echo "⏱️ Started at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+      - name: 🔍 Validate nginx configuration syntax
+        timeout-minutes: 2
+        run: |
+          echo "🔍 Validating nginx configuration files..."
+
+          # Check nginx.conf exists
+          if [[ ! -f "nginx.conf" ]]; then
+            echo "❌ nginx.conf not found"
+            exit 1
+          fi
+
+          # Check environment-specific config
+          ENV_CONFIG="infrastructure/nginx/ectropy-${{ github.event.inputs.environment }}.conf"
+          if [[ ! -f "$ENV_CONFIG" ]]; then
+            echo "❌ Environment config not found: $ENV_CONFIG"
+            exit 1
+          fi
+
+          echo "✅ Configuration files found"
+          echo "   - nginx.conf"
+          echo "   - $ENV_CONFIG"
+
+      - name: 🔍 Validate required upstreams
+        timeout-minutes: 1
+        run: |
+          echo "🔍 Checking for required upstream definitions..."
+
+          ENV_CONFIG="infrastructure/nginx/ectropy-${{ github.event.inputs.environment }}.conf"
+          REQUIRED_UPSTREAMS=("web_dashboard" "api_gateway" "mcp_server")
+          MISSING_UPSTREAMS=()
+
+          for upstream in "${REQUIRED_UPSTREAMS[@]}"; do
+            if ! grep -q "upstream $upstream" "$ENV_CONFIG"; then
+              MISSING_UPSTREAMS+=("$upstream")
+            fi
+          done
+
+          if [ ${#MISSING_UPSTREAMS[@]} -gt 0 ]; then
+            echo "❌ Missing required upstreams: ${MISSING_UPSTREAMS[*]}"
+            exit 1
+          fi
+
+          echo "✅ All required upstreams defined"
+
+      - name: 🔍 Validate required routes
+        timeout-minutes: 1
+        run: |
+          echo "🔍 Checking for required location blocks..."
+
+          ENV_CONFIG="infrastructure/nginx/ectropy-${{ github.event.inputs.environment }}.conf"
+          REQUIRED_ROUTES=(
+            "location /health"
+            "location /api/tools"
+            "location /api/mcp/"
+            "location /api/"
+            "location /"
+          )
+
+          MISSING_ROUTES=()
+
+          for route in "${REQUIRED_ROUTES[@]}"; do
+            if ! grep -q "$route" "$ENV_CONFIG"; then
+              MISSING_ROUTES+=("$route")
+            fi
+          done
+
+          if [ ${#MISSING_ROUTES[@]} -gt 0 ]; then
+            echo "❌ Missing required routes: ${MISSING_ROUTES[*]}"
+            exit 1
+          fi
+
+          echo "✅ All required routes defined"
+
+      - name: 🔑 Setup SSH credentials
+        timeout-minutes: 1
+        run: |
+          echo "🔑 Configuring SSH access..."
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          # Environment-specific SSH key and host
+          case "${{ github.event.inputs.environment }}" in
+            development)
+              echo "${{ secrets.DEV_SSH_KEY }}" > ~/.ssh/id_rsa
+              SERVER_IP="${{ vars.DEV_IP }}"
+              ;;
+            staging)
+              echo "${{ secrets.STAGING_SSH_KEY }}" > ~/.ssh/id_rsa
+              SERVER_IP="${{ vars.STAGING_IP }}"
+              ;;
+            production)
+              echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
+              SERVER_IP="${{ vars.PROD_BLUE_IP }}"
+              ;;
+            *)
+              echo "❌ Unsupported environment: ${{ github.event.inputs.environment }}"
+              exit 1
+              ;;
+          esac
+
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $SERVER_IP >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          echo "SERVER_IP=$SERVER_IP" >> $GITHUB_ENV
+          echo "✅ SSH credentials configured for ${{ github.event.inputs.environment }}"
+
+      - name: 🚀 Deploy nginx configuration
+        id: deploy_nginx
+        timeout-minutes: 5
+        run: |
+          echo "🚀 Deploying nginx configuration to ${{ github.event.inputs.environment }}..."
+
+          # Use existing deployment script
+          bash scripts/deployment/deploy-nginx-config.sh ${{ github.event.inputs.environment }}
+
+          if [ $? -eq 0 ]; then
+            echo "✅ Nginx configuration deployed successfully"
+            echo "deployed=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Nginx deployment failed"
+            echo "deployed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: ⏳ Wait for nginx reload
+        timeout-minutes: 1
+        run: |
+          echo "⏳ Waiting for nginx to reload configuration..."
+          sleep 10
+          echo "✅ Nginx reload complete"
+
+      - name: 🔍 Verify deployment
+        id: verify_nginx
+        timeout-minutes: 3
+        run: |
+          echo "🔍 Verifying nginx deployment..."
+
+          # Determine base URL based on environment
+          case "${{ github.event.inputs.environment }}" in
+            development)
+              BASE_URL="http://${{ vars.DEV_IP }}"
+              ;;
+            staging)
+              BASE_URL="https://staging.ectropy.ai"
+              ;;
+            production)
+              BASE_URL="https://ectropy.ai"
+              ;;
+          esac
+
+          echo "Testing endpoints against: $BASE_URL"
+
+          ENDPOINTS_PASSED=0
+          ENDPOINTS_FAILED=0
+
+          # Test load balancer health
+          if curl -f -s -o /dev/null "${BASE_URL}/lb-health" 2>/dev/null; then
+            echo "✅ Load balancer health: OK"
+            ENDPOINTS_PASSED=$((ENDPOINTS_PASSED + 1))
+          else
+            echo "⚠️ Load balancer health: FAILED"
+            ENDPOINTS_FAILED=$((ENDPOINTS_FAILED + 1))
+          fi
+
+          # Test MCP Server health
+          if curl -f -s -o /dev/null "${BASE_URL}/health" 2>/dev/null; then
+            echo "✅ MCP Server health: OK"
+            ENDPOINTS_PASSED=$((ENDPOINTS_PASSED + 1))
+          else
+            echo "⚠️ MCP Server health: FAILED"
+            ENDPOINTS_FAILED=$((ENDPOINTS_FAILED + 1))
+          fi
+
+          # Test API Gateway health
+          if curl -f -s -o /dev/null "${BASE_URL}/api/health" 2>/dev/null; then
+            echo "✅ API Gateway health: OK"
+            ENDPOINTS_PASSED=$((ENDPOINTS_PASSED + 1))
+          else
+            echo "⚠️ API Gateway health: FAILED"
+            ENDPOINTS_FAILED=$((ENDPOINTS_FAILED + 1))
+          fi
+
+          # Test Web Dashboard
+          if curl -f -s -o /dev/null "${BASE_URL}/" 2>/dev/null; then
+            echo "✅ Web Dashboard: OK"
+            ENDPOINTS_PASSED=$((ENDPOINTS_PASSED + 1))
+          else
+            echo "⚠️ Web Dashboard: FAILED"
+            ENDPOINTS_FAILED=$((ENDPOINTS_FAILED + 1))
+          fi
+
+          echo ""
+          echo "📊 Verification Summary:"
+          echo "   Passed: $ENDPOINTS_PASSED"
+          echo "   Failed: $ENDPOINTS_FAILED"
+
+          if [ $ENDPOINTS_FAILED -eq 0 ]; then
+            echo "✅ All endpoints validated successfully"
+            echo "validated=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ Some endpoints failed validation"
+            echo "validated=partial" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🎯 Nginx Deployment Complete
+        run: |
+          echo "## ✅ Nginx Configuration Deployment Complete"
+          echo ""
+          echo "**Environment:** ${{ github.event.inputs.environment }}"
+          echo "**Deployment Status:** ${{ steps.deploy_nginx.outputs.deployed }}"
+          echo "**Validation Status:** ${{ steps.verify_nginx.outputs.validated }}"
+          echo ""
+          echo "⏱️ Completed at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+  phase-4-validation:
+    name: ✅ Phase 4 - Post-Deployment Validation
+    runs-on: ubuntu-latest
+    needs:
+      [
+        phase-1-core-infrastructure,
+        phase-2-speckle-platform,
+        phase-3-application-services,
+        phase-nginx-deployment,
+      ]
+    if: always()
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🎯 Phase 4 Start
+        run: |
+          echo "## ✅ Phase 4: Post-Deployment Validation"
+          echo ""
+          echo "**Estimated Duration:** 2 minutes"
+          echo ""
+          echo "📋 Validation tasks:"
+          echo "  - Container status verification"
+          echo "  - Service health checks"
+          echo "  - Generate deployment report"
+          echo "  - Provide next steps guidance"
+          echo ""
+          echo "⏱️ Started at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+      - name: 🐳 Step 4.1 - Display container status
+        timeout-minutes: 1
+        run: |
+          COMPOSE_FILE="docker-compose.${{ github.event.inputs.environment }}.yml"
+
+          echo "## 🐳 Ectropy Container Status"
+          echo ""
+          docker compose -f "$COMPOSE_FILE" ps --format 'table {{.Name}}\t{{.Status}}\t{{.Ports}}' --filter 'name=ectropy' || docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' --filter 'name=ectropy'
+          echo ""
+
+      - name: 🔍 Comprehensive health validation
+        id: comprehensive_health
+        timeout-minutes: 2
+        continue-on-error: true
+        run: |
+          echo "## 🔍 Comprehensive Health Validation"
+          echo ""
+
+          health_passed=0
+          health_failed=0
+
+          # PostgreSQL health check
+          echo "### PostgreSQL Database"
+          if docker exec ectropy-postgres-1 pg_isready -U postgres > /dev/null 2>&1; then
+            echo "✅ PostgreSQL: Healthy (accepting connections)"
+            health_passed=$((health_passed + 1))
+          else
+            echo "❌ PostgreSQL: Unhealthy"
+            health_failed=$((health_failed + 1))
+          fi
+
+          # Redis health check
+          echo "### Redis Cache"
+          if docker exec ectropy-redis-1 redis-cli ping 2>/dev/null | grep -q "PONG"; then
+            echo "✅ Redis: Healthy (responding to PING)"
+            health_passed=$((health_passed + 1))
+          else
+            echo "❌ Redis: Unhealthy"
+            health_failed=$((health_failed + 1))
+          fi
+
+          # MinIO health check
+          if [ "${{ github.event.inputs.deployment_mode }}" == "full" ] || [ "${{ github.event.inputs.deployment_mode }}" == "speckle-only" ]; then
+            echo "### MinIO S3 Storage"
+            if curl -f -s http://localhost:9000/minio/health/live > /dev/null 2>&1; then
+              echo "✅ MinIO: Healthy (health endpoint responding)"
+              health_passed=$((health_passed + 1))
+            else
+              echo "❌ MinIO: Unhealthy"
+              health_failed=$((health_failed + 1))
+            fi
+          fi
+
+          # Speckle Server health check
+          if [ "${{ github.event.inputs.deployment_mode }}" == "full" ] || [ "${{ github.event.inputs.deployment_mode }}" == "speckle-only" ]; then
+            echo "### Speckle Server"
+            if curl -f -s http://localhost:3000 > /dev/null 2>&1; then
+              echo "✅ Speckle Server: Healthy (responding)"
+              health_passed=$((health_passed + 1))
+            else
+              echo "⚠️ Speckle Server: Not responding (may still be initializing)"
+              health_failed=$((health_failed + 1))
+            fi
+
+            echo "### Speckle Frontend"
+            if curl -f -s http://localhost:8080 > /dev/null 2>&1; then
+              echo "✅ Speckle Frontend: Healthy (accessible)"
+              health_passed=$((health_passed + 1))
+            else
+              echo "⚠️ Speckle Frontend: Not accessible"
+              health_failed=$((health_failed + 1))
+            fi
+          fi
+
+          # API Gateway health check
+          if [ "${{ github.event.inputs.deployment_mode }}" == "full" ] || [ "${{ github.event.inputs.deployment_mode }}" == "application-only" ]; then
+            echo "### API Gateway"
+            if curl -f -s http://localhost:4000/health > /dev/null 2>&1; then
+              echo "✅ API Gateway: Healthy (health endpoint OK)"
+              health_passed=$((health_passed + 1))
+            else
+              echo "⚠️ API Gateway: Health check failed"
+              health_failed=$((health_failed + 1))
+            fi
+
+            echo "### MCP Server"
+            if curl -f -s http://localhost:3001/health > /dev/null 2>&1; then
+              echo "✅ MCP Server: Healthy (health endpoint OK)"
+              health_passed=$((health_passed + 1))
+            else
+              echo "⚠️ MCP Server: Health check failed"
+              health_failed=$((health_failed + 1))
+            fi
+
+            echo "### Web Dashboard"
+            if curl -f -s http://localhost:3000 > /dev/null 2>&1; then
+              echo "✅ Web Dashboard: Healthy (serving content)"
+              health_passed=$((health_passed + 1))
+            else
+              echo "⚠️ Web Dashboard: Not accessible"
+              health_failed=$((health_failed + 1))
+            fi
+          fi
+
+          echo ""
+          echo "📊 Health Check Summary: $health_passed passed, $health_failed failed"
+
+          if [ $health_failed -eq 0 ]; then
+            echo "✅ All health checks passed"
+            echo "status=success" >> $GITHUB_OUTPUT
+          elif [ $health_passed -gt $health_failed ]; then
+            echo "⚠️ Deployment completed with some warnings"
+            echo "status=warning" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Multiple health checks failed"
+            echo "status=failure" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📋 Step 4.2 - Display next steps
+        run: |
+          echo "## 📋 Post-Deployment Next Steps"
+          echo ""
+          echo "### 🔧 Required Configuration"
+          echo ""
+          echo "1. **Database Migration**"
+          echo "   \`\`\`bash"
+          echo "   # Run database migrations"
+          echo "   ./scripts/deployment/apply-migration.ps1"
+          echo "   \`\`\`"
+          echo ""
+          echo "2. **Create Speckle Admin User**"
+          echo "   - Navigate to: http://localhost:8080"
+          echo "   - Create an admin account"
+          echo "   - Generate Personal Access Token"
+          echo ""
+          echo "3. **Update Environment Variables**"
+          echo "   \`\`\`bash"
+          echo "   # Add to .env.local:"
+          echo "   SPECKLE_SERVER_TOKEN=<your_token_here>"
+          echo "   \`\`\`"
+          echo ""
+          echo "4. **Restart API Gateway**"
+          echo "   \`\`\`bash"
+          echo "   docker compose -f docker-compose.${{ github.event.inputs.environment }}.yml restart api-gateway"
+          echo "   \`\`\`"
+          echo ""
+          echo "### 🧪 Smoke Tests"
+          echo ""
+          echo "Run these tests to verify functionality:"
+          echo ""
+          echo "- **PostgreSQL:** \`docker exec ectropy-postgres-1 pg_isready -U postgres\`"
+          echo "- **Redis:** \`docker exec ectropy-redis-1 redis-cli ping\`"
+          echo "- **MinIO:** \`curl http://localhost:9000/minio/health/live\`"
+          echo "- **API Gateway:** \`curl http://localhost:4000/health\`"
+          echo "- **Speckle GraphQL:** Navigate to http://localhost:3000/graphql"
+          echo ""
+          echo "### 🌐 Application URLs"
+          echo ""
+          echo "- **Web Dashboard:** http://localhost:3000"
+          echo "- **API Gateway:** http://localhost:4000"
+          echo "- **MCP Server:** http://localhost:3001"
+          echo "- **Speckle Server:** http://localhost:3000"
+          echo "- **Speckle Frontend:** http://localhost:8080"
+          echo "- **MinIO Console:** http://localhost:9001"
+          echo ""
+          echo "### 📚 Documentation"
+          echo ""
+          echo "- Speckle Integration: docs/SPECKLE_INTEGRATION.md"
+          echo "- Deployment Runbook: apps/mcp-server/data/runbooks/deployment/deploy-infrastructure-v1.0.0.json"
+          echo "- Troubleshooting: Check Docker logs for any failing services"
+          echo ""
+
+      - name: 🎯 Phase 4 Complete
+        run: |
+          echo "## ✅ Phase 4 Complete: Validation & Next Steps"
+          echo ""
+          echo "**Validation Status:** ${{ steps.comprehensive_health.outputs.status || 'completed' }}"
+          echo ""
+          echo "⏱️ Completed at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+  deployment-report:
+    name: 📊 Generate Deployment Report
+    runs-on: ubuntu-latest
+    needs:
+      [
+        create-pre-deployment-snapshot,
+        phase-1-core-infrastructure,
+        phase-2-speckle-platform,
+        phase-3-application-services,
+        phase-4-validation,
+      ]
+    if: always()
+    steps:
+      - name: 📦 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📊 Generate comprehensive deployment report
+        run: |
+          echo "# 🚀 Infrastructure Deployment Report"
+          echo ""
+          echo "## 📋 Deployment Details"
+          echo ""
+          echo "- **Environment:** ${{ github.event.inputs.environment }}"
+          echo "- **Deployment Mode:** ${{ github.event.inputs.deployment_mode }}"
+          echo "- **Triggered By:** ${{ github.actor }}"
+          echo "- **Timestamp:** $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          echo "- **Git Commit:** $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+          echo "- **Git Branch:** $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')"
+          echo "- **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo ""
+          echo "## 🎯 Phase Results"
+          echo ""
+          echo "| Phase | Status | Duration |"
+          echo "|-------|--------|----------|"
+          echo "| Pre-Flight Checks | ${{ needs.create-pre-deployment-snapshot.result == 'success' && '✅' || '⚠️' }} | - |"
+          echo "| Phase 1: Core Infrastructure | ${{ needs.phase-1-core-infrastructure.result }} | ~5 min |"
+          echo "| Phase 2: Speckle Platform | ${{ needs.phase-2-speckle-platform.result }} | ~7 min |"
+          echo "| Phase 3: Application Services | ${{ needs.phase-3-application-services.result }} | ~5 min |"
+          echo "| Phase 4: Validation | ${{ needs.phase-4-validation.result }} | ~2 min |"
+          echo ""
+          echo "## 🏥 Service Health Status"
+          echo ""
+          echo "### Core Infrastructure"
+          echo "- PostgreSQL: ${{ needs.phase-1-core-infrastructure.outputs.postgres_healthy == 'true' && '✅ Healthy' || '⚠️ Check logs' }}"
+          echo "- Redis: ${{ needs.phase-1-core-infrastructure.outputs.redis_healthy == 'true' && '✅ Healthy' || '⚠️ Check logs' }}"
+          echo "- Speckle DB: ${{ needs.phase-1-core-infrastructure.outputs.speckle_db_created == 'true' && '✅ Created' || '⚠️ Check status' }}"
+          echo ""
+
+          if [ "${{ github.event.inputs.deployment_mode }}" == "full" ] || [ "${{ github.event.inputs.deployment_mode }}" == "speckle-only" ]; then
+            echo "### Speckle BIM Platform"
+            echo "- MinIO: ${{ needs.phase-2-speckle-platform.outputs.minio_healthy == 'true' && '✅ Healthy' || '⚠️ Check logs' }}"
+            echo "- Speckle Server: ${{ needs.phase-2-speckle-platform.outputs.speckle_server_healthy == 'true' && '✅ Healthy' || '⚠️ May be initializing' }}"
+            echo "- Speckle Frontend: ✅ Deployed"
+            echo ""
+          fi
+
+          if [ "${{ github.event.inputs.deployment_mode }}" == "full" ] || [ "${{ github.event.inputs.deployment_mode }}" == "application-only" ]; then
+            echo "### Application Services"
+            echo "- API Gateway: ${{ needs.phase-3-application-services.outputs.api_gateway_healthy == 'true' && '✅ Healthy' || '⚠️ Check logs' }}"
+            echo "- MCP Server: ${{ needs.phase-3-application-services.outputs.mcp_server_healthy == 'true' && '✅ Healthy' || '⚠️ Check logs' }}"
+            echo "- Web Dashboard: ${{ needs.phase-3-application-services.outputs.web_dashboard_healthy == 'true' && '✅ Healthy' || '⚠️ Check logs' }}"
+            echo ""
+          fi
+
+          echo "## 📸 Snapshots"
+          echo ""
+          echo "- **Pre-Deployment Snapshot:** ${{ needs.create-pre-deployment-snapshot.outputs.snapshot_name }}"
+          echo "- **Snapshot Location:** ${{ env.BACKUP_DIR }}"
+          echo ""
+          echo "## 🔄 Rollback Information"
+          echo ""
+          echo "If you need to rollback this deployment:"
+          echo ""
+          echo "\`\`\`bash"
+          echo "# Using GitHub Actions"
+          echo "# Navigate to: Actions > Emergency Rollback"
+          echo "# Select snapshot: ${{ needs.create-pre-deployment-snapshot.outputs.snapshot_name }}"
+          echo ""
+          echo "# OR using Docker Compose"
+          echo "docker compose -f docker-compose.${{ github.event.inputs.environment }}.yml down"
+          echo "# Restore configuration from snapshot"
+          echo "\`\`\`"
+          echo ""
+
+          # Determine overall status
+          if [ "${{ needs.phase-4-validation.result }}" == "success" ]; then
+            echo "## ✅ Deployment Status: SUCCESS"
+            echo ""
+            echo "All phases completed successfully. Proceed with post-deployment configuration."
+          elif [ "${{ needs.phase-1-core-infrastructure.result }}" == "success" ]; then
+            echo "## ⚠️ Deployment Status: PARTIAL SUCCESS"
+            echo ""
+            echo "Core infrastructure deployed but some services may need attention."
+            echo "Review service logs and health checks above."
+          else
+            echo "## ❌ Deployment Status: FAILED"
+            echo ""
+            echo "Deployment encountered critical errors. Review logs and consider rollback."
+          fi
+          echo ""
+          echo "---"
+          echo "Generated by Ectropy Infrastructure Deployment Workflow v1.0.0"

@@ -1,0 +1,63 @@
+import { test, expect } from '@playwright/test';
+
+test.describe('Basic Website Assessment', () => {
+  test('should load landing page and take screenshot', async ({ page }) => {
+    console.log('Testing landing page...');
+
+    // Navigate to the landing page
+    await page.goto('http://localhost:4200/landing.html', {
+      waitUntil: 'domcontentloaded',
+      timeout: 10000,
+    });
+
+    // Check if the page title is correct
+    await expect(page).toHaveTitle(/Ectropy/);
+
+    // Check for key elements on the landing page
+    await expect(page.locator('h1')).toContainText('Ectropy');
+
+    // Take a screenshot
+    await page.screenshot({
+      path: 'reports/screenshots/landing-page-assessment.png',
+      fullPage: true,
+    });
+
+    console.log('Landing page assessment completed');
+  });
+
+  test('should assess dashboard availability', async ({ page }) => {
+    console.log('Testing dashboard access...');
+
+    // Try to access the dashboard page
+    await page.goto('http://localhost:4200/dashboard.html', {
+      waitUntil: 'domcontentloaded',
+      timeout: 10000,
+    });
+
+    // Take a screenshot of whatever loads
+    await page.screenshot({
+      path: 'reports/screenshots/dashboard-assessment.png',
+      fullPage: true,
+    });
+
+    console.log('Dashboard assessment completed');
+  });
+
+  test('should check index page', async ({ page }) => {
+    console.log('Testing index page...');
+
+    // Navigate to the index page
+    await page.goto('http://localhost:4200/index.html', {
+      waitUntil: 'domcontentloaded',
+      timeout: 10000,
+    });
+
+    // Take a screenshot
+    await page.screenshot({
+      path: 'reports/screenshots/index-page-assessment.png',
+      fullPage: true,
+    });
+
+    console.log('Index page assessment completed');
+  });
+});

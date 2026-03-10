@@ -1,0 +1,130 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:building-history",
+  "title": "Building History Schema",
+  "description": "Read-only view of decision archive for facility management and operations",
+  "type": "object",
+  "required": [
+    "$id",
+    "$schema",
+    "schemaVersion",
+    "buildingId",
+    "projectRef",
+    "decisions",
+    "graphMetadata"
+  ],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z0-9-]+:building-history:BH-[0-9]{4}-[0-9]{4}$"
+    },
+    "$schema": {
+      "const": "urn:luhtech:ectropy:schema:building-history"
+    },
+    "schemaVersion": {
+      "const": "3.0.0"
+    },
+    "buildingId": {
+      "type": "string",
+      "pattern": "^BH-[0-9]{4}-[0-9]{4}$"
+    },
+    "projectRef": { "$ref": "#/$defs/urn" },
+    "buildingInfo": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "type": { "type": "string" },
+        "squareFootage": { "type": "integer" },
+        "floors": { "type": "integer" },
+        "completionDate": { "type": "string", "format": "date" }
+      }
+    },
+    "decisions": {
+      "type": "object",
+      "description": "Aggregated decision statistics for the building",
+      "properties": {
+        "totalDecisions": { "type": "integer" },
+        "byType": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        },
+        "bySystem": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        },
+        "byLevel": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        }
+      }
+    },
+    "keyDecisions": {
+      "type": "array",
+      "description": "Important decisions facility managers should know about",
+      "items": {
+        "type": "object",
+        "properties": {
+          "decisionRef": { "$ref": "#/$defs/urn" },
+          "summary": { "type": "string" },
+          "impactArea": { "type": "string" },
+          "voxelRefs": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/urn" }
+          }
+        }
+      }
+    },
+    "searchIndex": {
+      "type": "object",
+      "description": "Metadata for building history search",
+      "properties": {
+        "lastIndexed": { "type": "string", "format": "date-time" },
+        "indexedDecisions": { "type": "integer" },
+        "searchableFields": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "accessControl": {
+      "type": "object",
+      "description": "Who can query this building's history",
+      "properties": {
+        "ownerAccess": { "type": "boolean" },
+        "facilityManagerAccess": { "type": "boolean" },
+        "contractorAccessExpiry": { "type": "string", "format": "date" },
+        "publicAccess": { "type": "boolean" }
+      }
+    },
+    "timestamps": {
+      "type": "object",
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "graphMetadata": {
+      "type": "object",
+      "required": ["inEdges", "outEdges"],
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/urn" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "urn": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[a-z][a-z0-9-]*:[a-z][a-z0-9-]*:[a-zA-Z0-9][a-zA-Z0-9-]*$"
+    }
+  }
+}

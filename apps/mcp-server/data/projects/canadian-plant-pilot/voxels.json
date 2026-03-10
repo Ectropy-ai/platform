@@ -1,0 +1,4300 @@
+[
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-5-2",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-41-5-2",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 41,
+      "y": 5,
+      "z": 2
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0009",
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0029"
+    ],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0009",
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0029"
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-42-33-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-42-33-3",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 42,
+      "y": 33,
+      "z": 3
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-8-33-9",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-8-33-9",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 8,
+      "y": 33,
+      "z": 9
+    },
+    "status": "BLOCKED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-47-20-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-47-20-0",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 47,
+      "y": 20,
+      "z": 0
+    },
+    "status": "PLANNED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0058",
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0073"
+    ],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0058",
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0073"
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-1-35-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-1-35-5",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 1,
+      "y": 35,
+      "z": 5
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0031"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0031"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-16-2-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-16-2-0",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 16,
+      "y": 2,
+      "z": 0
+    },
+    "status": "PLANNED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-31-28-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-31-28-10",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 31,
+      "y": 28,
+      "z": 10
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0054"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0054"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-36-35-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-36-35-3",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 36,
+      "y": 35,
+      "z": 3
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-38-17-9",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-38-17-9",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 38,
+      "y": 17,
+      "z": 9
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-26-18-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-26-18-3",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 26,
+      "y": 18,
+      "z": 3
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0018"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-7-5-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-7-5-0",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 7,
+      "y": 5,
+      "z": 0
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-1-22-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-1-22-6",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 1,
+      "y": 22,
+      "z": 6
+    },
+    "status": "PLANNED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-4-35-7",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-4-35-7",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 4,
+      "y": 35,
+      "z": 7
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-45-7-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-45-7-10",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 45,
+      "y": 7,
+      "z": 10
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0015"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-34-9-2",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-34-9-2",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 34,
+      "y": 9,
+      "z": 2
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0002"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-3-1-8",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-3-1-8",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 3,
+      "y": 1,
+      "z": 8
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-34-1",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-41-34-1",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 41,
+      "y": 34,
+      "z": 1
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0015"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0015"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-37-7-8",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-37-7-8",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 37,
+      "y": 7,
+      "z": 8
+    },
+    "status": "INSPECTION_REQUIRED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0010"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0010"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-29-23-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-29-23-10",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 29,
+      "y": 23,
+      "z": 10
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-47-28-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-47-28-5",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 47,
+      "y": 28,
+      "z": 5
+    },
+    "status": "INSPECTION_REQUIRED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0028"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0028"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-37-6-2",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-37-6-2",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 37,
+      "y": 6,
+      "z": 2
+    },
+    "status": "PLANNED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-23-11-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-23-11-5",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 23,
+      "y": 11,
+      "z": 5
+    },
+    "status": "BLOCKED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-18-0-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-18-0-6",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 18,
+      "y": 0,
+      "z": 6
+    },
+    "status": "BLOCKED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-31-13-2",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-31-13-2",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 31,
+      "y": 13,
+      "z": 2
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-25-3-2",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-25-3-2",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 25,
+      "y": 3,
+      "z": 2
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0005"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0005"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-7-6-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-7-6-0",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 7,
+      "y": 6,
+      "z": 0
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0043"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0043"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-34-30-7",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-34-30-7",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 34,
+      "y": 30,
+      "z": 7
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-21-28-1",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-21-28-1",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 21,
+      "y": 28,
+      "z": 1
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-20-1-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-20-1-6",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 20,
+      "y": 1,
+      "z": 6
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0008",
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0011"
+    ],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0008",
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0011"
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-13-11-9",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-13-11-9",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 13,
+      "y": 11,
+      "z": 9
+    },
+    "status": "BLOCKED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-40-1-7",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-40-1-7",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 40,
+      "y": 1,
+      "z": 7
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0050"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0050"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-19-22-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-19-22-10",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 19,
+      "y": 22,
+      "z": 10
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-12-0-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-12-0-10",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 12,
+      "y": 0,
+      "z": 10
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-15-1-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-15-1-3",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 15,
+      "y": 1,
+      "z": 3
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0002"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0002"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-9-18-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-9-18-10",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 9,
+      "y": 18,
+      "z": 10
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0030"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0030"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-20-35-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-20-35-0",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 20,
+      "y": 35,
+      "z": 0
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-40-30-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-40-30-0",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 40,
+      "y": 30,
+      "z": 0
+    },
+    "status": "PLANNED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-13-29-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-13-29-4",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 13,
+      "y": 29,
+      "z": 4
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0070"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0070"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-16-14-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-16-14-10",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 16,
+      "y": 14,
+      "z": 10
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0075"],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0004"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0075"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-8-22-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-8-22-0",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 8,
+      "y": 22,
+      "z": 0
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-44-35-2",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-44-35-2",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 44,
+      "y": 35,
+      "z": 2
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-41-2-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-41-2-5",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 41,
+      "y": 2,
+      "z": 5
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0027"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0027"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-14-14-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-14-14-6",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 14,
+      "y": 14,
+      "z": 6
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-30-29-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-30-29-6",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 30,
+      "y": 29,
+      "z": 6
+    },
+    "status": "BLOCKED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0035"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0035"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-35-35-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-35-35-10",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 35,
+      "y": 35,
+      "z": 10
+    },
+    "status": "PLANNED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0056"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0056"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-29-17-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-29-17-4",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 29,
+      "y": 17,
+      "z": 4
+    },
+    "status": "PLANNED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0072"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0072"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-9-26-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-9-26-6",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 9,
+      "y": 26,
+      "z": 6
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-1-20-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-1-20-3",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 1,
+      "y": 20,
+      "z": 3
+    },
+    "status": "BLOCKED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0039"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0039"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-4-17-2",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-4-17-2",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 4,
+      "y": 17,
+      "z": 2
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0010"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-45-21-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-45-21-0",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 45,
+      "y": 21,
+      "z": 0
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-40-35-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-40-35-0",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 40,
+      "y": 35,
+      "z": 0
+    },
+    "status": "PLANNED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-43-8-2",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-43-8-2",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 43,
+      "y": 8,
+      "z": 2
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0006",
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0047"
+    ],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0006",
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0047"
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-21-15-8",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-21-15-8",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 21,
+      "y": 15,
+      "z": 8
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0007"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-50-27-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-50-27-5",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 50,
+      "y": 27,
+      "z": 5
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-18-25-8",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-18-25-8",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 18,
+      "y": 25,
+      "z": 8
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0032",
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0045"
+    ],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0032",
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0045"
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-24-17-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-24-17-3",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 24,
+      "y": 17,
+      "z": 3
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0048"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0048"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-50-19-2",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-50-19-2",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 50,
+      "y": 19,
+      "z": 2
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-19-28-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-19-28-3",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 19,
+      "y": 28,
+      "z": 3
+    },
+    "status": "INSPECTION_REQUIRED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0049"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0049"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-19-5-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-19-5-5",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 19,
+      "y": 5,
+      "z": 5
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-37-9-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-37-9-3",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 37,
+      "y": 9,
+      "z": 3
+    },
+    "status": "COMPLETE",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0068"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0068"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-11-29-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-11-29-10",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 11,
+      "y": 29,
+      "z": 10
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0055"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0055"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-42-12-2",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-42-12-2",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 42,
+      "y": 12,
+      "z": 2
+    },
+    "status": "INSPECTION_REQUIRED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0038"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0038"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-3-2-1",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-3-2-1",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 3,
+      "y": 2,
+      "z": 1
+    },
+    "status": "PLANNED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-39-24-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-39-24-5",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 39,
+      "y": 24,
+      "z": 5
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-21-25-8",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-21-25-8",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 21,
+      "y": 25,
+      "z": 8
+    },
+    "status": "BLOCKED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-28-19-7",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-28-19-7",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 28,
+      "y": 19,
+      "z": 7
+    },
+    "status": "BLOCKED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-27-9-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-27-9-5",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 27,
+      "y": 9,
+      "z": 5
+    },
+    "status": "PLANNED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0014"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0014"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-9-7-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-9-7-3",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 9,
+      "y": 7,
+      "z": 3
+    },
+    "status": "BLOCKED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-17-8-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-17-8-0",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 17,
+      "y": 8,
+      "z": 0
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0016"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-A-18-16-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-A-18-16-3",
+    "zone": "ZONE-A",
+    "zoneName": "Manufacturing Hall",
+    "coordinates": {
+      "x": 18,
+      "y": 16,
+      "z": 3
+    },
+    "status": "PLANNED",
+    "trades": ["STRUCTURAL", "CONCRETE", "ELECTRICAL", "MECHANICAL"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-78-4-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-78-4-6",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 78,
+      "y": 4,
+      "z": 6
+    },
+    "status": "INSPECTION_REQUIRED",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-77-21-7",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-77-21-7",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 77,
+      "y": 21,
+      "z": 7
+    },
+    "status": "BLOCKED",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-68-11-8",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-68-11-8",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 68,
+      "y": 11,
+      "z": 8
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0067"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0067"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-59-21-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-59-21-5",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 59,
+      "y": 21,
+      "z": 5
+    },
+    "status": "COMPLETE",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-77-2-8",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-77-2-8",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 77,
+      "y": 2,
+      "z": 8
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-59-20-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-59-20-5",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 59,
+      "y": 20,
+      "z": 5
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-79-13-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-79-13-4",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 79,
+      "y": 13,
+      "z": 4
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0040"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0040"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-78-17-8",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-78-17-8",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 78,
+      "y": 17,
+      "z": 8
+    },
+    "status": "COMPLETE",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0012"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0012"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-70-3-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-70-3-6",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 70,
+      "y": 3,
+      "z": 6
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-61-9-9",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-61-9-9",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 61,
+      "y": 9,
+      "z": 9
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0066"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0066"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-57-14-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-57-14-5",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 57,
+      "y": 14,
+      "z": 5
+    },
+    "status": "COMPLETE",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0003"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0003"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-72-19-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-72-19-10",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 72,
+      "y": 19,
+      "z": 10
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-51-0-9",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-51-0-9",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 51,
+      "y": 0,
+      "z": 9
+    },
+    "status": "COMPLETE",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-67-11-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-67-11-6",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 67,
+      "y": 11,
+      "z": 6
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0013",
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0051"
+    ],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0013",
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0051"
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-60-17-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-60-17-6",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 60,
+      "y": 17,
+      "z": 6
+    },
+    "status": "COMPLETE",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0001"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-50-15-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-50-15-4",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 50,
+      "y": 15,
+      "z": 4
+    },
+    "status": "COMPLETE",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-58-9-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-58-9-5",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 58,
+      "y": 9,
+      "z": 5
+    },
+    "status": "COMPLETE",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-54-23-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-54-23-5",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 54,
+      "y": 23,
+      "z": 5
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0008"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-74-5-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-74-5-6",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 74,
+      "y": 5,
+      "z": 6
+    },
+    "status": "COMPLETE",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0036"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0036"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-71-21-9",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-71-21-9",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 71,
+      "y": 21,
+      "z": 9
+    },
+    "status": "COMPLETE",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-59-4-9",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-59-4-9",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 59,
+      "y": 4,
+      "z": 9
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0004"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0004"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-76-17-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-76-17-10",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 76,
+      "y": 17,
+      "z": 10
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-55-9-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-55-9-6",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 55,
+      "y": 9,
+      "z": 6
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-77-6-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-77-6-6",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 77,
+      "y": 6,
+      "z": 6
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-60-7-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-60-7-5",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 60,
+      "y": 7,
+      "z": 5
+    },
+    "status": "PLANNED",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0022"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0022"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-55-4-7",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-55-4-7",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 55,
+      "y": 4,
+      "z": 7
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-73-19-9",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-73-19-9",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 73,
+      "y": 19,
+      "z": 9
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-76-14-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-76-14-6",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 76,
+      "y": 14,
+      "z": 6
+    },
+    "status": "COMPLETE",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-64-3-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-64-3-6",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 64,
+      "y": 3,
+      "z": 6
+    },
+    "status": "PLANNED",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-61-4-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-61-4-4",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 61,
+      "y": 4,
+      "z": 4
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-55-4-7",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-55-4-7",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 55,
+      "y": 4,
+      "z": 7
+    },
+    "status": "COMPLETE",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0020"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0020"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-52-1-9",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-52-1-9",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 52,
+      "y": 1,
+      "z": 9
+    },
+    "status": "INSPECTION_REQUIRED",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0007"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0007"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-79-14-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-79-14-6",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 79,
+      "y": 14,
+      "z": 6
+    },
+    "status": "PLANNED",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-69-19-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-69-19-10",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 69,
+      "y": 19,
+      "z": 10
+    },
+    "status": "COMPLETE",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-73-16-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-73-16-10",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 73,
+      "y": 16,
+      "z": 10
+    },
+    "status": "COMPLETE",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-63-10-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-63-10-5",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 63,
+      "y": 10,
+      "z": 5
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-52-17-8",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-52-17-8",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 52,
+      "y": 17,
+      "z": 8
+    },
+    "status": "BLOCKED",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-58-18-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-58-18-10",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 58,
+      "y": 18,
+      "z": 10
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-60-24-9",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-60-24-9",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 60,
+      "y": 24,
+      "z": 9
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-B-60-18-8",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-B-60-18-8",
+    "zone": "ZONE-B",
+    "zoneName": "Office Block",
+    "coordinates": {
+      "x": 60,
+      "y": 18,
+      "z": 8
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["DRYWALL", "ELECTRICAL", "HVAC", "FLOORING"],
+    "decisions": [],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0006",
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0014"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-14-43-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-14-43-3",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 14,
+      "y": 43,
+      "z": 3
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-30-44-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-30-44-0",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 30,
+      "y": 44,
+      "z": 0
+    },
+    "status": "BLOCKED",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-16-48-2",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-16-48-2",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 16,
+      "y": 48,
+      "z": 2
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-10-46-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-10-46-3",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 10,
+      "y": 46,
+      "z": 3
+    },
+    "status": "COMPLETE",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-17-35-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-17-35-3",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 17,
+      "y": 35,
+      "z": 3
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-7-42-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-7-42-5",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 7,
+      "y": 42,
+      "z": 5
+    },
+    "status": "BLOCKED",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-12-38-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-12-38-0",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 12,
+      "y": 38,
+      "z": 0
+    },
+    "status": "COMPLETE",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-29-50-1",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-29-50-1",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 29,
+      "y": 50,
+      "z": 1
+    },
+    "status": "COMPLETE",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-23-41-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-23-41-4",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 23,
+      "y": 41,
+      "z": 4
+    },
+    "status": "INSPECTION_REQUIRED",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0019"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-0-42-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-0-42-0",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 0,
+      "y": 42,
+      "z": 0
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-25-48-1",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-25-48-1",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 25,
+      "y": 48,
+      "z": 1
+    },
+    "status": "INSPECTION_REQUIRED",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-22-44-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-22-44-5",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 22,
+      "y": 44,
+      "z": 5
+    },
+    "status": "COMPLETE",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-29-39-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-29-39-0",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 29,
+      "y": 39,
+      "z": 0
+    },
+    "status": "COMPLETE",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0011"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-30-49-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-30-49-6",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 30,
+      "y": 49,
+      "z": 6
+    },
+    "status": "BLOCKED",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-16-45-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-16-45-4",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 16,
+      "y": 45,
+      "z": 4
+    },
+    "status": "COMPLETE",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0044"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0044"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-9-45-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-9-45-4",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 9,
+      "y": 45,
+      "z": 4
+    },
+    "status": "BLOCKED",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-8-37-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-8-37-4",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 8,
+      "y": 37,
+      "z": 4
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-12-44-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-12-44-4",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 12,
+      "y": 44,
+      "z": 4
+    },
+    "status": "COMPLETE",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-9-48-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-9-48-5",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 9,
+      "y": 48,
+      "z": 5
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-13-37-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-13-37-4",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 13,
+      "y": 37,
+      "z": 4
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0023"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0023"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-11-50-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-11-50-3",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 11,
+      "y": 50,
+      "z": 3
+    },
+    "status": "PLANNED",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-24-48-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-24-48-5",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 24,
+      "y": 48,
+      "z": 5
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-11-46-2",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-11-46-2",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 11,
+      "y": 46,
+      "z": 2
+    },
+    "status": "COMPLETE",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-30-47-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-30-47-0",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 30,
+      "y": 47,
+      "z": 0
+    },
+    "status": "PLANNED",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-0-46-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-0-46-0",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 0,
+      "y": 46,
+      "z": 0
+    },
+    "status": "BLOCKED",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-27-43-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-27-43-4",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 27,
+      "y": 43,
+      "z": 4
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-13-41-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-13-41-6",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 13,
+      "y": 41,
+      "z": 6
+    },
+    "status": "INSPECTION_REQUIRED",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-5-39-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-5-39-5",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 5,
+      "y": 39,
+      "z": 5
+    },
+    "status": "COMPLETE",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-4-35-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-4-35-3",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 4,
+      "y": 35,
+      "z": 3
+    },
+    "status": "COMPLETE",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-C-11-48-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-C-11-48-0",
+    "zone": "ZONE-C",
+    "zoneName": "Loading/Receiving",
+    "coordinates": {
+      "x": 11,
+      "y": 48,
+      "z": 0
+    },
+    "status": "PLANNED",
+    "trades": ["CONCRETE", "ELECTRICAL", "DOORS"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-33-25-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-33-25-6",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 33,
+      "y": 25,
+      "z": 6
+    },
+    "status": "BLOCKED",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-30-12",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-36-30-12",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 36,
+      "y": 30,
+      "z": 12
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0001"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0001"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-30-24-11",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-30-24-11",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 30,
+      "y": 24,
+      "z": 11
+    },
+    "status": "BLOCKED",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0018"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0018"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-31-21-15",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-31-21-15",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 31,
+      "y": 21,
+      "z": 15
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-14",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-36-26-14",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 36,
+      "y": 26,
+      "z": 14
+    },
+    "status": "COMPLETE",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-38-21-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-38-21-0",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 38,
+      "y": 21,
+      "z": 0
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0057"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0057"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-39-25-15",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-39-25-15",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 39,
+      "y": 25,
+      "z": 15
+    },
+    "status": "COMPLETE",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0061"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0061"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-40-27-15",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-40-27-15",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 40,
+      "y": 27,
+      "z": 15
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0017"],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0013"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0017"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-25-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-36-25-4",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 36,
+      "y": 25,
+      "z": 4
+    },
+    "status": "BLOCKED",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-31-24-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-31-24-3",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 31,
+      "y": 24,
+      "z": 3
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-38-21-12",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-38-21-12",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 38,
+      "y": 21,
+      "z": 12
+    },
+    "status": "PLANNED",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0046"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0046"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-40-22-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-40-22-3",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 40,
+      "y": 22,
+      "z": 3
+    },
+    "status": "PLANNED",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0026"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0026"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-39-21-9",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-39-21-9",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 39,
+      "y": 21,
+      "z": 9
+    },
+    "status": "COMPLETE",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-33-21-1",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-33-21-1",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 33,
+      "y": 21,
+      "z": 1
+    },
+    "status": "PLANNED",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-37-20-2",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-37-20-2",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 37,
+      "y": 20,
+      "z": 2
+    },
+    "status": "COMPLETE",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-13",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-36-26-13",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 36,
+      "y": 26,
+      "z": 13
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0060",
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0064"
+    ],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0060",
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0064"
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-21-3",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-32-21-3",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 32,
+      "y": 21,
+      "z": 3
+    },
+    "status": "COMPLETE",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0019",
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0065"
+    ],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0005"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0019",
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0065"
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-33-20-6",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-33-20-6",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 33,
+      "y": 20,
+      "z": 6
+    },
+    "status": "BLOCKED",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0034"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0034"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-39-21-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-39-21-0",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 39,
+      "y": 21,
+      "z": 0
+    },
+    "status": "BLOCKED",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-37-23-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-37-23-0",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 37,
+      "y": 23,
+      "z": 0
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0071"],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0009"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0071"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-31-26-14",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-31-26-14",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 31,
+      "y": 26,
+      "z": 14
+    },
+    "status": "PLANNED",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0037"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0037"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-31-27-8",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-31-27-8",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 31,
+      "y": 27,
+      "z": 8
+    },
+    "status": "PLANNED",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0069"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0069"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-23-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-32-23-0",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 32,
+      "y": 23,
+      "z": 0
+    },
+    "status": "COMPLETE",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-37-22-11",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-37-22-11",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 37,
+      "y": 22,
+      "z": 11
+    },
+    "status": "COMPLETE",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0017",
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0020"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-38-30-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-38-30-5",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 38,
+      "y": 30,
+      "z": 5
+    },
+    "status": "COMPLETE",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-38-30-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-38-30-5",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 38,
+      "y": 30,
+      "z": 5
+    },
+    "status": "COMPLETE",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-29-8",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-36-29-8",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 36,
+      "y": 29,
+      "z": 8
+    },
+    "status": "INSPECTION_REQUIRED",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-40-30-2",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-40-30-2",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 40,
+      "y": 30,
+      "z": 2
+    },
+    "status": "COMPLETE",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0021"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0021"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-37-21-11",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-37-21-11",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 37,
+      "y": 21,
+      "z": 11
+    },
+    "status": "COMPLETE",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0041"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0041"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-40-20-14",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-40-20-14",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 40,
+      "y": 20,
+      "z": 14
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-25-9",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-32-25-9",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 32,
+      "y": 25,
+      "z": 9
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-39-23-12",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-39-23-12",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 39,
+      "y": 23,
+      "z": 12
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-30-25-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-30-25-10",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 30,
+      "y": 25,
+      "z": 10
+    },
+    "status": "COMPLETE",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-38-25-1",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-38-25-1",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 38,
+      "y": 25,
+      "z": 1
+    },
+    "status": "COMPLETE",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-33-24-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-33-24-4",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 33,
+      "y": 24,
+      "z": 4
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0033"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0033"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-34-20-7",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-34-20-7",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 34,
+      "y": 20,
+      "z": 7
+    },
+    "status": "PLANNED",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0053"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0053"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-23-1",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-32-23-1",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 32,
+      "y": 23,
+      "z": 1
+    },
+    "status": "PLANNED",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0025",
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0062"
+    ],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0025",
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0062"
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-32-23-4",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-32-23-4",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 32,
+      "y": 23,
+      "z": 4
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0063"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0063"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-36-26-5",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-36-26-5",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 36,
+      "y": 26,
+      "z": 5
+    },
+    "status": "COMPLETE",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": [
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0016",
+      "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0059"
+    ],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": [
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0016",
+        "urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0059"
+      ]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-D-31-25-0",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-D-31-25-0",
+    "zone": "ZONE-D",
+    "zoneName": "MEP Core",
+    "coordinates": {
+      "x": 31,
+      "y": 25,
+      "z": 0
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ELECTRICAL", "MECHANICAL", "PLUMBING", "FIRE_PROTECTION"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0052"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0052"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-11-38-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-11-38-10",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 11,
+      "y": 38,
+      "z": 10
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-28-4-11",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-28-4-11",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 28,
+      "y": 4,
+      "z": 11
+    },
+    "status": "COMPLETE",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-29-34-15",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-29-34-15",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 29,
+      "y": 34,
+      "z": 15
+    },
+    "status": "PLANNED",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-19-23-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-19-23-10",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 19,
+      "y": 23,
+      "z": 10
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-36-21-12",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-36-21-12",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 36,
+      "y": 21,
+      "z": 12
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-53-7-15",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-53-7-15",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 53,
+      "y": 7,
+      "z": 15
+    },
+    "status": "COMPLETE",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-24-48-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-24-48-10",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 24,
+      "y": 48,
+      "z": 10
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-55-7-15",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-55-7-15",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 55,
+      "y": 7,
+      "z": 15
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-49-11-15",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-49-11-15",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 49,
+      "y": 11,
+      "z": 15
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0074"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0074"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-8-27-12",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-8-27-12",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 8,
+      "y": 27,
+      "z": 12
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-53-19-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-53-19-10",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 53,
+      "y": 19,
+      "z": 10
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-73-29-14",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-73-29-14",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 73,
+      "y": 29,
+      "z": 14
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0003"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-30-20-11",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-30-20-11",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 30,
+      "y": 20,
+      "z": 11
+    },
+    "status": "COMPLETE",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-36-43-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-36-43-10",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 36,
+      "y": 43,
+      "z": 10
+    },
+    "status": "PLANNED",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-17-6-11",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-17-6-11",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 17,
+      "y": 6,
+      "z": 11
+    },
+    "status": "COMPLETE",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0024"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0024"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-35-3-10",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-35-3-10",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 35,
+      "y": 3,
+      "z": 10
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-66-39-12",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-66-39-12",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 66,
+      "y": 39,
+      "z": 12
+    },
+    "status": "COMPLETE",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-57-48-11",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-57-48-11",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 57,
+      "y": 48,
+      "z": 11
+    },
+    "status": "COMPLETE",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-64-45-14",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-64-45-14",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 64,
+      "y": 45,
+      "z": 14
+    },
+    "status": "BLOCKED",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0042"],
+    "inspections": [],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": ["urn:luhtech:canadian-plant-pilot:pm-decision:DEC-2026-0042"]
+    }
+  },
+  {
+    "$id": "urn:luhtech:canadian-plant-pilot:voxel:VOX-ZONE-E-65-7-14",
+    "$schema": "https://luhtech.dev/schemas/pm/voxel.schema.json",
+    "schemaVersion": "3.0.0",
+    "voxelId": "VOX-ZONE-E-65-7-14",
+    "zone": "ZONE-E",
+    "zoneName": "Site/Exterior",
+    "coordinates": {
+      "x": 65,
+      "y": 7,
+      "z": 14
+    },
+    "status": "IN_PROGRESS",
+    "trades": ["ROOFING", "ENVELOPE", "SITEWORK"],
+    "decisions": [],
+    "inspections": [
+      "urn:luhtech:canadian-plant-pilot:inspection:INSP-2026-0012"
+    ],
+    "graphMetadata": {
+      "inEdges": [],
+      "outEdges": []
+    }
+  }
+]

@@ -1,0 +1,26 @@
+# Production Infrastructure Variables
+# Copy this file to terraform.tfvars and fill in your values
+
+# DigitalOcean API Token (set via environment variable DO_TOKEN)
+# export DO_TOKEN="your-digitalocean-api-token-here"
+
+# SSH Keys (get fingerprints from: doctl compute ssh-key list)
+ssh_keys = [
+  "YOUR_SSH_KEY_FINGERPRINT_HERE",
+  # Add additional SSH key fingerprints as needed
+]
+
+# Production server size
+# Options:
+#   c2-4vcpu-8gb: Dedicated CPU, 4 vCPU, 8GB RAM, 100GB disk, $94/mo (RECOMMENDED)
+#   c-4-intel: Dedicated CPU Intel, 4 vCPU, 8GB RAM, 50GB disk, $109/mo
+#   c2-4vcpu-8gb-intel: Dedicated CPU Intel, 4 vCPU, 8GB RAM, 100GB disk, $122/mo
+production_size = "c2-4vcpu-8gb"
+
+# Production region
+# Options: nyc1, nyc3, sfo1, sfo2, sfo3, ams3, sgp1, lon1, fra1, tor1, blr1
+production_region = "sfo3"
+
+# PostgreSQL Database Cluster ID
+# Get this from: doctl databases list
+database_cluster_id = "d1d6854a-3ecf-45d3-b699-14b8e72aa898"

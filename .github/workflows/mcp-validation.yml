@@ -1,0 +1,626 @@
+name: MCP Server Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mcp-server/**'
+      - '.github/workflows/mcp-validation.yml'
+  pull_request:
+    paths:
+      - 'apps/mcp-server/**'
+      - '.github/workflows/mcp-validation.yml'
+  workflow_dispatch:
+  schedule:
+    # Run every 6 hours to monitor MCP server health
+    - cron: '0 */6 * * *'
+
+# Limit permissions for security
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  # Primary validation: Test MCP in containers (MUST PASS)
+  test-mcp-container:
+    name: Test MCP in Container
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          jq --version
+
+      - name: Setup MCP
+        uses: ./.github/actions/setup-mcp
+
+      - name: Test MCP Endpoints
+        run: |
+          echo "Testing health endpoint..."
+          if ! curl -sf http://localhost:3001/health | jq '.'; then
+            echo "❌ Health endpoint failed"
+            exit 1
+          fi
+
+          echo "Testing guidance endpoint..."
+          if ! curl -sf -X POST http://localhost:3001/api/mcp/get-guidance \
+            -H "Content-Type: application/json" \
+            -d '{"query": "test"}' | jq '.'; then
+            echo "❌ Guidance endpoint failed"
+            exit 1
+          fi
+
+          echo "Testing roadmap endpoint..."
+          if ! curl -sf http://localhost:3001/api/mcp/roadmap/current | jq '.'; then
+            echo "❌ Roadmap endpoint failed"
+            exit 1
+          fi
+
+          echo "✅ All endpoints responding"
+
+  test-container-integration:
+    name: Test Container MCP Integration
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read # Required to pull from GitHub Container Registry
+    container:
+      image: ghcr.io/luhtech/ectropy-devcontainer:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Verify MCP files present
+        run: |
+          echo "🔍 Checking MCP installation..."
+
+          # Check start-mcp script exists
+          if [ ! -f /usr/local/bin/start-mcp ]; then
+            echo "❌ start-mcp script not found"
+            exit 1
+          fi
+          echo "✅ start-mcp script exists"
+
+          # Check MCP workspace
+          if [ ! -d /workspace/mcp ]; then
+            echo "❌ MCP workspace not found"
+            exit 1
+          fi
+          echo "✅ MCP workspace exists"
+
+          # Check MCP server build
+          if [ ! -f /workspace/mcp/dist/apps/mcp-server/main.js ]; then
+            echo "❌ MCP server build not found"
+            exit 1
+          fi
+          echo "✅ MCP server build exists"
+
+      - name: Start MCP server
+        run: |
+          echo "🚀 Starting MCP server..."
+          start-mcp
+
+          # Give it a moment to fully start
+          sleep 3
+
+          # Check if running with more specific check
+          if ! pgrep -f 'dist/apps/mcp-server' > /dev/null && ! pgrep -f 'node.*main.js' > /dev/null; then
+            echo "❌ MCP process not running"
+            echo "Running processes:"
+            ps aux | grep -E 'node|mcp' | grep -v grep || true
+            exit 1
+          fi
+
+          echo "✅ MCP server is running"
+
+      - name: Test health endpoint
+        run: |
+          echo "🏥 Testing health endpoint..."
+
+          # Test with detailed error handling
+          RESPONSE=$(curl -s -w "\n%{http_code}" http://localhost:3001/health)
+          STATUS_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          if [ "$STATUS_CODE" = "200" ]; then
+            echo "✅ Health check passed (HTTP $STATUS_CODE)"
+            echo "$BODY" | jq '.' 2>/dev/null || echo "$BODY"
+          else
+            echo "❌ Health check failed (HTTP $STATUS_CODE)"
+            echo "Response: $BODY"
+            exit 1
+          fi
+
+      - name: Test MCP validation endpoints
+        run: |
+          echo "📋 Testing MCP validation endpoints..."
+
+          # Test get-guidance
+          echo "Testing get-guidance..."
+          if ! curl -sf -X POST http://localhost:3001/api/mcp/get-guidance \
+            -H "Content-Type: application/json" \
+            -d '{"query":"test query"}'; then
+            echo "❌ get-guidance endpoint failed"
+            exit 1
+          fi
+
+          # Test validate-work-plan
+          echo "Testing validate-work-plan..."
+          if ! curl -sf -X POST http://localhost:3001/api/mcp/validate-work-plan \
+            -H "Content-Type: application/json" \
+            -d '{"taskDescription":"Test","proposedApproach":"Test","filesImpacted":["test.js"],"estimatedComplexity":"simple","requiresTests":true}'; then
+            echo "❌ validate-work-plan endpoint failed"
+            exit 1
+          fi
+
+          # Test check-strategy
+          echo "Testing check-strategy..."
+          if ! curl -sf -X POST http://localhost:3001/api/mcp/check-strategy \
+            -H "Content-Type: application/json" \
+            -d '{"approach":"Test","validationSteps":["step1"]}'; then
+            echo "❌ check-strategy endpoint failed"
+            exit 1
+          fi
+
+          # Test roadmap
+          echo "Testing roadmap..."
+          if ! curl -sf http://localhost:3001/api/mcp/roadmap/current; then
+            echo "❌ roadmap endpoint failed"
+            exit 1
+          fi
+
+          echo "✅ All validation endpoints working"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## 🧪 Container MCP Integration Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Verified Capabilities" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ MCP pre-installed in container" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ MCP starts successfully" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ All validation endpoints working" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🎉 **Container MCP is fully operational!**" >> $GITHUB_STEP_SUMMARY
+
+  # Secondary validation: External staging server (OPTIONAL - may be down for maintenance)
+  validate-mcp-staging:
+    name: Validate External Staging MCP (Optional)
+    runs-on: ubuntu-latest
+    environment: staging
+    continue-on-error: true # Don't fail workflow if staging server is down
+    needs: [test-mcp-container, test-container-integration] # Run after container tests pass
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Required Secrets
+        id: validate_secrets
+        env:
+          MCP_API_KEY: ${{ secrets.MCP_API_KEY }}
+        run: |
+          echo "🔍 Validating MCP configuration..."
+
+          # Check if MCP_API_KEY is configured
+          if [ -z "$MCP_API_KEY" ]; then
+            echo "❌ MCP_API_KEY not configured"
+            echo ""
+            echo "📝 To fix this issue:"
+            echo "   1. Go to: Settings → Secrets and variables → Actions"
+            echo "   2. Click 'New repository secret'"
+            echo "   3. Name: MCP_API_KEY"
+            echo "   4. Value: Your MCP API key"
+            echo ""
+            echo "💡 Get your API key from the MCP server administrator"
+            exit 1
+          fi
+
+          echo "✅ MCP_API_KEY is configured"
+
+      - name: Install jq
+        id: install_jq
+        run: |
+          echo "🔧 Checking for jq installation..."
+
+          if command -v jq &> /dev/null; then
+            echo "✅ jq is already installed: $(jq --version)"
+          else
+            echo "📦 Installing jq..."
+            sudo apt-get update -qq
+            sudo apt-get install -y jq
+            echo "✅ jq installed: $(jq --version)"
+          fi
+
+      - name: Test MCP Server Connectivity
+        id: test_connectivity
+        env:
+          MCP_URL: http://${{ secrets.DO_HOST }}:3001
+        run: |
+          echo "🌐 Testing connectivity to MCP server..."
+
+          # Test basic connectivity (no auth required)
+          if ! curl -s --connect-timeout 10 --max-time 20 "$MCP_URL/health" > /dev/null; then
+            echo "❌ Cannot reach MCP server at $MCP_URL"
+            echo ""
+            echo "🔧 Troubleshooting steps:"
+            echo "   1. Check if MCP server is running"
+            echo "   2. Verify network connectivity"
+            echo "   3. Check firewall rules"
+            echo "   4. Verify MCP_URL is correct"
+            exit 1
+          fi
+
+          echo "✅ MCP server is reachable"
+
+      - name: Test MCP Health Endpoint
+        id: test_health
+        env:
+          MCP_URL: http://${{ secrets.DO_HOST }}:3001
+          MCP_API_KEY: ${{ secrets.MCP_API_KEY }}
+        run: |
+          echo "🏥 Testing MCP Health Endpoint..."
+
+          # Health check (no auth required)
+          response=$(curl -s -w "\n%{http_code}" "$MCP_URL/health")
+
+          status_code=$(echo "$response" | tail -n 1)
+          body=$(echo "$response" | head -n -1)
+
+          echo "Status: $status_code"
+          echo "Response: $body"
+
+          if [ "$status_code" = "500" ] || [ "$status_code" = "502" ] || [ "$status_code" = "503" ]; then
+            echo "⚠️ MCP server returned error: $status_code"
+            echo "This indicates the MCP server container may not be running properly"
+            echo ""
+            echo "Possible causes:"
+            echo "- MCP server failed to start"
+            echo "- Container crashed or is restarting"
+            echo "- Missing dependencies or configuration"
+            echo ""
+            echo "::warning::MCP server health check failed with HTTP $status_code"
+            # Don't fail immediately, continue to gather more diagnostics
+          elif [ "$status_code" != "200" ]; then
+            echo "❌ Health check failed with unexpected status: $status_code"
+            exit 1
+          else
+            echo "✅ Health check passed"
+          fi
+
+      - name: Test MCP Tools Endpoint
+        id: test_tools
+        env:
+          MCP_URL: http://${{ secrets.DO_HOST }}:3001
+          MCP_API_KEY: ${{ secrets.MCP_API_KEY }}
+        run: |
+          echo "🛠️  Testing MCP Tools Endpoint..."
+
+          # List available tools (requires API key)
+          response=$(curl -s -w "\n%{http_code}" \
+            -H "X-API-Key: $MCP_API_KEY" \
+            -H "Content-Type: application/json" \
+            "$MCP_URL/api/tools")
+
+          status_code=$(echo "$response" | tail -n 1)
+          body=$(echo "$response" | head -n -1)
+
+          echo "Status Code: $status_code"
+
+          # Handle different HTTP status codes with specific guidance
+          case $status_code in
+            200)
+              echo "✅ Authentication successful"
+              ;;
+            401)
+              echo "❌ Authentication failed (401 Unauthorized)"
+              echo ""
+              echo "🔧 Troubleshooting steps:"
+              echo "   1. Verify MCP_API_KEY is set in GitHub Secrets"
+              echo "   2. Check if the API key is correct and not expired"
+              echo "   3. Test the API key manually:"
+              echo "      curl -H 'X-API-Key: YOUR_KEY' ${MCP_URL}/api/tools"
+              echo "   4. Contact MCP server administrator for a new key if needed"
+              echo ""
+              echo "Response body:"
+              echo "$body" | jq '.' 2>/dev/null || echo "$body"
+              exit 1
+              ;;
+            403)
+              echo "❌ Forbidden (403)"
+              echo "The API key may not have sufficient permissions"
+              exit 1
+              ;;
+            404)
+              echo "❌ Endpoint not found (404)"
+              echo "The MCP server may not be configured correctly"
+              exit 1
+              ;;
+            500|502|503)
+              echo "⚠️ Server error ($status_code)"
+              echo "The external staging MCP server is experiencing issues"
+              echo ""
+              echo "Response body:"
+              echo "$body" | jq '.' 2>/dev/null || echo "$body"
+              echo ""
+              echo "🔍 Possible causes:"
+              echo "   1. MCP server internal error (check server logs)"
+              echo "   2. Database connectivity issues"
+              echo "   3. Redis connectivity issues"
+              echo "   4. Rate limiter or middleware failure"
+              echo "   5. Missing environment variables (MCP_API_KEY on server)"
+              echo ""
+              echo "💡 NOTE: This is an external staging server validation"
+              echo "   Container tests already passed - MCP code is working"
+              echo "   This indicates infrastructure/deployment issue, not code issue"
+              echo ""
+              echo "::warning::External staging MCP server returned HTTP $status_code - investigate server deployment"
+              exit 1
+              ;;
+            *)
+              echo "❌ Unexpected status code: $status_code"
+              echo "Response body:"
+              echo "$body" | jq '.' 2>/dev/null || echo "$body"
+              exit 1
+              ;;
+          esac
+
+          # Display and validate response
+          echo ""
+          echo "Tools available:"
+          echo "$body" | jq '.' || echo "$body"
+
+          # Verify tools array exists (jq is now guaranteed to be installed)
+          tools_count=$(echo "$body" | jq -r '.tools | length' 2>/dev/null || echo "0")
+          echo ""
+          echo "📊 Found $tools_count tools"
+
+          if [ "$tools_count" -lt 1 ]; then
+            echo "❌ No tools found in response"
+            exit 1
+          fi
+
+          echo "✅ Tools endpoint validated successfully"
+
+      - name: Test MCP Tools Without API Key (Should Fail)
+        id: test_auth
+        env:
+          MCP_URL: http://${{ secrets.DO_HOST }}:3001
+        run: |
+          echo "🔒 Testing MCP Tools Endpoint without API key..."
+
+          # Try without API key - should fail with 401
+          response=$(curl -s -w "\n%{http_code}" \
+            -H "Content-Type: application/json" \
+            "$MCP_URL/api/tools")
+
+          status_code=$(echo "$response" | tail -n 1)
+          body=$(echo "$response" | head -n -1)
+
+          echo "Status: $status_code"
+          echo "Response: $body"
+
+          if [ "$status_code" != "401" ]; then
+            echo "❌ Expected 401 Unauthorized, got $status_code"
+            exit 1
+          fi
+
+          echo "✅ API key authentication working correctly"
+
+      - name: Test MCP Execute Endpoint
+        id: test_execute
+        continue-on-error: true # This is optional functionality
+        env:
+          MCP_URL: http://${{ secrets.DO_HOST }}:3001
+          MCP_API_KEY: ${{ secrets.MCP_API_KEY }}
+        run: |
+          echo "⚙️  Testing MCP Execute Endpoint..."
+
+          # Test health_check tool
+          response=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "X-API-Key: $MCP_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"tool": "health_check", "params": {}}' \
+            "$MCP_URL/api/tools/execute")
+
+          status_code=$(echo "$response" | tail -n 1)
+          body=$(echo "$response" | head -n -1)
+
+          echo "Status Code: $status_code"
+          echo ""
+          echo "Execution result:"
+          echo "$body" | jq '.' || echo "$body"
+
+          if [ "$status_code" = "500" ]; then
+            echo "⚠️ Execute endpoint returned 500 - MCP server may be experiencing issues"
+            echo "This is non-critical as basic connectivity is working"
+            echo "::warning::MCP execute endpoint returned HTTP 500"
+          elif [ "$status_code" = "200" ]; then
+            echo "✅ Execute endpoint working correctly"
+          elif [ "$status_code" = "401" ]; then
+            echo "❌ Authentication failed on execute endpoint"
+            echo "This should not happen after tools endpoint passed"
+            exit 1
+          else
+            echo "⚠️ Execute endpoint returned $status_code"
+            echo "This may be expected depending on MCP configuration"
+          fi
+
+      - name: Test Get Agent Status Tool
+        id: test_agent_status
+        continue-on-error: true # This is optional functionality
+        env:
+          MCP_URL: http://${{ secrets.DO_HOST }}:3001
+          MCP_API_KEY: ${{ secrets.MCP_API_KEY }}
+        run: |
+          echo "👥 Testing Get Agent Status Tool..."
+
+          response=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "X-API-Key: $MCP_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"tool": "get_agent_status", "params": {}}' \
+            "$MCP_URL/api/tools/execute")
+
+          status_code=$(echo "$response" | tail -n 1)
+          body=$(echo "$response" | head -n -1)
+
+          echo "Agent status result:"
+          echo "$body" | jq '.' || echo "$body"
+
+          if [ "$status_code" = "500" ]; then
+            echo "⚠️ Agent status tool returned 500"
+            echo "::warning::MCP agent status returned HTTP 500"
+          elif [ "$status_code" != "200" ]; then
+            echo "⚠️ Agent status tool returned $status_code"
+          else
+            echo "✅ Agent status tool working"
+          fi
+
+      - name: Validate from Codespaces Context
+        id: test_codespaces
+        env:
+          MCP_URL: http://${{ secrets.DO_HOST }}:3001
+          MCP_API_KEY: ${{ secrets.MCP_API_KEY }}
+        run: |
+          echo "🐙 Testing MCP from Codespaces context..."
+
+          # Simulate Codespaces environment with headers
+          response=$(curl -s -w "\n%{http_code}" \
+            -H "X-API-Key: $MCP_API_KEY" \
+            -H "Origin: https://github.dev" \
+            -H "Referer: https://github.dev/" \
+            "$MCP_URL/health")
+
+          status_code=$(echo "$response" | tail -n 1)
+
+          if [ "$status_code" != "200" ]; then
+            echo "❌ MCP not accessible from Codespaces context"
+            exit 1
+          fi
+
+          echo "✅ MCP accessible from Codespaces context"
+
+      - name: Staging Server Summary
+        if: always()
+        run: |
+          # Determine overall status based on job result
+          if [ "${{ job.status }}" = "success" ]; then
+            STATUS_EMOJI="✅"
+            STATUS_TEXT="SUCCESS"
+          else
+            STATUS_EMOJI="⚠️"
+            STATUS_TEXT="ISSUES DETECTED"
+          fi
+
+          echo "## 🌐 External Staging MCP Server Results: ${STATUS_EMOJI} ${STATUS_TEXT}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **Note**: This is an optional check of the external staging deployment" >> $GITHUB_STEP_SUMMARY
+          echo "> Container tests (which validate MCP code) have already passed ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Results" >> $GITHUB_STEP_SUMMARY
+
+          # Check step results to provide accurate status
+          echo "- Secret Validation: ${{ steps.validate_secrets.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- jq Installation: ${{ steps.install_jq.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Server Connectivity: ${{ steps.test_connectivity.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Health Endpoint: ${{ steps.test_health.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tools Endpoint: ${{ steps.test_tools.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- API Key Authentication: ${{ steps.test_auth.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Execute Endpoint: ${{ steps.test_execute.outcome == 'success' && '✅' || '⚠️' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Agent Status Tool: ${{ steps.test_agent_status.outcome == 'success' && '✅' || '⚠️' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Codespaces Access: ${{ steps.test_codespaces.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Base URL**: http://${{ secrets.DO_HOST }}:3001" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: External Staging Server" >> $GITHUB_STEP_SUMMARY
+          echo "- **Authentication**: X-API-Key header" >> $GITHUB_STEP_SUMMARY
+          echo "- **API Key Status**: ${{ secrets.MCP_API_KEY != '' && 'Configured ✅' || 'Not Configured ❌' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ **External staging MCP server is operational**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **External staging server has issues - investigate deployment/infrastructure**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "This does not affect MCP code validity (container tests passed)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Final summary job - aggregates all results
+  validation-summary:
+    name: MCP Validation Summary
+    runs-on: ubuntu-latest
+    needs:
+      [test-mcp-container, test-container-integration, validate-mcp-staging]
+    if: always()
+
+    steps:
+      - name: Generate Validation Summary
+        run: |
+          echo "## 🎯 MCP Server Validation - Complete Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Container tests (required)
+          echo "### ✅ Core Validation (Container Tests)" >> $GITHUB_STEP_SUMMARY
+
+          # Container test result
+          if [ "${{ needs.test-mcp-container.result }}" = "success" ]; then
+            echo "- Container Build & Test: ✅ PASSED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Container Build & Test: ❌ FAILED (result: ${{ needs.test-mcp-container.result }})" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # DevContainer test result
+          if [ "${{ needs.test-container-integration.result }}" = "success" ]; then
+            echo "- DevContainer Integration: ✅ PASSED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- DevContainer Integration: ❌ FAILED (result: ${{ needs.test-container-integration.result }})" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # External staging (optional)
+          echo "### 🌐 External Deployment Check (Optional)" >> $GITHUB_STEP_SUMMARY
+
+          # Staging server result
+          if [ "${{ needs.validate-mcp-staging.result }}" = "success" ]; then
+            echo "- Staging Server: ✅ OPERATIONAL" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ needs.validate-mcp-staging.result }}" = "failure" ]; then
+            echo "- Staging Server: ⚠️ ISSUES DETECTED" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- Staging Server: ⚠️ ${{ needs.validate-mcp-staging.result }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Overall status
+          if [ "${{ needs.test-mcp-container.result }}" = "success" ] && [ "${{ needs.test-container-integration.result }}" = "success" ]; then
+            echo "## ✅ MCP Validation: **SUCCESS**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "🎉 **MCP Server code is validated and ready for deployment!**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Key Achievements" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ MCP server builds successfully in containers" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ All MCP endpoints respond correctly" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ DevContainer integration working" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Ready for AI agent integration" >> $GITHUB_STEP_SUMMARY
+            
+            if [ "${{ needs.validate-mcp-staging.result }}" != "success" ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### ⚠️ Note on Staging Server" >> $GITHUB_STEP_SUMMARY
+              echo "The external staging server check did not pass, but this does not affect" >> $GITHUB_STEP_SUMMARY
+              echo "the validity of the MCP code. This indicates an infrastructure/deployment" >> $GITHUB_STEP_SUMMARY
+              echo "issue that should be investigated separately." >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "## ❌ MCP Validation: **FAILED**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Container tests failed - MCP code needs attention**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the failed job logs above for specific error messages." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

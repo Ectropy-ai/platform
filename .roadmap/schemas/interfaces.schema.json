@@ -1,0 +1,348 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:interfaces",
+  "title": "Feature Interfaces Schema",
+  "description": "Schema for interfaces.json files that define MCP tool signatures, REST API endpoints, GraphQL resolvers, and middleware specifications for features.",
+  "type": "object",
+  "required": [
+    "$schema",
+    "$id",
+    "schemaVersion",
+    "meta",
+    "summary"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Reference to this schema"
+    },
+    "$id": {
+      "type": "string",
+      "description": "Unique URN identifier",
+      "pattern": "^urn:luhtech:[a-z]+:interfaces:[a-z0-9-]+$"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "description": "Version of this interfaces schema format",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "meta": {
+      "type": "object",
+      "required": ["ventureId", "featureId", "lastUpdated"],
+      "properties": {
+        "ventureId": {
+          "type": "string",
+          "description": "Venture identifier"
+        },
+        "featureId": {
+          "type": "string",
+          "description": "Feature identifier"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "author": {
+          "type": "string"
+        },
+        "sourceDoc": {
+          "type": "string",
+          "description": "Path to this file"
+        }
+      }
+    },
+    "summary": {
+      "type": "string",
+      "description": "Brief summary of what interfaces this file defines"
+    },
+    "mcpTools": {
+      "type": "object",
+      "description": "MCP tool definitions for AI agent access",
+      "properties": {
+        "totalCount": {
+          "type": "integer",
+          "description": "Total number of MCP tools defined"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mcpToolCategory"
+          }
+        }
+      }
+    },
+    "restApi": {
+      "type": "object",
+      "description": "REST API endpoint definitions",
+      "properties": {
+        "basePath": {
+          "type": "string",
+          "description": "Base path for all endpoints (e.g., /api/v2)"
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/restEndpoint"
+          }
+        }
+      }
+    },
+    "graphql": {
+      "type": "object",
+      "description": "GraphQL resolver definitions",
+      "properties": {
+        "queries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/graphqlResolver"
+          }
+        },
+        "mutations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/graphqlResolver"
+          }
+        },
+        "subscriptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/graphqlResolver"
+          }
+        }
+      }
+    },
+    "middleware": {
+      "type": "array",
+      "description": "Middleware specifications",
+      "items": {
+        "$ref": "#/$defs/middleware"
+      }
+    },
+    "events": {
+      "type": "array",
+      "description": "Event definitions emitted by this feature",
+      "items": {
+        "$ref": "#/$defs/eventDefinition"
+      }
+    },
+    "dataTypes": {
+      "type": "object",
+      "description": "Custom data types used in interfaces",
+      "additionalProperties": {
+        "$ref": "#/$defs/dataType"
+      }
+    }
+  },
+  "$defs": {
+    "mcpToolCategory": {
+      "type": "object",
+      "required": ["name", "tools"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Category name (e.g., Decision Management)"
+        },
+        "description": {
+          "type": "string"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mcpTool"
+          }
+        }
+      }
+    },
+    "mcpTool": {
+      "type": "object",
+      "required": ["name", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Tool name (snake_case)",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "description": {
+          "type": "string",
+          "description": "What this tool does"
+        },
+        "authorityRequired": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0, "maximum": 6},
+            {"type": "string", "enum": ["varies", "none"]}
+          ],
+          "description": "Authority level required (0-6 or 'varies')"
+        },
+        "input": {
+          "type": "object",
+          "description": "Input parameters",
+          "additionalProperties": {
+            "$ref": "#/$defs/parameterDef"
+          }
+        },
+        "output": {
+          "type": "object",
+          "description": "Output structure",
+          "additionalProperties": true
+        },
+        "errors": {
+          "type": "array",
+          "description": "Possible error codes",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": {"type": "string"},
+              "description": {"type": "string"}
+            }
+          }
+        },
+        "rateLimit": {
+          "type": "object",
+          "properties": {
+            "requests": {"type": "integer"},
+            "window": {"type": "string"}
+          }
+        }
+      }
+    },
+    "parameterDef": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["string", "number", "integer", "boolean", "array", "object", "urn", "enum"]
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        },
+        "pattern": {
+          "type": "string",
+          "description": "Regex pattern for string validation"
+        },
+        "minLength": {"type": "integer"},
+        "maxLength": {"type": "integer"},
+        "min": {"type": "number"},
+        "max": {"type": "number"},
+        "values": {
+          "type": "array",
+          "description": "Enum values",
+          "items": {"type": "string"}
+        },
+        "items": {
+          "type": "string",
+          "description": "Array item type"
+        },
+        "description": {"type": "string"}
+      }
+    },
+    "restEndpoint": {
+      "type": "object",
+      "required": ["method", "path", "description"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]
+        },
+        "path": {
+          "type": "string",
+          "description": "Endpoint path with parameters (e.g., /decisions/:id)"
+        },
+        "description": {"type": "string"},
+        "auth": {
+          "type": "string",
+          "enum": ["required", "optional", "none"]
+        },
+        "authorityRequired": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "request": {
+          "type": "object",
+          "properties": {
+            "params": {"type": "object"},
+            "query": {"type": "object"},
+            "body": {"type": "object"}
+          }
+        },
+        "response": {
+          "type": "object",
+          "properties": {
+            "200": {"type": "object"},
+            "400": {"type": "object"},
+            "401": {"type": "object"},
+            "404": {"type": "object"},
+            "500": {"type": "object"}
+          }
+        }
+      }
+    },
+    "graphqlResolver": {
+      "type": "object",
+      "required": ["name", "returnType"],
+      "properties": {
+        "name": {"type": "string"},
+        "description": {"type": "string"},
+        "args": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        },
+        "returnType": {"type": "string"},
+        "authorityRequired": {"type": "integer"}
+      }
+    },
+    "middleware": {
+      "type": "object",
+      "required": ["name", "description"],
+      "properties": {
+        "name": {"type": "string"},
+        "description": {"type": "string"},
+        "appliesTo": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "config": {"type": "object"}
+      }
+    },
+    "eventDefinition": {
+      "type": "object",
+      "required": ["name", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Event name (SCREAMING_SNAKE_CASE)",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "description": {"type": "string"},
+        "payload": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "emittedBy": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "dataType": {
+      "type": "object",
+      "properties": {
+        "description": {"type": "string"},
+        "fields": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "schema": {
+          "type": "string",
+          "description": "Reference to full schema if exists"
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

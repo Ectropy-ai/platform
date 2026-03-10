@@ -1,0 +1,548 @@
+{
+  "$schema": "../../schemas/strategy.schema.json",
+  "$id": "urn:luhtech:ectropy:strategy:platform-agent",
+  "title": "Platform Decision Agent Strategy",
+  "subtitle": "Ectropy Internal Roadmap Decision Engine Implementation",
+  "documentId": "STRATEGY-PA-2026-01-29",
+  "version": "1.0.0",
+  "status": "APPROVED",
+  "meta": {
+    "createdAt": "2026-01-29T00:00:00Z",
+    "lastUpdated": "2026-01-29T00:00:00Z",
+    "author": "Claude Agent",
+    "reviewedBy": "Architecture Session",
+    "sourceOfTruth": ".roadmap/features/platform-agent/STRATEGY.json"
+  },
+  "executiveSummary": {
+    "objective": "Implement the Dual-Process Decision Engine for Ectropy's internal development planning",
+    "approach": "Leverage the production-ready decision engine (424 tests, 23 MCP tools) with platform-specific context isolation",
+    "keyInsight": "Same cognitive architecture, completely different data - Platform Agent never sees tenant data, Tenant Agents never see code/roadmap",
+    "effort": "96 hours (4 weeks part-time)",
+    "dependencies": [
+      "Dual-Process Decision Engine (COMPLETE)",
+      "Multi-Tenant Foundation (COMPLETE)",
+      "Repository Split (January 30, 2026)"
+    ]
+  },
+  "architecturePrinciples": {
+    "principle1": {
+      "name": "Context Isolation Above All",
+      "description": "Platform Agent operates exclusively on code/feature planning data. Zero access to tenant construction data.",
+      "enforcement": [
+        "Repository boundary (private repo for platform files)",
+        "PostgreSQL RLS bypass via tenant_id = NULL",
+        "MCP tool excluded_contexts configuration",
+        "Separate Success Stack tier"
+      ]
+    },
+    "principle2": {
+      "name": "Cognitive Consistency",
+      "description": "Same dual-process architecture (Engine 1 + Engine 2 + USF Mediation) for both platform and tenant decisions",
+      "benefit": "Pattern reuse, consistent tooling, single codebase"
+    },
+    "principle3": {
+      "name": "Dogfooding",
+      "description": "Ectropy uses its own decision intelligence for development planning - validates the architecture at the meta-level",
+      "benefit": "Credibility, real-world testing, continuous improvement"
+    }
+  },
+  "currentState": {
+    "decisionEngineStatus": {
+      "status": "COMPLETE",
+      "tests": 424,
+      "coverage": ">80%",
+      "mcpTools": 23,
+      "services": [
+        {
+          "name": "success-stack.service.ts",
+          "lines": 705,
+          "status": "PRODUCTION_READY"
+        },
+        {
+          "name": "possibility-space.service.ts",
+          "lines": 870,
+          "status": "PRODUCTION_READY"
+        },
+        {
+          "name": "usf-mediator.service.ts",
+          "lines": 650,
+          "status": "PRODUCTION_READY"
+        },
+        {
+          "name": "sdi-calculator.service.ts",
+          "lines": 450,
+          "status": "PRODUCTION_READY"
+        },
+        {
+          "name": "pattern-compression.service.ts",
+          "lines": 735,
+          "status": "PRODUCTION_READY"
+        }
+      ]
+    },
+    "gaps": [
+      {
+        "gap": "Decision → Milestone Linking",
+        "description": "Decisions exist independently, not linked to roadmap milestones",
+        "priority": "P0"
+      },
+      {
+        "gap": "Platform Success Stack Tier",
+        "description": "No platform-specific pattern library exists",
+        "priority": "P0"
+      },
+      {
+        "gap": "Classification Propagation",
+        "description": "LEAD/DERIVED classification not propagated through decision chains",
+        "priority": "P1"
+      },
+      {
+        "gap": "Platform Eigenmodes",
+        "description": "12 eigenmodes are construction-focused, need platform equivalents",
+        "priority": "P1"
+      }
+    ]
+  },
+  "schemaExtensions": {
+    "roadmapMilestoneV31": {
+      "description": "Extended milestone schema with cognitive fields",
+      "newFields": {
+        "classification": {
+          "type": "string",
+          "enum": ["LEAD", "DERIVED", "EXTERNAL", "FLEXIBLE"],
+          "description": "Atomic Reference Strategy classification",
+          "default": "LEAD"
+        },
+        "healthScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "SDI-derived milestone health (0=crisis, 1=abundant)"
+        },
+        "eigenmodeSnapshot": {
+          "type": "array",
+          "items": {"type": "number"},
+          "minItems": 12,
+          "maxItems": 12,
+          "description": "Platform eigenmode values at milestone assessment"
+        },
+        "patternConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Success Stack match confidence for approach"
+        },
+        "explorationBudget": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Permitted exploration for novel approaches"
+        },
+        "linkedDecisions": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "URNs of decisions that drove this milestone"
+        },
+        "monitoringTriggers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {"type": "string", "enum": ["SDI_BREACH", "TIMELINE_DEVIATION", "SCOPE_CREEP", "DEPENDENCY_BLOCK"]},
+              "threshold": {"type": "number"},
+              "action": {"type": "string", "enum": ["alert", "escalate", "constrain", "re_mediate"]}
+            }
+          }
+        }
+      },
+      "example": {
+        "id": "PA-M1",
+        "name": "Schema Extension (V3.1)",
+        "targetDate": "2026-02-05",
+        "status": "planned",
+        "classification": "LEAD",
+        "healthScore": 0.85,
+        "eigenmodeSnapshot": [0.95, 0.88, 0.72, 0.90, 0.85, 0.78, 0.65, 0.92, 0.88, 0.95, 0.80, 0.75],
+        "patternConfidence": 0.82,
+        "explorationBudget": 0.2,
+        "linkedDecisions": [],
+        "monitoringTriggers": [
+          {"type": "TIMELINE_DEVIATION", "threshold": 0.7, "action": "alert"}
+        ],
+        "graphMetadata": {
+          "predecessors": [],
+          "successors": ["urn:luhtech:ectropy:milestone:PA-M2"]
+        }
+      }
+    },
+    "decisionEventV31": {
+      "description": "Extended decision event schema with roadmap linking",
+      "newFields": {
+        "linkedMilestoneUrn": {
+          "type": "string",
+          "pattern": "^urn:luhtech:[^:]+:milestone:.+$",
+          "description": "Milestone this decision affects"
+        },
+        "linkedFeatureUrn": {
+          "type": "string",
+          "pattern": "^urn:luhtech:[^:]+:feature:.+$",
+          "description": "Feature this decision affects"
+        },
+        "classification": {
+          "type": "string",
+          "enum": ["LEAD", "DERIVED", "EXTERNAL", "FLEXIBLE"],
+          "description": "Inherited from trigger type or explicit"
+        },
+        "authorityLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "description": "Platform authority cascade level required"
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Predecessor decision URNs"
+        },
+        "blocks": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Successor decision URNs"
+        }
+      }
+    }
+  },
+  "successStackTiers": {
+    "description": "Three-tier Success Stack architecture for complete isolation",
+    "tiers": {
+      "platform": {
+        "scope": "LuhTech Internal",
+        "content": "Feature delivery, venture coordination, schema design patterns",
+        "access": "Platform Agent ONLY",
+        "storage": ".roadmap/success-stack-platform.json (private repo)",
+        "examplePatterns": [
+          {
+            "id": "PAT-PLATFORM-FEAT-001",
+            "name": "M7_MILESTONE_DECOMPOSITION",
+            "actionType": "decompose_feature",
+            "confidence": 0.85,
+            "frequency": 47,
+            "conditions": "Feature complexity >= medium, has schema changes"
+          },
+          {
+            "id": "PAT-PLATFORM-SCHEMA-001",
+            "name": "V3_SCHEMA_EVOLUTION",
+            "actionType": "evolve_schema",
+            "confidence": 0.90,
+            "frequency": 23,
+            "conditions": "Breaking change required"
+          }
+        ]
+      },
+      "global": {
+        "scope": "All Tenants",
+        "content": "Anonymized construction patterns (no PII, no tenant identification)",
+        "access": "All Tenant Agents",
+        "storage": "PostgreSQL success_patterns table (isGlobal = true)",
+        "anonymization": {
+          "removedFields": ["tenant_id", "project_id", "sourceDecisions"],
+          "keptFields": ["contextSignature", "actionTemplate", "outcomeProfile"]
+        }
+      },
+      "tenant": {
+        "scope": "Single Tenant",
+        "content": "Tenant-specific construction patterns",
+        "access": "That Tenant Agent ONLY",
+        "storage": "PostgreSQL success_patterns table (tenant_id = specific)",
+        "isolation": "PostgreSQL RLS enforces tenant_id match"
+      }
+    },
+    "queryFlow": {
+      "platformAgent": "Query Platform tier only → Never sees Global or Tenant patterns",
+      "tenantAgent": "Query Tenant tier first → Fallback to Global tier → Never sees Platform tier"
+    }
+  },
+  "platformAuthorityMapping": {
+    "description": "4-tier authority cascade for platform development decisions",
+    "cascade": [
+      {
+        "level": 0,
+        "role": "CLAUDE_AGENT",
+        "description": "Automated decisions within established patterns",
+        "thresholds": {
+          "maxEffortHours": 4,
+          "scopeLimit": "Single file changes",
+          "patternConfidenceRequired": 0.9
+        },
+        "permissions": [
+          "Apply high-confidence patterns",
+          "Fix lint/type errors",
+          "Update documentation",
+          "Run tests and report"
+        ],
+        "escalationTriggers": [
+          "Novel situation (no pattern match)",
+          "Multi-file changes required",
+          "Schema modifications"
+        ]
+      },
+      {
+        "level": 1,
+        "role": "DEVELOPER",
+        "description": "Implementation decisions within approved features",
+        "thresholds": {
+          "maxEffortHours": 40,
+          "scopeLimit": "Single feature/service",
+          "patternConfidenceRequired": 0.7
+        },
+        "permissions": [
+          "Implement approved features",
+          "Create new services",
+          "Add tests",
+          "Refactor within scope"
+        ],
+        "escalationTriggers": [
+          "Cross-feature changes",
+          "Schema design decisions",
+          "External integrations"
+        ]
+      },
+      {
+        "level": 2,
+        "role": "ARCHITECT",
+        "description": "Design decisions affecting multiple features",
+        "thresholds": {
+          "maxEffortHours": 200,
+          "scopeLimit": "Multi-feature/cross-cutting",
+          "explorationPermitted": true
+        },
+        "permissions": [
+          "Schema design",
+          "Architecture decisions",
+          "Cross-feature refactoring",
+          "Integration design"
+        ],
+        "escalationTriggers": [
+          "Strategic direction changes",
+          "Venture-level impact",
+          "Funding gate decisions"
+        ]
+      },
+      {
+        "level": 3,
+        "role": "ERIK",
+        "description": "Strategic decisions and venture coordination",
+        "thresholds": {
+          "maxEffortHours": "unlimited",
+          "scopeLimit": "Strategic/venture-level"
+        },
+        "permissions": [
+          "All decisions",
+          "Venture priorities",
+          "Funding allocation",
+          "Strategic direction"
+        ]
+      }
+    ]
+  },
+  "implementationTasks": {
+    "phase1": {
+      "name": "Schema Extensions",
+      "duration": "Week 1",
+      "effort": "24 hours",
+      "tasks": [
+        {
+          "id": "PA-T1.1",
+          "name": "Create roadmap.schema.v3.1.json",
+          "description": "Add cognitive fields to milestone schema",
+          "file": ".roadmap/schemas/roadmap.schema.v3.1.json",
+          "hours": 6
+        },
+        {
+          "id": "PA-T1.2",
+          "name": "Extend decision-event.schema.v3.1.json",
+          "description": "Add milestone linking and classification fields",
+          "file": ".roadmap/schemas/decision/decision-event.schema.v3.1.json",
+          "hours": 6
+        },
+        {
+          "id": "PA-T1.3",
+          "name": "Create classification definitions",
+          "description": "Shared LEAD/DERIVED/EXTERNAL/FLEXIBLE definitions",
+          "file": ".roadmap/schemas/definitions/classification.schema.json",
+          "hours": 4
+        },
+        {
+          "id": "PA-T1.4",
+          "name": "Migrate existing roadmap data",
+          "description": "Add classification to all 8 venture milestones",
+          "scope": "All .roadmap/roadmap*.json files",
+          "hours": 8
+        }
+      ]
+    },
+    "phase2": {
+      "name": "Platform Success Stack",
+      "duration": "Week 2",
+      "effort": "32 hours",
+      "tasks": [
+        {
+          "id": "PA-T2.1",
+          "name": "Create platform pattern seeder",
+          "description": "Service to generate initial patterns from historical milestones",
+          "file": "apps/mcp-server/src/services/platform-pattern-seeder.ts",
+          "hours": 12
+        },
+        {
+          "id": "PA-T2.2",
+          "name": "Seed feature decomposition patterns",
+          "description": "M7, M5, M3 milestone patterns with conditions",
+          "count": "20+ patterns",
+          "hours": 8
+        },
+        {
+          "id": "PA-T2.3",
+          "name": "Seed schema design patterns",
+          "description": "Schema evolution, migration, deprecation patterns",
+          "count": "15+ patterns",
+          "hours": 6
+        },
+        {
+          "id": "PA-T2.4",
+          "name": "Seed deployment patterns",
+          "description": "Staging-first, rollback, blue-green patterns",
+          "count": "15+ patterns",
+          "hours": 6
+        }
+      ]
+    },
+    "phase3": {
+      "name": "MCP Integration",
+      "duration": "Week 3",
+      "effort": "24 hours",
+      "tasks": [
+        {
+          "id": "PA-T3.1",
+          "name": "Create platform agent configuration",
+          "description": "Tool whitelist, excluded contexts, authority cascade",
+          "file": "apps/mcp-server/src/config/platform-agent.config.ts",
+          "hours": 8
+        },
+        {
+          "id": "PA-T3.2",
+          "name": "Implement platform context service",
+          "description": "Inject platform context into MCP tool calls",
+          "file": "apps/mcp-server/src/services/platform-context.service.ts",
+          "hours": 8
+        },
+        {
+          "id": "PA-T3.3",
+          "name": "Platform eigenmode calculator",
+          "description": "Calculate 12 platform eigenmodes from codebase metrics",
+          "file": "apps/mcp-server/src/services/platform-eigenmode.service.ts",
+          "hours": 8
+        }
+      ]
+    },
+    "phase4": {
+      "name": "Integration & Testing",
+      "duration": "Week 4",
+      "effort": "16 hours",
+      "tasks": [
+        {
+          "id": "PA-T4.1",
+          "name": "Decision-milestone linking service",
+          "description": "Bidirectional linking with graphMetadata edges",
+          "file": "apps/mcp-server/src/services/decision-milestone-linker.service.ts",
+          "hours": 8
+        },
+        {
+          "id": "PA-T4.2",
+          "name": "Integration tests",
+          "description": "Platform agent scenarios, isolation verification",
+          "file": "apps/mcp-server/src/services/__tests__/platform-agent.integration.spec.ts",
+          "hours": 4
+        },
+        {
+          "id": "PA-T4.3",
+          "name": "Documentation",
+          "description": "Platform agent usage guide, pattern library docs",
+          "hours": 4
+        }
+      ]
+    }
+  },
+  "validationTests": {
+    "isolationTests": [
+      {
+        "testCase": "Platform agent cannot access tenant decisions",
+        "action": "Platform agent calls query_success_stack",
+        "expected": "Only platform patterns returned, zero tenant patterns"
+      },
+      {
+        "testCase": "Tenant agent cannot access platform roadmap",
+        "action": "Tenant agent calls read_roadmap",
+        "expected": "Tool not found error"
+      },
+      {
+        "testCase": "Platform agent cannot access global construction patterns",
+        "action": "Platform agent queries with construction context",
+        "expected": "Empty result (global tier excluded)"
+      }
+    ],
+    "integrationTests": [
+      {
+        "testCase": "Full platform decision flow",
+        "scenario": "Feature decomposition decision with pattern match",
+        "expected": "Pattern matched, M7 decomposition recommended, decision linked to milestone"
+      },
+      {
+        "testCase": "Novel exploration with escalation",
+        "scenario": "New feature type with no pattern precedent",
+        "expected": "Engine 2 generates options, escalates to ARCHITECT level"
+      },
+      {
+        "testCase": "Pattern compression from outcome",
+        "scenario": "Milestone completed successfully",
+        "expected": "Decision compressed to platform Success Stack pattern"
+      }
+    ]
+  },
+  "riskMitigation": {
+    "risk1": {
+      "risk": "Platform patterns accidentally exposed to tenants",
+      "mitigation": "Repository boundary (private repo) + MCP excluded_contexts",
+      "monitoring": "Audit logs for cross-tier pattern queries"
+    },
+    "risk2": {
+      "risk": "Platform eigenmodes not representative",
+      "mitigation": "Iterate on eigenmode definitions based on real usage",
+      "monitoring": "Track pattern match rates and adjust eigenmodes"
+    },
+    "risk3": {
+      "risk": "Decision-milestone linking creates maintenance burden",
+      "mitigation": "Automated linking based on trigger context",
+      "monitoring": "Track manual linking interventions"
+    }
+  },
+  "successCriteria": {
+    "quantitative": [
+      {"metric": "Pattern match rate", "target": ">60%", "baseline": "0%"},
+      {"metric": "Exploration success rate", "target": ">40%", "baseline": "N/A"},
+      {"metric": "Milestone on-time rate", "target": ">80%", "baseline": "70%"},
+      {"metric": "Decision audit coverage", "target": "100%", "baseline": "0%"}
+    ],
+    "qualitative": [
+      "Platform decisions have full rationale documentation",
+      "Feature decomposition recommendations are actionable",
+      "Authority escalation works correctly",
+      "No cross-tier data leakage"
+    ]
+  },
+  "graphMetadata": {
+    "inEdges": [
+      "urn:luhtech:ectropy:feature:platform-agent"
+    ],
+    "outEdges": []
+  }
+}

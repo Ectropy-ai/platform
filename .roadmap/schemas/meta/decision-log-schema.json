@@ -1,0 +1,349 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ectropy.ai/schemas/decision-log-v1.0.0.json",
+  "title": "Decision Log Schema",
+  "description": "JSON schema for Ectropy decision log - architectural decisions, strategic choices, and governance tracking",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "lastUpdated",
+    "metadata",
+    "decisions",
+    "indexes"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of this schema"
+    },
+    "lastUpdated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of last update"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["documentId", "purpose", "maintainer"],
+      "properties": {
+        "documentId": {
+          "type": "string",
+          "const": "decision-log"
+        },
+        "purpose": {
+          "type": "string",
+          "description": "Purpose of this document"
+        },
+        "maintainer": {
+          "type": "string",
+          "description": "Primary maintainer (human or ai-agents)"
+        },
+        "humanViewUrl": {
+          "type": "string",
+          "description": "Path to generated markdown view"
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "description": "Array of all decisions",
+      "items": {
+        "$ref": "#/definitions/decision"
+      }
+    },
+    "indexes": {
+      "type": "object",
+      "description": "Indexes for efficient decision lookup",
+      "required": [
+        "byStatus",
+        "byCategory",
+        "byImpact",
+        "byApprover",
+        "byDate"
+      ],
+      "properties": {
+        "byStatus": {
+          "type": "object",
+          "description": "Decisions indexed by status",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "byCategory": {
+          "type": "object",
+          "description": "Decisions indexed by category",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "byImpact": {
+          "type": "object",
+          "description": "Decisions indexed by impact level",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "byApprover": {
+          "type": "object",
+          "description": "Decisions indexed by approver",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "byDate": {
+          "type": "object",
+          "description": "Decisions indexed by date (YYYY-MM format)",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "decision": {
+      "type": "object",
+      "required": [
+        "decisionId",
+        "timestamp",
+        "title",
+        "context",
+        "alternatives",
+        "decision",
+        "rationale",
+        "status",
+        "category",
+        "impact"
+      ],
+      "properties": {
+        "decisionId": {
+          "type": "string",
+          "pattern": "^d-\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$",
+          "description": "Unique decision identifier (d-YYYY-MM-DD-slug)"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when decision was made"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Brief title of the decision"
+        },
+        "context": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "Background context explaining why this decision was needed"
+        },
+        "alternatives": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Alternative options considered",
+          "items": {
+            "type": "object",
+            "required": ["option", "pros", "cons"],
+            "properties": {
+              "option": {
+                "type": "string",
+                "description": "Description of this alternative"
+              },
+              "pros": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Advantages of this option"
+              },
+              "cons": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Disadvantages of this option"
+              },
+              "estimatedEffort": {
+                "type": "string",
+                "description": "Estimated effort (e.g., '2-3 days', '1 week')"
+              },
+              "riskLevel": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "critical"],
+                "description": "Risk level of this option"
+              }
+            }
+          }
+        },
+        "decision": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The final decision made"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "Explanation of why this decision was made"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "proposed",
+            "under-review",
+            "approved",
+            "rejected",
+            "implemented",
+            "deprecated"
+          ],
+          "description": "Current status of the decision"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "architecture",
+            "infrastructure",
+            "security",
+            "performance",
+            "api-design",
+            "data-model",
+            "workflow",
+            "tooling",
+            "policy",
+            "strategic",
+            "operational",
+            "technical-debt"
+          ],
+          "description": "Category of the decision"
+        },
+        "impact": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"],
+          "description": "Impact level of this decision"
+        },
+        "approvedBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of approvers (usernames or roles)"
+        },
+        "implementedDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Date when decision was implemented (YYYY-MM-DD)"
+        },
+        "deprecatedDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Date when decision was deprecated (YYYY-MM-DD)"
+        },
+        "votes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^v-\\d{4}-\\d{2}-\\d{2}-\\d{3}$"
+          },
+          "description": "Array of vote IDs associated with this decision"
+        },
+        "impactedDeliverables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Roadmap deliverable IDs impacted by this decision"
+        },
+        "impactedServices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Service IDs impacted by this decision"
+        },
+        "impactedInfrastructure": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Infrastructure component IDs impacted by this decision"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Evidence file paths supporting this decision"
+        },
+        "relatedDecisions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^d-\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$"
+          },
+          "description": "Related decision IDs"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tags for categorization and search"
+        },
+        "supersedes": {
+          "type": "string",
+          "pattern": "^d-\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$",
+          "description": "Decision ID that this decision supersedes"
+        },
+        "supersededBy": {
+          "type": "string",
+          "pattern": "^d-\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$",
+          "description": "Decision ID that supersedes this decision"
+        },
+        "reviewDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Date when decision should be reviewed (YYYY-MM-DD)"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["timestamp", "author", "note"],
+            "properties": {
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When note was added"
+              },
+              "author": {
+                "type": "string",
+                "description": "Who added the note"
+              },
+              "note": {
+                "type": "string",
+                "description": "Note content"
+              }
+            }
+          },
+          "description": "Additional notes and updates"
+        }
+      }
+    }
+  }
+}

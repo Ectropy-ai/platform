@@ -1,0 +1,554 @@
+# =============================================================================
+# DOCKER COMPOSE - DEVELOPMENT ENVIRONMENT
+# =============================================================================
+# Enterprise Standard: All ports configured via environment variables
+# Source of Truth: .env.development.ports, apps/mcp-server/data/routing-architecture.json
+# =============================================================================
+
+x-common-variables: &common-variables
+  NODE_ENV: development
+  TZ: UTC
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 5
+  start_period: 60s
+
+services:
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.development
+      args:
+        NODE_ENV: development
+      cache_from:
+        - node:20-alpine
+    # ENTERPRISE PATTERN: Explicit load order (last file wins)
+    # Layer 1: Base defaults (.env auto-loaded by Docker Compose)
+    # Layer 2: Environment-specific non-sensitive config
+    # Layer 3: Secrets (overrides all) - gitignored
+    env_file:
+      - .env # Base defaults
+      - .env.development # Environment config
+      - .env.local # Secrets (highest priority)
+    environment:
+      <<: *common-variables
+      # Port configuration from environment variable
+      PORT: ${API_GATEWAY_PORT:-4000}
+      API_GATEWAY_PORT: ${API_GATEWAY_PORT:-4000}
+      # Database configuration - standardized DATABASE_* pattern
+      DATABASE_HOST: postgres
+      DATABASE_PORT: ${DATABASE_PORT:-5432}
+      DATABASE_NAME: ectropy_dev
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      DATABASE_URL: postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-postgres}@postgres:5432/ectropy_dev
+      # Legacy DB_* aliases for backward compatibility
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ectropy_dev
+      DB_USER: postgres
+      DB_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      # Redis configuration
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_URL: redis://redis:6379
+      RUN_MIGRATIONS: 'false' # Enable migrations in production
+      # OAuth configuration loaded from .env.local via env_file above
+      # Application expects GOOGLE_CLIENT_ID, but env_file provides GOOGLE_CLIENT_ID_DEVELOPMENT
+      # Using entrypoint script would be cleaner, but for now we'll update the app code
+      SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-in-production}
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-production-min-32-chars}
+      # Speckle BIM Integration (API Gateway needs internal Docker hostname to connect to Speckle)
+      SPECKLE_SERVER_URL: http://speckle-server:3000
+      SPECKLE_API_URL: ${SPECKLE_API_URL:-http://speckle-server:3000/graphql}
+      # SPECKLE_SERVER_TOKEN - ENTERPRISE PATTERN: Loaded ONLY from env_file (.env.local)
+      # NOT declared here to avoid Docker Compose shell interpolation before env_file loads
+      ENABLE_RATE_LIMITING: ${ENABLE_RATE_LIMITING:-true}
+      # CRITICAL FIX: OAuth success redirect should go to nginx (port 80), not direct web-dashboard (port 3000)
+      # Issue: localhost-architecture-fixes.json ISSUE-002
+      FRONTEND_URL: http://localhost
+      OAUTH_SUCCESS_REDIRECT: http://localhost/dashboard
+      # CORS must allow nginx port 80 as origin
+      CORS_ORIGINS: http://localhost,http://localhost:3000,http://localhost:4000
+    ports:
+      - '${API_GATEWAY_PORT:-4000}:${API_GATEWAY_PORT:-4000}'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        [
+          'CMD',
+          'curl',
+          '-4',
+          '-f',
+          'http://localhost:${API_GATEWAY_PORT:-4000}/health',
+        ]
+    restart: unless-stopped
+    networks:
+      - ectropy-network
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: apps/mcp-server/Dockerfile.simple
+      args:
+        NODE_ENV: development
+      cache_from:
+        - node:20-alpine
+    environment:
+      <<: *common-variables
+      # MCP Server dual-port configuration
+      PORT: ${MCP_SERVER_STDIO_PORT:-3001}
+      MCP_PORT: ${MCP_SERVER_STDIO_PORT:-3001}
+      EXPRESS_PORT: ${MCP_SERVER_EXPRESS_PORT:-3002}
+      MCP_SERVER_STDIO_PORT: ${MCP_SERVER_STDIO_PORT:-3001}
+      MCP_SERVER_EXPRESS_PORT: ${MCP_SERVER_EXPRESS_PORT:-3002}
+      # Data path configuration (Enterprise Standard)
+      # Points to volume-mounted data directory for live updates
+      DATA_PATH: /app/data
+      # Database configuration - standardized DATABASE_* pattern
+      # ENTERPRISE FIX (2026-01-16): ROOT CAUSE #75 - Add DATABASE_URL for Prisma
+      # Prisma requires full connection string format for schema.prisma:14
+      # Format: postgresql://user:password@host:port/database
+      DATABASE_URL: postgresql://${DATABASE_USER:-postgres}:${DATABASE_PASSWORD:-postgres}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${DATABASE_NAME:-ectropy_dev}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: ${DATABASE_PORT:-5432}
+      DATABASE_NAME: ectropy_dev
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      # Legacy DB_* aliases for backward compatibility
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ectropy_dev
+      DB_USER: postgres
+      DB_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      # Redis configuration
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      # API Gateway configuration (Docker networking)
+      API_GATEWAY_HOST: api-gateway
+      API_GATEWAY_PORT: ${API_GATEWAY_PORT:-4000}
+    ports:
+      - '${MCP_SERVER_STDIO_PORT:-3001}:${MCP_SERVER_STDIO_PORT:-3001}'
+      - '${MCP_SERVER_EXPRESS_PORT:-3002}:${MCP_SERVER_EXPRESS_PORT:-3002}'
+    volumes:
+      # Mount data directory for live updates (Enterprise Standard)
+      # Allows GraphQL queries to access JSON data files
+      # Pattern: ./apps/mcp-server/data:/app/data:ro (read-only for security)
+      - ./apps/mcp-server/data:/app/data:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      # ENTERPRISE FIX (2026-01-16): HTTP-based health check for Express API testing
+      # Checks both MCP stdio port (3001) and Express API port (3002)
+      # Enables full SEPPA testing in development environment
+      test:
+        [
+          'CMD',
+          'sh',
+          '-c',
+          'curl -4 -f http://localhost:${MCP_SERVER_EXPRESS_PORT:-3002}/api/mcp/health || exit 1',
+        ]
+    restart: unless-stopped
+    networks:
+      - ectropy-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      # PostgreSQL uses POSTGRES_* variables internally
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      POSTGRES_DB: ${DATABASE_NAME:-ectropy_dev}
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+      # Environment variables for database/init.sql variable substitution
+      ECTROPY_DB_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      SPECKLE_POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      ROOT_DB_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+    ports:
+      - '${DATABASE_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/init.development.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ectropy-network
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ectropy-network
+
+  web-dashboard:
+    build:
+      context: .
+      dockerfile: apps/web-dashboard/Dockerfile
+      args:
+        NODE_ENV: development
+        # Pass React environment variables as build args (required for build-time injection)
+        REACT_APP_SPECKLE_FRONTEND_PORT: ${REACT_APP_SPECKLE_FRONTEND_PORT:-8080}
+        REACT_APP_DEMO_SPECKLE_STREAM_ID: ${REACT_APP_DEMO_SPECKLE_STREAM_ID}
+        REACT_APP_DEMO_SPECKLE_OBJECT_ID: ${REACT_APP_DEMO_SPECKLE_OBJECT_ID}
+        REACT_APP_API_URL: http://localhost # Uses nginx routing on port 80 (not direct :4000)
+        REACT_APP_LOG_LEVEL: debug
+      cache_from:
+        - node:20-alpine
+    environment:
+      <<: *common-variables
+      # Port configuration from environment variables
+      PORT: ${WEB_DASHBOARD_PORT:-3000}
+      WEB_DASHBOARD_PORT: ${WEB_DASHBOARD_PORT:-3000}
+      # React app environment variables (REACT_APP_ prefix required)
+      REACT_APP_WEB_DASHBOARD_PORT: ${REACT_APP_WEB_DASHBOARD_PORT:-3000}
+      REACT_APP_API_GATEWAY_PORT: ${REACT_APP_API_GATEWAY_PORT:-4000}
+      REACT_APP_MCP_PORT: ${REACT_APP_MCP_PORT:-3002}
+      REACT_APP_SPECKLE_FRONTEND_PORT: ${REACT_APP_SPECKLE_FRONTEND_PORT:-8080}
+      REACT_APP_API_URL: http://localhost # Uses nginx routing on port 80 (not direct :4000)
+      REACT_APP_SPECKLE_SERVER_URL: ${REACT_APP_SPECKLE_SERVER_URL:-http://localhost:3333}
+      REACT_APP_DEMO_SPECKLE_STREAM_ID: ${REACT_APP_DEMO_SPECKLE_STREAM_ID}
+      REACT_APP_DEMO_SPECKLE_OBJECT_ID: ${REACT_APP_DEMO_SPECKLE_OBJECT_ID}
+      REACT_APP_LOG_LEVEL: debug
+    ports:
+      - '${WEB_DASHBOARD_PORT:-3000}:${WEB_DASHBOARD_PORT:-3000}'
+    volumes:
+      - ./apps/web-dashboard/src:/app/src:cached
+      - ./apps/web-dashboard/public:/app/public:cached
+      - /app/node_modules
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ectropy-network
+
+  ectropy-console:
+    build:
+      context: .
+      dockerfile: apps/ectropy-console/Dockerfile
+      args:
+        VITE_GRAFANA_BASE_URL: ${VITE_GRAFANA_BASE_URL:-/grafana}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:4000}
+        # Subdomain deployment: console.localhost uses root path
+        VITE_BASE_PATH: /
+      cache_from:
+        - node:20-alpine
+    container_name: ectropy-console-dev
+    environment:
+      NODE_ENV: development
+      PORT: ${CONSOLE_PORT:-3001}
+    ports:
+      - '${CONSOLE_PORT:-3001}:3001'
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ectropy-network
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: ectropy-nginx-dev
+    ports:
+      - '${NGINX_PORT:-80}:80'
+    volumes:
+      - ./infrastructure/nginx/development.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      web-dashboard:
+        condition: service_started
+      ectropy-console:
+        condition: service_started
+      api-gateway:
+        condition: service_healthy
+      mcp-server:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--quiet',
+          '--tries=1',
+          '--spider',
+          'http://127.0.0.1/health',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - ectropy-network
+
+  qdrant:
+    image: qdrant/qdrant:v1.6.1
+    ports:
+      - '${QDRANT_HTTP_PORT:-6333}:6333'
+      - '${QDRANT_GRPC_PORT:-6334}:6334' # gRPC port
+    volumes:
+      - qdrant-data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: ${QDRANT_GRPC_PORT:-6334}
+      QDRANT_HTTP_PORT: ${QDRANT_HTTP_PORT:-6333}
+      QDRANT_GRPC_PORT: ${QDRANT_GRPC_PORT:-6334}
+    # Note: Qdrant is a third-party image with no curl/wget/netcat
+    # HTTP health check can be validated from host or dependent services
+    # Omitting healthcheck - Qdrant starts quickly and logs confirm readiness
+    restart: unless-stopped
+    networks:
+      - ectropy-network
+
+  # =========================================================================
+  # SPECKLE BIM INTEGRATION SERVICES
+  # =========================================================================
+  # Enterprise-grade BIM viewing, sharing, and collaboration platform
+  # Official Speckle Server: https://github.com/specklesystems/speckle-server
+  # =========================================================================
+
+  speckle-server:
+    image: speckle/speckle-server:2
+    container_name: ectropy-speckle-server
+    restart: unless-stopped
+    environment:
+      # Server URL configuration (local development)
+      CANONICAL_URL: http://localhost:8080
+      PRIVATE_OBJECTS_SERVER_URL: http://speckle-server:3000
+
+      # CORS configuration (allow web dashboard to access Speckle server)
+      # ENTERPRISE FIX (2025-11-23): Added http://localhost for Nginx-proxied dashboard (port 80)
+      CORS_ORIGIN: http://localhost,http://localhost:3000,http://localhost:8080
+
+      # Session security
+      SESSION_SECRET: ${SPECKLE_SESSION_SECRET:-dev_speckle_session_secret_change_in_production_32_chars}
+
+      # Authentication strategy (local username/password for dev)
+      STRATEGY_LOCAL: 'true'
+
+      # Logging
+      LOG_LEVEL: info
+      LOG_PRETTY: 'true'
+
+      # Database configuration (reuse existing PostgreSQL, separate database)
+      POSTGRES_URL: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      POSTGRES_DB: speckle
+
+      # Redis configuration (reuse existing Redis, separate DB index)
+      REDIS_URL: redis://redis:6379/1
+      PREVIEW_SERVICE_USE_PRIVATE_OBJECTS_SERVER_URL: 'true'
+      PREVIEW_SERVICE_REDIS_URL: redis://redis:6379/1
+      FILEIMPORT_SERVICE_USE_PRIVATE_OBJECTS_SERVER_URL: 'true'
+      FILEIMPORT_SERVICE_REDIS_URL: redis://redis:6379/1
+
+      # MinIO S3-compatible object storage
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
+      S3_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      S3_BUCKET: speckle-server
+      S3_CREATE_BUCKET: 'true'
+      S3_REGION: 'us-east-1'
+
+      # File upload limits
+      FILE_SIZE_LIMIT_MB: 1000
+
+      # Email configuration (disabled for local dev)
+      EMAIL_FROM: 'no-reply@ectropy.local'
+      EMAIL_SECURE: 'false'
+      EMAIL_REQUIRE_TLS: 'false'
+
+      # Frontend URL
+      FRONTEND_ORIGIN: http://localhost:8080
+
+      # File import queue
+      FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://postgres:${DATABASE_PASSWORD:-postgres}@postgres/speckle
+      FF_NEXT_GEN_FILE_IMPORTER_ENABLED: 'true'
+    ports:
+      - '${SPECKLE_SERVER_PORT:-3333}:${SPECKLE_SERVER_CONTAINER_PORT:-3000}' # Speckle API (exposed on host port 3333, container uses 3000)
+    # NOTE: Host port changed from 3000 to 3333 to avoid conflict with web-dashboard
+    # TEMPORARY: Frontend has ERR_EMPTY_RESPONSE issue, using GraphQL directly to create admin user
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    # healthcheck:
+    #   test: ['CMD', 'curl', '-4', '-f', , 'http://localhost:3000/readiness']
+    #   interval: 10s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 90s
+    # DISABLED: wget not available in speckle-server:2 container. Server logs show healthy startup.
+    # Monitor via logs: docker logs ectropy-speckle-server
+    # External health: curl http://localhost:8080 (via speckle-frontend)
+    networks:
+      - ectropy-network
+
+  speckle-frontend:
+    image: speckle/speckle-frontend-2:2
+    container_name: ectropy-speckle-frontend
+    restart: unless-stopped
+    environment:
+      # Server name
+      NUXT_PUBLIC_SERVER_NAME: 'Ectropy Local'
+
+      # Public-facing URLs (accessed by browser)
+      # NUXT_PUBLIC_API_ORIGIN: Browser-accessible API endpoint
+      # Must point to Speckle server backend, not frontend
+      # Backend is exposed on host port 3333
+      NUXT_PUBLIC_API_ORIGIN: http://localhost:3333
+      NUXT_PUBLIC_BASE_URL: http://localhost:8080
+
+      # Backend URL (Docker network internal - for SSR)
+      NUXT_PUBLIC_BACKEND_API_ORIGIN: http://speckle-server:3000
+
+      # Redis for SSR caching
+      NUXT_REDIS_URL: redis://redis:6379/1
+
+      # Logging
+      NUXT_PUBLIC_LOG_LEVEL: warn
+      LOG_LEVEL: info
+      LOG_PRETTY: 'true'
+
+      # Feature flags
+      NUXT_PUBLIC_FF_LARGE_FILE_IMPORTS_ENABLED: 'true'
+      NUXT_PUBLIC_FF_NEXT_GEN_FILE_IMPORTER_ENABLED: 'true'
+
+      # Port configuration - Override Speckle image default
+      # Speckle frontend-2 image sets PORT=8080 by default
+      # We explicitly set PORT=3000 to match Docker port mapping
+      PORT: '3000'
+    ports:
+      # Port mapping: host:8080 → container:3000
+      # Nuxt listens on PORT env var (set to 3000 above)
+      - '${SPECKLE_FRONTEND_PORT:-8080}:3000' # Frontend UI
+    depends_on:
+      - speckle-server
+    networks:
+      - ectropy-network
+
+  speckle-preview:
+    image: speckle/speckle-preview-service:2
+    container_name: ectropy-speckle-preview
+    restart: unless-stopped
+    mem_limit: 3000m
+    memswap_limit: 3000m
+    environment:
+      HOST: '0.0.0.0'
+      PORT: '3001'
+      LOG_LEVEL: info
+      LOG_PRETTY: 'true'
+      REDIS_URL: redis://redis:6379/1
+    depends_on:
+      - redis
+    networks:
+      - ectropy-network
+
+  speckle-webhook:
+    image: speckle/speckle-webhook-service:2
+    container_name: ectropy-speckle-webhook
+    restart: unless-stopped
+    environment:
+      LOG_LEVEL: info
+      LOG_PRETTY: 'true'
+      PG_CONNECTION_STRING: postgres://postgres:${DATABASE_PASSWORD:-postgres}@postgres/speckle
+    depends_on:
+      - speckle-server
+      - postgres
+    networks:
+      - ectropy-network
+
+  speckle-fileimport:
+    image: speckle/speckle-fileimport-service:2
+    container_name: ectropy-speckle-fileimport
+    restart: unless-stopped
+    environment:
+      LOG_LEVEL: info
+      LOG_PRETTY: 'true'
+
+      # Speckle Server URLs (internal Docker network)
+      SPECKLE_SERVER_URL: http://speckle-server:3000
+      CANONICAL_URL: http://localhost:8080
+
+      # Redis configuration (same as speckle-server)
+      REDIS_URL: redis://redis:6379/1
+
+      # PostgreSQL configuration (separate variables + connection string)
+      POSTGRES_URL: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      POSTGRES_DB: speckle
+      PG_CONNECTION_STRING: postgresql://postgres:${DATABASE_PASSWORD:-postgres}@postgres/speckle
+      FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://postgres:${DATABASE_PASSWORD:-postgres}@postgres/speckle
+    depends_on:
+      - speckle-server
+      - postgres
+      - redis
+    networks:
+      - ectropy-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: ectropy-minio
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio-data:/data
+    ports:
+      - '${MINIO_API_PORT:-9000}:9000' # S3 API
+      - '${MINIO_CONSOLE_PORT:-9001}:9001' # MinIO Console
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - ectropy-network
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  qdrant-data:
+    driver: local
+  minio-data:
+    driver: local
+
+networks:
+  ectropy-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

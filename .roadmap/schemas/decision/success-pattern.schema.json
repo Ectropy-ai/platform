@@ -1,0 +1,193 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:decision:success-pattern",
+  "title": "Success Pattern",
+  "description": "Compressed validated decision pattern for the Success Stack. Represents reusable decision-making wisdom extracted from successful outcomes.",
+  "type": "object",
+  "required": ["$id", "contextSignature", "actionType", "outcomeProfile", "confidence", "frequency"],
+  "properties": {
+    "$id": {
+      "type": "string",
+      "pattern": "^urn:luhtech:[^:]+:success-pattern:PAT-[0-9]{4}-[0-9]{4,}$",
+      "description": "URN identifier for the pattern"
+    },
+    "$schema": {
+      "type": "string",
+      "const": "https://luhtech.dev/schemas/decision/success-pattern.schema.json"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "const": "3.0.0"
+    },
+    "contextSignature": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 12,
+      "maxItems": 12,
+      "description": "12-element eigenmode vector representing the context in which this pattern applies"
+    },
+    "actionType": {
+      "type": "string",
+      "description": "Category of action this pattern recommends"
+    },
+    "actionTemplate": {
+      "type": "object",
+      "description": "Template for the action to take",
+      "properties": {
+        "type": { "type": "string" },
+        "parameters": {
+          "type": "object",
+          "description": "Parameterized action definition"
+        },
+        "constraints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Constraints that must hold for pattern to apply"
+        }
+      }
+    },
+    "outcomeProfile": {
+      "type": "object",
+      "required": ["expectedSuccessRate"],
+      "properties": {
+        "expectedSuccessRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Probability of successful outcome"
+        },
+        "expectedImprovement": {
+          "type": "number",
+          "description": "Average improvement factor when applied"
+        },
+        "variance": {
+          "type": "number",
+          "description": "Outcome variance across applications"
+        },
+        "bestCase": {
+          "type": "number",
+          "description": "Best observed improvement"
+        },
+        "worstCase": {
+          "type": "number",
+          "description": "Worst observed improvement"
+        }
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Overall confidence in this pattern (decays over time)"
+    },
+    "frequency": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of times this pattern has been applied"
+    },
+    "successCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of successful applications"
+    },
+    "lastApplied": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When pattern was last used"
+    },
+    "lastUpdated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When pattern was last modified"
+    },
+    "contextBreadth": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 1,
+      "description": "How broadly applicable (1 = specific, 0 = universal)"
+    },
+    "sourceDecisions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "URNs of decision events that contributed to this pattern"
+    },
+    "decayFactor": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 1,
+      "description": "Current decay factor (1 = fresh, approaches 0 over time)"
+    },
+    "halfLifeDays": {
+      "type": "integer",
+      "default": 180,
+      "description": "Days for confidence to decay by half"
+    },
+    "projectId": {
+      "type": "string",
+      "description": "Project this pattern originated from (null for global)"
+    },
+    "isGlobal": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether pattern is shared across projects"
+    },
+    "domain": {
+      "type": "string",
+      "description": "Construction domain (electrical, mechanical, etc.)"
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Searchable tags for pattern discovery"
+    },
+    "validationGates": {
+      "type": "object",
+      "description": "Results of compression validation",
+      "properties": {
+        "succeeded": {
+          "type": "boolean",
+          "description": "Did the source decision succeed?"
+        },
+        "replicable": {
+          "type": "boolean",
+          "description": "Can this be replicated in similar contexts?"
+        },
+        "generalizable": {
+          "type": "boolean",
+          "description": "Does this apply beyond the specific instance?"
+        },
+        "significant": {
+          "type": "boolean",
+          "description": "Is the improvement significant enough to warrant a pattern?"
+        }
+      }
+    },
+    "mergeHistory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "timestamp": { "type": "string", "format": "date-time" },
+          "mergedPatternUrn": { "type": "string" },
+          "resultingConfidence": { "type": "number" }
+        }
+      },
+      "description": "History of pattern merges"
+    },
+    "graphMetadata": {
+      "type": "object",
+      "properties": {
+        "inEdges": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "outEdges": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

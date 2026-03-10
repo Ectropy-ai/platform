@@ -1,0 +1,173 @@
+name: Production Server Diagnostics
+
+# Emergency diagnostic workflow to investigate production deployment issues
+# Provides remote access to container logs and status without requiring local SSH
+
+on:
+  workflow_dispatch:
+    inputs:
+      server:
+        description: 'Server to diagnose (blue or green)'
+        required: true
+        type: choice
+        options:
+          - blue
+          - green
+      operation:
+        description: 'Diagnostic operation'
+        required: true
+        type: choice
+        default: 'logs'
+        options:
+          - logs # Get container logs
+          - status # Get container status
+          - inspect # Inspect API Gateway container
+          - health # Test health endpoints
+          - all # Run all diagnostics
+
+permissions:
+  contents: read
+
+jobs:
+  run-diagnostics:
+    name: Run Production Diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          # Determine server IP
+          if [ "${{ inputs.server }}" == "blue" ]; then
+            SERVER_IP="${{ vars.PROD_BLUE_IP }}"
+          else
+            SERVER_IP="${{ vars.PROD_GREEN_IP }}"
+          fi
+
+          ssh-keyscan -H $SERVER_IP >> ~/.ssh/known_hosts
+          echo "SERVER_IP=$SERVER_IP" >> $GITHUB_ENV
+
+      - name: Get Container Logs
+        if: inputs.operation == 'logs' || inputs.operation == 'all'
+        run: |
+          echo "=================================================="
+          echo "🔍 CONTAINER LOGS - ${{ inputs.server }} server"
+          echo "Server IP: $SERVER_IP"
+          echo "=================================================="
+
+          ssh root@$SERVER_IP << 'REMOTE_SCRIPT'
+          cd /opt/ectropy
+
+          echo ""
+          echo "=== API Gateway Logs (last 100 lines) ==="
+          docker logs ectropy-api-gateway --tail 100 2>&1 || echo "Container not found or stopped"
+
+          echo ""
+          echo "=== MCP Server Logs (last 50 lines) ==="
+          docker logs ectropy-mcp-server --tail 50 2>&1 || echo "Container not found or stopped"
+
+          echo ""
+          echo "=== Web Dashboard Logs (last 50 lines) ==="
+          docker logs ectropy-web-dashboard --tail 50 2>&1 || echo "Container not found or stopped"
+          REMOTE_SCRIPT
+
+      - name: Get Container Status
+        if: inputs.operation == 'status' || inputs.operation == 'all'
+        run: |
+          echo "=================================================="
+          echo "📊 CONTAINER STATUS - ${{ inputs.server }} server"
+          echo "=================================================="
+
+          ssh root@$SERVER_IP << 'REMOTE_SCRIPT'
+          cd /opt/ectropy
+
+          echo ""
+          echo "=== Docker Compose Status ==="
+          docker compose ps 2>&1 || echo "Docker Compose not running"
+
+          echo ""
+          echo "=== All Ectropy Containers ==="
+          docker ps -a --filter "name=ectropy" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>&1
+
+          echo ""
+          echo "=== Container Health ==="
+          docker ps --filter "name=ectropy" --format "table {{.Names}}\t{{.Status}}" 2>&1
+          REMOTE_SCRIPT
+
+      - name: Inspect API Gateway
+        if: inputs.operation == 'inspect' || inputs.operation == 'all'
+        run: |
+          echo "=================================================="
+          echo "🔬 API GATEWAY INSPECTION - ${{ inputs.server }} server"
+          echo "=================================================="
+
+          ssh root@$SERVER_IP << 'REMOTE_SCRIPT'
+          echo ""
+          echo "=== Container Details ==="
+          docker inspect ectropy-api-gateway --format='
+          Name: {{.Name}}
+          State: {{.State.Status}}
+          Started: {{.State.StartedAt}}
+          Finished: {{.State.FinishedAt}}
+          ExitCode: {{.State.ExitCode}}
+          Error: {{.State.Error}}
+          Health: {{.State.Health.Status}}
+          RestartCount: {{.State.RestartCount}}
+          ' 2>&1 || echo "Container not found"
+
+          echo ""
+          echo "=== Environment Variables ==="
+          docker inspect ectropy-api-gateway --format='{{range .Config.Env}}{{println .}}{{end}}' 2>&1 | grep -v "SECRET\|PASSWORD\|TOKEN" || echo "Container not found"
+
+          echo ""
+          echo "=== Port Bindings ==="
+          docker inspect ectropy-api-gateway --format='{{range $p, $conf := .NetworkSettings.Ports}}{{$p}} -> {{(index $conf 0).HostPort}}{{println}}{{end}}' 2>&1 || echo "Container not found"
+
+          echo ""
+          echo "=== Network Configuration ==="
+          docker inspect ectropy-api-gateway --format='{{range .NetworkSettings.Networks}}IP: {{.IPAddress}} Gateway: {{.Gateway}}{{end}}' 2>&1 || echo "Container not found"
+          REMOTE_SCRIPT
+
+      - name: Test Health Endpoints
+        if: inputs.operation == 'health' || inputs.operation == 'all'
+        run: |
+          echo "=================================================="
+          echo "🏥 HEALTH ENDPOINT TESTS - ${{ inputs.server }} server"
+          echo "=================================================="
+
+          ssh root@$SERVER_IP << 'REMOTE_SCRIPT'
+          echo ""
+          echo "=== API Gateway Health (port 4000) ==="
+          curl -v http://localhost:4000/health 2>&1 || echo "Health check failed"
+
+          echo ""
+          echo "=== MCP Server Health (port 3001) ==="
+          curl -v http://localhost:3001/health 2>&1 || echo "Health check failed"
+
+          echo ""
+          echo "=== Web Dashboard (port 3000) ==="
+          curl -v http://localhost:3000/ 2>&1 || echo "Health check failed"
+
+          echo ""
+          echo "=== Network Connectivity ==="
+          netstat -tulpn | grep -E ':(3000|3001|4000)' || echo "No services listening on expected ports"
+          REMOTE_SCRIPT
+
+      - name: Generate Diagnostic Summary
+        if: always()
+        run: |
+          echo "## 🔍 Production Diagnostic Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Server**: ${{ inputs.server }} ($SERVER_IP)" >> $GITHUB_STEP_SUMMARY
+          echo "**Operation**: ${{ inputs.operation }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Review the job logs above for detailed diagnostic output." >> $GITHUB_STEP_SUMMARY

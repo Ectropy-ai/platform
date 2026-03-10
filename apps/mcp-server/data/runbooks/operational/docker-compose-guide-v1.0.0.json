@@ -1,0 +1,770 @@
+{
+  "version": "1.0.0",
+  "environment": "all",
+  "runbookType": "operational",
+  "metadata": {
+    "catalogId": "operational-runbook-v1-0-0",
+    "name": "Docker Compose Usage Guide",
+    "type": "operational",
+    "purpose": "Complete guide for using Docker Compose across all Ectropy environments (development, staging, production) with infrastructure management and service orchestration",
+    "maintainer": "DevOps / Infrastructure Team",
+    "author": "DevOps / Infrastructure Team",
+    "created": "2025-11-12T00:00:00Z",
+    "lastUpdated": "2025-11-16T00:00:00Z",
+    "estimatedDuration": "30 minutes",
+    "complexity": "medium",
+    "priority": "high",
+    "relatedDocuments": [
+      "docs/DOCKER_COMPOSE_GUIDE.md",
+      "docker-compose.infra.yml",
+      "docker-compose.development.yml",
+      "docker-compose.staging.yml",
+      "docker-compose.production.yml"
+    ],
+    "sourceFile": "docs/DOCKER_COMPOSE_GUIDE.md",
+    "conversionDate": "2025-11-16T00:00:00Z",
+    "schemaVersion": "1.0.0"
+  },
+  "executiveSummary": {
+    "description": "Comprehensive operational guide for managing Docker Compose configurations across all Ectropy environments. Covers infrastructure-only deployments for fast development, full-stack containerized deployments, and production orchestration with 6 distinct compose files.",
+    "status": "READY",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "LOW",
+    "keyChanges": [
+      "Cleaned up legacy compose files (2025-11-12)",
+      "Standardized 6 compose files with clear purposes",
+      "Renamed docker-compose.local.yml to docker-compose.infra.yml",
+      "Consolidated development.override into main development file"
+    ],
+    "prerequisites": [
+      "Docker Desktop or Docker Engine installed",
+      "Docker Compose v2+ (docker compose, not docker-compose)",
+      "Access to required environment variables",
+      "Sufficient system resources (8GB+ RAM recommended)"
+    ],
+    "impact": {
+      "systems": [
+        "Local development environment",
+        "CI/CD testing pipelines",
+        "Staging deployment (staging.ectropy.ai)",
+        "Production deployment (ectropy.ai)"
+      ],
+      "downtime": "None for local/development operations",
+      "rollbackTime": "Immediate (docker compose down)"
+    }
+  },
+  "preFlightChecks": [
+    {
+      "id": "docker-installed",
+      "order": 1,
+      "category": "infrastructure",
+      "name": "Docker Installation",
+      "description": "Verify Docker is installed and running",
+      "command": "docker --version && docker ps",
+      "expectedResult": "Docker version displayed and daemon responding",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "Docker must be installed and running. Install Docker Desktop or Docker Engine."
+      }
+    },
+    {
+      "id": "compose-version",
+      "order": 2,
+      "category": "infrastructure",
+      "name": "Docker Compose v2 Check",
+      "description": "Verify Docker Compose v2 is available",
+      "command": "docker compose version",
+      "expectedResult": "Docker Compose version v2.x.x or higher",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "Docker Compose v2+ required. Update Docker Desktop or install docker-compose-plugin."
+      }
+    },
+    {
+      "id": "env-file-exists",
+      "order": 3,
+      "category": "configuration",
+      "name": "Environment File Validation",
+      "description": "Check if required .env file exists for selected compose configuration",
+      "command": "test -f .env.infra || test -f .env.development || test -f .env",
+      "expectedResult": "At least one environment file exists",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "onFailure": {
+        "action": "skip",
+        "message": "Consider creating .env file from template for proper configuration"
+      }
+    },
+    {
+      "id": "port-availability",
+      "order": 4,
+      "category": "infrastructure",
+      "name": "Port Availability Check",
+      "description": "Verify key ports are not in use",
+      "command": "! (lsof -i :3000 || lsof -i :4000 || lsof -i :5432 || lsof -i :6379)",
+      "expectedResult": "Ports 3000, 4000, 5432, 6379 are available",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "onFailure": {
+        "action": "skip",
+        "message": "Some ports may be in use. Stop conflicting services or modify port mappings."
+      }
+    },
+    {
+      "id": "disk-space",
+      "order": 5,
+      "category": "infrastructure",
+      "name": "Disk Space Check",
+      "description": "Ensure sufficient disk space for Docker images and volumes",
+      "command": "df -h / | awk 'NR==2 {print $4}' | sed 's/G//' | awk '{if($1>10) exit 0; else exit 1}'",
+      "expectedResult": "At least 10GB free disk space",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "onFailure": {
+        "action": "skip",
+        "message": "Low disk space detected. Consider cleaning up Docker resources with 'docker system prune'"
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Local Development - Infrastructure Only",
+      "description": "Run databases in Docker, applications on host for fast iteration and debugging",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Copy Infrastructure Environment Template",
+          "description": "Create .env.infra from example template",
+          "command": "cp .env.infra.example .env.infra",
+          "purpose": "Initialize environment configuration for infrastructure services",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "fileExists",
+            "criteria": ".env.infra file exists"
+          },
+          "onFailure": {
+            "action": "skip",
+            "message": "File may already exist or template missing"
+          }
+        },
+        {
+          "step": "1.2",
+          "name": "Start Infrastructure Services",
+          "description": "Start PostgreSQL, Redis, and Qdrant in Docker",
+          "command": "docker compose -f docker-compose.infra.yml up -d",
+          "purpose": "Launch database and cache infrastructure for local development",
+          "required": true,
+          "automatable": true,
+          "timeout": "120s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "All infrastructure containers running"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to start infrastructure services. Check Docker logs."
+          },
+          "relatedFiles": [
+            "docker-compose.infra.yml",
+            ".env.infra"
+          ]
+        },
+        {
+          "step": "1.3",
+          "name": "Verify Database Health",
+          "description": "Wait for PostgreSQL to be ready to accept connections",
+          "command": "docker compose -f docker-compose.infra.yml exec postgres pg_isready -U ectropy",
+          "purpose": "Ensure database is fully initialized before running applications",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "retryable": true,
+          "maxRetries": 10,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "pg_isready returns 0"
+          }
+        },
+        {
+          "step": "1.4",
+          "name": "Start Applications on Host",
+          "description": "Run Ectropy applications using pnpm on host machine",
+          "commands": [
+            "pnpm nx serve web-dashboard",
+            "pnpm nx serve api-gateway",
+            "pnpm nx serve mcp-server"
+          ],
+          "purpose": "Launch applications with hot-reload and debugging capabilities",
+          "required": true,
+          "automatable": false,
+          "timeout": "300s",
+          "expectedOutput": "Applications listening on ports 3000, 4000, 8080"
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Full Stack Development - All Services in Docker",
+      "description": "Run complete stack in Docker for environment parity with staging",
+      "estimatedDuration": "10 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Copy Development Environment Template",
+          "description": "Create .env.development from example",
+          "command": "cp .env.development.example .env.development",
+          "purpose": "Initialize full-stack environment configuration",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "retryable": false,
+          "expectedStatus": 0
+        },
+        {
+          "step": "2.2",
+          "name": "Start Full Development Stack",
+          "description": "Launch all services including web-dashboard, api-gateway, mcp-server, databases",
+          "command": "docker compose -f docker-compose.development.yml up -d",
+          "purpose": "Create isolated development environment with all services containerized",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "serviceHealth",
+            "criteria": "All containers running and healthy"
+          },
+          "relatedFiles": [
+            "docker-compose.development.yml",
+            ".env.development"
+          ]
+        },
+        {
+          "step": "2.3",
+          "name": "Verify Services Health",
+          "description": "Check health endpoints for all application services",
+          "commands": [
+            "curl -f http://localhost:3000",
+            "curl -f http://localhost:4000/health",
+            "curl -f http://localhost:8080/health"
+          ],
+          "purpose": "Validate all services are responding correctly",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "retryable": true,
+          "maxRetries": 5,
+          "expectedStatus": [200, 0]
+        },
+        {
+          "step": "2.4",
+          "name": "View Logs",
+          "description": "Monitor service logs for errors or warnings",
+          "command": "docker compose -f docker-compose.development.yml logs -f",
+          "purpose": "Real-time monitoring of all service output",
+          "required": false,
+          "automatable": false,
+          "expectedOutput": "Streaming logs from all containers"
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Add Monitoring Stack (Optional)",
+      "description": "Deploy Prometheus and Grafana for observability",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Start Monitoring with Infrastructure",
+          "description": "Add monitoring to infrastructure-only setup",
+          "command": "docker compose -f docker-compose.infra.yml -f docker-compose.monitoring.yml up -d",
+          "purpose": "Enable metrics collection and visualization for infrastructure services",
+          "required": false,
+          "automatable": true,
+          "timeout": "120s",
+          "relatedFiles": [
+            "docker-compose.monitoring.yml"
+          ]
+        },
+        {
+          "step": "3.2",
+          "name": "Access Grafana Dashboard",
+          "description": "Open Grafana at http://localhost:3003 (admin/admin)",
+          "command": "open http://localhost:3003",
+          "purpose": "Access monitoring dashboards and metrics visualization",
+          "required": false,
+          "automatable": false,
+          "expectedOutput": "Grafana login page accessible"
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Database Management Operations",
+      "description": "Common database operations and maintenance tasks",
+      "estimatedDuration": "10 minutes",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Connect to PostgreSQL",
+          "description": "Open psql shell in database container",
+          "command": "docker compose -f docker-compose.infra.yml exec postgres psql -U ectropy -d ectropy_dev",
+          "purpose": "Direct database access for queries and debugging",
+          "required": false,
+          "automatable": false,
+          "expectedOutput": "PostgreSQL interactive terminal"
+        },
+        {
+          "step": "4.2",
+          "name": "Run Database Migrations",
+          "description": "Apply Prisma migrations to database schema",
+          "command": "docker compose -f docker-compose.development.yml exec api-gateway pnpm prisma migrate deploy",
+          "purpose": "Update database schema to latest version",
+          "required": false,
+          "automatable": true,
+          "timeout": "60s",
+          "retryable": true,
+          "maxRetries": 2,
+          "expectedStatus": 0
+        },
+        {
+          "step": "4.3",
+          "name": "Generate Prisma Client",
+          "description": "Regenerate Prisma TypeScript client",
+          "command": "docker compose -f docker-compose.development.yml exec api-gateway pnpm prisma generate",
+          "purpose": "Update TypeScript types for database models",
+          "required": false,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Service Management and Troubleshooting",
+      "description": "Common operations for managing and debugging services",
+      "estimatedDuration": "15 minutes",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "5.1",
+          "name": "Restart Single Service",
+          "description": "Restart specific service without affecting others",
+          "command": "docker compose -f docker-compose.development.yml restart api-gateway",
+          "purpose": "Apply configuration changes or recover from errors",
+          "required": false,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "5.2",
+          "name": "Rebuild Service After Code Changes",
+          "description": "Rebuild Docker image and restart service",
+          "command": "docker compose -f docker-compose.development.yml up -d --build api-gateway",
+          "purpose": "Deploy code changes to containerized service",
+          "required": false,
+          "automatable": true,
+          "timeout": "300s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "5.3",
+          "name": "View Service Logs",
+          "description": "Stream logs from specific service",
+          "command": "docker compose -f docker-compose.development.yml logs -f api-gateway",
+          "purpose": "Debug issues and monitor service behavior",
+          "required": false,
+          "automatable": false,
+          "expectedOutput": "Real-time log stream from api-gateway"
+        },
+        {
+          "step": "5.4",
+          "name": "Check Container Health Status",
+          "description": "Display status of all containers",
+          "command": "docker compose -f docker-compose.development.yml ps",
+          "purpose": "Identify unhealthy or stopped containers",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "List of containers with status and ports"
+        },
+        {
+          "step": "5.5",
+          "name": "Full Rebuild from Scratch",
+          "description": "Clean rebuild with no cache for troubleshooting",
+          "commands": [
+            "docker compose -f docker-compose.development.yml down -v",
+            "docker compose -f docker-compose.development.yml build --no-cache",
+            "docker compose -f docker-compose.development.yml up"
+          ],
+          "purpose": "Resolve persistent issues by completely rebuilding environment",
+          "required": false,
+          "automatable": true,
+          "timeout": "600s",
+          "expectedStatus": 0
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Cleanup and Resource Management",
+      "description": "Stop services and clean up Docker resources",
+      "estimatedDuration": "5 minutes",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "6.1",
+          "name": "Stop Services (Keep Data)",
+          "description": "Stop containers but preserve volumes",
+          "command": "docker compose -f docker-compose.development.yml stop",
+          "purpose": "Gracefully stop services while retaining database data",
+          "required": false,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "6.2",
+          "name": "Stop and Remove Containers",
+          "description": "Stop and remove containers, keep volumes",
+          "command": "docker compose -f docker-compose.development.yml down",
+          "purpose": "Clean up containers while preserving persistent data",
+          "required": false,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "6.3",
+          "name": "Full Cleanup (Remove Volumes)",
+          "description": "Stop, remove containers and delete all volumes for fresh start",
+          "command": "docker compose -f docker-compose.development.yml down -v",
+          "purpose": "Complete environment reset including database data",
+          "required": false,
+          "automatable": true,
+          "timeout": "60s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "6.4",
+          "name": "Clean Docker System",
+          "description": "Remove unused Docker resources to free disk space",
+          "command": "docker system prune -a --volumes",
+          "purpose": "Reclaim disk space from stopped containers, unused images, and volumes",
+          "required": false,
+          "automatable": true,
+          "timeout": "120s",
+          "expectedStatus": 0
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "healthChecks": [
+      {
+        "service": "web-dashboard",
+        "endpoint": "http://localhost:3000",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true,
+        "commands": []
+      },
+      {
+        "service": "api-gateway",
+        "endpoint": "http://localhost:4000/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true,
+        "commands": []
+      },
+      {
+        "service": "mcp-server-stdio",
+        "endpoint": "http://localhost:8080/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true,
+        "commands": []
+      },
+      {
+        "service": "postgres",
+        "endpoint": "tcp://localhost:5432",
+        "expectedStatus": 0,
+        "timeout": "5s",
+        "critical": true,
+        "commands": []
+      },
+      {
+        "service": "redis",
+        "endpoint": "tcp://localhost:6379",
+        "expectedStatus": 0,
+        "timeout": "5s",
+        "critical": true,
+        "commands": []
+      },
+      {
+        "service": "qdrant",
+        "endpoint": "http://localhost:6333",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": false,
+        "commands": []
+      }
+    ],
+    "smokeTests": [
+      {
+        "test": "Database Connection",
+        "endpoint": "docker exec postgres pg_isready",
+        "expectedBehavior": "PostgreSQL accepts connections",
+        "priority": "P0",
+        "commands": []
+      },
+      {
+        "test": "Redis Ping",
+        "endpoint": "docker exec redis redis-cli ping",
+        "expectedBehavior": "Redis responds with PONG",
+        "priority": "P0",
+        "commands": []
+      },
+      {
+        "test": "API Health Check",
+        "endpoint": "curl http://localhost:4000/health",
+        "expectedBehavior": "Returns 200 OK with health status",
+        "priority": "P0",
+        "commands": []
+      },
+      {
+        "test": "Web Dashboard Load",
+        "endpoint": "curl http://localhost:3000",
+        "expectedBehavior": "Returns React application HTML",
+        "priority": "P1",
+        "commands": []
+      }
+    ]
+  },
+  "rollback": {
+    "supported": true,
+    "estimatedTime": "2 minutes",
+    "dataLossRisk": "none",
+    "triggerConditions": [
+      "Services fail to start",
+      "Health checks fail after deployment",
+      "Port conflicts detected",
+      "Resource constraints (memory/disk)"
+    ],
+    "decisionMaker": "Developer or DevOps engineer",
+    "steps": [
+      {
+        "step": 1,
+        "name": "Stop All Services",
+        "command": "docker compose -f docker-compose.development.yml down",
+        "purpose": "Terminate all running containers",
+        "required": true
+      },
+      {
+        "step": 2,
+        "name": "Verify Cleanup",
+        "command": "docker ps | grep ectropy",
+        "purpose": "Confirm no Ectropy containers are running",
+        "required": true
+      },
+      {
+        "step": 3,
+        "name": "Restore Previous Configuration",
+        "command": "git checkout HEAD -- docker-compose.development.yml .env.development",
+        "purpose": "Revert to last known good configuration",
+        "required": false
+      }
+    ],
+    "verification": {
+      "healthCheck": "docker compose -f docker-compose.development.yml ps",
+      "expectedStatus": 0,
+      "successCriteria": "No containers running or all in healthy state"
+    }
+  },
+  "successCriteria": [
+    {
+      "criterion": "All infrastructure services (postgres, redis, qdrant) are running and healthy",
+      "status": "REQUIRED",
+      "validation": "docker compose ps shows all containers in 'Up' state"
+    },
+    {
+      "criterion": "Application services respond to health checks within 60 seconds",
+      "status": "REQUIRED",
+      "validation": "HTTP 200 responses from /health endpoints"
+    },
+    {
+      "criterion": "Database migrations complete successfully",
+      "status": "RECOMMENDED",
+      "validation": "Prisma migrate deploy exits with code 0"
+    },
+    {
+      "criterion": "No error messages in container logs",
+      "status": "RECOMMENDED",
+      "validation": "docker compose logs shows no ERROR or FATAL level messages"
+    },
+    {
+      "criterion": "Monitoring stack is accessible (if enabled)",
+      "status": "OPTIONAL",
+      "validation": "Grafana dashboard loads at http://localhost:3003"
+    }
+  ],
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "DB_PASSWORD",
+        "description": "PostgreSQL database password",
+        "example": "your_secure_password",
+        "required": true,
+        "environment": "all",
+        "secret": true,
+        "minimumLength": 8
+      },
+      {
+        "name": "REDIS_PASSWORD",
+        "description": "Redis authentication password",
+        "example": "redis_secure_password",
+        "required": false,
+        "environment": "all",
+        "secret": true
+      },
+      {
+        "name": "NODE_ENV",
+        "description": "Node.js environment mode",
+        "example": "development",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "DATABASE_URL",
+        "description": "PostgreSQL connection string",
+        "example": "postgresql://ectropy:password@localhost:5432/ectropy_dev",
+        "required": true,
+        "environment": "all",
+        "secret": true
+      }
+    ]
+  },
+  "mcpIntegration": {
+    "queryableFields": [
+      "metadata.catalogId",
+      "metadata.purpose",
+      "environment",
+      "runbookType",
+      "phases[].name",
+      "phases[].steps[].name",
+      "phases[].steps[].command"
+    ],
+    "supportedQueries": [
+      {
+        "query": "How do I start infrastructure services for development?",
+        "returns": "Phase 1: Local Development - Infrastructure Only",
+        "purpose": "Guide developers to start databases without full containerization"
+      },
+      {
+        "query": "What's the command to start the full development stack?",
+        "returns": "docker compose -f docker-compose.development.yml up -d",
+        "purpose": "Quick reference for full-stack Docker deployment"
+      },
+      {
+        "query": "How do I add monitoring to my development environment?",
+        "returns": "Phase 3: Add Monitoring Stack (Optional)",
+        "purpose": "Enable observability for local development"
+      },
+      {
+        "query": "How do I rebuild a service after code changes?",
+        "returns": "Phase 5, Step 5.2: Rebuild Service After Code Changes",
+        "purpose": "Deploy code changes to containerized services"
+      },
+      {
+        "query": "What ports are used by Ectropy services?",
+        "returns": "Web:3000, MCP:3001/3002, Grafana:3003, API:4000, Postgres:5432, Redis:6379, Qdrant:6333/6334",
+        "purpose": "Port allocation reference for debugging conflicts"
+      },
+      {
+        "query": "How do I clean up Docker resources?",
+        "returns": "Phase 6: Cleanup and Resource Management",
+        "purpose": "Free disk space and reset environment"
+      }
+    ],
+    "decisionSupport": [
+      "Choose infrastructure-only (docker-compose.infra.yml) for fast development with hot-reload",
+      "Choose full stack (docker-compose.development.yml) for environment parity with staging",
+      "Add monitoring stack when diagnosing performance issues or testing metrics",
+      "Use 'down -v' for complete cleanup including database data",
+      "Run health checks after any service restart or rebuild"
+    ],
+    "architectureAlignment": {
+      "routingConfig": "Port mappings align with routing-architecture.json service definitions",
+      "portAllocation": "Follows standardized port scheme: Web(3xxx), API(4xxx), DB(5xxx), Cache(6xxx)",
+      "oauthConfig": "Environment variables must include OAuth callback URLs for Speckle integration"
+    }
+  },
+  "knownIssues": [
+    {
+      "id": "PORT-CONFLICT-001",
+      "title": "Port Already in Use",
+      "severity": "MEDIUM",
+      "impact": "Service fails to start due to port conflict",
+      "mitigation": "Use lsof -i :PORT (macOS/Linux) or netstat (Windows) to identify conflicting process",
+      "action": "Stop conflicting service or modify port mapping in compose file",
+      "priority": "P1"
+    },
+    {
+      "id": "DB-INIT-002",
+      "title": "Database Connection Refused on First Start",
+      "severity": "LOW",
+      "impact": "Application services may fail before database is ready",
+      "mitigation": "PostgreSQL takes 10-15 seconds to initialize on first start",
+      "action": "Wait for database health check or restart dependent services",
+      "priority": "P2"
+    },
+    {
+      "id": "DISK-SPACE-003",
+      "title": "Docker Images Consume Disk Space",
+      "severity": "MEDIUM",
+      "impact": "Build failures or slow performance due to low disk space",
+      "mitigation": "Regularly run 'docker system prune' to clean unused resources",
+      "action": "Monitor Docker Desktop storage usage in Settings → Resources",
+      "priority": "P2"
+    }
+  ]
+}

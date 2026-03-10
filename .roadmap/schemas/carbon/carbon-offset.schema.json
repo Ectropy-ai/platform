@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:carbon:carbon-offset",
+  "title": "Carbon Offset",
+  "description": "Carbon credit purchase with voxel-level attribution for spatial tracking",
+  "type": "object",
+  "required": [
+    "id",
+    "projectId",
+    "orderId",
+    "creditType",
+    "quantity",
+    "verification"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^OFFSET-[0-9]{4}-[0-9]{4,}$",
+      "description": "Unique offset identifier"
+    },
+    "projectId": {
+      "type": "string",
+      "description": "Construction project receiving offset"
+    },
+    "orderId": {
+      "type": "string",
+      "description": "Purchase order reference"
+    },
+    "creditType": {
+      "type": "string",
+      "enum": [
+        "soil_carbon",
+        "redd_plus",
+        "arr",
+        "renewable_energy",
+        "methane_capture"
+      ],
+      "description": "Type of carbon credit"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "Tons of CO2e offset"
+    },
+    "verification": {
+      "$ref": "#/definitions/CreditVerification",
+      "description": "Third-party verification details"
+    },
+    "voxelAttributions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "voxelId": { "type": "string" },
+          "offsetCO2": {
+            "type": "number",
+            "description": "CO2e offset allocated to voxel"
+          },
+          "coordinates": {
+            "type": "object",
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "z": { "type": "number" }
+            }
+          }
+        },
+        "required": ["voxelId", "offsetCO2"]
+      },
+      "description": "Spatial attribution to specific voxels"
+    },
+    "supplier": {
+      "$ref": "#/definitions/OffsetSupplier",
+      "description": "Supplier information (e.g., Raizal farm/forest)"
+    },
+    "purchaseDate": { "type": "string", "format": "date-time" },
+    "certificateUrl": { "type": "string", "format": "uri" },
+    "retirementDate": { "type": "string", "format": "date-time" },
+    "price": {
+      "type": "object",
+      "properties": {
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "default": "USD" },
+        "pricePerTon": { "type": "number" }
+      }
+    }
+  },
+  "definitions": {
+    "CreditVerification": {
+      "type": "object",
+      "required": ["standard", "registry", "serialNumber"],
+      "properties": {
+        "standard": {
+          "type": "string",
+          "enum": [
+            "verra",
+            "gold_standard",
+            "american_carbon_registry",
+            "climate_action_reserve"
+          ]
+        },
+        "registry": { "type": "string" },
+        "serialNumber": { "type": "string" },
+        "verificationDate": { "type": "string", "format": "date" },
+        "verifier": { "type": "string" },
+        "projectType": { "type": "string" }
+      }
+    },
+    "OffsetSupplier": {
+      "type": "object",
+      "properties": {
+        "supplierId": { "type": "string" },
+        "name": { "type": "string" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "country": { "type": "string" },
+            "region": { "type": "string" },
+            "coordinates": {
+              "type": "object",
+              "properties": {
+                "lat": { "type": "number" },
+                "lng": { "type": "number" }
+              }
+            }
+          }
+        },
+        "stewardName": {
+          "type": "string",
+          "description": "Farm/forest steward name"
+        },
+        "satelliteImageUrl": { "type": "string", "format": "uri" },
+        "projectDescription": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,159 @@
+{
+  "$schema": "https://luhtech.dev/schemas/agent-prompt.schema.json",
+  "$id": "urn:luhtech:ectropy:agent-prompt:test-isolation-patterns",
+  "schemaVersion": "1.0.0",
+  "meta": {
+    "createdAt": "2026-01-27T16:30:00Z",
+    "createdBy": "claude",
+    "purpose": "Guide agents on proper unit test isolation patterns for services with external dependencies",
+    "targetBranch": "N/A - Reference document",
+    "priority": "REFERENCE"
+  },
+  "overview": {
+    "title": "Unit Test Isolation Patterns",
+    "description": "Enterprise patterns for isolating unit tests from external infrastructure (Redis, API servers, databases). These patterns ensure fast, reliable test execution without requiring running services.",
+    "applicability": [
+      "Tests for services that connect to Redis",
+      "Tests for services that make HTTP requests to other services",
+      "Tests for services that connect to databases",
+      "Tests expecting specific data structures from implementations"
+    ]
+  },
+  "patterns": [
+    {
+      "id": "env-var-clearing",
+      "name": "Environment Variable Clearing Pattern",
+      "problem": "Service constructors check for environment variables (e.g., REDIS_URL) and create connections if present. This causes unit tests to timeout waiting for unavailable infrastructure.",
+      "solution": "Clear infrastructure environment variables in beforeEach BEFORE instantiating the service.",
+      "codeExample": {
+        "language": "typescript",
+        "before": "beforeEach(() => {\n  originalRedisUrl = process.env.REDIS_URL;\n  service = new MyService(); // May connect to Redis!\n});",
+        "after": "beforeEach(() => {\n  originalRedisUrl = process.env.REDIS_URL;\n  delete process.env.REDIS_URL; // Clear BEFORE instantiation\n  service = new MyService(); // Won't connect to Redis\n});\n\nafterEach(() => {\n  if (originalRedisUrl) process.env.REDIS_URL = originalRedisUrl;\n  else delete process.env.REDIS_URL;\n});"
+      },
+      "affectedServices": [
+        "AuthMonitor",
+        "Any service with: if (process.env.REDIS_URL) { this.redis = new Redis(...) }"
+      ],
+      "evidence": {
+        "file": "apps/mcp-server/src/services/__tests__/auth-monitor.spec.ts",
+        "commit": "7184a3c"
+      }
+    },
+    {
+      "id": "msw-http-isolation",
+      "name": "MSW HTTP Request Isolation",
+      "problem": "Tests for services that make HTTP requests to other services (e.g., API Gateway) fail when those services aren't running.",
+      "solution": "Use MSW (Mock Service Worker) to intercept HTTP requests and return mock responses.",
+      "codeExample": {
+        "language": "typescript",
+        "code": "import { http, HttpResponse } from 'msw';\nimport { setupServer } from 'msw/node';\n\nconst server = setupServer(\n  http.get('http://localhost:4000/api/users', () => {\n    return HttpResponse.json({ error: 'Unauthorized' }, { status: 401 });\n  }),\n  http.get('http://localhost:4000/admin/dashboard', () => {\n    return HttpResponse.json({ error: 'Unauthorized' }, { status: 401 });\n  })\n);\n\nbeforeAll(() => server.listen({ onUnhandledRequest: 'warn' }));\nafterEach(() => server.resetHandlers());\nafterAll(() => server.close());"
+      },
+      "notes": [
+        "Use onUnhandledRequest: 'warn' to see which endpoints need mocking",
+        "Add handlers for all endpoints your service calls",
+        "Reset handlers between tests for isolation"
+      ],
+      "evidence": {
+        "file": "apps/mcp-server/src/services/__tests__/auth-monitor.spec.ts",
+        "commit": "7184a3c"
+      }
+    },
+    {
+      "id": "test-implementation-alignment",
+      "name": "Test-Implementation Alignment Pattern",
+      "problem": "Tests expect different data structures than implementations provide (e.g., expecting raw numbers when objects with properties exist).",
+      "solution": "Update tests to match actual implementation structure. Verify by reading source file before writing/updating tests.",
+      "codeExample": {
+        "language": "typescript",
+        "before": "// Test expects raw number\nexpect(TOKEN_BUDGETS[0]).toBe(1000);",
+        "after": "// Test matches actual structure: { role: 'Field Worker', tokens: 1000, includes: [...] }\nexpect(TOKEN_BUDGETS[0].tokens).toBe(1000);"
+      },
+      "guidelines": [
+        "Always read the source file before writing tests for it",
+        "Match test expectations to actual exported types/interfaces",
+        "When structure differs, update test not implementation (unless implementation is wrong)"
+      ],
+      "evidence": {
+        "file": "apps/mcp-server/src/__tests__/unit/rag/types.test.ts",
+        "sourceFile": "apps/mcp-server/src/services/rag/types.ts",
+        "commit": "7184a3c"
+      }
+    },
+    {
+      "id": "missing-utility-functions",
+      "name": "Missing Utility Function Pattern",
+      "problem": "Tests import functions that don't exist in the implementation yet.",
+      "solution": "Add the missing functions to the implementation following existing patterns.",
+      "codeExample": {
+        "language": "typescript",
+        "testImport": "import { buildDocumentUrn, buildChunkUrn, buildContextUrn } from '../../../services/rag/types.js';",
+        "implementation": "export function buildDocumentUrn(tenantId: string, documentId: string): string {\n  return `urn:luhtech:${tenantId}:document:${documentId}`;\n}\n\nexport function buildChunkUrn(tenantId: string, documentId: string, chunkIndex: number): string {\n  return `urn:luhtech:${tenantId}:chunk:${documentId}:${chunkIndex}`;\n}\n\nexport function buildContextUrn(tenantId: string, contextId: string): string {\n  return `urn:luhtech:${tenantId}:rag-context:${contextId}`;\n}"
+      },
+      "guidelines": [
+        "Follow existing URN patterns in the codebase",
+        "Maintain consistency with related functions (buildRagChunkUrn, buildRagCollectionUrn, etc.)",
+        "Add to the end of the relevant section for easy discovery"
+      ],
+      "evidence": {
+        "file": "apps/mcp-server/src/services/rag/types.ts",
+        "linesAdded": "685-695",
+        "commit": "7184a3c"
+      }
+    }
+  ],
+  "antiPatterns": [
+    {
+      "name": "Testing Against Missing Infrastructure",
+      "problem": "Running tests that require Redis/API servers when they're not running",
+      "symptom": "Tests timeout after 5000ms with connection errors",
+      "solution": "Use env-var-clearing or msw-http-isolation patterns"
+    },
+    {
+      "name": "Mocking Too Low",
+      "problem": "Mocking internal implementation details instead of external boundaries",
+      "symptom": "Tests pass but don't test real behavior",
+      "solution": "Mock at the boundary (env vars, HTTP requests) not internal methods"
+    },
+    {
+      "name": "Shared Test State",
+      "problem": "Tests modifying environment variables without cleanup",
+      "symptom": "Tests pass individually but fail when run together",
+      "solution": "Always save/restore state in beforeEach/afterEach"
+    }
+  ],
+  "testCategories": {
+    "unitTests": {
+      "location": "apps/*/src/**/__tests__/**/*.{test,spec}.ts",
+      "framework": "Vitest",
+      "isolation": "Full - no external dependencies",
+      "patterns": ["env-var-clearing", "msw-http-isolation", "test-implementation-alignment"]
+    },
+    "integrationTests": {
+      "location": "tests/integration/**/*.spec.ts",
+      "framework": "Vitest",
+      "isolation": "Partial - may use Docker infrastructure",
+      "patterns": ["Docker Compose test environment"]
+    },
+    "e2eTests": {
+      "location": "tests/playwright/**/*.spec.ts",
+      "framework": "Playwright",
+      "isolation": "None - full stack required",
+      "patterns": ["Global setup/teardown with Docker"]
+    }
+  },
+  "relatedFiles": {
+    "decisionLog": ".roadmap/decision-log.json#d-2026-01-27-test-isolation-patterns",
+    "vitestConfig": "vitest.config.ts",
+    "playwrightConfig": "playwright.config.ts",
+    "testSetup": [
+      "apps/api-gateway/src/setupTests.ts",
+      "apps/web-dashboard/src/setupTests.ts",
+      "tests/setup.ts"
+    ]
+  },
+  "successMetrics": {
+    "targetPassRate": "100% for unit tests without infrastructure",
+    "targetTimeout": "5s default (configurable per test)",
+    "ciExecution": "Unit tests must pass in GitHub Actions without Docker services"
+  }
+}

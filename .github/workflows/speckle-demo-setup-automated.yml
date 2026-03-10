@@ -1,0 +1,75 @@
+name: Speckle Demo Setup (Automated)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      building_type:
+        description: 'Building type to setup'
+        required: true
+        type: choice
+        default: 'residential-single-family'
+        options:
+          - residential-single-family
+          - residential-multi-family
+          - commercial-office
+          - commercial-large
+
+jobs:
+  setup-demo:
+    name: Setup Demo Content
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Make script executable
+        run: chmod +x scripts/core/speckle-demo-setup.sh
+
+      - name: Run demo setup script
+        id: setup
+        env:
+          SPECKLE_ADMIN_EMAIL: ${{ vars.SPECKLE_ADMIN_EMAIL }}
+          SPECKLE_ADMIN_PASSWORD: ${{ secrets.SPECKLE_ADMIN_PASSWORD }}
+        run: |
+          # Run script and capture output
+          bash scripts/core/speckle-demo-setup.sh ${{ github.event.inputs.environment }} ${{ github.event.inputs.building_type }} | tee setup-output.txt
+
+          # Extract IDs from output
+          STREAM_ID=$(grep "Stream ID:" setup-output.txt | awk '{print $3}')
+          OBJECT_ID=$(grep "Object ID:" setup-output.txt | awk '{print $3}')
+
+          # Set outputs for next steps
+          echo "STREAM_ID=$STREAM_ID" >> $GITHUB_OUTPUT
+          echo "OBJECT_ID=$OBJECT_ID" >> $GITHUB_OUTPUT
+
+      - name: Display configuration
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "DEMO SETUP COMPLETE"
+          echo "═══════════════════════════════════════════════════════════"
+          echo ""
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Building Type: ${{ github.event.inputs.building_type }}"
+          echo ""
+          echo "Stream ID: ${{ steps.setup.outputs.STREAM_ID }}"
+          echo "Object ID: ${{ steps.setup.outputs.OBJECT_ID }}"
+          echo ""
+          echo "Next: Add these to docker-compose.${{ github.event.inputs.environment }}.yml"
+          echo ""
+
+      - name: Upload setup output
+        uses: actions/upload-artifact@v4
+        with:
+          name: speckle-demo-setup-${{ github.event.inputs.environment }}-${{ github.event.inputs.building_type }}
+          path: setup-output.txt
+          retention-days: 30

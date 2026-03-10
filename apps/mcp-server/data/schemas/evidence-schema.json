@@ -1,0 +1,351 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ectropy.ai/schemas/evidence-schema.json",
+  "title": "Ectropy Evidence Document Schema",
+  "description": "JSON schema for enterprise evidence documentation following schema-first methodology",
+  "type": "object",
+  "required": [
+    "documentId",
+    "version",
+    "lastUpdated",
+    "metadata",
+    "evidenceType",
+    "status",
+    "findings"
+  ],
+  "properties": {
+    "documentId": {
+      "type": "string",
+      "pattern": "^evidence-[a-z0-9-]+$",
+      "description": "Unique identifier for evidence document (kebab-case, prefixed with 'evidence-')",
+      "examples": [
+        "evidence-integration-tests-fix-2025-12-30",
+        "evidence-enterprise-remediation-2025-12-30"
+      ]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version (major.minor.patch)",
+      "examples": ["1.0.0", "1.1.0"]
+    },
+    "lastUpdated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of last update",
+      "examples": ["2025-12-30T23:00:00.000Z"]
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["title", "description", "maintainer", "tags"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Human-readable evidence title",
+          "examples": ["Integration Tests Fix - December 30, 2025"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief summary (1-2 sentences)",
+          "examples": [
+            "Documentation of integration test failure root cause analysis and enterprise solution implementation"
+          ]
+        },
+        "maintainer": {
+          "type": "string",
+          "description": "Team or individual responsible",
+          "examples": ["platform-qa-team", "infrastructure-team"]
+        },
+        "purpose": {
+          "type": "string",
+          "description": "Detailed purpose statement",
+          "examples": [
+            "Document root cause, solution approach, and validation results for integration test failures"
+          ]
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Searchable tags",
+          "examples": [["testing", "integration", "vitest", "enterprise", "p0"]]
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"],
+          "description": "Evidence priority level"
+        },
+        "confidenceLevel": {
+          "type": "string",
+          "enum": ["high", "medium", "low"],
+          "description": "Confidence in findings accuracy"
+        }
+      }
+    },
+    "evidenceType": {
+      "type": "string",
+      "enum": [
+        "fix",
+        "analysis",
+        "validation",
+        "incident",
+        "audit",
+        "assessment",
+        "investigation"
+      ],
+      "description": "Type of evidence document"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "in-review", "validated", "active", "archived"],
+      "description": "Evidence document status"
+    },
+    "sessionInfo": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "Session date (YYYY-MM-DD)"
+        },
+        "duration": {
+          "type": "string",
+          "description": "Session duration (human-readable)",
+          "examples": ["2.5 hours", "45 minutes"]
+        },
+        "analyst": {
+          "type": "string",
+          "description": "Who performed the analysis",
+          "examples": ["Claude Code", "platform-team"]
+        },
+        "methodology": {
+          "type": "string",
+          "description": "Methodology used",
+          "examples": [
+            "Deep root cause analysis",
+            "Ground truth validation",
+            "Enterprise remediation"
+          ]
+        }
+      }
+    },
+    "problemStatement": {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "string",
+          "description": "Brief problem summary"
+        },
+        "impact": {
+          "type": "string",
+          "description": "Business/technical impact"
+        },
+        "symptoms": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Observed symptoms"
+        },
+        "environment": {
+          "type": "string",
+          "enum": ["development", "staging", "production", "test"],
+          "description": "Affected environment"
+        }
+      }
+    },
+    "rootCause": {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "string",
+          "description": "Root cause summary"
+        },
+        "technicalDetail": {
+          "type": "string",
+          "description": "Detailed technical explanation"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": { "type": "string" },
+              "lines": { "type": "string" },
+              "issue": { "type": "string" }
+            }
+          },
+          "description": "Affected files"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "architecture",
+            "configuration",
+            "code-quality",
+            "infrastructure",
+            "testing",
+            "security",
+            "performance"
+          ],
+          "description": "Root cause category"
+        }
+      }
+    },
+    "solution": {
+      "type": "object",
+      "properties": {
+        "approach": {
+          "type": "string",
+          "description": "Solution approach description"
+        },
+        "implementation": {
+          "type": "object",
+          "properties": {
+            "changes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string" },
+                  "lines": { "type": "string" },
+                  "description": { "type": "string" },
+                  "before": { "type": "string" },
+                  "after": { "type": "string" }
+                }
+              },
+              "description": "Code changes made"
+            },
+            "filesModified": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "List of modified files"
+            },
+            "linesChanged": {
+              "type": "integer",
+              "description": "Total lines changed"
+            }
+          }
+        },
+        "enterprisePatterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Enterprise patterns applied",
+          "examples": [
+            [
+              "vi.hoisted() for proper Vitest mock initialization",
+              "Stateful business logic in mocks"
+            ]
+          ]
+        },
+        "commits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sha": { "type": "string" },
+              "message": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          },
+          "description": "Related commits"
+        }
+      }
+    },
+    "findings": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["complete", "partial", "in-progress", "blocked"],
+          "description": "Findings status"
+        },
+        "testResults": {
+          "type": "object",
+          "properties": {
+            "before": {
+              "type": "object",
+              "properties": {
+                "passing": { "type": "integer" },
+                "failing": { "type": "integer" },
+                "total": { "type": "integer" },
+                "passRate": { "type": "number" }
+              }
+            },
+            "after": {
+              "type": "object",
+              "properties": {
+                "passing": { "type": "integer" },
+                "failing": { "type": "integer" },
+                "total": { "type": "integer" },
+                "passRate": { "type": "number" }
+              }
+            }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Custom metrics for this evidence type"
+        },
+        "validation": {
+          "type": "object",
+          "properties": {
+            "method": { "type": "string" },
+            "results": { "type": "array", "items": { "type": "string" } },
+            "reproducible": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "lessonsLearned": {
+      "type": "object",
+      "properties": {
+        "whatWentWrong": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Issues identified"
+        },
+        "whatWentRight": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Successes"
+        },
+        "improvements": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Process improvements"
+        }
+      }
+    },
+    "nextActions": {
+      "type": "object",
+      "properties": {
+        "immediate": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Immediate next steps"
+        },
+        "shortTerm": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Short-term actions (1-2 weeks)"
+        },
+        "longTerm": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Long-term strategic actions"
+        }
+      }
+    },
+    "relatedDocuments": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Cross-references to other documentation",
+      "examples": [
+        {
+          "testMatrix": "apps/mcp-server/data/test-matrix.json",
+          "currentTruth": "apps/mcp-server/data/current-truth.json"
+        }
+      ]
+    }
+  }
+}

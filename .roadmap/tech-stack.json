@@ -1,0 +1,444 @@
+{
+  "$schema": "https://luhtech.dev/schemas/tech-stack-v1.json",
+  "version": "1.0.0",
+  "ventureId": "ectropy",
+  "lastUpdated": "2025-12-12T08:00:00Z",
+  "stack": {
+    "languages": [
+      {
+        "name": "TypeScript",
+        "version": "^5.3",
+        "purpose": ["backend", "frontend", "api"],
+        "primary": true,
+        "percentageOfCodebase": 85,
+        "runtimeVersion": "Node.js 20 LTS"
+      },
+      {
+        "name": "JavaScript",
+        "version": "ES2022",
+        "purpose": ["frontend", "scripting"],
+        "primary": false,
+        "percentageOfCodebase": 8
+      },
+      {
+        "name": "SQL",
+        "version": "PostgreSQL 16",
+        "purpose": ["data"],
+        "primary": false,
+        "percentageOfCodebase": 4
+      },
+      {
+        "name": "Shell",
+        "version": "bash 5.x",
+        "purpose": ["scripting", "infrastructure"],
+        "primary": false,
+        "percentageOfCodebase": 3
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "Next.js",
+        "version": "14.x",
+        "category": "web-frontend",
+        "language": "TypeScript",
+        "documentation": "https://nextjs.org/docs",
+        "license": "MIT",
+        "updatePolicy": "latest",
+        "selectionRationale": "React framework with SSR, API routes, and optimized builds for BIM viewer SPA"
+      },
+      {
+        "name": "Express",
+        "version": "^4.18",
+        "category": "api",
+        "language": "TypeScript",
+        "documentation": "https://expressjs.com/",
+        "license": "MIT",
+        "updatePolicy": "lts",
+        "selectionRationale": "Mature Node.js web framework for API Gateway with Passport.js integration"
+      },
+      {
+        "name": "Prisma",
+        "version": "^5.7",
+        "category": "orm",
+        "language": "TypeScript",
+        "documentation": "https://www.prisma.io/docs",
+        "license": "Apache-2.0",
+        "updatePolicy": "latest",
+        "selectionRationale": "Type-safe database client with schema migrations and introspection"
+      },
+      {
+        "name": "Material UI",
+        "version": "^5.x",
+        "category": "ui-components",
+        "language": "TypeScript",
+        "documentation": "https://mui.com/",
+        "license": "MIT",
+        "updatePolicy": "lts",
+        "selectionRationale": "Comprehensive React component library for enterprise dashboards"
+      },
+      {
+        "name": "Tailwind CSS",
+        "version": "^3.4",
+        "category": "ui-components",
+        "language": "CSS",
+        "documentation": "https://tailwindcss.com/docs",
+        "license": "MIT",
+        "updatePolicy": "latest",
+        "selectionRationale": "Utility-first CSS framework for rapid UI development"
+      }
+    ],
+    "libraries": [
+      {
+        "name": "zod",
+        "version": "^3.22",
+        "purpose": "Runtime schema validation for TypeScript",
+        "packageManager": "pnpm",
+        "license": "MIT",
+        "critical": true,
+        "securityReviewed": true
+      },
+      {
+        "name": "@speckle/viewer",
+        "version": "^2.x",
+        "purpose": "3D BIM viewer component for Speckle streams",
+        "packageManager": "pnpm",
+        "license": "Apache-2.0",
+        "critical": true,
+        "securityReviewed": true
+      },
+      {
+        "name": "three",
+        "version": "^0.160",
+        "purpose": "3D rendering engine underlying Speckle viewer",
+        "packageManager": "pnpm",
+        "license": "MIT",
+        "critical": true,
+        "securityReviewed": true
+      },
+      {
+        "name": "passport",
+        "version": "^0.7",
+        "purpose": "Authentication middleware with OAuth strategies",
+        "packageManager": "pnpm",
+        "license": "MIT",
+        "critical": true,
+        "securityReviewed": true
+      },
+      {
+        "name": "passport-google-oauth20",
+        "version": "^2.0",
+        "purpose": "Google OAuth 2.0 strategy for Passport.js",
+        "packageManager": "pnpm",
+        "license": "MIT",
+        "critical": true,
+        "securityReviewed": true
+      },
+      {
+        "name": "ioredis",
+        "version": "^5.3",
+        "purpose": "Redis client for sessions and caching",
+        "packageManager": "pnpm",
+        "license": "MIT",
+        "critical": true,
+        "securityReviewed": true
+      },
+      {
+        "name": "winston",
+        "version": "^3.11",
+        "purpose": "Logging library with multiple transports",
+        "packageManager": "pnpm",
+        "license": "MIT",
+        "critical": false,
+        "securityReviewed": true
+      }
+    ],
+    "databases": [
+      {
+        "name": "PostgreSQL",
+        "type": "relational",
+        "engine": "postgresql",
+        "version": "16",
+        "hosted": true,
+        "provider": "DigitalOcean Managed PostgreSQL",
+        "purpose": "Primary relational database for platform data (staging and production use managed databases, development uses Docker)",
+        "extensions": ["uuid-ossp", "pg_stat_statements"]
+      },
+      {
+        "name": "Redis",
+        "type": "key-value",
+        "engine": "redis",
+        "version": "7",
+        "hosted": false,
+        "provider": "Self-hosted (Docker)",
+        "purpose": "Session management, caching, rate limiting"
+      },
+      {
+        "name": "MinIO (S3-compatible)",
+        "type": "key-value",
+        "engine": "redis",
+        "version": "latest",
+        "hosted": false,
+        "provider": "Self-hosted (Docker)",
+        "purpose": "S3-compatible object storage for Speckle blobs and file uploads (tracked as key-value for schema compatibility)"
+      }
+    ],
+    "infrastructure": [
+      {
+        "name": "DigitalOcean Droplet",
+        "category": "compute",
+        "provider": "DigitalOcean",
+        "service": "Droplet",
+        "purpose": "API services, databases, and Docker runtime",
+        "region": "sfo3",
+        "costTier": "professional"
+      },
+      {
+        "name": "DigitalOcean Spaces",
+        "category": "storage",
+        "provider": "DigitalOcean",
+        "service": "Spaces",
+        "purpose": "Backup storage and static assets",
+        "costTier": "starter"
+      },
+      {
+        "name": "Cloudflare",
+        "category": "cdn",
+        "provider": "Cloudflare",
+        "service": "CDN + DNS",
+        "purpose": "DNS management, CDN, DDoS protection",
+        "costTier": "free"
+      },
+      {
+        "name": "GitHub Actions",
+        "category": "ci-cd",
+        "provider": "GitHub",
+        "service": "GitHub Actions",
+        "purpose": "CI/CD pipelines with hybrid runner strategy",
+        "costTier": "starter"
+      }
+    ],
+    "devTools": [
+      {
+        "name": "pnpm",
+        "version": "^8.x",
+        "category": "package-manager",
+        "required": true,
+        "configFile": "pnpm-workspace.yaml"
+      },
+      {
+        "name": "Nx",
+        "version": "^17.x",
+        "category": "monorepo",
+        "required": true,
+        "configFile": "nx.json"
+      },
+      {
+        "name": "ESLint",
+        "version": "^8.x",
+        "category": "linter",
+        "required": true,
+        "configFile": ".eslintrc.json"
+      },
+      {
+        "name": "Prettier",
+        "version": "^3.x",
+        "category": "formatter",
+        "required": true,
+        "configFile": ".prettierrc"
+      },
+      {
+        "name": "Husky",
+        "version": "^8.x",
+        "category": "version-control",
+        "required": true,
+        "configFile": ".husky/"
+      },
+      {
+        "name": "Docker",
+        "version": "^24.x",
+        "category": "build-tool",
+        "required": true,
+        "configFile": "docker-compose.*.yml"
+      }
+    ],
+    "thirdPartyServices": [
+      {
+        "name": "Google OAuth 2.0",
+        "category": "auth",
+        "provider": "Google",
+        "apiVersion": "v2",
+        "pricing": "free",
+        "sdkUsed": "passport-google-oauth20"
+      },
+      {
+        "name": "OpenAI API",
+        "category": "ai-ml",
+        "provider": "OpenAI",
+        "apiVersion": "v1",
+        "pricing": "usage-based",
+        "sdkUsed": "openai"
+      },
+      {
+        "name": "Speckle",
+        "category": "bim",
+        "provider": "Speckle Systems (self-hosted)",
+        "apiVersion": "v2",
+        "pricing": "free",
+        "sdkUsed": "@speckle/viewer"
+      }
+    ],
+    "testing": [
+      {
+        "name": "Vitest",
+        "version": "^1.x",
+        "type": "unit",
+        "runner": "vitest",
+        "coverage": true,
+        "ciIntegrated": true
+      },
+      {
+        "name": "Playwright",
+        "version": "^1.40",
+        "type": "e2e",
+        "runner": "playwright",
+        "coverage": false,
+        "ciIntegrated": true
+      },
+      {
+        "name": "React Testing Library",
+        "version": "^14.x",
+        "type": "integration",
+        "runner": "vitest",
+        "coverage": true,
+        "ciIntegrated": true
+      }
+    ]
+  },
+  "architecturePatterns": [
+    {
+      "name": "modular-monolith",
+      "description": "Nx-managed monorepo with discrete apps and shared libs",
+      "implementation": "apps/ for deployable applications, libs/ for shared code",
+      "rationale": "Enables code sharing while maintaining clear boundaries and independent deployability",
+      "scope": "full-system"
+    },
+    {
+      "name": "api-first",
+      "description": "Single entry point for all API requests with OAuth and session management",
+      "implementation": "Express server at port 3002 with Passport.js strategies",
+      "rationale": "Centralized authentication, rate limiting, and request routing",
+      "scope": "api"
+    },
+    {
+      "name": "mcp-server",
+      "description": "Model Context Protocol for AI agent integration with platform data",
+      "implementation": "Node.js MCP server serving JSON governance files",
+      "rationale": "Enables structured AI interactions with enterprise construction data",
+      "scope": "backend"
+    },
+    {
+      "name": "domain-driven",
+      "description": "BIM collaboration via self-hosted Speckle server",
+      "implementation": "5-service Speckle stack with @speckle/viewer React component",
+      "rationale": "Open-source BIM collaboration with 3D viewer and version control",
+      "scope": "data-layer"
+    }
+  ],
+  "codeReuse": {
+    "forkParent": null,
+    "sharedPercentage": 0,
+    "customizationAreas": [],
+    "syncStrategy": "none",
+    "sharedPackages": [
+      "libs/shared/utils",
+      "libs/shared/types",
+      "libs/shared/ui"
+    ]
+  },
+  "monorepo": {
+    "tool": "nx",
+    "packages": [
+      { "name": "web-dashboard", "path": "apps/web-dashboard", "type": "app" },
+      { "name": "api-gateway", "path": "apps/api-gateway", "type": "app" },
+      { "name": "mcp-server", "path": "apps/mcp-server", "type": "app" },
+      {
+        "name": "shared-utils",
+        "path": "libs/shared/utils",
+        "type": "library"
+      },
+      {
+        "name": "shared-types",
+        "path": "libs/shared/types",
+        "type": "library"
+      },
+      { "name": "shared-ui", "path": "libs/shared/ui", "type": "library" }
+    ],
+    "sharedConfigs": ["tsconfig.base.json", ".eslintrc.json", ".prettierrc"]
+  },
+  "standards": {
+    "styleguide": "LuhTech TypeScript Style Guide",
+    "linter": "ESLint",
+    "formatter": "Prettier",
+    "commitConvention": "conventional-commits",
+    "branchingStrategy": "github-flow",
+    "prRequirements": {
+      "reviewers": 1,
+      "ciPassing": true,
+      "coverageThreshold": 70
+    }
+  },
+  "techDebt": [
+    {
+      "id": "td-test-coverage",
+      "title": "Low unit test coverage (13.7%)",
+      "description": "QA framework with gradual enforcement: WARN Dec 18 → BLOCK-NEW Jan 1 → BLOCK-ALL Jan 15",
+      "impact": "high",
+      "effort": "large",
+      "category": "testing",
+      "targetDate": "2026-01-15"
+    },
+    {
+      "id": "td-auth-fixture-migration",
+      "title": "E2E auth.fixture migration incomplete (56%)",
+      "description": "Complete migration of remaining 8 tests to auth.fixture pattern",
+      "impact": "medium",
+      "effort": "medium",
+      "category": "testing",
+      "targetDate": "2025-12-31"
+    }
+  ],
+  "migrationPlan": [
+    {
+      "id": "mig-repo-split",
+      "title": "Repository split to separate organization",
+      "from": "luhtech/Ectropy (monorepo)",
+      "to": "luhtech/Ectropy (public) + ectropy-tech/Ectropy-Business (private)",
+      "status": "planned",
+      "rationale": "Enable open-source community while protecting business IP",
+      "targetDate": "2026-01-17",
+      "effort": "large",
+      "riskLevel": "medium"
+    }
+  ],
+  "metrics": {
+    "dependencyCount": 342,
+    "outdatedDependencies": 12,
+    "securityVulnerabilities": {
+      "critical": 0,
+      "high": 0,
+      "medium": 2,
+      "low": 5
+    },
+    "testCoverage": 13.7,
+    "buildTime": "~3 minutes (Nx cached)",
+    "deployFrequency": "On-demand",
+    "lastAuditDate": "2025-12-12"
+  },
+  "notes": [
+    {
+      "date": "2025-12-12T08:00:00Z",
+      "author": "claude",
+      "content": "V3 tech-stack.json created for luhtech/Ectropy. Nx monorepo with TypeScript, Next.js frontend, Express API gateway, self-hosted Speckle BIM stack. QA framework implementing gradual test coverage enforcement."
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "name": "Ectropy Development",
+  "image": "ghcr.io/luhtech/ectropy-devcontainer:latest",
+  "workspaceFolder": "/workspace",
+
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/sshd:1": {
+      "version": "latest"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-azuretools.vscode-docker",
+        "Anthropic.claude-dev"
+      ],
+      "settings": {
+        "mcp.servers": {
+          "ectropy": {
+            "url": "http://143.198.154.94:3002",
+            "apiKey": "${localEnv:MCP_API_KEY}"
+          }
+        }
+      }
+    }
+  },
+
+  "forwardPorts": [3000, 3001, 3002, 4000, 5432, 6379, 6334],
+
+  "postCreateCommand": "chmod +x .devcontainer/setup.sh && .devcontainer/setup.sh",
+
+  "postStartCommand": "bash -c 'if command -v start-mcp >/dev/null 2>&1; then start-mcp; else echo \"⚠️  MCP not installed - run: sudo bash .devcontainer/install-mcp.sh\"; fi'",
+
+  "remoteUser": "node",
+
+  "remoteEnv": {
+    "MCP_API_KEY": "${localEnv:MCP_API_KEY}",
+    "MCP_URL": "http://143.198.154.94:3002"
+  }
+}

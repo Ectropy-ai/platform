@@ -1,0 +1,30 @@
+# 🎯 ECTROPY FEDERATED CONSTRUCTION PLATFORM - NAMESPACE
+# Production-ready Kubernetes namespace with enhanced security labels
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ectropy-production
+  labels:
+    name: ectropy-production
+    environment: production
+    project: federated-construction-platform
+    security-tier: enhanced
+    security.ectropy.io/validated: 'true'
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+  annotations:
+    security.ectropy.io/deployment-date: '2025-07-10'
+    security.ectropy.io/security-level: 'enterprise'
+    security.ectropy.io/validated-by: 'enhanced-security-middleware'
+
+---
+# Service Account for enhanced security RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ectropy-service-account
+  namespace: ectropy-production
+  annotations:
+    security.ectropy.io/managed-by: 'enhanced-security-system'
+automountServiceAccountToken: false

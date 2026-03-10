@@ -1,0 +1,49 @@
+[Unit]
+Description=Config Sync from DigitalOcean Spaces (Zero-SSH Pattern)
+Documentation=https://github.com/luhtech/Ectropy/blob/main/.roadmap/PHASE_P3_ZERO_SSH_TERRAFORM_STRATEGY_2026-02-14.json
+After=network-online.target docker.service
+Wants=network-online.target
+PartOf=config-sync.timer
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+
+# Environment Configuration
+Environment="SPACES_BUCKET=ectropy-staging-configs"
+Environment="SPACES_REGION=sfo3"
+Environment="CONFIG_DIR=/opt/ectropy"
+Environment="LOG_FILE=/var/log/config-sync.log"
+Environment="DOCKER_CONFIG=/opt/ectropy/.docker"
+
+# AWS Credentials (provided by cloud-init or manually configured)
+# Required: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+# DO NOT hardcode credentials - use environment variables or instance metadata
+EnvironmentFile=-/etc/default/config-sync
+
+# Working Directory
+WorkingDirectory=/opt/ectropy
+
+# Execute sync script
+ExecStart=/opt/ectropy/scripts/config-sync.sh
+
+# Logging Configuration
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=config-sync
+
+# Security Settings (Fortune 500 Compliance)
+# ProtectSystem=strict would prevent writing to /opt/ectropy
+ProtectSystem=full
+ProtectHome=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+# Resource Limits
+TimeoutStartSec=120s
+Restart=on-failure
+RestartSec=60s
+
+[Install]
+WantedBy=multi-user.target

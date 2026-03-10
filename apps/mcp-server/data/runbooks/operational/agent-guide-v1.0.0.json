@@ -1,0 +1,1389 @@
+{
+  "version": "1.0.0",
+  "environment": "all",
+  "runbookType": "operational",
+  "metadata": {
+    "catalogId": "operational-runbook-v1-0-0-agent",
+    "name": "MCP Agent Setup Guide",
+    "type": "operational",
+    "purpose": "Comprehensive onboarding and operational guide for AI agents (Claude, GitHub Copilot, etc.) working with the Ectropy platform, covering MCP integration, workflow patterns, quality gates, and enterprise development standards",
+    "maintainer": "AI Agent Framework Team",
+    "author": "AI Agent Framework Team",
+    "created": "2025-11-16T00:00:00Z",
+    "lastUpdated": "2025-11-16T00:00:00Z",
+    "estimatedDuration": "2 hours",
+    "complexity": "high",
+    "priority": "critical",
+    "relatedDocuments": [
+      "docs/AGENT_GUIDE.md",
+      "docs/AI_AGENT_PROTOCOL.md",
+      "docs/ARCHITECTURE.md",
+      "docs/CURRENT_TRUTH.md",
+      "docs/DEVELOPMENT.md",
+      "docs/DEPENDENCY_MANAGEMENT_POLICY.md",
+      "docs/DOCUMENTATION_POLICY.md"
+    ],
+    "sourceFile": "docs/AGENT_GUIDE.md",
+    "conversionDate": "2025-11-16T00:00:00Z",
+    "schemaVersion": "1.0.0"
+  },
+  "executiveSummary": {
+    "description": "Complete operational guide for AI agents developing on the Ectropy platform. Covers environment setup, MCP server integration, quality gates, testing requirements, documentation standards, and enterprise development workflows. Provides both simple feature workflows and comprehensive MCP-guided workflows for complex implementations.",
+    "status": "READY",
+    "confidenceLevel": "HIGH",
+    "riskAssessment": "LOW",
+    "keyChanges": [
+      "Consolidated from multiple agent guides into single source",
+      "Added MCP Graph Query Layer (97% token reduction)",
+      "Implemented JSON-first documentation workflow",
+      "Added 4-layer quality gate system",
+      "Standardized 12-file documentation policy"
+    ],
+    "prerequisites": [
+      "Read ARCHITECTURE.md (10 min) - Understand system structure",
+      "Read CURRENT_TRUTH.md (5 min) - Know current platform state",
+      "Read AI_AGENT_PROTOCOL.md (5 min) - Understand MCP workflow",
+      "MCP Server access (staging.ectropy.ai or local)",
+      "API key for MCP authentication",
+      "Development environment (GitHub Codespaces, Claude Desktop, or local)"
+    ],
+    "impact": {
+      "systems": [
+        "AI agent development workflow",
+        "MCP server integration",
+        "Quality gate validation",
+        "Documentation generation",
+        "Evidence-based development"
+      ],
+      "downtime": "None",
+      "rollbackTime": "N/A - operational guide only"
+    }
+  },
+  "preFlightChecks": [
+    {
+      "id": "mcp-connection",
+      "order": 1,
+      "category": "infrastructure",
+      "name": "MCP Server Connectivity",
+      "description": "Verify connection to MCP server (staging or local)",
+      "command": "curl -f https://staging.ectropy.ai/health",
+      "expectedResult": "HTTP 200 with health status JSON",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "Cannot connect to MCP server. Verify network connectivity and MCP_URL environment variable."
+      }
+    },
+    {
+      "id": "mcp-api-key",
+      "order": 2,
+      "category": "security",
+      "name": "MCP API Key Validation",
+      "description": "Verify MCP_API_KEY is set and valid",
+      "command": "curl -f -H \"X-API-Key: $MCP_API_KEY\" https://staging.ectropy.ai/api/tools",
+      "expectedResult": "HTTP 200 with list of available MCP tools",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "Invalid or missing MCP_API_KEY. Set MCP_API_KEY environment variable or GitHub secret."
+      }
+    },
+    {
+      "id": "git-repo-access",
+      "order": 3,
+      "category": "infrastructure",
+      "name": "Git Repository Access",
+      "description": "Verify access to Ectropy repository",
+      "command": "git status",
+      "expectedResult": "Git repository status displayed",
+      "severity": "critical",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "Not in a git repository or no git access. Clone Ectropy repository first."
+      }
+    },
+    {
+      "id": "node-version",
+      "order": 4,
+      "category": "dependencies",
+      "name": "Node.js Version Check",
+      "description": "Verify Node.js 18+ is installed",
+      "command": "node --version | grep -E 'v(18|19|20|21|22)'",
+      "expectedResult": "Node.js version 18 or higher",
+      "severity": "error",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "Node.js 18+ required. Update Node.js or use nvm/fnm."
+      }
+    },
+    {
+      "id": "pnpm-installed",
+      "order": 5,
+      "category": "dependencies",
+      "name": "pnpm Package Manager",
+      "description": "Verify pnpm is installed",
+      "command": "pnpm --version",
+      "expectedResult": "pnpm version displayed",
+      "severity": "error",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "abort",
+        "message": "pnpm required. Install with: npm install -g pnpm"
+      }
+    },
+    {
+      "id": "architecture-doc-read",
+      "order": 6,
+      "category": "configuration",
+      "name": "Architecture Documentation Review",
+      "description": "Verify ARCHITECTURE.md exists and has been read",
+      "command": "test -f docs/ARCHITECTURE.md",
+      "expectedResult": "docs/ARCHITECTURE.md exists",
+      "severity": "warning",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "skip",
+        "message": "Read docs/ARCHITECTURE.md before starting work to understand system structure."
+      }
+    },
+    {
+      "id": "current-truth-doc-read",
+      "order": 7,
+      "category": "configuration",
+      "name": "Current Truth Documentation Review",
+      "description": "Verify CURRENT_TRUTH.md exists and is current",
+      "command": "test -f docs/CURRENT_TRUTH.md",
+      "expectedResult": "docs/CURRENT_TRUTH.md exists",
+      "severity": "warning",
+      "required": true,
+      "automatable": true,
+      "onFailure": {
+        "action": "skip",
+        "message": "Read docs/CURRENT_TRUTH.md to understand current platform state."
+      }
+    },
+    {
+      "id": "docker-available",
+      "order": 8,
+      "category": "infrastructure",
+      "name": "Docker Availability",
+      "description": "Check if Docker is available (optional for some workflows)",
+      "command": "docker --version",
+      "expectedResult": "Docker version displayed",
+      "severity": "warning",
+      "required": false,
+      "automatable": true,
+      "onFailure": {
+        "action": "skip",
+        "message": "Docker not available. Some workflows require Docker for containerized testing."
+      }
+    }
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Initial Setup and Environment Understanding",
+      "description": "Configure MCP connection, understand environment capabilities, and review core documentation",
+      "estimatedDuration": "30 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "1.1",
+          "name": "Set MCP Environment Variables",
+          "description": "Configure MCP_URL and MCP_API_KEY for server connection",
+          "commands": [
+            "export MCP_URL=https://staging.ectropy.ai",
+            "export MCP_API_KEY=<your-api-key>"
+          ],
+          "purpose": "Enable MCP server connectivity for guidance and validation",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "retryable": false,
+          "expectedStatus": 0,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "Environment variables set successfully"
+          },
+          "onFailure": {
+            "action": "abort",
+            "message": "Cannot proceed without MCP server access"
+          }
+        },
+        {
+          "step": "1.2",
+          "name": "Test MCP Connection",
+          "description": "Verify connection to MCP server health endpoint",
+          "command": "curl -f https://staging.ectropy.ai/health",
+          "purpose": "Validate network connectivity to MCP server",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": 200,
+          "validation": {
+            "type": "exitCode",
+            "criteria": "HTTP 200 response received"
+          }
+        },
+        {
+          "step": "1.3",
+          "name": "Test MCP API Authentication",
+          "description": "Verify API key works with authenticated endpoint",
+          "command": "curl -f -H \"X-API-Key: $MCP_API_KEY\" https://staging.ectropy.ai/api/tools",
+          "purpose": "Validate API key authentication",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "retryable": true,
+          "maxRetries": 3,
+          "expectedStatus": 200
+        },
+        {
+          "step": "1.4",
+          "name": "Review Architecture Documentation",
+          "description": "Read ARCHITECTURE.md to understand system structure",
+          "command": "cat docs/ARCHITECTURE.md",
+          "purpose": "Understand monorepo structure, service architecture, and file locations",
+          "required": true,
+          "automatable": false,
+          "expectedOutput": "Architecture documentation content"
+        },
+        {
+          "step": "1.5",
+          "name": "Review Current Platform State",
+          "description": "Read CURRENT_TRUTH.md to know recent changes",
+          "command": "cat docs/CURRENT_TRUTH.md",
+          "purpose": "Understand current platform state and recent modifications",
+          "required": true,
+          "automatable": false,
+          "expectedOutput": "Current truth documentation content"
+        },
+        {
+          "step": "1.6",
+          "name": "Review MCP Agent Protocol",
+          "description": "Read AI_AGENT_PROTOCOL.md to understand workflow",
+          "command": "cat docs/AI_AGENT_PROTOCOL.md",
+          "purpose": "Learn MCP-guided workflow and validation gates",
+          "required": true,
+          "automatable": false,
+          "expectedOutput": "MCP protocol documentation"
+        },
+        {
+          "step": "1.7",
+          "name": "Identify Environment Capabilities",
+          "description": "Determine which tools are available (bash, git, docker, etc.)",
+          "commands": [
+            "which bash || echo 'No bash'",
+            "which git || echo 'No git'",
+            "which docker || echo 'No docker'",
+            "which gh || echo 'No GitHub CLI'"
+          ],
+          "purpose": "Understand environment-specific constraints and adapt workflow",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "List of available tools"
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "MCP Graph Query Layer Integration",
+      "description": "Learn to use MCP Graph Query endpoints for efficient platform intelligence",
+      "estimatedDuration": "20 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "2.1",
+          "name": "Test GraphQL Endpoint",
+          "description": "Verify GraphQL query endpoint is accessible",
+          "command": "curl -X POST https://staging.ectropy.ai/graphql -H \"Content-Type: application/json\" -d '{\"query\": \"{ __schema { types { name } } }\"}'",
+          "purpose": "Validate GraphQL endpoint connectivity",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 200
+        },
+        {
+          "step": "2.2",
+          "name": "Query Platform Decisions",
+          "description": "Retrieve all platform decisions using Graph Query API",
+          "command": "curl -f https://staging.ectropy.ai/api/mcp/graph/decisions",
+          "purpose": "Access decision intelligence without loading full DECISION_LOG.md (97% token reduction)",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 200
+        },
+        {
+          "step": "2.3",
+          "name": "Query Specific Decision with GraphQL",
+          "description": "Retrieve single decision with selected fields only",
+          "command": "curl -X POST https://staging.ectropy.ai/graphql -H \"Content-Type: application/json\" -d '{\"query\": \"{ decisions { decisionId title status impact category } }\"}'",
+          "purpose": "Demonstrate efficient field selection for minimal token usage",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 200
+        },
+        {
+          "step": "2.4",
+          "name": "Query Decision Dependencies",
+          "description": "Get decision relationship graph",
+          "command": "curl -f https://staging.ectropy.ai/api/mcp/graph/decisions/d-2025-11-11-json-first-documentation/dependencies",
+          "purpose": "Understand decision relationships and impact analysis",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 200
+        },
+        {
+          "step": "2.5",
+          "name": "Query Evidence Files",
+          "description": "Retrieve evidence metadata for validation",
+          "command": "curl -f https://staging.ectropy.ai/api/mcp/graph/evidence",
+          "purpose": "Access evidence files without filesystem traversal",
+          "required": false,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 200,
+          "onFailure": {
+            "action": "retry",
+            "message": "Evidence query failed but not critical"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "Quality Gates and Validation Framework",
+      "description": "Understand 4-layer quality gate system: pre-commit, pre-merge, proactive monitoring, and dependency validation",
+      "estimatedDuration": "30 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "3.1",
+          "name": "Review Pre-Commit Hook",
+          "description": "Understand local validation that runs before each commit",
+          "command": "cat .husky/pre-commit",
+          "purpose": "Learn about pattern validation, security scanning, TypeScript checks, tests, and linting",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "Pre-commit hook script content"
+        },
+        {
+          "step": "3.2",
+          "name": "Review PR Validation Workflow",
+          "description": "Understand pre-merge validation for pull requests",
+          "command": "cat .github/workflows/pr-validation.yml",
+          "purpose": "Learn about 4 parallel validation jobs: TypeScript, tests, lint, dependencies",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "PR validation workflow YAML"
+        },
+        {
+          "step": "3.3",
+          "name": "Test Local TypeScript Validation",
+          "description": "Run TypeScript type checking locally",
+          "command": "pnpm nx affected --target=type-check --base=main",
+          "purpose": "Verify TypeScript strict mode compliance before commit",
+          "required": true,
+          "automatable": true,
+          "timeout": "120s",
+          "retryable": false,
+          "expectedStatus": 0
+        },
+        {
+          "step": "3.4",
+          "name": "Test Local Test Suite",
+          "description": "Run affected tests with coverage",
+          "command": "pnpm nx affected --target=test --base=main --coverage",
+          "purpose": "Ensure 80% minimum coverage requirement met",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "3.5",
+          "name": "Run Dependency Compatibility Check",
+          "description": "Validate third-party library versions and features",
+          "command": "./scripts/ci/validate-dependency-compatibility.sh",
+          "purpose": "Prevent using features not available in current dependency versions",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "3.6",
+          "name": "Review Infrastructure Health Monitoring",
+          "description": "Understand proactive health checks for self-hosted runners",
+          "command": "cat .github/workflows/runner-health.yml",
+          "purpose": "Learn about automated infrastructure validation every 3 hours",
+          "required": false,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "Runner health workflow YAML",
+          "onFailure": {
+            "action": "retry",
+            "message": "Runner health workflow file not found"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Documentation Standards and JSON-First Workflow",
+      "description": "Learn 12-file documentation policy and JSON-first documentation generation",
+      "estimatedDuration": "20 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "4.1",
+          "name": "Review Documentation Policy",
+          "description": "Understand 12 core documentation files and size limits",
+          "command": "cat docs/DOCUMENTATION_POLICY.md",
+          "purpose": "Learn approved documentation structure and no new .md file policy",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "Documentation policy content"
+        },
+        {
+          "step": "4.2",
+          "name": "Review current-truth.json Schema",
+          "description": "Understand JSON-first documentation structure",
+          "command": "cat docs/current-truth.json",
+          "purpose": "Learn how to update CURRENT_TRUTH.md via JSON editing",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedOutput": "Current truth JSON structure"
+        },
+        {
+          "step": "4.3",
+          "name": "Validate Documentation JSON",
+          "description": "Run validation on current-truth.json",
+          "command": "npm run docs:validate",
+          "purpose": "Ensure JSON follows schema before regenerating markdown",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "4.4",
+          "name": "Generate Markdown from JSON",
+          "description": "Regenerate CURRENT_TRUTH.md from JSON source",
+          "command": "npm run docs:generate",
+          "purpose": "Understand automated markdown generation workflow",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "4.5",
+          "name": "Review Evidence File Schema",
+          "description": "Understand evidence file structure and validation",
+          "command": "cat evidence/schema/evidence-schema.json",
+          "purpose": "Learn how to create valid evidence files for all changes",
+          "required": true,
+          "automatable": true,
+          "timeout": "5s",
+          "expectedOutput": "Evidence schema JSON"
+        },
+        {
+          "step": "4.6",
+          "name": "Validate Evidence Files",
+          "description": "Run validation on all evidence files",
+          "command": "node scripts/validation/validate-evidence.cjs",
+          "purpose": "Ensure all evidence follows required schema",
+          "required": false,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "retry",
+            "message": "Evidence validation failed but not critical for setup"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Simple Feature Workflow",
+      "description": "Quick workflow for UI components and small feature enhancements",
+      "estimatedDuration": "15 minutes",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "5.1",
+          "name": "Create Feature Branch",
+          "description": "Branch from main for new feature",
+          "commands": [
+            "git checkout main",
+            "git pull origin main",
+            "git checkout -b feature/my-feature-name"
+          ],
+          "purpose": "Isolate feature work in dedicated branch",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "5.2",
+          "name": "Implement Feature",
+          "description": "Write code following TypeScript strict mode and existing patterns",
+          "command": "echo 'Manual step: Implement feature code'",
+          "purpose": "Develop feature using enterprise standards",
+          "required": true,
+          "automatable": false,
+          "expectedOutput": "Feature implementation complete"
+        },
+        {
+          "step": "5.3",
+          "name": "Write Tests",
+          "description": "Create tests achieving 80% minimum coverage",
+          "command": "pnpm nx test web-dashboard --testFile=MyComponent.test.tsx",
+          "purpose": "Ensure code quality and prevent regressions",
+          "required": true,
+          "automatable": true,
+          "timeout": "120s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "5.4",
+          "name": "Verify Visually",
+          "description": "Start dev server and test component manually",
+          "command": "pnpm nx serve web-dashboard",
+          "purpose": "Validate UI/UX and visual correctness",
+          "required": true,
+          "automatable": false,
+          "expectedOutput": "Component renders correctly in browser",
+          "onFailure": {
+            "action": "abort",
+            "message": "Dev server failed to start"
+          }
+        },
+        {
+          "step": "5.5",
+          "name": "Run Quality Checks",
+          "description": "Execute TypeScript, tests, and lint checks",
+          "commands": [
+            "pnpm nx run web-dashboard:type-check",
+            "pnpm nx run web-dashboard:test --coverage",
+            "pnpm nx run web-dashboard:lint"
+          ],
+          "purpose": "Ensure all quality gates pass before commit",
+          "required": true,
+          "automatable": true,
+          "timeout": "180s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "5.6",
+          "name": "Commit Changes",
+          "description": "Commit with conventional commit format",
+          "command": "git add . && git commit -m \"feat: add MyComponent for feature X\"",
+          "purpose": "Save changes with descriptive commit message",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "5.7",
+          "name": "Push Branch",
+          "description": "Push feature branch to remote",
+          "command": "git push origin feature/my-feature-name",
+          "purpose": "Make branch available for PR creation",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "5.8",
+          "name": "Create Pull Request",
+          "description": "Open PR to develop branch",
+          "command": "gh pr create --base develop --title \"feat: my feature\" --body \"Closes #123\"",
+          "purpose": "Submit feature for code review and validation",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to create pull request"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "MCP-Guided Workflow for Complex Changes",
+      "description": "Complete 9-step workflow with MCP validation for infrastructure changes",
+      "estimatedDuration": "45 minutes",
+      "parallel": false,
+      "criticalPath": true,
+      "steps": [
+        {
+          "step": "6.1",
+          "name": "Query MCP for Guidance",
+          "description": "Get MCP guidance for implementation approach",
+          "command": "curl -X POST https://staging.ectropy.ai/api/mcp/get-guidance -d '{\"query\":\"Add IFC upload\",\"context\":\"API Gateway\"}'",
+          "purpose": "Receive AI-validated guidance before planning",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 200,
+          "relatedFiles": [
+            "evidence/mcp-guidance.json"
+          ]
+        },
+        {
+          "step": "6.2",
+          "name": "Create Work Plan",
+          "description": "Draft detailed implementation plan based on MCP guidance",
+          "command": "echo 'Manual step: Create work-plan.json based on MCP guidance'",
+          "purpose": "Document step-by-step implementation strategy",
+          "required": true,
+          "automatable": false,
+          "expectedOutput": "work-plan.json file created"
+        },
+        {
+          "step": "6.3",
+          "name": "Validate Work Plan with MCP",
+          "description": "Submit work plan for MCP validation (must score 70/100)",
+          "command": "curl -X POST https://staging.ectropy.ai/api/mcp/validate-work-plan -d @work-plan.json",
+          "purpose": "Ensure plan meets quality standards before implementation",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 200,
+          "validation": {
+            "type": "output",
+            "criteria": "Score >= 70/100"
+          },
+          "onFailure": {
+            "action": "retry",
+            "message": "Revise work plan based on MCP feedback and revalidate"
+          },
+          "relatedFiles": [
+            "evidence/validation.json"
+          ]
+        },
+        {
+          "step": "6.4",
+          "name": "Check Strategy Alignment",
+          "description": "Verify approach aligns with platform strategy",
+          "command": "curl -X POST https://staging.ectropy.ai/api/mcp/check-strategy -d '{\"approach\":\"...\",\"validationSteps\":[\"...\"]}' > evidence/strategy.json",
+          "purpose": "Confirm implementation strategy follows platform patterns",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 200
+        },
+        {
+          "step": "6.5",
+          "name": "Implement Changes",
+          "description": "Execute implementation following validated work plan",
+          "command": "echo 'Manual step: Implement changes per validated work plan'",
+          "purpose": "Develop feature with enterprise quality standards",
+          "required": true,
+          "automatable": false,
+          "expectedOutput": "Implementation complete per work plan"
+        },
+        {
+          "step": "6.6",
+          "name": "Create Evidence Files",
+          "description": "Document implementation with evidence files at each step",
+          "commands": [
+            "mkdir -p evidence/my-implementation",
+            "# Create evidence files following evidence-schema.json"
+          ],
+          "purpose": "Build audit trail for validation and review",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "6.7",
+          "name": "Run Tests",
+          "description": "Execute test suite with 80% minimum coverage",
+          "command": "pnpm nx affected --target=test --base=main --coverage",
+          "purpose": "Validate implementation correctness and prevent regressions",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "expectedStatus": 0,
+          "validation": {
+            "type": "output",
+            "criteria": "Coverage >= 80%"
+          }
+        },
+        {
+          "step": "6.8",
+          "name": "Update CURRENT_TRUTH.md",
+          "description": "Add entry to current-truth.json and regenerate markdown",
+          "commands": [
+            "# Edit docs/current-truth.json with new node",
+            "npm run docs:validate",
+            "npm run docs:generate"
+          ],
+          "purpose": "Maintain single source of truth for platform state",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "6.9",
+          "name": "Commit with Evidence References",
+          "description": "Commit changes with references to evidence files",
+          "command": "git add . && git commit -m \"feat: implementation\\n\\nEvidence: evidence/my-implementation/\"",
+          "purpose": "Link commits to evidence for traceability",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "abort",
+            "message": "Commit failed - check for uncommitted changes or pre-commit hook failures"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 7,
+      "name": "Versioning and Release Management",
+      "description": "MCP-guided version bump decisions and release process",
+      "estimatedDuration": "30 minutes",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "7.1",
+          "name": "Gather Changes Since Last Release",
+          "description": "Collect git log from last tag to develop",
+          "command": "git log --oneline $(git describe --tags --abbrev=0)..develop > changes.txt",
+          "purpose": "Prepare context for MCP version decision",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "7.2",
+          "name": "Query MCP for Version Bump Decision",
+          "description": "Ask MCP whether this should be MAJOR, MINOR, or PATCH",
+          "command": "curl -X POST http://localhost:3001/api/mcp/get-guidance -d '{\"query\":\"Should this be MAJOR, MINOR, or PATCH release?\",\"context\":\"$(cat changes.txt)\"}'",
+          "purpose": "Get AI-validated version bump recommendation",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 200
+        },
+        {
+          "step": "7.3",
+          "name": "Create Release Branch",
+          "description": "Branch from develop with version number",
+          "commands": [
+            "git checkout develop",
+            "git pull origin develop",
+            "git checkout -b release/v1.1.0"
+          ],
+          "purpose": "Isolate release preparation",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "7.4",
+          "name": "Bump Version with npm",
+          "description": "Use npm version command based on MCP recommendation",
+          "command": "npm version minor",
+          "purpose": "Update package.json version semantically",
+          "required": true,
+          "automatable": true,
+          "timeout": "10s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "7.5",
+          "name": "Update CHANGELOG.md",
+          "description": "Move unreleased entries to new version section",
+          "command": "echo 'Manual step: Update CHANGELOG.md with release notes'",
+          "purpose": "Document release changes for users",
+          "required": true,
+          "automatable": false,
+          "expectedOutput": "CHANGELOG.md updated with version section"
+        },
+        {
+          "step": "7.6",
+          "name": "Commit Release Preparation",
+          "description": "Commit version bump and changelog",
+          "command": "git add package.json CHANGELOG.md && git commit -m \"chore: prepare release v1.1.0\"",
+          "purpose": "Save release changes",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "7.7",
+          "name": "Push Release Branch",
+          "description": "Push branch to remote for PR",
+          "command": "git push origin release/v1.1.0",
+          "purpose": "Make release available for review",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "7.8",
+          "name": "Create Release PR",
+          "description": "Open PR to main with release details",
+          "command": "gh pr create --base main --head release/v1.1.0 --title \"Release v1.1.0\" --body \"See CHANGELOG.md\"",
+          "purpose": "Submit release for approval and validation",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0,
+          "onFailure": {
+            "action": "abort",
+            "message": "Failed to create release PR"
+          }
+        }
+      ]
+    },
+    {
+      "phase": 8,
+      "name": "Deployment and Rollback",
+      "description": "Deploy to staging/production and rollback procedures",
+      "estimatedDuration": "20 minutes",
+      "parallel": false,
+      "criticalPath": false,
+      "steps": [
+        {
+          "step": "8.1",
+          "name": "Pre-Deploy Validation",
+          "description": "Run complete validation suite before deployment",
+          "commands": [
+            "pnpm nx affected --target=test,type-check,lint --base=main",
+            "./scripts/ci/validate-dependency-compatibility.sh"
+          ],
+          "purpose": "Ensure deployment readiness",
+          "required": true,
+          "automatable": true,
+          "timeout": "300s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "8.2",
+          "name": "Update CURRENT_TRUTH.md for Deployment",
+          "description": "Document deployment in current-truth.json",
+          "command": "echo 'Manual step: Edit current-truth.json and regenerate markdown'",
+          "purpose": "Record deployment event in platform state",
+          "required": true,
+          "automatable": false,
+          "expectedOutput": "CURRENT_TRUTH.md updated with deployment entry"
+        },
+        {
+          "step": "8.3",
+          "name": "Deploy to Staging",
+          "description": "Trigger staging deployment workflow",
+          "command": "gh workflow run deploy-staging-matrix.yml",
+          "purpose": "Deploy to staging environment for validation",
+          "required": true,
+          "automatable": true,
+          "timeout": "600s",
+          "expectedStatus": 0
+        },
+        {
+          "step": "8.4",
+          "name": "Monitor Deployment",
+          "description": "Watch deployment workflow execution",
+          "command": "gh run watch",
+          "purpose": "Track deployment progress and catch failures",
+          "required": true,
+          "automatable": false,
+          "expectedOutput": "Deployment workflow completes successfully"
+        },
+        {
+          "step": "8.5",
+          "name": "Run Post-Deployment Health Checks",
+          "description": "Verify all services healthy after deployment",
+          "commands": [
+            "curl -f https://staging.ectropy.ai/health",
+            "curl -f https://staging.ectropy.ai/api/health",
+            "curl -f https://staging.ectropy.ai/mcp/health"
+          ],
+          "purpose": "Validate deployment success",
+          "required": true,
+          "automatable": true,
+          "timeout": "60s",
+          "retryable": true,
+          "maxRetries": 5,
+          "expectedStatus": 200
+        },
+        {
+          "step": "8.6",
+          "name": "Create Deployment Evidence",
+          "description": "Document successful deployment with evidence file",
+          "command": "mkdir -p evidence/deployment-$(date +%Y-%m-%d) && # Create evidence",
+          "purpose": "Build audit trail for deployment",
+          "required": true,
+          "automatable": true,
+          "timeout": "30s",
+          "expectedStatus": 0
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "healthChecks": [
+      {
+        "service": "MCP Server",
+        "endpoint": "https://staging.ectropy.ai/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "MCP API Gateway",
+        "endpoint": "https://staging.ectropy.ai/api/mcp/health",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "GraphQL Endpoint",
+        "endpoint": "https://staging.ectropy.ai/graphql",
+        "method": "POST",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": true
+      },
+      {
+        "service": "Web Dashboard",
+        "endpoint": "https://staging.ectropy.ai",
+        "method": "GET",
+        "expectedStatus": 200,
+        "timeout": "10s",
+        "critical": false
+      }
+    ],
+    "smokeTests": [
+      {
+        "test": "MCP Tools List",
+        "endpoint": "curl -H \"X-API-Key: $MCP_API_KEY\" https://staging.ectropy.ai/api/tools",
+        "expectedBehavior": "Returns JSON array of available MCP tools",
+        "priority": "P0"
+      },
+      {
+        "test": "GraphQL Decision Query",
+        "endpoint": "curl -X POST https://staging.ectropy.ai/graphql -d '{\"query\":\"{ decisions { decisionId } }\"}'",
+        "expectedBehavior": "Returns list of platform decisions",
+        "priority": "P0"
+      },
+      {
+        "test": "Evidence Graph Query",
+        "endpoint": "curl https://staging.ectropy.ai/api/mcp/graph/evidence",
+        "expectedBehavior": "Returns evidence metadata",
+        "priority": "P1"
+      },
+      {
+        "test": "Local TypeScript Validation",
+        "endpoint": "pnpm nx affected --target=type-check --base=main",
+        "expectedBehavior": "TypeScript compilation passes with no errors",
+        "priority": "P0"
+      },
+      {
+        "test": "Local Test Suite",
+        "endpoint": "pnpm nx affected --target=test --base=main",
+        "expectedBehavior": "All tests pass with >= 80% coverage",
+        "priority": "P0"
+      }
+    ],
+    "performanceThresholds": [
+      {
+        "metric": "MCP Query Response Time",
+        "threshold": "< 2 seconds",
+        "measurement": "Time to receive guidance or validation response"
+      },
+      {
+        "metric": "GraphQL Query Response Time",
+        "threshold": "< 1 second",
+        "measurement": "Time to receive decision/evidence data"
+      },
+      {
+        "metric": "Pre-Commit Hook Execution",
+        "threshold": "< 30 seconds",
+        "measurement": "Total time for all pre-commit validations"
+      },
+      {
+        "metric": "PR Validation Job Duration",
+        "threshold": "< 10 minutes per job",
+        "measurement": "Each of 4 parallel validation jobs"
+      }
+    ],
+    "dataIntegrity": [
+      {
+        "check": "Evidence File Schema Validation",
+        "validation": "node scripts/validation/validate-evidence.cjs",
+        "expected": "All evidence files pass schema validation"
+      },
+      {
+        "check": "Documentation JSON Schema Validation",
+        "validation": "npm run docs:validate",
+        "expected": "current-truth.json passes schema validation"
+      },
+      {
+        "check": "Dependency Compatibility",
+        "validation": "./scripts/ci/validate-dependency-compatibility.sh",
+        "expected": "All dependencies compatible with used features"
+      }
+    ]
+  },
+  "rollback": {
+    "supported": true,
+    "estimatedTime": "10 minutes",
+    "dataLossRisk": "none",
+    "triggerConditions": [
+      "Deployment health checks fail",
+      "TypeScript compilation errors in production",
+      "Test failures after merge",
+      "MCP server unreachable",
+      "Critical security vulnerability detected"
+    ],
+    "decisionMaker": "AI Agent with human approval for production",
+    "steps": [
+      {
+        "step": 1,
+        "name": "SSH to Deployment Server",
+        "command": "ssh root@143.198.154.94",
+        "purpose": "Access deployment server for rollback",
+        "required": true
+      },
+      {
+        "step": 2,
+        "name": "Navigate to Ectropy Directory",
+        "command": "cd /var/www/ectropy",
+        "purpose": "Change to application directory",
+        "required": true
+      },
+      {
+        "step": 3,
+        "name": "Checkout Previous Commit",
+        "command": "git checkout <previous-commit-hash>",
+        "purpose": "Revert to last known good version",
+        "required": true
+      },
+      {
+        "step": 4,
+        "name": "Rebuild Docker Containers",
+        "command": "docker compose -f docker-compose.staging.yml build",
+        "purpose": "Rebuild containers with previous code",
+        "required": true
+      },
+      {
+        "step": 5,
+        "name": "Restart Services",
+        "command": "docker compose -f docker-compose.staging.yml up -d",
+        "purpose": "Deploy rolled-back version",
+        "required": true
+      },
+      {
+        "step": 6,
+        "name": "Verify Rollback Health",
+        "command": "curl -f https://staging.ectropy.ai/health",
+        "purpose": "Confirm services healthy after rollback",
+        "required": true
+      }
+    ],
+    "verification": {
+      "healthCheck": "curl -f https://staging.ectropy.ai/health && curl -f https://staging.ectropy.ai/api/health",
+      "expectedStatus": 200,
+      "successCriteria": "All services return HTTP 200 from health endpoints"
+    }
+  },
+  "monitoring": {
+    "duration": "24 hours after deployment",
+    "keyMetrics": [
+      {
+        "metric": "MCP Server Response Time",
+        "threshold": "< 2 seconds",
+        "alertOn": "> 5 seconds",
+        "severity": "warning"
+      },
+      {
+        "metric": "GraphQL Query Performance",
+        "threshold": "< 1 second",
+        "alertOn": "> 3 seconds",
+        "severity": "warning"
+      },
+      {
+        "metric": "Health Check Success Rate",
+        "threshold": "100%",
+        "alertOn": "< 99%",
+        "severity": "critical"
+      },
+      {
+        "metric": "Test Coverage",
+        "threshold": ">= 80%",
+        "alertOn": "< 80%",
+        "severity": "critical"
+      }
+    ],
+    "alertThresholds": [
+      {
+        "condition": "MCP server unreachable for > 5 minutes",
+        "severity": "critical",
+        "action": "Page on-call engineer",
+        "escalation": "Rollback deployment immediately"
+      },
+      {
+        "condition": "Test failures in PR validation",
+        "severity": "critical",
+        "action": "Block merge",
+        "escalation": "Notify developer to fix before merge"
+      },
+      {
+        "condition": "Pre-commit hook failures",
+        "severity": "warning",
+        "action": "Block commit",
+        "escalation": "Developer must fix issues or use --no-verify with justification"
+      }
+    ],
+    "dashboards": [
+      "https://staging.ectropy.ai/api/mcp/health",
+      "GitHub Actions workflows dashboard",
+      "Docker container health status"
+    ]
+  },
+  "successCriteria": [
+    {
+      "criterion": "MCP server connectivity established and API key validated",
+      "status": "REQUIRED",
+      "validation": "curl -H \"X-API-Key: $MCP_API_KEY\" https://staging.ectropy.ai/api/tools returns HTTP 200"
+    },
+    {
+      "criterion": "Core documentation reviewed (ARCHITECTURE.md, CURRENT_TRUTH.md, AI_AGENT_PROTOCOL.md)",
+      "status": "REQUIRED",
+      "validation": "Agent confirms understanding of system structure and workflow"
+    },
+    {
+      "criterion": "Graph Query Layer tested and functional",
+      "status": "REQUIRED",
+      "validation": "GraphQL and REST endpoints return valid decision/evidence data"
+    },
+    {
+      "criterion": "Quality gates understood (4-layer validation system)",
+      "status": "REQUIRED",
+      "validation": "Agent can run local TypeScript checks, tests, and lint successfully"
+    },
+    {
+      "criterion": "Documentation standards followed (12-file policy, JSON-first)",
+      "status": "REQUIRED",
+      "validation": "Updates to current-truth.json pass validation and generate markdown"
+    },
+    {
+      "criterion": "Simple feature workflow executed successfully",
+      "status": "RECOMMENDED",
+      "validation": "Feature branch created, tests pass, PR opened to develop"
+    },
+    {
+      "criterion": "MCP-guided workflow completed for complex change",
+      "status": "RECOMMENDED",
+      "validation": "Work plan validated >= 70/100, evidence files created, CURRENT_TRUTH.md updated"
+    },
+    {
+      "criterion": "Deployment executed with health check validation",
+      "status": "OPTIONAL",
+      "validation": "Staging deployment successful with all services healthy"
+    }
+  ],
+  "mcpIntegration": {
+    "queryableFields": [
+      "metadata.catalogId",
+      "metadata.name",
+      "metadata.purpose",
+      "environment",
+      "runbookType",
+      "phases[].name",
+      "phases[].steps[].name",
+      "phases[].steps[].command",
+      "successCriteria[].criterion",
+      "preFlightChecks[].name"
+    ],
+    "supportedQueries": [
+      {
+        "query": "How do I set up MCP server connection?",
+        "returns": "Phase 1: Initial Setup and Environment Understanding",
+        "purpose": "Guide agents through MCP connectivity setup",
+        "args": []
+      },
+      {
+        "query": "What are the Graph Query endpoints for decision intelligence?",
+        "returns": "Phase 2: MCP Graph Query Layer Integration with REST and GraphQL examples",
+        "purpose": "Enable efficient platform intelligence queries with 97% token reduction",
+        "args": []
+      },
+      {
+        "query": "What quality gates must I pass before merging?",
+        "returns": "Phase 3: Quality Gates and Validation Framework (4 layers)",
+        "purpose": "Understand pre-commit, pre-merge, proactive, and dependency validation",
+        "args": []
+      },
+      {
+        "query": "How do I update CURRENT_TRUTH.md?",
+        "returns": "Phase 4: Documentation Standards - Edit current-truth.json, validate, and regenerate",
+        "purpose": "Learn JSON-first documentation workflow",
+        "args": []
+      },
+      {
+        "query": "What's the workflow for simple UI features?",
+        "returns": "Phase 5: Simple Feature Workflow (8 steps)",
+        "purpose": "Quick workflow for components and small enhancements",
+        "args": []
+      },
+      {
+        "query": "What's the MCP-guided workflow for complex changes?",
+        "returns": "Phase 6: MCP-Guided Workflow (9 mandatory steps)",
+        "purpose": "Complete validation workflow for infrastructure/architecture changes",
+        "args": []
+      },
+      {
+        "query": "How do I decide MAJOR vs MINOR vs PATCH version?",
+        "returns": "Phase 7: Versioning and Release Management with MCP decision support",
+        "purpose": "Get AI-validated version bump recommendations",
+        "args": []
+      },
+      {
+        "query": "What's the deployment and rollback procedure?",
+        "returns": "Phase 8: Deployment and Rollback with health check validation",
+        "purpose": "Deploy safely with rollback capability",
+        "args": []
+      }
+    ],
+    "decisionSupport": [
+      "Use Simple Feature Workflow (Phase 5) for UI components, styling, small enhancements",
+      "Use MCP-Guided Workflow (Phase 6) for infrastructure, database, API, security, or cross-service changes",
+      "Always query MCP for guidance before creating work plans (mandatory for complex changes)",
+      "Work plan must score >= 70/100 in MCP validation before implementation",
+      "Update current-truth.json (not CURRENT_TRUTH.md directly) following JSON-first workflow",
+      "Create evidence files for all changes following evidence-schema.json",
+      "Query MCP for version bump decision (MAJOR/MINOR/PATCH) before creating release",
+      "Run all quality gates locally before pushing (TypeScript, tests, lint, dependencies)",
+      "Use Graph Query endpoints to minimize token usage (97% reduction vs full markdown files)"
+    ],
+    "architectureAlignment": {
+      "routingConfig": "MCP endpoints align with routing-architecture.json service definitions",
+      "portAllocation": "MCP Server: 3001 (native), 3002 (express API), API Gateway: 4000, Web: 3000",
+      "oauthConfig": "MCP API uses X-API-Key header or apiKey query parameter for authentication"
+    }
+  },
+  "knownIssues": [
+    {
+      "id": "MCP-CONNECTION-001",
+      "title": "MCP Server Unreachable from GitHub Actions",
+      "severity": "HIGH",
+      "impact": "MCP validation gates cannot run in CI/CD pipeline",
+      "mitigation": "Use local MCP server or staging environment with proper firewall rules",
+      "action": "Verify MCP_URL and MCP_API_KEY are set in GitHub Actions secrets",
+      "priority": "P0"
+    },
+    {
+      "id": "GRAPHQL-TIMEOUT-002",
+      "title": "GraphQL Queries Timeout on Large Decision Sets",
+      "severity": "MEDIUM",
+      "impact": "Queries with deep nesting may exceed timeout",
+      "mitigation": "Use field selection to query only needed data, avoid deep relationship traversal",
+      "action": "Break large queries into multiple smaller queries",
+      "priority": "P1"
+    },
+    {
+      "id": "DOCS-JSON-SYNC-003",
+      "title": "CURRENT_TRUTH.md Manual Edits Lost on Regeneration",
+      "severity": "LOW",
+      "impact": "Direct markdown edits overwritten by docs:generate script",
+      "mitigation": "Never edit CURRENT_TRUTH.md directly, always edit current-truth.json",
+      "action": "Use docs:validate before docs:generate to catch schema errors",
+      "priority": "P2"
+    },
+    {
+      "id": "COVERAGE-THRESHOLD-004",
+      "title": "Test Coverage Below 80% Blocks Merge",
+      "severity": "MEDIUM",
+      "impact": "PR validation fails if coverage drops below threshold",
+      "mitigation": "Write tests achieving 80% minimum coverage before creating PR",
+      "action": "Run pnpm nx test --coverage locally before pushing",
+      "priority": "P1"
+    }
+  ],
+  "environmentVariables": {
+    "required": [
+      {
+        "name": "MCP_URL",
+        "description": "MCP server endpoint URL",
+        "example": "https://staging.ectropy.ai",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      },
+      {
+        "name": "MCP_API_KEY",
+        "description": "API key for MCP server authentication",
+        "example": "your-api-key-here",
+        "required": true,
+        "environment": "all",
+        "secret": true,
+        "minimumLength": 32
+      },
+      {
+        "name": "GITHUB_TOKEN",
+        "description": "GitHub personal access token for API access",
+        "example": "ghp_xxxxxxxxxxxxx",
+        "required": false,
+        "environment": "all",
+        "secret": true
+      },
+      {
+        "name": "NODE_ENV",
+        "description": "Node.js environment mode",
+        "example": "development",
+        "required": true,
+        "environment": "all",
+        "secret": false
+      }
+    ]
+  }
+}

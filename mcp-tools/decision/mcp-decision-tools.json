@@ -1,0 +1,128 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schema/tools/v1",
+  "$id": "ectropy://mcp/decision-lifecycle-tools/v1",
+  "name": "decision-lifecycle",
+  "version": "1.0.0",
+  "description": "MCP tools for construction decision lifecycle management including capture, escalation, graph traversal, and inspection integration",
+  "tools": [
+    {
+      "name": "create_decision_request",
+      "description": "Create a new decision request from field capture. Automatically determines required authority level and begins escalation workflow.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["question", "requestorId"],
+        "properties": {
+          "question": { "type": "string", "description": "The decision question being asked" },
+          "requestorId": { "type": "string", "description": "ID of person making the request" },
+          "evidence": { "type": "array", "items": { "type": "object", "properties": { "type": { "type": "string", "enum": ["PHOTO", "DOCUMENT", "VOICE", "VIDEO", "SMS"] }, "uri": { "type": "string" }, "description": { "type": "string" } } }, "description": "Supporting evidence" },
+          "category": { "type": "string", "enum": ["TOLERANCE_VARIANCE", "MATERIAL_SUBSTITUTION", "SCHEDULE_CHANGE", "SAFETY_CONCERN", "QUALITY_ISSUE", "DESIGN_CLARIFICATION"] },
+          "spatialReference": { "type": "object", "properties": { "voxelId": { "type": "string" }, "coordinates": { "type": "object", "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "z": { "type": "number" } } }, "level": { "type": "string" }, "room": { "type": "string" } } },
+          "urgency": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"], "default": "MEDIUM" },
+          "relatedElements": { "type": "array", "items": { "type": "string" }, "description": "IFC element GUIDs" }
+        }
+      },
+      "outputSchema": { "type": "object", "properties": { "requestId": { "type": "string" }, "status": { "type": "string" }, "requiredAuthorityLevel": { "type": "string" }, "escalationPath": { "type": "array" }, "relatedDecisions": { "type": "array" }, "aiRecommendation": { "type": "string" }, "estimatedResolutionTime": { "type": "string" } } }
+    },
+    {
+      "name": "analyze_decision_authority",
+      "description": "Determine required authority level for a decision based on schedule, budget, tolerance, and safety impacts",
+      "inputSchema": { "type": "object", "required": ["decisionRequestId"], "properties": { "decisionRequestId": { "type": "string" }, "overrideFactors": { "type": "object", "properties": { "scheduleImpact": { "type": "string" }, "budgetImpact": { "type": "number" }, "toleranceVariance": { "type": "string" }, "safetyImplication": { "type": "string" } } } } },
+      "outputSchema": { "type": "object", "properties": { "requiredLevel": { "type": "string" }, "limitingFactor": { "type": "string" }, "escalationPath": { "type": "array" }, "suggestedApprovers": { "type": "array" }, "reasoning": { "type": "string" } } }
+    },
+    {
+      "name": "traverse_decision_graph",
+      "description": "Find root cause and related decisions by traversing the decision graph. Essential for consequence analysis.",
+      "inputSchema": { "type": "object", "required": ["startingPointId"], "properties": { "startingPointId": { "type": "string" }, "traversalDirection": { "type": "string", "enum": ["UPSTREAM", "DOWNSTREAM", "BOTH"], "default": "UPSTREAM" }, "maxDepth": { "type": "integer", "default": 10 }, "includeParticipants": { "type": "boolean", "default": true }, "matchPatterns": { "type": "boolean", "default": true } } },
+      "outputSchema": { "type": "object", "properties": { "rootCause": { "type": "object" }, "causalChain": { "type": "array" }, "participants": { "type": "array" }, "patterns": { "type": "array" }, "suggestedResolution": { "type": "object" }, "narrative": { "type": "string" } } }
+    },
+    {
+      "name": "record_decision",
+      "description": "Immutably record a decision with full context, rationale, and authority chain",
+      "inputSchema": { "type": "object", "required": ["requestId", "decision", "rationale", "deciderId"], "properties": { "requestId": { "type": "string" }, "decision": { "type": "string", "enum": ["APPROVE", "REJECT", "DEFER", "ESCALATE"] }, "rationale": { "type": "string" }, "deciderId": { "type": "string" }, "selectedOption": { "type": "string" }, "conditions": { "type": "array", "items": { "type": "string" } }, "evidence": { "type": "array" } } },
+      "outputSchema": { "type": "object", "properties": { "decisionId": { "type": "string" }, "immutableHash": { "type": "string" }, "status": { "type": "string" }, "notifications": { "type": "array" } } }
+    },
+    {
+      "name": "create_schedule_proposal",
+      "description": "Propose a change to the 10-day look-ahead schedule for team coordination",
+      "inputSchema": { "type": "object", "required": ["proposerId", "changes", "justification"], "properties": { "proposerId": { "type": "string" }, "changes": { "type": "array", "items": { "type": "object", "properties": { "taskId": { "type": "string" }, "changeType": { "type": "string", "enum": ["RESCHEDULE", "RESEQUENCE", "SWAP_LOCATION", "ADD", "REMOVE"] }, "proposedStart": { "type": "string", "format": "date" }, "proposedEnd": { "type": "string", "format": "date" }, "proposedLocation": { "type": "string" } }, "required": ["taskId", "changeType"] } }, "justification": { "type": "string" }, "affectedParties": { "type": "array", "items": { "type": "string" } }, "coordinationStatus": { "type": "array" } } },
+      "outputSchema": { "type": "object", "properties": { "proposalId": { "type": "string" }, "status": { "type": "string" }, "aiAnalysis": { "type": "object" }, "requiredApprovers": { "type": "array" }, "conflicts": { "type": "array" } } }
+    },
+    {
+      "name": "record_consequence",
+      "description": "Document a consequence of a prior decision for root cause tracking",
+      "inputSchema": { "type": "object", "required": ["description", "reporterId"], "properties": { "sourceDecisionId": { "type": "string" }, "description": { "type": "string" }, "reporterId": { "type": "string" }, "category": { "type": "string", "enum": ["TOLERANCE_VARIANCE", "SCHEDULE_IMPACT", "COST_IMPACT", "QUALITY_IMPACT", "SAFETY_IMPACT", "COORDINATION_CONFLICT"] }, "severity": { "type": "string", "enum": ["MINOR", "MODERATE", "MAJOR", "CRITICAL"] }, "evidence": { "type": "array" }, "spatialReference": { "type": "object" }, "triggerGraphTrace": { "type": "boolean", "default": true } } },
+      "outputSchema": { "type": "object", "properties": { "consequenceId": { "type": "string" }, "sourceDecisionId": { "type": "string" }, "aiTraceAnalysis": { "type": "object" }, "suggestedResolutions": { "type": "array" }, "escalationRequired": { "type": "boolean" }, "requiredAuthorityLevel": { "type": "string" } } }
+    },
+    {
+      "name": "get_inspection_view",
+      "description": "Get all decisions attached to a spatial location for inspection validation",
+      "inputSchema": { "type": "object", "required": ["voxelId"], "properties": { "voxelId": { "type": "string" }, "includeRootCauses": { "type": "boolean", "default": true }, "inspectionType": { "type": "string", "enum": ["ROUGH", "FINAL", "SPECIAL"] } } },
+      "outputSchema": { "type": "object", "properties": { "voxelId": { "type": "string" }, "coordinates": { "type": "object" }, "attachedDecisions": { "type": "array" }, "toleranceVariances": { "type": "array" }, "approvalStatus": { "type": "string" }, "inspectionReady": { "type": "boolean" }, "requiredDocumentation": { "type": "array" } } }
+    },
+    {
+      "name": "record_inspection",
+      "description": "Record inspection results with decision acknowledgment",
+      "inputSchema": { "type": "object", "required": ["inspectorId", "voxelId", "result"], "properties": { "inspectorId": { "type": "string" }, "voxelId": { "type": "string" }, "inspectionType": { "type": "string", "enum": ["ROUGH", "FINAL", "SPECIAL", "REINSPECTION"] }, "result": { "type": "string", "enum": ["PASS", "FAIL", "CONDITIONAL_PASS", "DEFERRED"] }, "reviewedDecisions": { "type": "array" }, "findings": { "type": "array" }, "evidence": { "type": "array" } } },
+      "outputSchema": { "type": "object", "properties": { "inspectionId": { "type": "string" }, "result": { "type": "string" }, "signOff": { "type": "object" } } }
+    },
+    {
+      "name": "calculate_reward",
+      "description": "Calculate community reward points for collaborative contributions",
+      "inputSchema": { "type": "object", "required": ["eventType", "entityId", "contributorId"], "properties": { "eventType": { "type": "string", "enum": ["EARLY_DETECTION", "THOROUGH_DOCUMENTATION", "COORDINATION_PROPOSAL", "PATTERN_CREATION", "KNOWLEDGE_CONTRIBUTION", "RAPID_RESPONSE"] }, "entityId": { "type": "string" }, "contributorId": { "type": "string" } } },
+      "outputSchema": { "type": "object", "properties": { "rewardId": { "type": "string" }, "basePoints": { "type": "integer" }, "multipliers": { "type": "array" }, "totalPoints": { "type": "integer" }, "tier": { "type": "string" }, "leaderboardPosition": { "type": "integer" } } }
+    },
+    {
+      "name": "create_decision_template",
+      "description": "Create a reusable template from an approved decision pattern",
+      "inputSchema": { "type": "object", "required": ["sourceDecisionId", "templateName"], "properties": { "sourceDecisionId": { "type": "string" }, "templateName": { "type": "string" }, "description": { "type": "string" }, "applicableCategories": { "type": "array", "items": { "type": "string" } }, "toleranceRanges": { "type": "object" }, "preApprovedBy": { "type": "array", "items": { "type": "string" } } } },
+      "outputSchema": { "type": "object", "properties": { "templateId": { "type": "string" }, "status": { "type": "string" }, "usageCount": { "type": "integer" } } }
+    },
+    {
+      "name": "get_10day_lookahead",
+      "description": "Get the current 10-day look-ahead schedule with decision attachments",
+      "inputSchema": { "type": "object", "properties": { "projectId": { "type": "string" }, "startDate": { "type": "string", "format": "date" }, "includeProposals": { "type": "boolean", "default": true }, "includeConflicts": { "type": "boolean", "default": true }, "filterByTrade": { "type": "array", "items": { "type": "string" } } } },
+      "outputSchema": { "type": "object", "properties": { "dateRange": { "type": "object" }, "tasks": { "type": "array" }, "activeProposals": { "type": "array" }, "conflicts": { "type": "array" }, "pendingDecisions": { "type": "array" } } }
+    },
+    {
+      "name": "attach_decision_to_voxels",
+      "description": "Attach a decision to affected voxels automatically. Analyzes BIM elements, finds adjacent voxels, and creates alerts for affected trades.",
+      "inputSchema": { "type": "object", "required": ["decisionId"], "properties": { "decisionId": { "type": "string" }, "manualVoxels": { "type": "array", "items": { "type": "string" } }, "affectedTrades": { "type": "array", "items": { "type": "string" } }, "createAlerts": { "type": "boolean", "default": true }, "notifyForemen": { "type": "boolean", "default": true } } },
+      "outputSchema": { "type": "object", "properties": { "attachments": { "type": "array" }, "notificationsSent": { "type": "integer" }, "toleranceOverrides": { "type": "array" } } }
+    },
+    {
+      "name": "get_voxel_decision_surface",
+      "description": "Get all decisions, tolerances, and alerts attached to a voxel. Used when worker enters a location.",
+      "inputSchema": { "type": "object", "required": ["voxelId"], "properties": { "voxelId": { "type": "string" }, "filterByTrade": { "type": "string" }, "includeAcknowledgments": { "type": "boolean", "default": true }, "includeRootCauses": { "type": "boolean", "default": false } } },
+      "outputSchema": { "type": "object", "properties": { "voxelId": { "type": "string" }, "location": { "type": "object" }, "decisions": { "type": "array" }, "toleranceOverrides": { "type": "array" }, "activeAlerts": { "type": "array" }, "acknowledgments": { "type": "array" }, "requiresAction": { "type": "boolean" } } }
+    },
+    {
+      "name": "acknowledge_voxel_decision",
+      "description": "Record worker acknowledgment of a decision at a voxel location",
+      "inputSchema": { "type": "object", "required": ["voxelId", "decisionId", "workerId"], "properties": { "voxelId": { "type": "string" }, "decisionId": { "type": "string" }, "workerId": { "type": "string" }, "method": { "type": "string", "enum": ["APP_TAP", "SMS_REPLY", "VOICE", "AR_GESTURE"] }, "location": { "type": "object" }, "notes": { "type": "string" } } },
+      "outputSchema": { "type": "object", "properties": { "acknowledgmentId": { "type": "string" }, "verified": { "type": "boolean" }, "timestamp": { "type": "string" } } }
+    },
+    {
+      "name": "find_voxels_for_work",
+      "description": "Find all voxels a worker will encounter for a task, with decision summaries",
+      "inputSchema": { "type": "object", "required": ["taskId"], "properties": { "taskId": { "type": "string" }, "workerId": { "type": "string" }, "includeAdjacent": { "type": "boolean", "default": true } } },
+      "outputSchema": { "type": "object", "properties": { "taskVoxels": { "type": "array" }, "totalDecisions": { "type": "integer" }, "unacknowledged": { "type": "integer" } } }
+    },
+    {
+      "name": "create_tolerance_override",
+      "description": "Create a pre-approved tolerance variance at a voxel",
+      "inputSchema": { "type": "object", "required": ["voxelId", "toleranceType", "approvedValue", "sourceDecisionId"], "properties": { "voxelId": { "type": "string" }, "toleranceType": { "type": "string", "enum": ["WALL_FLATNESS", "CEILING_HEIGHT", "FLOOR_LEVEL", "PROTRUSION", "GAP", "ALIGNMENT", "FINISH_QUALITY"] }, "standardValue": { "type": "object" }, "approvedValue": { "type": "object" }, "sourceDecisionId": { "type": "string" }, "rationale": { "type": "string" }, "applicableTrades": { "type": "array" } } }
+    },
+    {
+      "name": "calculate_voxel_savings",
+      "description": "Calculate value generated by proactive decision attachment at voxels",
+      "inputSchema": { "type": "object", "required": ["projectId"], "properties": { "projectId": { "type": "string" }, "dateRange": { "type": "object", "properties": { "start": { "type": "string", "format": "date" }, "end": { "type": "string", "format": "date" } } } } },
+      "outputSchema": { "type": "object", "properties": { "voxelsWithDecisions": { "type": "integer" }, "incidentsAvoided": { "type": "integer" }, "hoursSaved": { "type": "number" }, "dollarsSaved": { "type": "number" }, "topContributors": { "type": "array" } } }
+    }
+  ],
+  "resources": [
+    { "name": "decision_graph", "description": "The decision relationship graph for a project", "uri": "ectropy://project/{projectId}/decision-graph" },
+    { "name": "authority_matrix", "description": "Project authority level definitions and tolerances", "uri": "ectropy://project/{projectId}/authority-matrix" },
+    { "name": "decision_templates", "description": "Library of reusable decision patterns", "uri": "ectropy://project/{projectId}/templates" },
+    { "name": "leaderboard", "description": "Community contribution leaderboard", "uri": "ectropy://project/{projectId}/leaderboard" }
+  ]
+}

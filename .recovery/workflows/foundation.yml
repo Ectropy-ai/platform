@@ -1,0 +1,45 @@
+name: Foundation Health
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        run: |
+          npm install -g pnpm@8.15.9
+          pnpm --version
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Build MCP
+        run: |
+          pnpm nx run mcp-server:build --output-style=stream
+
+      - name: Truth baseline
+        run: |
+          bash scripts/truth-baseline.sh || echo "Truth script not found"
+
+      - name: Report status
+        if: always()
+        run: |
+          echo "Build attempts:"
+          pnpm nx run mcp-server:build --output-style=stream && echo "MCP: ✅" || echo "MCP: ❌"
+          pnpm nx run web-dashboard:build --output-style=stream && echo "Dashboard: ✅" || echo "Dashboard: ❌"
+          pnpm nx run api-gateway:build --output-style=stream && echo "API: ✅" || echo "API: ❌"

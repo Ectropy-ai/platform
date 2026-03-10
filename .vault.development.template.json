@@ -1,0 +1,14 @@
+{
+  "_instructions": "Copy to .vault.development.json and fill in values",
+  "JWT_SECRET": "dev-jwt-secret-local-only-not-secure",
+  "JWT_REFRESH_SECRET": "dev-refresh-secret-local-only",
+  "SESSION_SECRET": "dev-session-secret-local-only",
+  "DB_PASSWORD": "localdev",
+  "REDIS_PASSWORD": "",
+  "ENCRYPTION_KEY": "dev-encryption-key-local-only",
+  "DATABASE_URL": "postgresql://postgres:${DB_PASSWORD}@localhost:5432/ectropy_dev",
+  "POSTGRES_PASSWORD": "localdev",
+  "SPECKLE_POSTGRES_PASSWORD": "localdev",
+  "SPECKLE_REDIS_PASSWORD": "",
+  "SPECKLE_SESSION_SECRET": "dev-speckle-session"
+}

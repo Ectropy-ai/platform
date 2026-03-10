@@ -1,0 +1,127 @@
+# Prometheus Alerting Rules for Waitlist Endpoints
+# Monitors landing page and waitlist API performance
+
+groups:
+  - name: waitlist_alerts
+    rules:
+      # High error rate on waitlist endpoint
+      - alert: WaitlistHighErrorRate
+        expr: |
+          (
+            rate(http_requests_total{job="api-gateway", endpoint="/api/waitlist", status_code!~"2..|3.."}[5m]) /
+            rate(http_requests_total{job="api-gateway", endpoint="/api/waitlist"}[5m])
+          ) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: waitlist-api
+        annotations:
+          summary: 'High error rate on waitlist API endpoint'
+          description: 'Error rate on /api/waitlist endpoint is {{ $value | humanizePercentage }} over the last 5 minutes'
+
+      # Waitlist endpoint down
+      - alert: WaitlistEndpointDown
+        expr: up{job="api-gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: waitlist-api
+        annotations:
+          summary: 'Waitlist API endpoint is down'
+          description: 'The waitlist API endpoint has been down for more than 1 minute'
+
+      # High rate limiting hits
+      - alert: WaitlistHighRateLimiting
+        expr: |
+          rate(http_requests_total{job="api-gateway", endpoint="/api/waitlist", status_code="429"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: waitlist-api
+        annotations:
+          summary: 'High rate limiting on waitlist endpoint'
+          description: 'Rate limiting is being triggered {{ $value }} times per second on waitlist endpoint'
+
+      # Database connection failures for waitlist
+      - alert: WaitlistDatabaseErrors
+        expr: |
+          rate(database_connection_errors_total{service="waitlist"}[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+          service: waitlist-database
+        annotations:
+          summary: 'Database connection errors for waitlist service'
+          description: 'Database connection errors detected for waitlist service: {{ $value }} errors per second'
+
+      # Slow waitlist API response times
+      - alert: WaitlistSlowResponses
+        expr: |
+          histogram_quantile(0.95, 
+            rate(http_request_duration_seconds_bucket{job="api-gateway", endpoint="/api/waitlist"}[5m])
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: waitlist-api
+        annotations:
+          summary: 'Slow response times on waitlist API'
+          description: '95th percentile response time is {{ $value }}s for waitlist API'
+
+      # Landing page not accessible
+      - alert: LandingPageDown
+        expr: up{job="web-dashboard"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: landing-page
+        annotations:
+          summary: 'Landing page is not accessible'
+          description: 'The landing page has been inaccessible for more than 1 minute'
+
+      # High number of waitlist signups (potential abuse)
+      - alert: WaitlistSpike
+        expr: |
+          rate(waitlist_signups_total[1m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: waitlist-api
+        annotations:
+          summary: 'Unusual spike in waitlist signups'
+          description: 'Waitlist signups are occurring at {{ $value }} per second, which may indicate abuse'
+
+      # Low disk space for database
+      - alert: DatabaseDiskSpaceLow
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/var/lib/postgresql"} /
+            node_filesystem_size_bytes{mountpoint="/var/lib/postgresql"}
+          ) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: 'Database disk space is low'
+          description: 'Database disk space is below 10% ({{ $value | humanizePercentage }} remaining)'
+
+  - name: waitlist_performance
+    rules:
+      # Recording rule for waitlist signup rate
+      - record: waitlist:signup_rate_5m
+        expr: rate(waitlist_signups_total[5m])
+
+      # Recording rule for waitlist API availability
+      - record: waitlist:api_availability_5m
+        expr: |
+          (
+            rate(http_requests_total{job="api-gateway", endpoint="/api/waitlist", status_code!~"5.."}[5m]) /
+            rate(http_requests_total{job="api-gateway", endpoint="/api/waitlist"}[5m])
+          )
+
+      # Recording rule for average response time
+      - record: waitlist:avg_response_time_5m
+        expr: |
+          rate(http_request_duration_seconds_sum{job="api-gateway", endpoint="/api/waitlist"}[5m]) /
+          rate(http_request_duration_seconds_count{job="api-gateway", endpoint="/api/waitlist"}[5m])

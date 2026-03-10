@@ -1,0 +1,793 @@
+{
+  "$schema": "../../schemas/interfaces.schema.json",
+  "$id": "urn:luhtech:ectropy:interfaces:dual-process-decision",
+  "featureId": "dual-process-decision",
+  "version": "1.0.0",
+  "schemaVersion": "3.0.0",
+  "meta": {
+    "sourceOfTruth": ".roadmap/features/dual-process-decision/interfaces.json",
+    "lastUpdated": "2026-01-22T00:00:00Z"
+  },
+  "mcpTools": [
+    {
+      "name": "calculate_sdi",
+      "category": "sdi",
+      "description": "Calculate Solution Density Index for current project/zone context",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Project identifier"
+          },
+          "zoneId": {
+            "type": "string",
+            "description": "Optional takt zone for localized SDI"
+          },
+          "includeComponents": {
+            "type": "boolean",
+            "default": true,
+            "description": "Include component breakdown in response"
+          },
+          "includeThresholds": {
+            "type": "boolean",
+            "default": true,
+            "description": "Include threshold values in response"
+          }
+        },
+        "required": ["projectId"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "sdiValue": {
+            "type": "number",
+            "description": "Raw SDI value (typically 10^3 to 10^6)"
+          },
+          "sdiLog": {
+            "type": "number",
+            "description": "log10(SDI) for normalized comparison"
+          },
+          "shannonEntropy": {
+            "type": "number",
+            "description": "H = log2(SDI) - information entropy"
+          },
+          "classification": {
+            "type": "string",
+            "enum": ["critical", "warning", "healthy", "abundant"]
+          },
+          "explorationBudget": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Computed exploration budget (0-1)"
+          },
+          "components": {
+            "type": "object",
+            "properties": {
+              "viablePathCount": { "type": "integer" },
+              "constraintCount": { "type": "integer" },
+              "resourceSlackRatio": { "type": "number" },
+              "eigenmodeStability": { "type": "number" }
+            }
+          },
+          "thresholds": {
+            "type": "object",
+            "properties": {
+              "critical": { "type": "number" },
+              "warning": { "type": "number" },
+              "healthy": { "type": "number" },
+              "abundant": { "type": "number" }
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "authorityRequired": null,
+      "stateModifying": false
+    },
+    {
+      "name": "get_sdi_thresholds",
+      "category": "sdi",
+      "description": "Retrieve project-specific SDI thresholds",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Project identifier"
+          }
+        },
+        "required": ["projectId"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "critical": {
+            "type": "number",
+            "description": "Below this: crisis mode"
+          },
+          "warning": {
+            "type": "number",
+            "description": "Below this: constrain exploration"
+          },
+          "healthy": {
+            "type": "number",
+            "description": "Normal operations"
+          },
+          "abundant": {
+            "type": "number",
+            "description": "Full exploration enabled"
+          },
+          "isProjectSpecific": {
+            "type": "boolean",
+            "description": "Whether thresholds are customized for this project"
+          }
+        }
+      },
+      "authorityRequired": null,
+      "stateModifying": false
+    },
+    {
+      "name": "query_success_stack",
+      "category": "engine1",
+      "description": "Query validated patterns from Success Stack by eigenmode similarity",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "contextSignature": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 12,
+            "maxItems": 12,
+            "description": "12-element eigenmode vector for context matching"
+          },
+          "actionType": {
+            "type": "string",
+            "description": "Optional filter by action type"
+          },
+          "similarityThreshold": {
+            "type": "number",
+            "default": 0.85,
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Minimum similarity score for pattern inclusion"
+          },
+          "maxResults": {
+            "type": "integer",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "includeGlobalPatterns": {
+            "type": "boolean",
+            "default": true,
+            "description": "Include patterns from other projects"
+          }
+        },
+        "required": ["projectId", "contextSignature"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "applicablePatterns": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/SuccessPattern" }
+          },
+          "patternMatchScores": {
+            "type": "array",
+            "items": { "type": "number" },
+            "description": "Similarity scores for each pattern"
+          },
+          "confidence": {
+            "type": "number",
+            "description": "Overall confidence in recommendations"
+          },
+          "recommendedAction": {
+            "$ref": "#/definitions/Action"
+          },
+          "projectedOutcome": {
+            "$ref": "#/definitions/ProjectedOutcome"
+          },
+          "queryLatencyMs": {
+            "type": "number"
+          }
+        }
+      },
+      "authorityRequired": null,
+      "stateModifying": false
+    },
+    {
+      "name": "get_pattern_details",
+      "category": "engine1",
+      "description": "Retrieve full pattern details including source decisions",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "patternUrn": {
+            "type": "string",
+            "pattern": "^urn:luhtech:[^:]+:success-pattern:PAT-[0-9]{4}-[0-9]{4,}$"
+          },
+          "includeSourceDecisions": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": ["patternUrn"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pattern": { "$ref": "#/definitions/SuccessPattern" },
+          "sourceDecisions": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/DecisionSummary" }
+          },
+          "usageHistory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": { "type": "string", "format": "date-time" },
+                "projectId": { "type": "string" },
+                "outcome": { "type": "string", "enum": ["success", "partial", "failure"] }
+              }
+            }
+          }
+        }
+      },
+      "authorityRequired": null,
+      "stateModifying": false
+    },
+    {
+      "name": "compress_decision_pattern",
+      "category": "engine1",
+      "description": "Manually trigger pattern compression for a validated decision",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "decisionUrn": {
+            "type": "string",
+            "description": "URN of the decision to compress"
+          },
+          "forceCompression": {
+            "type": "boolean",
+            "default": false,
+            "description": "Skip validation gates (admin only)"
+          }
+        },
+        "required": ["decisionUrn"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "patternUrn": {
+            "type": "string",
+            "description": "URN of created/merged pattern"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["created", "merged", "skipped"],
+            "description": "What action was taken"
+          },
+          "validationResults": {
+            "type": "object",
+            "properties": {
+              "succeeded": { "type": "boolean" },
+              "replicable": { "type": "boolean" },
+              "generalizable": { "type": "boolean" },
+              "significant": { "type": "boolean" }
+            }
+          },
+          "reason": {
+            "type": "string",
+            "description": "Explanation if skipped"
+          }
+        }
+      },
+      "authorityRequired": 3,
+      "stateModifying": true
+    },
+    {
+      "name": "generate_options",
+      "category": "engine2",
+      "description": "Generate all viable options for a decision point",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": { "type": "string" },
+          "zoneId": { "type": "string" },
+          "decisionContext": {
+            "type": "object",
+            "properties": {
+              "triggerType": { "type": "string" },
+              "constraints": { "type": "array", "items": { "type": "string" } },
+              "resources": { "type": "object" },
+              "deadline": { "type": "string", "format": "date-time" }
+            }
+          },
+          "computationDepth": {
+            "type": "integer",
+            "default": 3,
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Search depth for option generation"
+          },
+          "includeRiskProfiles": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": ["projectId", "decisionContext"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "viableOptions": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/Option" }
+          },
+          "novelOptions": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/Option" },
+            "description": "Options without pattern precedent"
+          },
+          "sdiProjections": {
+            "type": "object",
+            "additionalProperties": { "type": "number" },
+            "description": "Map of option ID to projected SDI"
+          },
+          "riskProfiles": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/definitions/RiskProfile" }
+          },
+          "explorationValue": {
+            "type": "object",
+            "additionalProperties": { "type": "number" },
+            "description": "Information value of exploring each option"
+          },
+          "computationDepth": { "type": "integer" },
+          "generationLatencyMs": { "type": "number" }
+        }
+      },
+      "authorityRequired": null,
+      "stateModifying": false
+    },
+    {
+      "name": "project_sdi_impact",
+      "category": "engine2",
+      "description": "Project SDI impact of a proposed action",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": { "type": "string" },
+          "zoneId": { "type": "string" },
+          "proposedAction": { "$ref": "#/definitions/Action" },
+          "horizon": {
+            "type": "integer",
+            "default": 7,
+            "description": "Days to project forward"
+          }
+        },
+        "required": ["projectId", "proposedAction"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "currentSdi": { "type": "number" },
+          "projectedSdi": { "type": "number" },
+          "sdiDelta": { "type": "number" },
+          "sdiDeltaPercent": { "type": "number" },
+          "projectedClassification": {
+            "type": "string",
+            "enum": ["critical", "warning", "healthy", "abundant"]
+          },
+          "confidenceInterval": {
+            "type": "object",
+            "properties": {
+              "lower": { "type": "number" },
+              "upper": { "type": "number" },
+              "confidence": { "type": "number" }
+            }
+          },
+          "cascadingEffects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "affectedZone": { "type": "string" },
+                "sdiImpact": { "type": "number" },
+                "probability": { "type": "number" }
+              }
+            }
+          }
+        }
+      },
+      "authorityRequired": null,
+      "stateModifying": false
+    },
+    {
+      "name": "mediate_decision",
+      "category": "mediation",
+      "description": "Run full dual-process arbitration between Engine 1 and Engine 2",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": { "type": "string" },
+          "zoneId": { "type": "string" },
+          "trigger": { "$ref": "#/definitions/DecisionTrigger" },
+          "actorId": { "type": "string" },
+          "forceEngine": {
+            "type": "string",
+            "enum": ["engine1", "engine2"],
+            "description": "Force use of specific engine (for testing)"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": false,
+            "description": "Return decision without executing"
+          }
+        },
+        "required": ["projectId", "trigger", "actorId"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "decisionEventUrn": {
+            "type": "string",
+            "description": "URN of created decision event"
+          },
+          "selectedAction": { "$ref": "#/definitions/Action" },
+          "sourceEngine": {
+            "type": "string",
+            "enum": ["engine1", "engine2", "blend", "escalate"]
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Human-readable explanation of arbitration"
+          },
+          "explorationAllocation": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "riskBearer": { "type": "string" },
+          "monitoringTriggers": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/MonitoringTrigger" }
+          },
+          "fallbackAction": { "$ref": "#/definitions/Action" },
+          "escalationTarget": { "type": "string" },
+          "engine1Output": {
+            "type": "object",
+            "description": "Summary of Engine 1 results"
+          },
+          "engine2Output": {
+            "type": "object",
+            "description": "Summary of Engine 2 results"
+          },
+          "mediationLatencyMs": { "type": "number" }
+        }
+      },
+      "authorityRequired": 0,
+      "stateModifying": true
+    },
+    {
+      "name": "get_exploration_budget",
+      "category": "mediation",
+      "description": "Calculate current exploration budget based on state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": { "type": "string" },
+          "zoneId": { "type": "string" },
+          "includeBreakdown": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": ["projectId"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "budget": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "breakdown": {
+            "type": "object",
+            "properties": {
+              "sdiFactor": {
+                "type": "number",
+                "description": "Contribution from SDI (40% weight)"
+              },
+              "stabilityFactor": {
+                "type": "number",
+                "description": "Contribution from eigenmode stability (35% weight)"
+              },
+              "resourceFactor": {
+                "type": "number",
+                "description": "Contribution from resource slack (25% weight)"
+              }
+            }
+          },
+          "recommendation": {
+            "type": "string",
+            "enum": ["exploit", "cautious_explore", "balanced", "aggressive_explore"]
+          }
+        }
+      },
+      "authorityRequired": null,
+      "stateModifying": false
+    },
+    {
+      "name": "set_monitoring_trigger",
+      "category": "mediation",
+      "description": "Configure monitoring trigger for an exploratory decision",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "decisionEventUrn": { "type": "string" },
+          "triggerType": {
+            "type": "string",
+            "enum": ["sdi_breach", "timeline_deviation", "resource_exhaustion", "cascade_detection", "confidence_collapse"]
+          },
+          "condition": {
+            "type": "object",
+            "properties": {
+              "metric": { "type": "string" },
+              "operator": { "type": "string", "enum": ["<", ">", "<=", ">=", "==", "!="] },
+              "threshold": { "type": "number" }
+            },
+            "required": ["metric", "operator", "threshold"]
+          },
+          "response": {
+            "type": "string",
+            "enum": ["fallback", "escalate", "constrain", "re_mediate"]
+          },
+          "checkIntervalMs": {
+            "type": "integer",
+            "default": 60000,
+            "minimum": 1000
+          }
+        },
+        "required": ["decisionEventUrn", "triggerType", "condition", "response"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "triggerUrn": { "type": "string" },
+          "isActive": { "type": "boolean" }
+        }
+      },
+      "authorityRequired": 1,
+      "stateModifying": true
+    },
+    {
+      "name": "check_monitoring_triggers",
+      "category": "mediation",
+      "description": "Evaluate active monitoring triggers against current state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": { "type": "string" },
+          "decisionEventUrn": {
+            "type": "string",
+            "description": "Check triggers for specific decision (optional)"
+          },
+          "executeResponses": {
+            "type": "boolean",
+            "default": false,
+            "description": "Execute response actions for triggered monitors"
+          }
+        },
+        "required": ["projectId"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "triggersChecked": { "type": "integer" },
+          "triggersActivated": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "triggerUrn": { "type": "string" },
+                "triggerType": { "type": "string" },
+                "currentValue": { "type": "number" },
+                "threshold": { "type": "number" },
+                "response": { "type": "string" },
+                "responseExecuted": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      },
+      "authorityRequired": null,
+      "stateModifying": false
+    },
+    {
+      "name": "record_decision_outcome",
+      "category": "outcome",
+      "description": "Record outcome of a decision for pattern learning",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "decisionEventUrn": { "type": "string" },
+          "success": { "type": "boolean" },
+          "actualVsProjected": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1,
+            "description": "-1 = much worse, 0 = as expected, 1 = much better"
+          },
+          "downstreamEffects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "affectedEntity": { "type": "string" },
+                "effectType": { "type": "string" },
+                "magnitude": { "type": "number" }
+              }
+            }
+          },
+          "learningsExtracted": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "triggerPatternCompression": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": ["decisionEventUrn", "success", "actualVsProjected"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "recorded": { "type": "boolean" },
+          "compressionEligible": { "type": "boolean" },
+          "compressionTriggered": { "type": "boolean" },
+          "patternUrn": {
+            "type": "string",
+            "description": "If compression created/updated pattern"
+          },
+          "validationConfidence": { "type": "number" }
+        }
+      },
+      "authorityRequired": 1,
+      "stateModifying": true
+    }
+  ],
+  "definitions": {
+    "SuccessPattern": {
+      "type": "object",
+      "properties": {
+        "$id": { "type": "string" },
+        "contextSignature": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 12,
+          "maxItems": 12
+        },
+        "actionType": { "type": "string" },
+        "outcomeProfile": {
+          "type": "object",
+          "properties": {
+            "expectedSuccessRate": { "type": "number" },
+            "expectedImprovement": { "type": "number" },
+            "variance": { "type": "number" }
+          }
+        },
+        "confidence": { "type": "number" },
+        "frequency": { "type": "integer" },
+        "lastApplied": { "type": "string", "format": "date-time" },
+        "contextBreadth": { "type": "number" }
+      }
+    },
+    "Action": {
+      "type": "object",
+      "properties": {
+        "actionType": { "type": "string" },
+        "targetUrn": { "type": "string" },
+        "parameters": { "type": "object" },
+        "estimatedDuration": { "type": "number" },
+        "estimatedCost": { "type": "number" }
+      }
+    },
+    "ProjectedOutcome": {
+      "type": "object",
+      "properties": {
+        "successProbability": { "type": "number" },
+        "expectedImprovement": { "type": "number" },
+        "confidenceInterval": {
+          "type": "object",
+          "properties": {
+            "lower": { "type": "number" },
+            "upper": { "type": "number" }
+          }
+        }
+      }
+    },
+    "Option": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "$ref": "#/definitions/Action" },
+        "isNovel": { "type": "boolean" },
+        "projectedSdi": { "type": "number" },
+        "riskLevel": { "type": "string", "enum": ["low", "medium", "high"] }
+      }
+    },
+    "RiskProfile": {
+      "type": "object",
+      "properties": {
+        "overallRisk": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "factors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "severity": { "type": "number" },
+              "probability": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "DecisionTrigger": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["scheduled", "exception", "opportunity", "escalation"] },
+        "source": { "type": "string" },
+        "urgency": { "type": "number", "minimum": 0, "maximum": 1 },
+        "deadline": { "type": "string", "format": "date-time" },
+        "context": { "type": "object" }
+      },
+      "required": ["type", "source", "urgency"]
+    },
+    "MonitoringTrigger": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "condition": {
+          "type": "object",
+          "properties": {
+            "metric": { "type": "string" },
+            "operator": { "type": "string" },
+            "threshold": { "type": "number" }
+          }
+        },
+        "response": { "type": "string" },
+        "checkIntervalMs": { "type": "integer" }
+      }
+    },
+    "DecisionSummary": {
+      "type": "object",
+      "properties": {
+        "decisionUrn": { "type": "string" },
+        "title": { "type": "string" },
+        "outcome": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "graphMetadata": {
+    "inEdges": ["urn:luhtech:ectropy:feature:dual-process-decision"],
+    "outEdges": []
+  },
+  "createdAt": "2026-01-22T00:00:00Z",
+  "updatedAt": "2026-01-22T00:00:00Z"
+}

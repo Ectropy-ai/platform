@@ -1,0 +1,160 @@
+# ============================================================================
+# DNS Management - Cloudflare Provider
+# ============================================================================
+# Date: 2026-02-02
+# Purpose: Infrastructure-as-code for ectropy.ai DNS records
+# Root Cause: #0 - Eliminate manual DNS drift and configuration errors
+# Pattern: Terraform GitOps for DNS (staging.ectropy.ai pointed to wrong IP)
+# Compliance: Prevent manual errors, audit trail via Terraform state
+# ============================================================================
+# Cloudflare Provider Configuration
+# ============================================================================
+# API Token: Requires Zone:Read, DNS:Edit permissions for ectropy.ai
+# Set via environment variable: CLOUDFLARE_API_TOKEN or TF_VAR_cloudflare_api_token
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}
+
+# ============================================================================
+# Variables
+# ============================================================================
+
+variable "cloudflare_api_token" {
+  description = "Cloudflare API token with Zone:Read and DNS:Edit permissions"
+  type        = string
+  sensitive   = true
+}
+
+variable "cloudflare_zone_id" {
+  description = "Cloudflare Zone ID for ectropy.ai"
+  type        = string
+  # Zone ID for ectropy.ai (obtain from Cloudflare dashboard)
+  default     = "" # Will be populated after obtaining from Cloudflare
+}
+
+# ============================================================================
+# DNS Records - Staging Environment
+# ============================================================================
+
+# Staging A Record (Load Balancer)
+resource "cloudflare_record" "staging" {
+  zone_id = var.cloudflare_zone_id
+  name    = "staging"
+  content = digitalocean_loadbalancer.staging.ip
+  type    = "A"
+  ttl     = 300 # 5 minutes for faster failover
+  proxied = true # Cloudflare proxy enabled (SSL, caching, DDoS protection)
+  comment = "Staging environment - VPC isolated (143.244.210.44)"
+}
+
+# Staging API (explicit subdomain if needed)
+resource "cloudflare_record" "staging_api" {
+  zone_id = var.cloudflare_zone_id
+  name    = "api.staging"
+  content = digitalocean_loadbalancer.staging.ip
+  type    = "A"
+  ttl     = 300
+  proxied = true
+  comment = "Staging API endpoint"
+}
+
+# ============================================================================
+# DNS Records - Production Environment
+# ============================================================================
+# NOTE: Production records commented until production deployment validated
+# Root Cause: Production in alpha state, never deployed (no app running)
+# Uncommenting requires:
+#   1. Production load balancer defined in Terraform
+#   2. Application successfully deployed to production
+#   3. Health checks passing
+
+# # Production A Record (Load Balancer)
+# resource "cloudflare_record" "production" {
+#   zone_id = var.cloudflare_zone_id
+#   name    = "@" # Root domain: ectropy.ai
+#   content = digitalocean_loadbalancer.production.ip
+#   type    = "A"
+#   ttl     = 300
+#   proxied = true
+#   comment = "Production environment - VPC isolated"
+# }
+
+# # Production WWW (CNAME to root)
+# resource "cloudflare_record" "production_www" {
+#   zone_id = var.cloudflare_zone_id
+#   name    = "www"
+#   content = "ectropy.ai"
+#   type    = "CNAME"
+#   ttl     = 300
+#   proxied = true
+#   comment = "WWW redirect to root domain"
+# }
+
+# # Production API
+# resource "cloudflare_record" "production_api" {
+#   zone_id = var.cloudflare_zone_id
+#   name    = "api"
+#   content = digitalocean_loadbalancer.production.ip
+#   type    = "A"
+#   ttl     = 300
+#   proxied = true
+#   comment = "Production API endpoint"
+# }
+
+# ============================================================================
+# DNS Records - Development/Testing (if needed)
+# ============================================================================
+
+# Development environment (optional)
+# resource "cloudflare_record" "dev" {
+#   zone_id = var.cloudflare_zone_id
+#   name    = "dev"
+#   content = "dev-server-ip-here"
+#   type    = "A"
+#   ttl     = 300
+#   proxied = true
+#   comment = "Development environment"
+# }
+
+# ============================================================================
+# DNS Outputs
+# ============================================================================
+
+output "staging_dns" {
+  description = "Staging DNS hostname"
+  value       = cloudflare_record.staging.hostname
+}
+
+output "staging_dns_target" {
+  description = "Staging DNS target IP (Load Balancer)"
+  value       = digitalocean_loadbalancer.staging.ip
+}
+
+# ============================================================================
+# DNS Management Pattern
+# ============================================================================
+# Enterprise GitOps pattern for DNS:
+#   1. Cloudflare API Token stored in terraform_deploy_key.tfvars (gitignored)
+#   2. Zone ID obtained from Cloudflare dashboard
+#   3. DNS records managed via Terraform (no manual changes)
+#   4. Automatic updates when load balancer IPs change
+#   5. Audit trail via Terraform state history
+#
+# Initial Setup:
+#   1. Obtain Cloudflare API Token with Zone:Read + DNS:Edit permissions
+#   2. Obtain Zone ID for ectropy.ai from Cloudflare dashboard
+#   3. Add to terraform_deploy_key.tfvars:
+#      cloudflare_api_token = "your-token-here"
+#      cloudflare_zone_id = "your-zone-id-here"
+#   4. Import existing DNS records:
+#      terraform import cloudflare_record.staging <zone_id>/<record_id>
+#   5. Run terraform apply to sync state
+#
+# Benefits:
+#   ✅ No manual DNS configuration drift
+#   ✅ Automatic IP updates when infrastructure changes
+#   ✅ Version control for DNS changes
+#   ✅ Audit trail via Terraform state
+#   ✅ Prevents errors like staging pointing to wrong IP
+# ============================================================================

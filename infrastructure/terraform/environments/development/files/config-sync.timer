@@ -1,0 +1,19 @@
+[Unit]
+Description=Config Sync Timer (Zero-SSH Pattern - Poll every 60 seconds)
+Requires=config-sync.service
+
+[Timer]
+# Start timer 30 seconds after boot (allow network to stabilize)
+OnBootSec=30sec
+
+# Poll every 60 seconds for config changes
+OnUnitActiveSec=60sec
+
+# Run timer even if system clock not yet synchronized
+AccuracySec=1sec
+
+# Persistent timer - if system was offline, run on next boot
+Persistent=true
+
+[Install]
+WantedBy=timers.target

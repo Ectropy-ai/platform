@@ -1,0 +1,50 @@
+{
+  "name": "@ectropy/database",
+  "version": "1.0.0",
+  "description": "Ectropy database connection management with dynamic routing and RLS support",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@prisma/client": "6.16.3",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.5",
+    "@types/pg": "^8.10.9",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.1"
+  },
+  "keywords": [
+    "database",
+    "prisma",
+    "multi-tenant",
+    "row-level-security",
+    "rls",
+    "connection-management"
+  ],
+  "author": "Ectropy",
+  "license": "UNLICENSED"
+}

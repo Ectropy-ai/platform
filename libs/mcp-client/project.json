@@ -1,0 +1,35 @@
+{
+  "name": "mcp-client",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/mcp-client/src",
+  "projectType": "library",
+  "tags": ["scope:mcp", "type:integration"],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "libs/mcp-client/dist",
+        "main": "libs/mcp-client/src/index.ts",
+        "tsConfig": "libs/mcp-client/tsconfig.lib.json",
+        "assets": ["libs/mcp-client/*.md"]
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["libs/mcp-client/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "config": "libs/mcp-client/vitest.config.ts",
+        "passWithNoTests": true,
+        "reportsDirectory": "../../coverage/libs/mcp-client"
+      }
+    }
+  }
+}

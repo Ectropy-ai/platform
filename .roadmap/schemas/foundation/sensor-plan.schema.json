@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:luhtech:ectropy:schema:foundation:sensor-plan",
+  "title": "Sensor Deployment Plan",
+  "description": "Plan for deploying IoT sensors across building (Foundation Layer)",
+  "type": "object",
+  "required": ["id", "projectId", "sensorType", "deploymentStrategy"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^SENSOR-PLAN-[0-9]{4}-[0-9]{4,}$",
+      "description": "Unique sensor plan identifier"
+    },
+    "projectId": {
+      "type": "string",
+      "description": "Project or building reference"
+    },
+    "sensorType": {
+      "type": "string",
+      "enum": [
+        "TEMPERATURE",
+        "HUMIDITY",
+        "CO2",
+        "OCCUPANCY",
+        "LIGHT",
+        "VIBRATION",
+        "PRESSURE",
+        "LEAK_DETECTION"
+      ],
+      "description": "Type of sensor being deployed"
+    },
+    "deploymentStrategy": {
+      "$ref": "#/definitions/DeploymentStrategy",
+      "description": "Sensor placement strategy"
+    },
+    "sensors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sensorId": { "type": "string" },
+          "location": {
+            "type": "object",
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "z": { "type": "number" },
+              "room": { "type": "string" },
+              "zone": { "type": "string" }
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PLANNED",
+              "INSTALLED",
+              "COMMISSIONED",
+              "OPERATIONAL",
+              "DECOMMISSIONED"
+            ]
+          },
+          "installDate": { "type": "string", "format": "date" },
+          "lastMaintenance": { "type": "string", "format": "date" }
+        }
+      }
+    },
+    "dataRetentionPolicy": {
+      "type": "object",
+      "properties": {
+        "hotStorage": {
+          "type": "number",
+          "description": "Days in TimescaleDB hot storage"
+        },
+        "coldStorage": {
+          "type": "number",
+          "description": "Days in compressed storage"
+        },
+        "aggregationInterval": {
+          "type": "string",
+          "enum": ["1m", "5m", "15m", "1h"]
+        }
+      }
+    },
+    "alerting": {
+      "type": "object",
+      "properties": {
+        "thresholds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "metric": { "type": "string" },
+              "operator": {
+                "type": "string",
+                "enum": ["<", ">", "<=", ">=", "=="]
+              },
+              "value": { "type": "number" },
+              "severity": {
+                "type": "string",
+                "enum": ["INFO", "WARNING", "CRITICAL"]
+              }
+            }
+          }
+        },
+        "notificationChannels": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "DeploymentStrategy": {
+      "type": "object",
+      "properties": {
+        "coverage": {
+          "type": "string",
+          "enum": ["FULL", "CRITICAL_SPACES", "SAMPLE_GRID"]
+        },
+        "density": {
+          "type": "number",
+          "description": "Sensors per square foot/meter"
+        },
+        "zoneAssignment": {
+          "type": "string",
+          "enum": ["BY_ROOM", "BY_HVAC_ZONE", "BY_FLOOR", "CUSTOM"]
+        },
+        "redundancy": {
+          "type": "boolean",
+          "description": "Whether to deploy backup sensors"
+        }
+      }
+    }
+  }
+}
