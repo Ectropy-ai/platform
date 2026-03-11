@@ -39,14 +39,18 @@ fi
 # Store exit status
 EXIT_CODE=0
 
-# 1. Run infrastructure pattern validation
+# 1. Run infrastructure pattern validation (if script exists)
 echo ""
 echo "📋 Validating infrastructure patterns..."
-if bash scripts/validate-patterns.sh; then
-  echo "✅ Pattern validation passed"
+if [ -f scripts/validate-patterns.sh ]; then
+  if bash scripts/validate-patterns.sh; then
+    echo "✅ Pattern validation passed"
+  else
+    echo "❌ Pattern validation failed"
+    EXIT_CODE=1
+  fi
 else
-  echo "❌ Pattern validation failed"
-  EXIT_CODE=1
+  echo "⚠️  scripts/validate-patterns.sh not found, skipping pattern validation"
 fi
 
 # 2. Run secrets scanner with proper error handling

@@ -247,6 +247,8 @@ import aiRoutes from './routes/ai.routes.js';
 import { AdminRoutes } from './routes/admin.routes.js';
 import { ConsoleRoutes } from './routes/console/index.js';
 import { ExternalIntegrationsRoutes } from './routes/external-integrations.routes.js';
+import { createDemoProvisioningRoutes } from './routes/admin/provision-demo-user.route.js';
+import { createSeedDemoDataRoutes } from './routes/admin/seed-demo-data.route.js';
 import mcpProxyRoutes from './routes/mcp-proxy.routes.js';
 import { TaskRoutes } from './routes/tasks.routes.js';
 import { AlertRoutes } from './routes/alerts.routes.js';
@@ -1298,6 +1300,19 @@ async function bootstrap(): Promise<void> {
       );
     } catch (error) {
       logger.error('Failed to load External Integrations routes', { error });
+    }
+
+    // DEMO PROVISIONING PIPELINE (2026-03-10): n8n demo-approval-pipeline endpoints
+    // Endpoints: provision-demo-user, seed-demo-data
+    // Authentication: API key with scope-based authorization
+    try {
+      app.use('/api/admin', createDemoProvisioningRoutes());
+      app.use('/api/admin', createSeedDemoDataRoutes());
+      logger.info(
+        '✅ Demo Provisioning routes mounted successfully at /api/admin'
+      );
+    } catch (error) {
+      logger.error('Failed to load Demo Provisioning routes', { error });
     }
 
     // ENTERPRISE FIX (2025-12-18): ROOT CAUSE #62 - Register MCP Proxy Routes

@@ -211,6 +211,7 @@ apps/*/src/**/*.js
 libs/**/src/**/*.js
 apps/*/src/**/*.d.ts
 libs/**/src/**/*.d.ts
+!apps/web-dashboard/src/vite-env.d.ts
 !apps/mcp-server/src/server-simple.js
 
 # Ignore compiled test outputs
