@@ -92,6 +92,9 @@ env:
   # Other required variables
   NODE_ENV: test
 
+  # GitHub Packages auth for @luh-tech scoped packages (read-only, least-privilege)
+  LUHTECH_PKG_READ: ${{ secrets.LUHTECH_PKG_READ }}
+
 jobs:
   # =============================================================================
   # PHASE 1: INFRASTRUCTURE & SMOKE TESTS

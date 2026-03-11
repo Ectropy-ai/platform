@@ -71,6 +71,9 @@ COPY libs/speckle-integration/package.json ./libs/speckle-integration/
 # Nx build requires workspace packages to exist for lockfile pruning
 COPY packages/database/package.json ./packages/database/
 
+# GitHub Packages auth for @luh-tech scoped packages
+ARG LUHTECH_PKG_READ=""
+
 # Install dependencies (postinstall will generate Prisma client)
 RUN pnpm install --frozen-lockfile
 

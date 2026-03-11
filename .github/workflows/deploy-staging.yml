@@ -25,6 +25,8 @@ concurrency:
 env:
   REGISTRY: registry.digitalocean.com/ectropy-registry
   WATCHTOWER_POLL_INTERVAL: 60 # 1 minute (server-side Watchtower sleep interval)
+  # GitHub Packages auth for @luh-tech scoped packages (read-only, least-privilege)
+  LUHTECH_PKG_READ: ${{ secrets.LUHTECH_PKG_READ }}
 
 jobs:
   # =========================================================================
@@ -212,6 +214,7 @@ jobs:
             --build-arg BUILD_DATE="${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}" \
             --build-arg REACT_APP_ENABLE_SPECKLE=true \
             --build-arg REACT_APP_API_URL=https://staging.ectropy.ai \
+            --build-arg LUHTECH_PKG_READ=${{ secrets.LUHTECH_PKG_READ }} \
             $EXTRA_ARGS \
             .
 

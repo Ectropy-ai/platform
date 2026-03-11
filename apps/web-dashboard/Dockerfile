@@ -85,6 +85,9 @@ RUN set -e && \
     retry_with_backoff corepack prepare pnpm@10.14.0 --activate && \
     echo "pnpm prepared successfully, version: $(pnpm --version)"
 
+# GitHub Packages auth for @luh-tech scoped packages
+ARG LUHTECH_PKG_READ=""
+
 # Install dependencies (postinstall will generate Prisma client)
 # Native modules (argon2, sharp, msgpackr-extract) will compile from source using build tools above
 # pnpm already prepared above, this install will use cached version (no network download)

@@ -30,6 +30,8 @@ on:
 env:
   # ENTERPRISE PATTERN: DOCR for industry-standard container registry
   REGISTRY: registry.digitalocean.com/ectropy-registry
+  # GitHub Packages auth for @luh-tech scoped packages (read-only, least-privilege)
+  LUHTECH_PKG_READ: ${{ secrets.LUHTECH_PKG_READ }}
 
 permissions:
   contents: read
@@ -203,6 +205,7 @@ jobs:
             -t ${{ matrix.service }}:latest \
             --build-arg NODE_ENV=production \
             --build-arg BUILD_SHA=${{ github.sha }} \
+            --build-arg LUHTECH_PKG_READ=${{ secrets.LUHTECH_PKG_READ }} \
             $EXTRA_ARGS \
             .
 

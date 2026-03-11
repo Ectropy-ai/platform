@@ -29,6 +29,7 @@
   "packageManager": "pnpm@10.14.0",
   "dependencies": {
     "@ectropy/database": "workspace:*",
+    "@luh-tech/crm": "0.1.0",
     "@prisma/client": "6.16.3",
     "@types/multer": "^2.0.0",
     "append-field": "^1.0.0",

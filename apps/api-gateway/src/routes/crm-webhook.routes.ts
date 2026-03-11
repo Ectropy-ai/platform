@@ -19,8 +19,8 @@ import {
   AuthenticationError,
 } from '@ectropy/shared/utils';
 import {
-  CRMIntegrationService,
   CRMWebhookEvent,
+  LifecycleStage,
 } from '../services/user-management/index.js';
 
 // Import Express type augmentation
@@ -32,7 +32,6 @@ import '../../../../libs/shared/types/src/express.js';
 
 export interface CRMWebhookRoutesConfig {
   prisma: PrismaClient;
-  crmApiKey: string;
   crmWebhookSecret?: string;
 }
 
@@ -54,18 +53,13 @@ export interface CRMWebhookRoutesConfig {
  */
 export class CRMWebhookRoutes {
   private router: Router;
-  private crmService: CRMIntegrationService;
+  private prisma: PrismaClient;
   private webhookSecret?: string;
 
   constructor(config: CRMWebhookRoutesConfig) {
     this.router = Router();
+    this.prisma = config.prisma;
     this.webhookSecret = config.crmWebhookSecret;
-
-    // Initialize service
-    this.crmService = new CRMIntegrationService(config.prisma, {
-      crmApiKey: config.crmApiKey,
-      crmApiUrl: process.env.CRM_API_URL,
-    });
 
     this.setupRoutes();
   }
@@ -180,7 +174,7 @@ export class CRMWebhookRoutes {
     try {
       // Process webhook asynchronously (fire-and-forget)
       // Don't block webhook response on processing completion
-      this.crmService.handleWebhook(event).catch((error) => {
+      this.processWebhookEvent(event).catch((error) => {
         logger.error('[CRMWebhookRoutes] Webhook processing failed', {
           eventType,
           error: error instanceof Error ? error.message : 'Unknown error',
@@ -247,6 +241,87 @@ export class CRMWebhookRoutes {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
       return false;
+    }
+  }
+
+  /**
+   * Process inbound CRM webhook event (database-only, no outbound CRM calls)
+   */
+  private async processWebhookEvent(event: CRMWebhookEvent): Promise<void> {
+    const email = event.data?.email as string | undefined;
+    if (!email) {
+      logger.warn('[CRMWebhookRoutes] Webhook missing email in data', {
+        eventType: event.eventType,
+      });
+      return;
+    }
+
+    switch (event.eventType) {
+      case 'lead.qualified': {
+        const registration = await this.prisma.userRegistration.findUnique({
+          where: { email: email.toLowerCase() },
+        });
+        if (
+          registration &&
+          (registration.lifecycle_stage === LifecycleStage.WAITLIST ||
+            registration.lifecycle_stage === LifecycleStage.EMAIL_SENT)
+        ) {
+          logger.info('[CRMWebhookRoutes] Lead qualified from CRM', {
+            email,
+            currentStage: registration.lifecycle_stage,
+          });
+        }
+        break;
+      }
+
+      case 'trial.started': {
+        logger.info('[CRMWebhookRoutes] Trial started confirmed from CRM', {
+          email,
+        });
+        break;
+      }
+
+      case 'trial.converted': {
+        const reg = await this.prisma.userRegistration.findUnique({
+          where: { email: email.toLowerCase() },
+        });
+        if (reg && reg.lifecycle_stage === LifecycleStage.TRIAL) {
+          await this.prisma.userRegistration.update({
+            where: { id: reg.id },
+            data: {
+              lifecycle_stage: LifecycleStage.PAID,
+              converted_at: new Date(),
+            },
+          });
+          logger.info(
+            '[CRMWebhookRoutes] Trial converted to PAID via CRM webhook',
+            { email }
+          );
+        }
+        break;
+      }
+
+      case 'subscription.cancelled': {
+        const reg = await this.prisma.userRegistration.findUnique({
+          where: { email: email.toLowerCase() },
+        });
+        if (reg) {
+          await this.prisma.userRegistration.update({
+            where: { id: reg.id },
+            data: { lifecycle_stage: LifecycleStage.CHURNED },
+          });
+          logger.info(
+            '[CRMWebhookRoutes] Subscription cancelled via CRM webhook',
+            { email }
+          );
+        }
+        break;
+      }
+
+      default:
+        logger.warn('[CRMWebhookRoutes] Unhandled webhook event type', {
+          eventType: event.eventType,
+        });
     }
   }
 }

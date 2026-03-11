@@ -15,7 +15,11 @@ import {
   StakeholderRole,
 } from '@prisma/client';
 import { logger } from '@ectropy/shared/utils';
-import { CRMIntegrationService } from './crm-integration.service.js';
+import {
+  TwentyGraphQLClient,
+  PersonService,
+  CompanyService,
+} from '@luh-tech/crm';
 import {
   UserManagementError,
   UserManagementErrorCode,
@@ -51,7 +55,9 @@ const SUBSCRIPTION_TIER_LIMITS = {
  * - CRM company + contact sync (fire-and-forget)
  */
 export class TenantProvisioningService {
-  private crmService: CRMIntegrationService;
+  private crmEnabled: boolean;
+  private personService: PersonService | null;
+  private companyService: CompanyService | null;
 
   constructor(
     private prisma: PrismaClient,
@@ -61,7 +67,22 @@ export class TenantProvisioningService {
       crmApiKey?: string;
     }
   ) {
-    this.crmService = new CRMIntegrationService(prisma, crmConfig);
+    this.crmEnabled =
+      crmConfig?.crmEnabled ?? process.env.CRM_ENABLED === 'true';
+    if (this.crmEnabled && (crmConfig?.crmApiKey || process.env.CRM_API_KEY)) {
+      const client = new TwentyGraphQLClient({
+        apiUrl:
+          crmConfig?.crmApiUrl ??
+          process.env.CRM_API_URL ??
+          'https://crm.luh.tech/graphql',
+        apiKey: crmConfig?.crmApiKey ?? process.env.CRM_API_KEY ?? '',
+      });
+      this.personService = new PersonService(client);
+      this.companyService = new CompanyService(client);
+    } else {
+      this.personService = null;
+      this.companyService = null;
+    }
     logger.info('[TenantProvisioningService] Initialized');
   }
 
@@ -216,38 +237,43 @@ export class TenantProvisioningService {
     });
 
     // CRM: Sync company record (fire-and-forget — never blocks provisioning)
-    this.crmService.syncCompanyToCRM({
-      tenantId: result.tenant.id,
-      name: result.tenant.name,
-      slug: result.tenant.slug,
-      subscriptionTier: result.tenant.subscription_tier,
-      primaryEmail: result.tenant.primary_email,
-      billingEmail: result.tenant.billing_email ?? undefined,
-      userCount: 1, // Just the owner at provisioning time
-      projectCount: 1, // Default project
-      createdAt: result.tenant.created_at,
-    }).catch((error) => {
-      logger.error('[TenantProvisioningService] CRM company sync error (non-blocking)', {
-        tenantId: result.tenant.id,
-        error: error instanceof Error ? error.message : 'Unknown',
-      });
-    });
+    if (this.companyService) {
+      const domain = result.tenant.primary_email?.split('@')[1];
+      this.companyService
+        .upsertByDomain({
+          name: result.tenant.name,
+          domainName: domain,
+        })
+        .catch((error) => {
+          logger.error(
+            '[TenantProvisioningService] CRM company sync error (non-blocking)',
+            {
+              tenantId: result.tenant.id,
+              error: error instanceof Error ? error.message : 'Unknown',
+            }
+          );
+        });
+    }
 
     // CRM: Sync owner contact (fire-and-forget)
-    this.crmService.syncContactToCRM({
-      email: result.user.email,
-      fullName: result.user.full_name ?? result.user.email,
-      tenantId: result.tenant.id,
-      userId: result.user.id,
-      role: request.ownerInfo?.role ?? StakeholderRole.owner,
-      createdAt: result.user.created_at,
-    }).catch((error) => {
-      logger.error('[TenantProvisioningService] CRM owner contact sync error (non-blocking)', {
-        tenantId: result.tenant.id,
-        userId: result.user.id,
-        error: error instanceof Error ? error.message : 'Unknown',
-      });
-    });
+    if (this.personService) {
+      this.personService
+        .upsertByEmail({
+          email: result.user.email,
+          firstName: result.user.full_name?.split(' ')[0] ?? result.user.email,
+          lastName: result.user.full_name?.split(' ').slice(1).join(' ') ?? '',
+        })
+        .catch((error) => {
+          logger.error(
+            '[TenantProvisioningService] CRM owner contact sync error (non-blocking)',
+            {
+              tenantId: result.tenant.id,
+              userId: result.user.id,
+              error: error instanceof Error ? error.message : 'Unknown',
+            }
+          );
+        });
+    }
 
     return {
       tenantId: result.tenant.id,

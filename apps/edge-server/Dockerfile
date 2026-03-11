@@ -48,6 +48,9 @@ COPY libs/iot-edge/package.json libs/iot-edge/
 
 COPY . .
 
+# GitHub Packages auth for @luh-tech scoped packages
+ARG LUHTECH_PKG_READ=""
+
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 

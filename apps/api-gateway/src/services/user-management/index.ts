@@ -16,4 +16,3 @@ export { UserRegistrationService } from './user-registration.service.js';
 export { UserInvitationService } from './user-invitation.service.js';
 export { TenantProvisioningService } from './tenant-provisioning.service.js';
 export { UserAuthorizationService } from './user-authorization.service.js';
-export { CRMIntegrationService } from './crm-integration.service.js';

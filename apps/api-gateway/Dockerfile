@@ -62,6 +62,10 @@ RUN apk add --no-cache --virtual .build-deps \
     make \
     g++
 
+# GitHub Packages auth for @luh-tech scoped packages (e.g. @luh-tech/crm)
+# Pass via: docker build --build-arg GITHUB_TOKEN=<pat>
+ARG LUHTECH_PKG_READ=""
+
 # Install dependencies (postinstall will generate Prisma client)
 # Native modules (argon2) will compile from source if pre-built binaries unavailable
 RUN pnpm install --frozen-lockfile

@@ -17,7 +17,7 @@ import { randomBytes } from 'crypto';
 import { logger } from '@ectropy/shared/utils';
 import { emailService } from '../email.service.js';
 import { EmailTemplateService } from './email-template.service.js';
-import { CRMIntegrationService } from './crm-integration.service.js';
+import { TwentyGraphQLClient, PersonService } from '@luh-tech/crm';
 import {
   UserManagementError,
   UserManagementErrorCode,
@@ -44,7 +44,8 @@ import {
  */
 export class UserRegistrationService {
   private emailTemplateService: EmailTemplateService;
-  private crmService: CRMIntegrationService;
+  private crmEnabled: boolean;
+  private personService: PersonService | null;
 
   constructor(
     private prisma: PrismaClient,
@@ -59,11 +60,19 @@ export class UserRegistrationService {
     }
   ) {
     this.emailTemplateService = new EmailTemplateService(prisma);
-    this.crmService = new CRMIntegrationService(prisma, {
-      crmEnabled: config.crmEnabled,
-      crmApiUrl: config.crmApiUrl,
-      crmApiKey: config.crmApiKey,
-    });
+    this.crmEnabled = config.crmEnabled ?? process.env.CRM_ENABLED === 'true';
+    if (this.crmEnabled && (config.crmApiKey || process.env.CRM_API_KEY)) {
+      const client = new TwentyGraphQLClient({
+        apiUrl:
+          config.crmApiUrl ??
+          process.env.CRM_API_URL ??
+          'https://crm.luh.tech/graphql',
+        apiKey: config.crmApiKey ?? process.env.CRM_API_KEY ?? '',
+      });
+      this.personService = new PersonService(client);
+    } else {
+      this.personService = null;
+    }
     logger.info('[UserRegistrationService] Initialized', {
       frontendUrl: config.frontendUrl,
       trialDurationDays:
@@ -137,21 +146,22 @@ export class UserRegistrationService {
       },
     });
 
-    // CRM: Sync lead (fire-and-forget — never blocks registration)
-    this.crmService.syncLeadToCRM({
-      email: registration.email,
-      fullName: registration.full_name ?? undefined,
-      source: registration.registration_source ?? 'landing_page',
-      utmSource: registration.utm_source ?? undefined,
-      utmMedium: registration.utm_medium ?? undefined,
-      utmCampaign: registration.utm_campaign ?? undefined,
-      lifecycleStage: LifecycleStage.WAITLIST,
-    }).catch((error) => {
-      logger.error('[UserRegistrationService] CRM lead sync error', {
-        registrationId: registration.id,
-        error: error instanceof Error ? error.message : 'Unknown',
-      });
-    });
+    // CRM: Upsert person (fire-and-forget — never blocks registration)
+    if (this.personService) {
+      const nameParts = (registration.full_name ?? '').trim().split(/\s+/);
+      this.personService
+        .upsertByEmail({
+          firstName: nameParts[0] || 'Unknown',
+          lastName: nameParts.slice(1).join(' ') || '',
+          email: registration.email,
+        })
+        .catch((error) => {
+          logger.error('[UserRegistrationService] CRM lead sync error', {
+            registrationId: registration.id,
+            error: error instanceof Error ? error.message : 'Unknown',
+          });
+        });
+    }
 
     return this.mapToResponse(registration);
   }
@@ -339,22 +349,28 @@ export class UserRegistrationService {
       metadata: { verifiedAt: updated.verified_at },
     });
 
-    // CRM: Update person — email verified (fire-and-forget)
-    // Note: tenantId/userId not yet available at this stage; will be set at startTrial
-    this.crmService.syncLeadToCRM({
-      email: registration.email,
-      fullName: registration.full_name ?? undefined,
-      source: registration.registration_source ?? 'landing_page',
-      utmSource: registration.utm_source ?? undefined,
-      utmMedium: registration.utm_medium ?? undefined,
-      utmCampaign: registration.utm_campaign ?? undefined,
-      lifecycleStage: LifecycleStage.EMAIL_VERIFIED,
-    }).catch((error) => {
-      logger.error('[UserRegistrationService] CRM email-verified sync error', {
-        registrationId: registration.id,
-        error: error instanceof Error ? error.message : 'Unknown',
-      });
-    });
+    // CRM: Update person lifecycle — email verified (fire-and-forget)
+    if (this.personService) {
+      const nameParts = (registration.full_name ?? '').trim().split(/\s+/);
+      this.personService
+        .upsertByEmail({
+          firstName: nameParts[0] || 'Unknown',
+          lastName: nameParts.slice(1).join(' ') || '',
+          email: registration.email,
+        })
+        .then((person) =>
+          this.personService!.updateLifecycleStage(person.id, 'email_verified')
+        )
+        .catch((error) => {
+          logger.error(
+            '[UserRegistrationService] CRM email-verified sync error',
+            {
+              registrationId: registration.id,
+              error: error instanceof Error ? error.message : 'Unknown',
+            }
+          );
+        });
+    }
 
     return this.mapToResponse(updated);
   }
@@ -444,35 +460,27 @@ export class UserRegistrationService {
       },
     });
 
-    // CRM: Sync as contact if we have tenant/user (fire-and-forget)
-    // TenantProvisioningService runs before this in the orchestration layer;
-    // re-fetch to get latest tenant_id/user_id
-    const refreshed = await this.prisma.userRegistration.findUnique({
-      where: { id: request.registrationId },
-    });
-
-    if (refreshed?.tenant_id && refreshed?.user_id) {
-      this.crmService.syncContactToCRM({
-        email: registration.email,
-        fullName: registration.full_name ?? registration.email,
-        tenantId: refreshed.tenant_id,
-        userId: refreshed.user_id,
-        role: 'owner',
-        createdAt: registration.created_at,
-      }).catch((error) => {
-        logger.error('[UserRegistrationService] CRM trial-started contact sync error', {
-          registrationId: request.registrationId,
-          error: error instanceof Error ? error.message : 'Unknown',
+    // CRM: Update person lifecycle to trial (fire-and-forget)
+    if (this.personService) {
+      const nameParts = (registration.full_name ?? '').trim().split(/\s+/);
+      this.personService
+        .upsertByEmail({
+          firstName: nameParts[0] || 'Unknown',
+          lastName: nameParts.slice(1).join(' ') || '',
+          email: registration.email,
+        })
+        .then((person) =>
+          this.personService!.updateLifecycleStage(person.id, 'trial')
+        )
+        .catch((error) => {
+          logger.error(
+            '[UserRegistrationService] CRM trial-started sync error',
+            {
+              registrationId: request.registrationId,
+              error: error instanceof Error ? error.message : 'Unknown',
+            }
+          );
         });
-      });
-    } else {
-      // Fallback: update lead lifecycle stage in CRM
-      this.crmService.syncLeadToCRM({
-        email: registration.email,
-        fullName: registration.full_name ?? undefined,
-        source: registration.registration_source ?? 'landing_page',
-        lifecycleStage: LifecycleStage.TRIAL,
-      }).catch(() => { /* non-blocking */ });
     }
 
     return this.mapToResponse(updated);
@@ -554,21 +562,27 @@ export class UserRegistrationService {
       },
     });
 
-    // CRM: Update contact lifecycle to PAID (fire-and-forget)
-    if (registration.tenant_id && registration.user_id) {
-      this.crmService.syncContactToCRM({
-        email: registration.email,
-        fullName: registration.full_name ?? registration.email,
-        tenantId: registration.tenant_id,
-        userId: registration.user_id,
-        role: `owner:paid:${request.subscriptionTier}`,
-        createdAt: registration.created_at,
-      }).catch((error) => {
-        logger.error('[UserRegistrationService] CRM paid-conversion contact sync error', {
-          registrationId: request.registrationId,
-          error: error instanceof Error ? error.message : 'Unknown',
+    // CRM: Update person lifecycle to PAID (fire-and-forget)
+    if (this.personService) {
+      const nameParts = (registration.full_name ?? '').trim().split(/\s+/);
+      this.personService
+        .upsertByEmail({
+          firstName: nameParts[0] || 'Unknown',
+          lastName: nameParts.slice(1).join(' ') || '',
+          email: registration.email,
+        })
+        .then((person) =>
+          this.personService!.updateLifecycleStage(person.id, 'paid')
+        )
+        .catch((error) => {
+          logger.error(
+            '[UserRegistrationService] CRM paid-conversion sync error',
+            {
+              registrationId: request.registrationId,
+              error: error instanceof Error ? error.message : 'Unknown',
+            }
+          );
         });
-      });
     }
 
     return this.mapToResponse(updated);

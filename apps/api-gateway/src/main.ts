@@ -51,8 +51,12 @@ process.on('uncaughtException', (error: Error) => {
   console.error(`Type: ${typeof error}`);
   console.error(`Constructor: ${error?.constructor?.name || 'unknown'}`);
   try {
-    console.error(`JSON: ${JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2)}`);
-  } catch { /* ignore serialization errors */ }
+    console.error(
+      `JSON: ${JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2)}`
+    );
+  } catch {
+    /* ignore serialization errors */
+  }
   console.error('========================================');
   logger.error('========================================');
   logger.error('FATAL: Uncaught Exception');
@@ -67,9 +71,10 @@ process.on('uncaughtException', (error: Error) => {
 process.on(
   'unhandledRejection',
   (reason: unknown, promise: Promise<unknown>) => {
-    const reasonStr = reason instanceof Error
-      ? `${reason.name}: ${reason.message}\n${reason.stack}`
-      : String(reason);
+    const reasonStr =
+      reason instanceof Error
+        ? `${reason.name}: ${reason.message}\n${reason.stack}`
+        : String(reason);
     console.error('========================================');
     console.error('FATAL: Unhandled Promise Rejection');
     console.error(`Reason: ${reasonStr}`);
@@ -787,12 +792,10 @@ async function bootstrap(): Promise<void> {
     // Mount CRM Webhook routes - Twenty CRM integration (M3.4)
     try {
       const prisma = getPrismaClient();
-      const crmApiKey = process.env['CRM_API_KEY'] || '';
       const crmWebhookSecret = process.env['CRM_WEBHOOK_SECRET'];
 
       const crmWebhookRoutes = new CRMWebhookRoutes({
         prisma,
-        crmApiKey,
         crmWebhookSecret,
       });
       app.use('/api/webhooks/crm', crmWebhookRoutes.getRouter());
