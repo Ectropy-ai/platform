@@ -15,10 +15,11 @@ const MCP_SERVER_HOST = process.env.MCP_SERVER_HOST || 'mcp-server';
 const MCP_SERVER_PORT = process.env.MCP_SERVER_PORT || '3002';
 
 /**
- * Proxy all MCP deliverable requests to the MCP Server
+ * Proxy all MCP requests to the MCP Server
+ * Handles /health, /deliverables, /roadmap, /votes, /graph, etc.
  */
-router.all('/deliverables/*', async (req: Request, res: Response) => {
-  const path = req.path.replace('/mcp', ''); // Remove /mcp prefix
+router.all('/*', async (req: Request, res: Response) => {
+  const path = req.path;
   const queryString = req.url.includes('?') ? req.url.split('?')[1] : '';
   const fullPath = queryString ? `${path}?${queryString}` : path;
 
