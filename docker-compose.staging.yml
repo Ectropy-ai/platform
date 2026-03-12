@@ -247,31 +247,8 @@ services:
       # Enable Watchtower auto-updates for zero-SSH deployment
       com.centurylinklabs.watchtower.enable: 'true'
 
-  ectropy-console:
-    image: registry.digitalocean.com/ectropy-registry/ectropy-console:staging
-    container_name: ectropy-console
-    environment:
-      NODE_ENV: staging
-      PORT: 3001
-    # ROOT CAUSE FIX: Changed default host port from 3001 to 3003
-    # Port 3001 conflicts with mcp-server (MCP_STDIO_PORT defaults to 3001)
-    # Container still listens on 3001 internally, only the host mapping changes
-    ports:
-      - '${CONSOLE_PORT:-3003}:3001'
-    depends_on:
-      - api-gateway
-    restart: unless-stopped
-    healthcheck:
-      <<: *healthcheck-defaults
-      test: ['CMD', 'curl', '-f', 'http://localhost:3001/']
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 256M
-        reservations:
-          cpus: '0.1'
-          memory: 128M
+  # Console service: Moved to private repo (DEC-002)
+  # Image still published to DOCR by Ectropy-Business CI
     networks:
       - ectropy-network
     labels:

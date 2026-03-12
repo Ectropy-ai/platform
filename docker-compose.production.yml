@@ -27,8 +27,6 @@ services:
         condition: service_started
       mcp-server:
         condition: service_started
-      ectropy-console:
-        condition: service_started
     restart: unless-stopped
     healthcheck:
       test:
@@ -163,37 +161,8 @@ services:
     networks:
       - ectropy-network
 
-  ectropy-console:
-    image: registry.digitalocean.com/ectropy-registry/ectropy-console:latest
-    # NOTE: Build args (VITE_*) now baked into CI/CD image build
-    # See: .github/workflows/build-production-images.yml
-    container_name: ectropy-console
-    environment:
-      - NODE_ENV=production
-      - PORT=3001
-    ports:
-      - '${CONSOLE_PORT:-3003}:3001'
-    restart: unless-stopped
-    healthcheck:
-      test:
-        - CMD
-        - curl
-        - '-f'
-        - http://localhost:3001
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 256M
-        reservations:
-          cpus: '0.1'
-          memory: 128M
-    networks:
-      - ectropy-network
+  # Console service: Moved to private repo (DEC-002)
+  # Image still published to DOCR by Ectropy-Business CI
 
   mcp-server:
     image: registry.digitalocean.com/ectropy-registry/mcp-server:latest

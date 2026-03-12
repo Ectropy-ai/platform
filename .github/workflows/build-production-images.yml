@@ -4,7 +4,7 @@ name: Build Production Docker Images
 # Builds and pushes production images to DigitalOcean Container Registry (DOCR)
 #
 # Architecture:
-# - Builds: api-gateway, mcp-server, web-dashboard, ectropy-console
+# - Builds: api-gateway, mcp-server, web-dashboard
 # - Tags: {commit-sha}, latest
 # - Registry: registry.digitalocean.com/ectropy-registry/*
 # - Trigger: Manual dispatch or on main branch releases
@@ -49,7 +49,6 @@ jobs:
           - api-gateway
           - mcp-server
           - web-dashboard
-          - ectropy-console
 
     steps:
       # ENTERPRISE P0 FIX (2025-12-18): FREE UP DISK SPACE BEFORE DOCKER BUILDS
@@ -133,7 +132,6 @@ jobs:
           pnpm prisma:generate
 
       - name: Build ${{ matrix.service }}
-        if: matrix.service != 'ectropy-console'
         timeout-minutes: 20
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
@@ -169,10 +167,6 @@ jobs:
               fi
               echo "✅ web-dashboard artifacts verified"
               ;;
-            ectropy-console)
-              # ectropy-console uses Vite (no Nx build step) — artifacts verified by Docker build
-              echo "✅ ectropy-console skips pre-build verification (Vite builds inside Docker)"
-              ;;
           esac
 
       - name: Set up Docker Buildx
@@ -195,18 +189,12 @@ jobs:
           echo ""
 
           # Build image directly from Dockerfile
-          EXTRA_ARGS=""
-          if [ "${{ matrix.service }}" = "ectropy-console" ]; then
-            EXTRA_ARGS="--build-arg VITE_BASE_PATH=/ --build-arg VITE_API_BASE_URL=https://api.ectropy.ai"
-          fi
-
           docker build \
             -f apps/${{ matrix.service }}/Dockerfile \
             -t ${{ matrix.service }}:latest \
             --build-arg NODE_ENV=production \
             --build-arg BUILD_SHA=${{ github.sha }} \
             --build-arg LUHTECH_PKG_READ=${{ secrets.LUHTECH_PKG_READ }} \
-            $EXTRA_ARGS \
             .
 
           echo "✅ Docker image built successfully"
@@ -284,7 +272,6 @@ jobs:
             echo "- \`registry.digitalocean.com/ectropy-registry/api-gateway:latest\`" >> $GITHUB_STEP_SUMMARY
             echo "- \`registry.digitalocean.com/ectropy-registry/mcp-server:latest\`" >> $GITHUB_STEP_SUMMARY
             echo "- \`registry.digitalocean.com/ectropy-registry/web-dashboard:latest\`" >> $GITHUB_STEP_SUMMARY
-            echo "- \`registry.digitalocean.com/ectropy-registry/ectropy-console:latest\`" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Next steps:**" >> $GITHUB_STEP_SUMMARY
             echo "1. Deploy to Green production server: \`bash scripts/deployment/deploy-to-production-server.sh green\`" >> $GITHUB_STEP_SUMMARY
@@ -313,7 +300,6 @@ jobs:
             • \`registry.digitalocean.com/ectropy-registry/api-gateway:latest\`
             • \`registry.digitalocean.com/ectropy-registry/mcp-server:latest\`
             • \`registry.digitalocean.com/ectropy-registry/web-dashboard:latest\`
-            • \`registry.digitalocean.com/ectropy-registry/ectropy-console:latest\`
 
             **Next Steps:**
             1. Deploy to production server

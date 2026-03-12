@@ -124,7 +124,6 @@ jobs:
           - mcp-server
           - api-gateway
           - web-dashboard
-          - ectropy-console
 
     steps:
       - name: Checkout
@@ -173,7 +172,6 @@ jobs:
           pnpm prisma:generate
 
       - name: Build ${{ matrix.service }} with Nx
-        if: matrix.service != 'ectropy-console'
         timeout-minutes: 18
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
@@ -202,11 +200,6 @@ jobs:
         run: |
           echo "🐳 Building staging Docker image for ${{ matrix.service }}..."
 
-          EXTRA_ARGS=""
-          if [ "${{ matrix.service }}" = "ectropy-console" ]; then
-            EXTRA_ARGS="--build-arg VITE_BASE_PATH=/console/ --build-arg VITE_API_BASE_URL=https://staging.ectropy.ai"
-          fi
-
           docker build \
             -f apps/${{ matrix.service }}/Dockerfile \
             -t ${{ matrix.service }}:staging \
@@ -215,7 +208,6 @@ jobs:
             --build-arg REACT_APP_ENABLE_SPECKLE=true \
             --build-arg REACT_APP_API_URL=https://staging.ectropy.ai \
             --build-arg LUHTECH_PKG_READ=${{ secrets.LUHTECH_PKG_READ }} \
-            $EXTRA_ARGS \
             .
 
           echo "✅ Docker image built successfully"
@@ -264,7 +256,7 @@ jobs:
           echo "Retention policy: staging + latest tags + 5 most recent SHA tags per service"
           echo ""
 
-          for SERVICE in api-gateway mcp-server web-dashboard ectropy-console; do
+          for SERVICE in api-gateway mcp-server web-dashboard; do
             echo "--- Cleaning $SERVICE ---"
 
             # List all tags for the service, sorted by updated_at
@@ -1269,7 +1261,7 @@ jobs:
             echo "- \`${{ env.REGISTRY }}/api-gateway:staging\`" >> $GITHUB_STEP_SUMMARY
             echo "- \`${{ env.REGISTRY }}/mcp-server:staging\`" >> $GITHUB_STEP_SUMMARY
             echo "- \`${{ env.REGISTRY }}/web-dashboard:staging\`" >> $GITHUB_STEP_SUMMARY
-            echo "- \`${{ env.REGISTRY }}/ectropy-console:staging\`" >> $GITHUB_STEP_SUMMARY
+
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Application URL:** https://staging.ectropy.ai" >> $GITHUB_STEP_SUMMARY
           else

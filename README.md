@@ -25,7 +25,6 @@ pnpm test
 
 - **API Gateway** - REST API backend (`apps/api-gateway`)
 - **Web Dashboard** - React frontend (`apps/web-dashboard`)
-- **Ectropy Console** - Internal employee admin console (`apps/ectropy-console`)
 - **MCP Server** - AI orchestration service (`apps/mcp-server`)
 
 ## License

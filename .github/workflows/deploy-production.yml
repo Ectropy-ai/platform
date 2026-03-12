@@ -82,12 +82,12 @@ jobs:
       - name: Log in to DigitalOcean Container Registry
         run: doctl registry login --expiry-seconds 600
 
-      - name: Verify all 4 images exist in DOCR with :latest tag
+      - name: Verify all 3 images exist in DOCR with :latest tag
         run: |
-          echo "Verifying all 4 production images exist in DOCR..."
+          echo "Verifying all 3 production images exist in DOCR..."
           FAILED=0
 
-          for SERVICE in api-gateway mcp-server web-dashboard ectropy-console; do
+          for SERVICE in api-gateway mcp-server web-dashboard; do
             echo "Checking $SERVICE..."
             # doctl list-tags --format Tag outputs multi-column rows, extract first column with awk
             TAG_NAMES=$(doctl registry repository list-tags "$SERVICE" --format Tag --no-header 2>&1 | awk '{print $1}') || true
@@ -108,7 +108,7 @@ jobs:
           fi
 
           echo ""
-          echo "✅ All 4 images verified in DOCR"
+          echo "✅ All 3 images verified in DOCR"
 
   ################################################################################
   # Phase 2: Validate Prerequisites

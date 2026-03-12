@@ -331,8 +331,7 @@
     "docrTagCounts": {
       "api-gateway": 6,
       "mcp-server": 6,
-      "web-dashboard": 6,
-      "ectropy-console": 6
+      "web-dashboard": 6
     },
     "workflowRunHistory": {
       "deploy-production": "5 consecutive failures (all 2026-03-07, iterative fixes)",

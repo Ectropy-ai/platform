@@ -4829,7 +4829,7 @@
       "status": "completed",
       "content": {
         "context": "Five Why analysis revealed that Deploy Staging workflow validated health endpoints (HTTP 200) but never verified the NEW image was running. Combined with Watchtower DOCR auth path mismatch, E2E tests consistently ran against stale staging code. This gap existed since the Watchtower-based deployment architecture was introduced.",
-        "approach": "Added ARG BUILD_SHA to all 4 Dockerfiles (api-gateway, mcp-server, web-dashboard, ectropy-console). Added BUILD_SHA build-arg to deploy-staging.yml, deploy-production.yml, and build-production-images.yml. Updated /health endpoints (api-gateway, mcp-server) to return buildSha field. Added SHA verification polling step in validate-deployment that waits up to 180s for correct BUILD_SHA before proceeding to E2E tests.",
+        "approach": "Added ARG BUILD_SHA to all platform Dockerfiles (api-gateway, mcp-server, web-dashboard). Added BUILD_SHA build-arg to deploy-staging.yml, deploy-production.yml, and build-production-images.yml. Updated /health endpoints (api-gateway, mcp-server) to return buildSha field. Added SHA verification polling step in validate-deployment that waits up to 180s for correct BUILD_SHA before proceeding to E2E tests. Note: console moved to Ectropy-Business (DEC-002).",
         "outcome": "Every deployed container now reports its build commit SHA via /health endpoint. Deploy workflow verifies expected SHA is running before E2E tests proceed. Eliminates entire class of stale-code testing bugs.",
         "impact": "critical"
       },

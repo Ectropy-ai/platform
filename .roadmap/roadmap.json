@@ -206,17 +206,6 @@
       "dependsOnFeatures": ["urn:luhtech:ectropy:feature:decision-lifecycle"]
     },
     {
-      "id": "ectropy-console",
-      "name": "Ectropy Console",
-      "category": "ui",
-      "description": "Central management console for the Ectropy platform",
-      "status": "planned",
-      "priority": 2,
-      "featureRef": ".roadmap/features/ectropy-console/FEATURE.json",
-      "featureUrn": "urn:luhtech:ectropy:feature:ectropy-console",
-      "specVersion": "1.0.0"
-    },
-    {
       "id": "efas",
       "name": "Enterprise Feature Authorization System",
       "category": "infrastructure",
