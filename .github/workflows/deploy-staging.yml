@@ -213,6 +213,12 @@ jobs:
           echo "✅ Docker image built successfully"
           docker images | grep "${{ matrix.service }}"
 
+      # ENTERPRISE FIX (2026-03-12): Refresh DOCR credentials before push
+      # ROOT CAUSE: Docker build (~3-4 min) causes DOCR token staleness
+      # despite 3600s expiry. Re-login ensures fresh credentials for push.
+      - name: Refresh DOCR login before push
+        run: doctl registry login --expiry-seconds 3600
+
       - name: Push Docker image to DOCR
         run: |
           echo "📤 Pushing ${{ matrix.service }} images to DOCR..."
