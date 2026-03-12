@@ -47,6 +47,8 @@ on:
         required: true
       SPECKLE_ADMIN_PASSWORD:
         required: true
+      LUHTECH_PKG_READ:
+        required: true
 
 jobs:
   seed-database:
@@ -72,11 +74,13 @@ jobs:
       - name: Install pnpm
         run: |
           echo "📦 Installing pnpm package manager..."
-          npm install -g pnpm@9
+          npm install -g pnpm@10.14.0
           pnpm --version
           echo "✅ pnpm installed"
 
       - name: Install Dependencies
+        env:
+          LUHTECH_PKG_READ: ${{ secrets.LUHTECH_PKG_READ }}
         run: |
           echo "📦 Installing project dependencies..."
           pnpm install --no-frozen-lockfile --no-strict-peer-dependencies

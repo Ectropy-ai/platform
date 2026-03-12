@@ -1099,6 +1099,7 @@ jobs:
     secrets:
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       SPECKLE_ADMIN_PASSWORD: ${{ secrets.SPECKLE_ADMIN_PASSWORD }}
+      LUHTECH_PKG_READ: ${{ secrets.LUHTECH_PKG_READ }}
 
   # =========================================================================
   # E2E TESTS: Full end-to-end validation
