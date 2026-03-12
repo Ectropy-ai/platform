@@ -38,7 +38,7 @@ while IFS= read -r script_ref; do
   else
     echo "✅ Found: $script_path"
   fi
-done < <(grep -rh "scripts/" "$WORKFLOW_DIR" --include="*.yml" --exclude-dir=".archive" | grep -E "(bash|run:)" | grep "scripts/" || true)
+done < <(grep -rh "scripts/" "$WORKFLOW_DIR" --include="*.yml" --exclude-dir="archive" | grep -E "(bash|run:)" | grep "scripts/" || true)
 
 echo ""
 echo "📊 Validation Summary:"

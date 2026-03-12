@@ -281,6 +281,7 @@ validate-*.sh
 !scripts/validate-environment.sh
 !scripts/ci/validate-database-url-pattern.sh
 !scripts/ci/validate-deployment-health.sh
+!scripts/ci/validate-oauth-config.sh
 !scripts/ci/validate-secrets.sh
 !scripts/ci/validate-workflow-environments.sh
 !scripts/security/validate-secret-sync.sh
@@ -309,6 +310,7 @@ validate-*.sh
 !scripts/terraform/validate-and-provision-production.sh
 verify-*.sh
 !.github/scripts/verify-mcp-readiness.sh
+!scripts/deployment/verify-ports.sh
 setup-*.sh
 !scripts/setup-redis-memory-overcommit.sh
 !scripts/setup-environment.sh
