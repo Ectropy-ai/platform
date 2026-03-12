@@ -167,12 +167,21 @@ COPY --from=builder /app/scripts ./scripts
 # V3 roadmap provides modular architecture (roadmap.json, boundaries.json, dependencies.json, tech-stack.json)
 COPY --from=builder /app/.roadmap ./.roadmap
 
+# GitHub Packages auth for @luh-tech scoped packages (runner stage)
+# ARG must be redeclared in each stage to receive --build-arg from docker build
+ARG LUHTECH_PKG_READ
+RUN echo "@luh-tech:registry=https://npm.pkg.github.com" > .npmrc && \
+    echo "//npm.pkg.github.com/:_authToken=${LUHTECH_PKG_READ}" >> .npmrc
+
 # Install dependencies from generated package.json
 # Cannot use --frozen-lockfile because package.json was modified by prepare script
 # and no longer matches the builder stage lockfile
 # Cannot use --production because Prisma CLI is devDependency
 # Prisma client generation requires the CLI at runtime in containerized environments
 RUN pnpm install --no-frozen-lockfile
+
+# Security: Remove .npmrc to avoid leaking token in final image
+RUN rm -f .npmrc
 
 # Generate ALL Prisma clients for production runtime (Phase 3 multi-schema architecture)
 # @prisma/client, @prisma/client-platform, @prisma/client-shared
