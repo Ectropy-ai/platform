@@ -247,13 +247,6 @@ services:
       # Enable Watchtower auto-updates for zero-SSH deployment
       com.centurylinklabs.watchtower.enable: 'true'
 
-  # Console service: Moved to private repo (DEC-002)
-  # Image still published to DOCR by Ectropy-Business CI
-    networks:
-      - ectropy-network
-    labels:
-      com.centurylinklabs.watchtower.enable: 'true'
-
   mcp-server:
     image: registry.digitalocean.com/ectropy-registry/mcp-server:staging
     container_name: ectropy-mcp
