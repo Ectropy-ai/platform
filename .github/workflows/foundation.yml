@@ -169,6 +169,8 @@ jobs:
           echo "✅ pnpm configured with default GitHub Actions cache"
 
       - name: Install dependencies with retry
+        env:
+          LUHTECH_PKG_READ: ${{ secrets.LUHTECH_PKG_READ }}
         run: |
           max_attempts=3
           attempt=1
@@ -408,6 +410,8 @@ jobs:
 
       # Install dependencies with retry logic using existing robust script
       - name: Install dependencies with retry
+        env:
+          LUHTECH_PKG_READ: ${{ secrets.LUHTECH_PKG_READ }}
         run: |
           max_attempts=3
           attempt=1
