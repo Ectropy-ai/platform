@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -20,7 +21,6 @@ import {
   ProjectCard,
   ProjectMembersDialog,
 } from '../components/ProjectManagement';
-import ProjectWorkspace from './ProjectWorkspace';
 import { apiService } from '../services/api';
 
 interface Project {
@@ -39,11 +39,11 @@ interface Project {
 }
 
 const ProjectsListPage: React.FC = () => {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [membersDialogState, setMembersDialogState] = useState<{
     open: boolean;
     projectId: string;
@@ -76,7 +76,7 @@ const ProjectsListPage: React.FC = () => {
   };
 
   const handleSelectProject = (projectId: string) => {
-    setSelectedProjectId(projectId);
+    navigate(`/projects/${projectId}`);
   };
 
   const handleMembersClick = (project: Project) => {
@@ -87,17 +87,7 @@ const ProjectsListPage: React.FC = () => {
     });
   };
 
-  const handleBack = () => {
-    setSelectedProjectId(null);
-    fetchProjects(); // Refresh projects list
-  };
-
-  // If a project is selected, show the workspace
-  if (selectedProjectId) {
-    return <ProjectWorkspace projectId={selectedProjectId} onBack={handleBack} />;
-  }
-
-  // Otherwise show the projects list
+  // Projects list
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       {/* Header */}

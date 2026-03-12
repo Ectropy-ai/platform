@@ -25,6 +25,7 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const PlatformDashboard = lazy(() => import('./pages/PlatformDashboard')); // Phase 2: Tier 0 landing page
 import LandingPage from './pages/LandingPage';
 const ProjectsListPage = lazy(() => import('./pages/ProjectsListPage'));
+const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage'));
 const ViewerPage = lazy(() => import('./pages/ViewerPage').then(m => ({ default: m.ViewerPage })));
 const UserManagementPage = lazy(() =>
   import('./components/admin/user-management').then(m => ({ default: m.UserManagementPage })),
@@ -61,12 +62,11 @@ const MainApp: React.FC = () => {
   };
 
   // Determine current view from URL path
-  const currentView =
-    location.pathname === '/projects'
-      ? 'projects'
-      : location.pathname === '/viewer'
-        ? 'viewer'
-        : 'dashboard';
+  const currentView = location.pathname.startsWith('/projects')
+    ? 'projects'
+    : location.pathname === '/viewer'
+      ? 'viewer'
+      : 'dashboard';
 
   // Loading fallback for lazy-loaded components
   const LoadingFallback = () => (
@@ -136,6 +136,7 @@ const MainApp: React.FC = () => {
           <Routes>
             <Route path='/viewer' element={<ViewerPage />} />
             <Route path='/projects' element={<ProjectsListPage />} />
+            <Route path='/projects/:id' element={<ProjectDetailPage />} />
             <Route path='/admin/users' element={<UserManagementPage />} />
             {/* Phase 2: Tier 0 Platform Dashboard as landing page */}
             <Route path='/dashboard' element={<PlatformDashboard />} />
