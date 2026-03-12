@@ -2,8 +2,25 @@
   "$schema": "https://luhtech.dev/schemas/decision-log-v2.json",
   "version": "2.0.0",
   "ventureId": "ectropy",
-  "lastUpdated": "2026-02-25T20:00:00.000Z",
+  "lastUpdated": "2026-03-11T00:00:00.000Z",
   "decisions": [
+    {
+      "decisionId": "DEC-002",
+      "timestamp": "2026-03-11T00:00:00Z",
+      "title": "Console Migration — ectropy-console to Ectropy-Business",
+      "context": "ectropy-console contains is_platform_admin gating, demo provisioning, and internal admin tooling. This is business logic, not open-source platform code. Keeping it in the public repo violates the boundary contract.",
+      "decision": "Move apps/ectropy-console from ectropy-ai/platform (public, Apache-2.0) to luh-tech/Ectropy-Business (private, PROPRIETARY). DOCR image name stays ectropy-console. Nginx config untouched. Only CI workflow changes.",
+      "rationale": "Admin console with is_platform_admin gate, demo provisioning, and internal tooling belongs in the private business repo. Public repo should not contain enterprise admin surfaces.",
+      "status": "resolved",
+      "category": "architecture",
+      "impact": "high",
+      "implementedDate": "2026-03-11",
+      "evidence": [
+        "ECTROPY-ARCH-CONSOLE-MIGRATION-2026-03-11.docx",
+        "boundaries.json v2.1.0 — console removed from publicRepo.includes"
+      ],
+      "tags": ["repo-split", "console", "architecture", "DEC-002"]
+    },
     {
       "decisionId": "d-2026-02-25-e2e-test-fixture-pattern",
       "timestamp": "2026-02-25T16:00:00Z",
