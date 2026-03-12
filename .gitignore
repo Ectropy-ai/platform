@@ -281,6 +281,7 @@ validate-*.sh
 !scripts/validate-environment.sh
 !scripts/ci/validate-database-url-pattern.sh
 !scripts/ci/validate-deployment-health.sh
+!scripts/ci/validate-secrets.sh
 !scripts/ci/validate-workflow-environments.sh
 !scripts/security/validate-secret-sync.sh
 !scripts/validation/validate-production.sh
