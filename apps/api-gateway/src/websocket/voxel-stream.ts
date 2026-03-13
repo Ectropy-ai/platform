@@ -153,11 +153,17 @@ const MAX_MESSAGE_SIZE = 64 * 1024;
 const MAX_CONNECTIONS_PER_IP = 5;
 
 /** Allowed WebSocket origins (Fortune 500: OWASP origin validation) */
-const ALLOWED_ORIGINS = [
-  'https://staging.ectropy.ai',
-  'https://ectropy.ai',
-  'https://console.staging.ectropy.ai',
-];
+const ALLOWED_ORIGINS = (() => {
+  const envOrigins = process.env['ALLOWED_ORIGINS'];
+  if (envOrigins) {
+    return envOrigins.split(',').map((o) => o.trim()).filter(Boolean);
+  }
+  return [
+    'https://staging.ectropy.ai',
+    'https://ectropy.ai',
+    'https://console.staging.ectropy.ai',
+  ];
+})();
 
 // ============================================================================
 // VOXEL STREAM HANDLER CLASS

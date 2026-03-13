@@ -248,11 +248,11 @@ export const StreamSelector: React.FC<StreamSelectorProps> = ({
               <MenuItem key={stream.id} value={stream.stream_id}>
                 <Box sx={{ width: '100%' }}>
                   <Typography variant='body2'>{stream.stream_name}</Typography>
-                  <Typography variant='caption' color='text.secondary' display='block'>
-                    {stream.commit_count} commits
-                    {stream.last_commit_date &&
-                      ` • Last: ${new Date(stream.last_commit_date).toLocaleDateString()}`}
-                  </Typography>
+                  {stream.last_commit_date && (
+                    <Typography variant='caption' color='text.secondary' display='block'>
+                      Last commit: {new Date(stream.last_commit_date).toLocaleDateString()}
+                    </Typography>
+                  )}
                 </Box>
               </MenuItem>
             ))}
@@ -320,12 +320,6 @@ export const StreamSelector: React.FC<StreamSelectorProps> = ({
 
             return (
               <Stack direction='row' spacing={1}>
-                <Chip
-                  label={`${stream.commit_count} commits`}
-                  size='small'
-                  color='primary'
-                  variant='outlined'
-                />
                 <Chip
                   label={`Created ${new Date(stream.created_at).toLocaleDateString()}`}
                   size='small'

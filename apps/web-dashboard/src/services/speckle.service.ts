@@ -11,7 +11,6 @@ export interface SpeckleStream {
   stream_id: string;
   stream_name: string;
   construction_project_id: string;
-  commit_count: number;
   last_commit_date: string | null;
   latest_object_id: string | null; // Object ID from latest commit for viewer rendering
   created_at: string;
@@ -133,7 +132,7 @@ export class SpeckleService {
 
     // ENTERPRISE FIX (2026-01-13): Transform backend Speckle GraphQL format to frontend format
     // ROOT CAUSE: Backend returns { id, name, description, commits: {items: []} }
-    //             Frontend expects { id, stream_id, stream_name, commit_count, last_commit_date }
+    //             Frontend expects { id, stream_id, stream_name, last_commit_date }
     // SOLUTION: Map backend format to frontend SpeckleStream interface
     // CRITICAL FIX (2026-01-13): Extract objectId from latest commit for viewer rendering
     return streams.map((stream: any) => {
@@ -145,7 +144,6 @@ export class SpeckleService {
         stream_id: stream.id, // Use id as stream_id for consistency
         stream_name: stream.name || 'Unnamed Stream',
         construction_project_id: projectId,
-        commit_count: stream.commits?.items?.length || 0,
         last_commit_date: latestCommit?.createdAt || null,
         latest_object_id: objectId, // CRITICAL: Extract objectId for viewer
         created_at: stream.createdAt || new Date().toISOString(),
