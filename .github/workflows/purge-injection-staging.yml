@@ -25,8 +25,8 @@ jobs:
       - name: Dry Run
         run: npx tsx scripts/database/purge-injection.ts --dry-run
         env:
-          DATABASE_URL: ${{ secrets.PLATFORM_DATABASE_URL }}
+          DATABASE_URL: postgresql://${{ vars.DATABASE_USER }}:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}?sslmode=require
       - name: Execute Purge
         run: npx tsx scripts/database/purge-injection.ts --execute
         env:
-          DATABASE_URL: ${{ secrets.PLATFORM_DATABASE_URL }}
+          DATABASE_URL: postgresql://${{ vars.DATABASE_USER }}:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}?sslmode=require
