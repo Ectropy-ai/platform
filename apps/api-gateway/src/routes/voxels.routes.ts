@@ -614,13 +614,13 @@ export class VoxelRoutes {
           v.status,
           v.health_status as "healthStatus",
           v.percent_complete as "percentComplete",
-          v.center,
+          json_build_object('x', v.coord_x, 'y', v.coord_y, 'z', v.coord_z) as center,
           v.resolution,
           v.level,
           v.created_at as "createdAt",
           v.updated_at as "updatedAt",
           COALESCE(
-            (SELECT COUNT(*) FROM pm_decisions pd WHERE pd.voxel_id = v.id),
+            (SELECT COUNT(*) FROM voxel_decision_attachments vda WHERE vda.voxel_id = v.id),
             0
           ) as "decisionCount"
         FROM voxels v
@@ -679,7 +679,7 @@ export class VoxelRoutes {
           COUNT(*) FILTER (WHERE status = 'COMPLETE') as "completeCount",
           COUNT(*) FILTER (WHERE status = 'BLOCKED') as "blockedCount",
           COALESCE(SUM(
-            (SELECT COUNT(*) FROM pm_decisions pd WHERE pd.voxel_id = v.id)
+            (SELECT COUNT(*) FROM voxel_decision_attachments vda WHERE vda.voxel_id = v.id)
           ), 0) as "decisionCount"
         FROM voxels v
         WHERE project_id = $1
@@ -733,24 +733,24 @@ export class VoxelRoutes {
       const query = `
         SELECT
           al.id,
-          al.action as type,
-          al.action as title,
-          al.details->>'message' as description,
-          al.timestamp,
+          al.event_type as type,
+          al.event_type as title,
+          al.event_data->>'message' as description,
+          al.created_at as timestamp,
           CASE
-            WHEN al.action LIKE '%error%' OR al.action LIKE '%failed%' THEN 'error'
-            WHEN al.action LIKE '%warning%' OR al.action LIKE '%issue%' THEN 'warning'
-            WHEN al.action LIKE '%complete%' OR al.action LIKE '%success%' THEN 'success'
+            WHEN al.event_type LIKE '%error%' OR al.event_type LIKE '%failed%' THEN 'error'
+            WHEN al.event_type LIKE '%warning%' OR al.event_type LIKE '%issue%' THEN 'warning'
+            WHEN al.event_type LIKE '%complete%' OR al.event_type LIKE '%success%' THEN 'success'
             ELSE 'info'
           END as severity,
-          al.entity_id as "voxelId",
-          al.user_id as "userId",
+          al.resource_id as "voxelId",
+          al.actor_id as "userId",
           u.full_name as "userName"
         FROM audit_log al
-        LEFT JOIN users u ON al.user_id = u.id
-        WHERE al.project_id = $1
-          AND al.entity_type = 'voxel'
-        ORDER BY al.timestamp DESC
+        LEFT JOIN users u ON al.actor_id = u.id::text
+        WHERE al.resource_type = 'voxel'
+          AND al.resource_id IN (SELECT id::text FROM voxels WHERE project_id = $1)
+        ORDER BY al.created_at DESC
         LIMIT $2
       `;
 
@@ -787,13 +787,13 @@ export class VoxelRoutes {
           v.status,
           v.health_status as "healthStatus",
           v.percent_complete as "percentComplete",
-          v.center,
+          json_build_object('x', v.coord_x, 'y', v.coord_y, 'z', v.coord_z) as center,
           v.resolution,
           v.level,
           v.created_at as "createdAt",
           v.updated_at as "updatedAt",
           COALESCE(
-            (SELECT COUNT(*) FROM pm_decisions pd WHERE pd.voxel_id = v.id),
+            (SELECT COUNT(*) FROM voxel_decision_attachments vda WHERE vda.voxel_id = v.id),
             0
           ) as "decisionCount"
         FROM voxels v
@@ -948,14 +948,16 @@ export class VoxelRoutes {
       // Step 4: Log to audit_log for cross-system audit trail
       const auditQuery = `
         INSERT INTO audit_log (
-          user_id, project_id, entity_type, entity_id, action, details
-        ) VALUES ($1, $2, 'voxel', $3, 'status_change', $4)
+          event_hash, event_type, resource_id, resource_type, actor_id, event_data, source_ip, user_agent
+        ) VALUES (
+          encode(digest(gen_random_uuid()::text || now()::text, 'sha256'), 'hex'),
+          'status_change', $1, 'voxel', $2, $3, $4, $5
+        )
       `;
 
       await client.query(auditQuery, [
-        update.userId,
-        row.projectId,
         current.id,
+        update.userId || 'system',
         JSON.stringify({
           message: `Status changed from ${previousStatus} to ${update.status}`,
           previousStatus,
@@ -965,7 +967,10 @@ export class VoxelRoutes {
           percentComplete: update.percentComplete,
           note: update.note,
           source: update.source || 'API',
+          projectId: row.projectId,
         }),
+        update.ipAddress,
+        update.userAgent,
       ]);
 
       await client.query('COMMIT');
