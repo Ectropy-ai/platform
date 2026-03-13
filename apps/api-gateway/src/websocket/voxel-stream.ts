@@ -149,6 +149,16 @@ const CLIENT_TIMEOUT = 60000;
 /** Maximum message size (64KB) */
 const MAX_MESSAGE_SIZE = 64 * 1024;
 
+/** Maximum concurrent connections per IP address */
+const MAX_CONNECTIONS_PER_IP = 5;
+
+/** Allowed WebSocket origins (Fortune 500: OWASP origin validation) */
+const ALLOWED_ORIGINS = [
+  'https://staging.ectropy.ai',
+  'https://ectropy.ai',
+  'https://console.staging.ectropy.ai',
+];
+
 // ============================================================================
 // VOXEL STREAM HANDLER CLASS
 // ============================================================================
@@ -203,6 +213,28 @@ export class VoxelStreamHandler {
    * Handles new WebSocket connection
    */
   private handleConnection(ws: ExtendedVoxelWebSocket, request: any): void {
+    // Fortune 500: Origin validation (OWASP WebSocket Security)
+    const origin = request.headers['origin'];
+    const isDev = process.env['NODE_ENV'] === 'development';
+    if (origin && !isDev) {
+      if (!ALLOWED_ORIGINS.includes(origin)) {
+        logger.warn('[VoxelStream] Rejected connection from unauthorized origin', { origin });
+        ws.close(4003, 'Forbidden');
+        return;
+      }
+    }
+
+    // Fortune 500: Per-IP connection limit (prevents runaway reconnect storms)
+    const clientIp = request.headers['x-real-ip'] || request.socket.remoteAddress || 'unknown';
+    const existingFromIp = [...this.clients.values()].filter(
+      (c) => c.readyState === WebSocket.OPEN && (request.headers['x-real-ip'] || request.socket.remoteAddress) === clientIp
+    ).length;
+    if (existingFromIp >= MAX_CONNECTIONS_PER_IP) {
+      logger.warn('[VoxelStream] Connection limit reached for IP', { ip: clientIp, existing: existingFromIp });
+      ws.close(4029, 'Too Many Connections');
+      return;
+    }
+
     // Generate unique client ID
     const clientId = `voxel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 

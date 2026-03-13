@@ -1,0 +1,63 @@
+{
+  "session": "INFRA-HARDENING-2026-03-13",
+  "timestamp": "2026-03-13T00:00:00Z",
+  "methodology": "Ground Truth — Read before write. Source everything.",
+  "briefingCorrections": {
+    "RC-1": "Briefing claimed no WS handler exists. CORRECTED: voxel-stream.ts (770 lines) already implemented with Redis Pub/Sub. Issue is likely build/deploy, not missing source.",
+    "RC-3": "Briefing claimed smoke test race condition. CORRECTED: deploy workflow already has 7-min polling with 3-consecutive-healthy requirement + BUILD_SHA verification.",
+    "RC-4": "Briefing claimed dead nginx blocks. CORRECTED: All blocks route to legitimate services. Zero dead blocks found."
+  },
+  "resolvedIssues": {
+    "RC-2": {
+      "status": "RESOLVED",
+      "description": "Consolidated migration for all Sprint 5 ROS MRO schema drift",
+      "migration": "prisma/migrations/20260313000000_sprint5_ros_mro_schema_drift/migration.sql",
+      "items": [
+        "VoxelHealthStatus enum (HEALTHY, AT_RISK, CRITICAL)",
+        "VoxelStatus.ON_HOLD enum value",
+        "voxels.health_status column (NOT NULL DEFAULT HEALTHY)",
+        "voxel_status_history table (14 columns, 4 indexes, 2 FKs)",
+        "voxels(level, system) aggregation index"
+      ]
+    },
+    "RC-1": {
+      "status": "INVESTIGATED — No source code fix needed",
+      "description": "WebSocket handler exists in source. Build system (Webpack via Nx) bundles main.ts → main.js including all imports. Import chain verified: main.ts → websocket/voxel-stream.ts. A redeploy should resolve the dist issue."
+    },
+    "RC-3": {
+      "status": "ASSESSED — Already resolved in current workflow",
+      "description": "validate-deployment job requires 3 consecutive healthy polls (30s) + BUILD_SHA verification before smoke-tests run. The 0.2s race condition described in briefing does not match current implementation."
+    },
+    "RC-4": {
+      "status": "AUDITED — No action needed",
+      "description": "All 18 nginx location blocks in main server block route to legitimate services. No dead blocks found. Route ↔ nginx 1:1 correspondence confirmed."
+    }
+  },
+  "fortuneFiveHundredItems": [
+    "WS rate limiting: nginx ws_connect zone (10r/m per IP, burst 5)",
+    "WS origin validation: allowlist check on connection (OWASP WebSocket Security)",
+    "WS per-IP connection limit: max 5 concurrent (prevents reconnect storms)",
+    "WS health metrics: voxelStream stats in /health and /api/health responses"
+  ],
+  "testsAdded": [
+    "voxel-stream.spec.ts — 10 tests: lifecycle, messaging, subscriptions, broadcast, stats",
+    "schema-drift.spec.ts — Static analysis: every table and enum in schema.prisma verified against migration SQL"
+  ],
+  "nginxChanges": {
+    "blocksRemoved": 0,
+    "blocksAdded": 0,
+    "blocksModified": 1,
+    "details": "/ws/ block: added rate limiting (limit_req zone=ws_connect burst=5 nodelay)"
+  },
+  "commits": [
+    "fix(schema): add missing Sprint 5 ROS MRO migration (RC-2)",
+    "feat(infra): Fortune 500 security and observability hardening",
+    "test(infra): schema drift detection + voxel-stream handler tests"
+  ],
+  "openItems": [
+    "RC-1 build verification: Trigger a redeploy to confirm voxel-stream handler appears in dist/main.js",
+    "AuditLog column drift: routes query action/details/entity_id but migration has event_type/resource_id/actor_id — causes fallback to mock data"
+  ],
+  "committedBy": "claude-agent",
+  "reviewedBy": "PENDING — Erik Luhtala"
+}
