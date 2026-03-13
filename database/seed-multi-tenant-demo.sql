@@ -258,12 +258,13 @@ INSERT INTO projects (
 -- Add Project Roles (Optional: For testing RBAC)
 -- =============================================================================
 
--- Give demo user owner role on their project
+-- Give demo user owner role on their project (with full permissions)
 INSERT INTO project_roles (
   id,
   project_id,
   user_id,
   role,
+  permissions,
   is_active,
   assigned_at
 )
@@ -272,6 +273,7 @@ SELECT
   p.id,
   u.id,
   'owner',
+  ARRAY['read','write','admin','delete','manage_members'],
   true,
   CURRENT_TIMESTAMP
 FROM projects p
@@ -279,12 +281,13 @@ CROSS JOIN users u
 WHERE p.name = 'Demo Office Building'
   AND u.email = 'demo@ectropy.com';
 
--- Give test user owner role on their project
+-- Give test user owner role on their project (with full permissions)
 INSERT INTO project_roles (
   id,
   project_id,
   user_id,
   role,
+  permissions,
   is_active,
   assigned_at
 )
@@ -293,6 +296,7 @@ SELECT
   p.id,
   u.id,
   'owner',
+  ARRAY['read','write','admin','delete','manage_members'],
   true,
   CURRENT_TIMESTAMP
 FROM projects p
@@ -300,12 +304,13 @@ CROSS JOIN users u
 WHERE p.name = 'Sample Residential Complex'
   AND u.email = 'test@ectropy.com';
 
--- Give admin read access to all projects (cross-tenant)
+-- Give admin full access to all projects (cross-tenant)
 INSERT INTO project_roles (
   id,
   project_id,
   user_id,
   role,
+  permissions,
   is_active,
   assigned_at
 )
@@ -314,6 +319,7 @@ SELECT
   p.id,
   u.id,
   'admin',
+  ARRAY['read','write','admin'],
   true,
   CURRENT_TIMESTAMP
 FROM projects p
@@ -330,6 +336,7 @@ INSERT INTO project_roles (
   project_id,
   user_id,
   role,
+  permissions,
   is_active,
   assigned_at
 )
@@ -338,6 +345,7 @@ SELECT
   p.id,
   u.id,
   'consultant',  -- ROOT CAUSE #231 FIX: Changed from 'member' (invalid enum) to 'consultant' (valid StakeholderRole)
+  ARRAY['read'],
   true,
   CURRENT_TIMESTAMP
 FROM projects p
