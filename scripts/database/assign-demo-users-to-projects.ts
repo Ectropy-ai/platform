@@ -1,9 +1,11 @@
 #!/usr/bin/env tsx
 /**
- * One-off script: Assign demo users to demo projects via project_roles
+ * One-off script: Clean orphaned projects + assign demo users to demo projects
  *
- * Ensures all ectropy-demo tenant users have proper project_roles records
- * with correct permissions. Safe to re-run (idempotent via upsert).
+ * Phase 1: Delete all projects that are NOT the two demo projects
+ *          (E2E Test Project, My First Project, etc.) — FK cascades handle children
+ * Phase 2: Ensure all ectropy-demo tenant users have proper project_roles records
+ *          with correct permissions. Safe to re-run (idempotent via upsert).
  *
  * Usage:
  *   DATABASE_URL=... npx tsx scripts/database/assign-demo-users-to-projects.ts --dry-run
@@ -15,6 +17,9 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 const DRY_RUN = !process.argv.includes('--execute');
 const DEMO_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+
+/** The only two projects that should exist after cleanup */
+const KEEP_PROJECTS = ['Demo Office Building', 'Sample Residential Complex'];
 
 /** Permission sets by role */
 const PERMISSIONS: Record<string, string[]> = {
@@ -33,9 +38,58 @@ interface Assignment {
   action: 'create' | 'update' | 'skip';
 }
 
+/**
+ * Phase 1: Delete orphaned projects (E2E leftovers, My First Project, etc.)
+ * All FK relations use onDelete: Cascade so child records are cleaned automatically.
+ */
+async function cleanOrphanedProjects(): Promise<number> {
+  console.log('   🧹 Phase 1: Orphaned project cleanup\n');
+
+  // Audit: list ALL projects in the database
+  const allProjects = await prisma.project.findMany({
+    select: { id: true, name: true, tenant_id: true, status: true },
+    orderBy: { name: 'asc' },
+  });
+
+  console.log(`   Total projects in database: ${allProjects.length}`);
+  for (const p of allProjects) {
+    const keep = KEEP_PROJECTS.includes(p.name);
+    console.log(`     ${keep ? '✅' : '🗑️ '} "${p.name}" (${p.status}, tenant=${p.tenant_id?.slice(0, 8) ?? 'NULL'})`);
+  }
+
+  const toDelete = allProjects.filter((p) => !KEEP_PROJECTS.includes(p.name));
+
+  if (toDelete.length === 0) {
+    console.log('\n   ✅ No orphaned projects to delete.\n');
+    return 0;
+  }
+
+  console.log(`\n   📊 ${toDelete.length} orphaned project(s) to delete\n`);
+
+  if (DRY_RUN) {
+    return toDelete.length;
+  }
+
+  // Delete orphaned projects (FK cascade handles project_roles, speckle_streams, etc.)
+  const result = await prisma.project.deleteMany({
+    where: {
+      name: { notIn: KEEP_PROJECTS },
+    },
+  });
+
+  console.log(`   🗑️  Deleted ${result.count} orphaned project(s) (FK cascade cleaned children)\n`);
+  return result.count;
+}
+
 async function main() {
-  console.log(`\n🔗 Assign Demo Users to Projects`);
+  console.log(`\n🔗 Demo Database Cleanup & Role Assignment`);
   console.log(`   Mode: ${DRY_RUN ? 'DRY RUN (use --execute to apply)' : 'EXECUTE'}\n`);
+
+  // Phase 1: Clean orphaned projects
+  const deleted = await cleanOrphanedProjects();
+
+  // Phase 2: Assign demo users to demo projects
+  console.log('   🔗 Phase 2: Project role assignment\n');
 
   // Find all demo tenant users
   const users = await prisma.user.findMany({
@@ -43,7 +97,7 @@ async function main() {
     select: { id: true, email: true, role: true },
   });
 
-  // Find all demo tenant projects
+  // Find all demo tenant projects (should be exactly 2 after cleanup)
   const projects = await prisma.project.findMany({
     where: { tenant_id: DEMO_TENANT_ID },
     select: { id: true, name: true, owner_id: true },
@@ -165,6 +219,16 @@ async function main() {
   }
 
   console.log(`\n   🔗 Complete: ${applied}/${creates.length + updates.length} changes applied.\n`);
+
+  // Final audit
+  const finalProjects = await prisma.project.findMany({
+    select: { name: true, status: true },
+    orderBy: { name: 'asc' },
+  });
+  const finalRoles = await prisma.projectRole.count({ where: { is_active: true } });
+  console.log('   📋 Final state:');
+  console.log(`     Projects: ${finalProjects.length} (${finalProjects.map((p) => p.name).join(', ')})`);
+  console.log(`     Active project_roles: ${finalRoles}\n`);
 
   await prisma.$disconnect();
   process.exit(0);
