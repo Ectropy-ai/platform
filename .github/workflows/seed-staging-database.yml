@@ -329,6 +329,7 @@ jobs:
           # Direct LB access (HTTP) has 300s timeout — no Cloudflare in path.
           SPECKLE_UPLOAD_URL: http://${{ vars.STAGING_LB_IP }}/speckle
           SPECKLE_TOKEN: ${{ env.SPECKLE_TOKEN }}
+          DEMO_ASSETS_BASE_URL: ${{ vars.DEMO_ASSETS_BASE_URL }}
         run: |
           echo "========================================="
           echo "SEEDING SPECKLE BIM DEMO DATA"
@@ -337,20 +338,24 @@ jobs:
           echo "Environment: Staging"
           echo "Speckle URL: ${SPECKLE_URL}"
           echo "Speckle Upload URL: ${SPECKLE_UPLOAD_URL} (bypasses Cloudflare 100s timeout)"
-          echo "IFC Files: test-data/demo-office-building.ifc, test-data/Ifc4_SampleHouse.ifc"
+          DEMO_ASSETS_BASE_URL="${DEMO_ASSETS_BASE_URL:-https://luhtech-demo-assets.nyc3.digitaloceanspaces.com/ifc}"
+          echo "IFC Source: ${DEMO_ASSETS_BASE_URL}"
           echo ""
 
-          # Validate IFC files exist
-          echo "🔍 Validating IFC files..."
-          if [ ! -f "test-data/demo-office-building.ifc" ]; then
-            echo "❌ ERROR: demo-office-building.ifc not found"
-            exit 1
-          fi
-          if [ ! -f "test-data/Ifc4_SampleHouse.ifc" ]; then
-            echo "❌ ERROR: Ifc4_SampleHouse.ifc not found"
-            exit 1
-          fi
-          echo "✅ IFC files validated"
+          # Download IFC files from DO Spaces
+          echo "📥 Downloading IFC files from Spaces..."
+          mkdir -p /tmp/ifc-assets
+          for FILE in demo-office-building.ifc Ifc4_SampleHouse.ifc; do
+            echo "  Fetching ${FILE}..."
+            HTTP_CODE=$(curl -s -o "/tmp/ifc-assets/${FILE}" -w "%{http_code}" "${DEMO_ASSETS_BASE_URL}/${FILE}")
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "❌ ERROR: Failed to download ${FILE} from Spaces (HTTP ${HTTP_CODE})"
+              echo "  URL: ${DEMO_ASSETS_BASE_URL}/${FILE}"
+              exit 1
+            fi
+            SIZE=$(wc -c < "/tmp/ifc-assets/${FILE}")
+            echo "  ✅ ${FILE} (${SIZE} bytes)"
+          done
           echo ""
 
           # Query demo project IDs from database
@@ -398,7 +403,7 @@ jobs:
             --max-time 300 \
             -X POST "${OFFICE_UPLOAD_URL}" \
             -H "Authorization: Bearer ${SPECKLE_TOKEN}" \
-            -F "file=@test-data/demo-office-building.ifc")
+            -F "file=@/tmp/ifc-assets/demo-office-building.ifc")
           OFFICE_UPLOAD_RESULT=$(cat /tmp/office_upload.json)
 
           echo "  HTTP status: $OFFICE_HTTP_CODE"
@@ -442,7 +447,7 @@ jobs:
             --max-time 300 \
             -X POST "${RESIDENTIAL_UPLOAD_URL}" \
             -H "Authorization: Bearer ${SPECKLE_TOKEN}" \
-            -F "file=@test-data/Ifc4_SampleHouse.ifc")
+            -F "file=@/tmp/ifc-assets/Ifc4_SampleHouse.ifc")
           RESIDENTIAL_UPLOAD_RESULT=$(cat /tmp/residential_upload.json)
 
           echo "  HTTP status: $RESIDENTIAL_HTTP_CODE"

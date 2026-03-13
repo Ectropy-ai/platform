@@ -1,0 +1,195 @@
+name: Upload Demo Assets to Spaces (One-Off)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  upload:
+    name: Upload IFC Demo Assets
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Generate minimal IFC files
+        run: |
+          mkdir -p /tmp/ifc-assets
+
+          cat > /tmp/ifc-assets/demo-office-building.ifc << 'IFCEOF'
+          ISO-10303-21;
+          HEADER;
+          FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');
+          FILE_NAME('demo-office-building.ifc','2026-03-13T00:00:00',('Ectropy Demo'),('LuhTech Holdings'),'','','');
+          FILE_SCHEMA(('IFC2X3'));
+          ENDSEC;
+          DATA;
+          #1=IFCPROJECT('1hqIFTRST7k8bBiIBNmFkp',$,'Demo Office Building',$,$,$,$,(#20),#6);
+          #2=IFCORGANIZATION($,'LuhTech Holdings',$,$,$);
+          #3=IFCORGANIZATION($,'Ectropy Demo',$,$,$);
+          #4=IFCPERSONANDORGANIZATION(#5,#3,$);
+          #5=IFCPERSON($,'Demo','User',$,$,$,$,$);
+          #6=IFCUNITASSIGNMENT((#7,#8,#9));
+          #7=IFCSIUNIT(*,.LENGTHUNIT.,.MILLI.,.METRE.);
+          #8=IFCSIUNIT(*,.AREAUNIT.,$,.SQUARE_METRE.);
+          #9=IFCSIUNIT(*,.VOLUMEUNIT.,$,.CUBIC_METRE.);
+          #10=IFCSITE('0WU4A9R50peh5HRnxIfp01',$,'Demo Site',$,$,#11,$,$,.ELEMENT.,$,$,$,$,$);
+          #11=IFCLOCALPLACEMENT($,#12);
+          #12=IFCAXIS2PLACEMENT3D(#13,$,$);
+          #13=IFCCARTESIANPOINT((0.,0.,0.));
+          #20=IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.E-05,#12,$);
+          #30=IFCBUILDING('2FCZDorxHDT8NI01RKKdAF',$,'Demo Office Building',$,$,#31,$,$,.ELEMENT.,$,$,$);
+          #31=IFCLOCALPLACEMENT(#11,#12);
+          #40=IFCBUILDINGSTOREY('3TfGFSQnLC98CDqetyKVeV',$,'Ground Floor',$,$,#41,$,$,.ELEMENT.,0.);
+          #41=IFCLOCALPLACEMENT(#31,#12);
+          #50=IFCWALL('4mN9FmF8D1F8NQFu7T3SiG',$,'Exterior Wall North',$,$,#51,#52,$);
+          #51=IFCLOCALPLACEMENT(#41,#12);
+          #52=IFCPRODUCTDEFINITIONSHAPE($,$,(#53));
+          #53=IFCSHAPEREPRESENTATION(#20,'Body','SweptSolid',(#54));
+          #54=IFCEXTRUDEDAREASOLID(#55,#12,#56,3000.);
+          #55=IFCRECTANGLEPROFILEDEF(.AREA.,$,#57,12000.,300.);
+          #56=IFCDIRECTION((0.,0.,1.));
+          #57=IFCAXIS2PLACEMENT2D(#58,$);
+          #58=IFCCARTESIANPOINT((0.,0.));
+          #60=IFCCOLUMN('5mN9FmF8D1F8NQFu7T3SiG',$,'Column A1',$,$,#61,#62,$);
+          #61=IFCLOCALPLACEMENT(#41,#12);
+          #62=IFCPRODUCTDEFINITIONSHAPE($,$,(#63));
+          #63=IFCSHAPEREPRESENTATION(#20,'Body','SweptSolid',(#64));
+          #64=IFCEXTRUDEDAREASOLID(#65,#12,#56,3000.);
+          #65=IFCCIRCLEPROFILEDEF(.AREA.,$,#57,250.);
+          #70=IFCSLAB('6mN9FmF8D1F8NQFu7T3SiG',$,'Ground Floor Slab',$,$,#71,#72,$);
+          #71=IFCLOCALPLACEMENT(#41,#12);
+          #72=IFCPRODUCTDEFINITIONSHAPE($,$,(#73));
+          #73=IFCSHAPEREPRESENTATION(#20,'Body','SweptSolid',(#74));
+          #74=IFCEXTRUDEDAREASOLID(#75,#12,#56,300.);
+          #75=IFCRECTANGLEPROFILEDEF(.AREA.,$,#57,15000.,12000.);
+          #80=IFCDOOR('7mN9FmF8D1F8NQFu7T3SiG',$,'Main Entrance',$,$,#81,$,$,2100.,900.);
+          #81=IFCLOCALPLACEMENT(#41,#12);
+          #100=IFCRELAGGREGATES('1A2B3C4D5E6F7G8H',$,$,$,#1,(#10));
+          #101=IFCRELAGGREGATES('2A2B3C4D5E6F7G8H',$,$,$,#10,(#30));
+          #102=IFCRELAGGREGATES('3A2B3C4D5E6F7G8H',$,$,$,#30,(#40));
+          #103=IFCRELCONTAINEDINSPATIALSTRUCTURE('4A2B3C4D5E6F7G8H',$,$,$,(#50,#60,#70,#80),#40);
+          ENDSEC;
+          END-ISO-10303-21;
+          IFCEOF
+
+          cat > /tmp/ifc-assets/Ifc4_SampleHouse.ifc << 'IFCEOF'
+          ISO-10303-21;
+          HEADER;
+          FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');
+          FILE_NAME('Ifc4_SampleHouse.ifc','2026-03-13T00:00:00',('Ectropy Demo'),('LuhTech Holdings'),'','','');
+          FILE_SCHEMA(('IFC2X3'));
+          ENDSEC;
+          DATA;
+          #1=IFCPROJECT('2hqIFTRST7k8bBiIBNmFkq',$,'Sample Residential Complex',$,$,$,$,(#20),#6);
+          #2=IFCORGANIZATION($,'LuhTech Holdings',$,$,$);
+          #3=IFCORGANIZATION($,'Ectropy Demo',$,$,$);
+          #4=IFCPERSONANDORGANIZATION(#5,#3,$);
+          #5=IFCPERSON($,'Demo','User',$,$,$,$,$);
+          #6=IFCUNITASSIGNMENT((#7,#8,#9));
+          #7=IFCSIUNIT(*,.LENGTHUNIT.,.MILLI.,.METRE.);
+          #8=IFCSIUNIT(*,.AREAUNIT.,$,.SQUARE_METRE.);
+          #9=IFCSIUNIT(*,.VOLUMEUNIT.,$,.CUBIC_METRE.);
+          #10=IFCSITE('1WU4A9R50peh5HRnxIfp02',$,'Residential Site',$,$,#11,$,$,.ELEMENT.,$,$,$,$,$);
+          #11=IFCLOCALPLACEMENT($,#12);
+          #12=IFCAXIS2PLACEMENT3D(#13,$,$);
+          #13=IFCCARTESIANPOINT((0.,0.,0.));
+          #20=IFCGEOMETRICREPRESENTATIONCONTEXT($,'Model',3,1.E-05,#12,$);
+          #30=IFCBUILDING('3FCZDorxHDT8NI01RKKdAG',$,'Sample Residential Complex',$,$,#31,$,$,.ELEMENT.,$,$,$);
+          #31=IFCLOCALPLACEMENT(#11,#12);
+          #40=IFCBUILDINGSTOREY('4TfGFSQnLC98CDqetyKVeW',$,'Ground Floor',$,$,#41,$,$,.ELEMENT.,0.);
+          #41=IFCLOCALPLACEMENT(#31,#12);
+          #50=IFCWALL('5nN9FmF8D1F8NQFu7T3SjH',$,'Living Room Wall',$,$,#51,#52,$);
+          #51=IFCLOCALPLACEMENT(#41,#12);
+          #52=IFCPRODUCTDEFINITIONSHAPE($,$,(#53));
+          #53=IFCSHAPEREPRESENTATION(#20,'Body','SweptSolid',(#54));
+          #54=IFCEXTRUDEDAREASOLID(#55,#12,#56,2700.);
+          #55=IFCRECTANGLEPROFILEDEF(.AREA.,$,#57,8000.,200.);
+          #56=IFCDIRECTION((0.,0.,1.));
+          #57=IFCAXIS2PLACEMENT2D(#58,$);
+          #58=IFCCARTESIANPOINT((0.,0.));
+          #60=IFCSLAB('6nN9FmF8D1F8NQFu7T3SjH',$,'Foundation Slab',$,$,#61,#62,$);
+          #61=IFCLOCALPLACEMENT(#41,#12);
+          #62=IFCPRODUCTDEFINITIONSHAPE($,$,(#63));
+          #63=IFCSHAPEREPRESENTATION(#20,'Body','SweptSolid',(#64));
+          #64=IFCEXTRUDEDAREASOLID(#65,#12,#56,250.);
+          #65=IFCRECTANGLEPROFILEDEF(.AREA.,$,#57,10000.,8000.);
+          #70=IFCROOF('7nN9FmF8D1F8NQFu7T3SjH',$,'Main Roof',$,$,#71,$,$);
+          #71=IFCLOCALPLACEMENT(#41,#12);
+          #80=IFCDOOR('8nN9FmF8D1F8NQFu7T3SjH',$,'Front Door',$,$,#81,$,$,2100.,1000.);
+          #81=IFCLOCALPLACEMENT(#41,#12);
+          #90=IFCWINDOW('9nN9FmF8D1F8NQFu7T3SjH',$,'Living Room Window',$,$,#91,$,$,1200.,1500.);
+          #91=IFCLOCALPLACEMENT(#41,#12);
+          #100=IFCRELAGGREGATES('5A2B3C4D5E6F7G8H',$,$,$,#1,(#10));
+          #101=IFCRELAGGREGATES('6A2B3C4D5E6F7G8H',$,$,$,#10,(#30));
+          #102=IFCRELAGGREGATES('7A2B3C4D5E6F7G8H',$,$,$,#30,(#40));
+          #103=IFCRELCONTAINEDINSPATIALSTRUCTURE('8A2B3C4D5E6F7G8H',$,$,$,(#50,#60,#70,#80,#90),#40);
+          ENDSEC;
+          END-ISO-10303-21;
+          IFCEOF
+
+          echo "Generated IFC files:"
+          ls -la /tmp/ifc-assets/
+          echo ""
+          head -5 /tmp/ifc-assets/demo-office-building.ifc
+          echo "..."
+          head -5 /tmp/ifc-assets/Ifc4_SampleHouse.ifc
+
+      - name: Create Spaces bucket if needed
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          ENDPOINT="https://nyc3.digitaloceanspaces.com"
+
+          # Check if bucket exists
+          if aws s3 ls "s3://luhtech-demo-assets" --endpoint-url "$ENDPOINT" 2>/dev/null; then
+            echo "Bucket luhtech-demo-assets already exists"
+          else
+            echo "Creating bucket luhtech-demo-assets..."
+            aws s3 mb "s3://luhtech-demo-assets" --endpoint-url "$ENDPOINT" --region nyc3
+            echo "Bucket created"
+          fi
+
+      - name: Upload IFC files to Spaces
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          ENDPOINT="https://nyc3.digitaloceanspaces.com"
+          BUCKET="luhtech-demo-assets"
+
+          echo "Uploading demo-office-building.ifc..."
+          aws s3 cp /tmp/ifc-assets/demo-office-building.ifc \
+            "s3://${BUCKET}/ifc/demo-office-building.ifc" \
+            --endpoint-url "$ENDPOINT" \
+            --acl public-read \
+            --content-type "application/x-step"
+
+          echo "Uploading Ifc4_SampleHouse.ifc..."
+          aws s3 cp /tmp/ifc-assets/Ifc4_SampleHouse.ifc \
+            "s3://${BUCKET}/ifc/Ifc4_SampleHouse.ifc" \
+            --endpoint-url "$ENDPOINT" \
+            --acl public-read \
+            --content-type "application/x-step"
+
+          echo ""
+          echo "Listing uploaded files:"
+          aws s3 ls "s3://${BUCKET}/ifc/" --endpoint-url "$ENDPOINT"
+
+      - name: Verify public URLs
+        run: |
+          BASE="https://luhtech-demo-assets.nyc3.digitaloceanspaces.com/ifc"
+
+          echo "Verifying public access..."
+          for FILE in demo-office-building.ifc Ifc4_SampleHouse.ifc; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${BASE}/${FILE}")
+            echo "  ${BASE}/${FILE} → HTTP ${STATUS}"
+            if [ "$STATUS" != "200" ]; then
+              echo "  ERROR: Expected 200, got ${STATUS}"
+              exit 1
+            fi
+          done
+
+          echo ""
+          echo "All IFC assets publicly accessible"
