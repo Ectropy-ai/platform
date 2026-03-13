@@ -153,6 +153,7 @@ const MAX_MESSAGE_SIZE = 64 * 1024;
 const MAX_CONNECTIONS_PER_IP = 5;
 
 /** Allowed WebSocket origins (Fortune 500: OWASP origin validation) */
+// WS AUTH FIX 2026-03-13: env-driven origin list replaces hardcoded domains
 const ALLOWED_ORIGINS = (() => {
   const envOrigins = process.env['ALLOWED_ORIGINS'];
   if (envOrigins) {
