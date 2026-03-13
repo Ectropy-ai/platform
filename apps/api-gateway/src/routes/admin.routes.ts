@@ -44,6 +44,7 @@ import {
   getDemoPersistenceService,
   type GeneratedRecords as PersistenceRecords,
 } from '../services/demo-persistence.service.js';
+import { getSpeckleToken } from './speckle.routes.enterprise.js';
 
 /**
  * Stakeholder roles in the construction platform
@@ -1203,7 +1204,7 @@ export class AdminRoutes {
 
       const demoService = new DemoSetupService(this.dbPool, {
         speckleServerUrl,
-        speckleServerToken: process.env['SPECKLE_SERVER_TOKEN'] || '',
+        speckleServerToken: await getSpeckleToken(),
         speckleAdminEmail:
           process.env['SPECKLE_ADMIN_EMAIL'] || 'speckle-admin@ectropy.ai',
         speckleAdminPassword: process.env['SPECKLE_ADMIN_PASSWORD'] || '',

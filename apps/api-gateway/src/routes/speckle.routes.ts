@@ -14,6 +14,7 @@ import { SpeckleClient } from '@ectropy/shared/integrations';
 import { IFCProcessingService } from '@ectropy/ifc-processing';
 import { pool } from '../database/connection';
 import { logger } from '../../../../libs/shared/utils/src/logger.js';
+import { getSpeckleToken } from './speckle.routes.enterprise.js';
 
 // ENTERPRISE: Import centralized User type - no local interface declarations
 import type { User } from '@ectropy/shared/types';
@@ -62,10 +63,10 @@ export interface SpeckleServiceDependencies {
  * Create default service instances for production use
  * ENTERPRISE: Factory pattern for lazy initialization with proper error handling
  */
-function createDefaultServices(): Required<SpeckleServiceDependencies> {
+async function createDefaultServices(): Promise<Required<SpeckleServiceDependencies>> {
   const config = {
     serverUrl: process.env.SPECKLE_SERVER_URL || 'http://localhost:8080',
-    token: process.env.SPECKLE_SERVER_TOKEN || '',
+    token: await getSpeckleToken(),
   };
 
   if (!config.token) {
@@ -106,18 +107,19 @@ function createDefaultServices(): Required<SpeckleServiceDependencies> {
  * const router = createSpeckleRouter({ speckleService: mockService });
  * ```
  */
-export function createSpeckleRouter(
+export async function createSpeckleRouter(
   dependencies?: SpeckleServiceDependencies
-): ExpressRouter {
+): Promise<ExpressRouter> {
   // Use injected dependencies or create defaults for production
+  const defaults = dependencies ? null : await createDefaultServices();
   const { speckleService, ifcProcessor } = dependencies
     ? {
         speckleService:
-          dependencies.speckleService || createDefaultServices().speckleService,
+          dependencies.speckleService || (await createDefaultServices()).speckleService,
         ifcProcessor:
-          dependencies.ifcProcessor || createDefaultServices().ifcProcessor,
+          dependencies.ifcProcessor || (await createDefaultServices()).ifcProcessor,
       }
-    : createDefaultServices();
+    : defaults!;
 
   const router: ExpressRouter = Router();
 
@@ -499,11 +501,22 @@ export function createSpeckleRouter(
 // Lazy evaluation ensures production code works while allowing test mocks to initialize
 // Tests import { createSpeckleRouter } and call it with mocks
 // Production imports default and gets router with real services
+// NOTE: This file is NOT mounted in main.ts (enterprise routes are used instead).
+// Kept for test compatibility only.
 let defaultRouter: ExpressRouter | null = null;
+let routerInitPromise: Promise<ExpressRouter> | null = null;
 export default new Proxy({} as ExpressRouter, {
   get(_target, prop) {
     if (!defaultRouter) {
-      defaultRouter = createSpeckleRouter();
+      // Kick off async init; first access may miss but subsequent calls will resolve
+      if (!routerInitPromise) {
+        routerInitPromise = createSpeckleRouter().then((r) => {
+          defaultRouter = r;
+          return r;
+        });
+      }
+      // Return no-op until async init completes (dead code path — file not mounted)
+      return undefined;
     }
     return (defaultRouter as any)[prop];
   },

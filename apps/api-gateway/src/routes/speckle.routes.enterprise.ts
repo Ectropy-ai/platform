@@ -73,7 +73,7 @@ let _cachedToken: string | null = null;
 let _tokenReadAt = 0;
 const TOKEN_CACHE_TTL = 30_000; // 30 seconds
 
-async function getSpeckleToken(): Promise<string> {
+export async function getSpeckleToken(): Promise<string> {
   const now = Date.now();
   if (_cachedToken !== null && now - _tokenReadAt < TOKEN_CACHE_TTL) {
     return _cachedToken;
