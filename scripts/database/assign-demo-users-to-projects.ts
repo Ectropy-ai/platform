@@ -91,10 +91,15 @@ async function main() {
   // Phase 2: Assign demo users to demo projects
   console.log('   🔗 Phase 2: Project role assignment\n');
 
-  // Find all demo tenant users
+  // Find all demo tenant users + platform admins (they need project access too)
   const users = await prisma.user.findMany({
-    where: { tenant_id: DEMO_TENANT_ID },
-    select: { id: true, email: true, role: true },
+    where: {
+      OR: [
+        { tenant_id: DEMO_TENANT_ID },
+        { is_platform_admin: true },
+      ],
+    },
+    select: { id: true, email: true, role: true, is_platform_admin: true },
   });
 
   // Find all demo tenant projects (should be exactly 2 after cleanup)
@@ -116,9 +121,10 @@ async function main() {
 
   for (const project of projects) {
     for (const user of users) {
-      // Determine role: owner if user owns the project, consultant otherwise
+      // Determine role: owner if user owns the project, admin for platform admins, consultant otherwise
       const isOwner = project.owner_id === user.id;
-      const role = isOwner ? 'owner' : 'consultant';
+      const isPlatformAdmin = (user as any).is_platform_admin === true;
+      const role = isOwner ? 'owner' : isPlatformAdmin ? 'admin' : 'consultant';
       const permissions = PERMISSIONS[role] || PERMISSIONS.consultant;
 
       // Check existing role
