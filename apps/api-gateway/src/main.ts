@@ -274,7 +274,7 @@ import {
 } from '../../../libs/shared/audit/src/index.js';
 
 // WebSocket modules
-import { initializeVoxelStream } from './websocket/voxel-stream.js';
+import { initializeVoxelStream, getVoxelStreamHandler } from './websocket/voxel-stream.js';
 import { initializeRedisPubSub } from './websocket/redis-pubsub.js';
 
 // P0 FIX (2026-01-05): Moved getEnvConfig() into bootstrap() function
@@ -890,6 +890,22 @@ async function bootstrap(): Promise<void> {
             validation: 'comprehensive',
             websockets: 'enabled',
           },
+          websocket: (() => {
+            const vsHandler = getVoxelStreamHandler();
+            if (vsHandler) {
+              const wsStats = vsHandler.getStats();
+              return {
+                voxelStream: {
+                  status: 'ok',
+                  connectedClients: wsStats.totalConnections,
+                  activeProjects: wsStats.activeProjects,
+                  uptime: wsStats.uptime,
+                  redisPubSub: wsStats.redisPubSub,
+                },
+              };
+            }
+            return { voxelStream: { status: 'not_initialized', connectedClients: 0 } };
+          })(),
           database: {
             status: dbHealth.status,
             latency: dbHealth.latency,
@@ -1017,6 +1033,22 @@ async function bootstrap(): Promise<void> {
             validation: 'comprehensive',
             websockets: 'enabled',
           },
+          websocket: (() => {
+            const vsHandler = getVoxelStreamHandler();
+            if (vsHandler) {
+              const wsStats = vsHandler.getStats();
+              return {
+                voxelStream: {
+                  status: 'ok',
+                  connectedClients: wsStats.totalConnections,
+                  activeProjects: wsStats.activeProjects,
+                  uptime: wsStats.uptime,
+                  redisPubSub: wsStats.redisPubSub,
+                },
+              };
+            }
+            return { voxelStream: { status: 'not_initialized', connectedClients: 0 } };
+          })(),
           database: {
             status: dbHealth.status,
             latency: dbHealth.latency,
