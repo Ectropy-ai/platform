@@ -222,7 +222,7 @@ jobs:
 
           # Write DOCR credentials directly — bypasses Docker credential helper
           mkdir -p /tmp/docker-creds
-          doctl registry docker-config --expiry-seconds 3600 > /tmp/docker-creds/config.json
+          doctl registry docker-config --read-write --expiry-seconds 3600 > /tmp/docker-creds/config.json
 
           # Tag for DOCR
           docker tag ${{ matrix.service }}:staging ${{ env.REGISTRY }}/${{ matrix.service }}:staging
