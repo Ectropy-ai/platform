@@ -564,13 +564,15 @@ export class DemoPersistenceService {
       try {
         await client.query(`
           INSERT INTO audit_log (
-            project_id, entity_type, entity_id, action, details, timestamp
-          ) VALUES ($1, 'project', $2, $3, $4, NOW())
+            event_hash, event_type, resource_id, resource_type, actor_id, event_data
+          ) VALUES (
+            encode(digest(gen_random_uuid()::text || now()::text, 'sha256'), 'hex'),
+            $1, $2, 'project', 'system', $3
+          )
         `, [
-          projectId,
-          projectId,
           activity.type,
-          JSON.stringify({ message: activity.message, severity: activity.severity }),
+          projectId,
+          JSON.stringify({ message: activity.message, severity: activity.severity, projectId }),
         ]);
         count++;
       } catch (err) {

@@ -493,13 +493,13 @@ export class PlaybackEventExecutor {
       // Use audit_log table which exists in the schema
       await this.pool.query(`
         INSERT INTO audit_log (
-          project_id, entity_type, entity_id, action, details, timestamp
-        ) VALUES ($1, $2, $3, $4, $5, NOW())
+          event_hash, event_type, resource_id, resource_type, actor_id, event_data
+        ) VALUES (
+          encode(digest(gen_random_uuid()::text || now()::text, 'sha256'), 'hex'),
+          'status_change', $1, 'voxel', 'demo_playback', $2
+        )
       `, [
-        this.config.projectId,
-        'voxel',
         voxelId,
-        'status_change',
         JSON.stringify({
           previousStatus,
           newStatus,
@@ -508,6 +508,7 @@ export class PlaybackEventExecutor {
           description: event.description,
           severity: EVENT_SEVERITY_MAP[event.type] || 'info',
           source: 'demo_playback',
+          projectId: this.config.projectId,
         }),
       ]);
     } catch (error) {
@@ -541,19 +542,20 @@ export class PlaybackEventExecutor {
     try {
       await this.pool.query(`
         INSERT INTO audit_log (
-          project_id, entity_type, entity_id, action, details, timestamp
-        ) VALUES ($1, $2, $3, $4, $5, NOW())
+          event_hash, event_type, resource_id, resource_type, actor_id, event_data
+        ) VALUES (
+          encode(digest(gen_random_uuid()::text || now()::text, 'sha256'), 'hex'),
+          'milestone_reached', $1, 'milestone', 'demo_playback', $2
+        )
       `, [
-        this.config.projectId,
-        'milestone',
         milestone.id,
-        'milestone_reached',
         JSON.stringify({
           name: milestone.name,
           description: milestone.description,
           position: milestone.position,
           severity: 'success',
           source: 'demo_playback',
+          projectId: this.config.projectId,
         }),
       ]);
     } catch (error) {
