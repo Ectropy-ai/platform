@@ -152,6 +152,56 @@ function createDecisions(projectId: string, projectIndex: number) {
   ];
 }
 
+/** Generate 25 representative demo voxels across 5 systems, 5 levels */
+function createDemoVoxels(projectId: string) {
+  const systems = ['STRUCT', 'MECH', 'ELEC', 'PLUMB', 'HVAC'];
+  const statuses = ['PLANNED', 'IN_PROGRESS', 'COMPLETE', 'BLOCKED', 'ON_HOLD'] as const;
+  const healthStatuses = ['HEALTHY', 'HEALTHY', 'HEALTHY', 'AT_RISK', 'CRITICAL'] as const;
+  const voxels: any[] = [];
+  const spacing = 200;
+
+  for (let level = 0; level < 5; level++) {
+    for (let s = 0; s < 5; s++) {
+      const idx = level * 5 + s;
+      const system = systems[s];
+      const x = s * spacing + spacing / 2;
+      const y = level * spacing + spacing / 2;
+      const z = level * 1000 + 500;
+      const halfSize = spacing * 0.45;
+
+      voxels.push({
+        id: crypto.randomUUID(),
+        urn: `urn:luhtech:demo:voxel:${projectId.slice(0, 8)}-${String(idx).padStart(3, '0')}`,
+        project_id: projectId,
+        voxel_id: `VOX-L${level}-${system}-${String(idx).padStart(3, '0')}`,
+        status: statuses[idx % statuses.length],
+        health_status: healthStatuses[idx % healthStatuses.length],
+        coord_x: x,
+        coord_y: y,
+        coord_z: z,
+        resolution: spacing * 0.9,
+        min_x: x - halfSize,
+        max_x: x + halfSize,
+        min_y: y - halfSize,
+        max_y: y + halfSize,
+        min_z: z - halfSize,
+        max_z: z + halfSize,
+        building: 'Main Building',
+        level: `Level ${level}`,
+        system,
+        percent_complete:
+          statuses[idx % statuses.length] === 'COMPLETE' ? 100 :
+          statuses[idx % statuses.length] === 'IN_PROGRESS' ? Math.floor(Math.random() * 60) + 20 :
+          statuses[idx % statuses.length] === 'PLANNED' ? 0 : undefined,
+        decision_count: Math.floor(Math.random() * 4),
+        is_critical_path: idx % 5 === 0,
+      });
+    }
+  }
+
+  return voxels;
+}
+
 /**
  * Create the demo data seeding router.
  * Mounted at /api/admin in main.ts — route path is /seed-demo-data.
@@ -163,19 +213,130 @@ export function createSeedDemoDataRoutes(): Router {
   /**
    * POST /api/admin/seed-demo-data
    *
-   * Seed two demo projects with decisions, roles, and sample queries.
+   * Two modes:
    *
-   * Request body:
+   * Mode 1 — Existing project (projectId provided):
+   *   { projectId: string, assignRolesTo: ["email@..."] }
+   *   Assigns OWNER roles to listed emails on the existing project.
+   *   Seeds 25 demo voxels if the project has 0 voxels.
+   *   Idempotent: ON CONFLICT (user_id, project_id, role) DO UPDATE SET is_active = true.
+   *
+   * Mode 2 — New projects (no projectId):
    *   { user_id: string, tenant_id: string }
-   *
-   * Response:
-   *   { projects: [{ id, name, value }], decisions_count, roles_assigned }
+   *   Creates 2 demo projects with decisions and roles.
    */
   router.post(
     '/seed-demo-data',
     apiKeyMiddleware.dualAuth(['seed_demo_data', '*']),
     asyncHandler(async (req: Request, res: Response): Promise<void> => {
-      const { user_id, tenant_id } = req.body;
+      const { user_id, tenant_id, projectId, assignRolesTo } = req.body;
+
+      // ================================================================
+      // Mode 1: Assign roles to an existing project + seed voxels if empty
+      // ================================================================
+      if (projectId && typeof projectId === 'string') {
+        // Validate assignRolesTo
+        if (!assignRolesTo || !Array.isArray(assignRolesTo) || assignRolesTo.length === 0) {
+          res.status(400).json({
+            error: 'assignRolesTo must be a non-empty array of email addresses',
+            code: 'MISSING_ASSIGN_ROLES_TO',
+          });
+          return;
+        }
+
+        // Verify project exists
+        const project = await prisma.project.findUnique({
+          where: { id: projectId },
+          select: { id: true, name: true, total_budget: true },
+        });
+        if (!project) {
+          res.status(404).json({
+            error: 'Project not found',
+            code: 'PROJECT_NOT_FOUND',
+            projectId,
+          });
+          return;
+        }
+
+        const result = await prisma.$transaction(async (tx) => {
+          let rolesAssigned = 0;
+          let voxelsSeeded = 0;
+          const roleResults: { email: string; status: string }[] = [];
+
+          // Assign OWNER role to each email
+          for (const email of assignRolesTo) {
+            const normalizedEmail = String(email).toLowerCase().trim();
+            const targetUser = await tx.user.findFirst({
+              where: { email: normalizedEmail },
+              select: { id: true, email: true },
+            });
+
+            if (!targetUser) {
+              roleResults.push({ email: normalizedEmail, status: 'user_not_found' });
+              logger.warn('[Demo Seed] User not found for role assignment', { email: normalizedEmail });
+              continue;
+            }
+
+            await tx.projectRole.upsert({
+              where: {
+                user_id_project_id_role: {
+                  user_id: targetUser.id,
+                  project_id: projectId,
+                  role: 'OWNER',
+                },
+              },
+              create: {
+                user_id: targetUser.id,
+                project_id: projectId,
+                role: 'OWNER',
+                permissions: ['admin', 'read', 'write', 'delete', 'manage_members'],
+                voting_power: 100,
+                is_active: true,
+              },
+              update: { is_active: true },
+            });
+
+            rolesAssigned++;
+            roleResults.push({ email: normalizedEmail, status: 'assigned' });
+          }
+
+          // Seed voxels if project has none
+          const voxelCount = await tx.voxel.count({ where: { project_id: projectId } });
+          if (voxelCount === 0) {
+            const demoVoxels = createDemoVoxels(projectId);
+            for (const voxel of demoVoxels) {
+              await tx.voxel.create({ data: voxel });
+            }
+            voxelsSeeded = demoVoxels.length;
+          }
+
+          return { rolesAssigned, voxelsSeeded, existingVoxels: voxelCount, roleResults };
+        });
+
+        logger.info('[Demo Seed] Existing project seeded', {
+          projectId,
+          rolesAssigned: result.rolesAssigned,
+          voxelsSeeded: result.voxelsSeeded,
+          existingVoxels: result.existingVoxels,
+          seededBy: req.apiKey?.name || req.user?.email || 'unknown',
+        });
+
+        res.status(200).json(
+          createResponse.success({
+            mode: 'existing_project',
+            project: { id: project.id, name: project.name },
+            roles_assigned: result.rolesAssigned,
+            role_results: result.roleResults,
+            voxels_seeded: result.voxelsSeeded,
+            existing_voxels: result.existingVoxels,
+          })
+        );
+        return;
+      }
+
+      // ================================================================
+      // Mode 2: Create new demo projects (original behavior)
+      // ================================================================
 
       // --- Validate required fields ---
       if (!user_id || typeof user_id !== 'string') {
@@ -286,6 +447,7 @@ export function createSeedDemoDataRoutes(): Router {
 
       res.status(200).json(
         createResponse.success({
+          mode: 'new_projects',
           projects: result.projects,
           decisions_count: result.decisions_count,
           roles_assigned: result.roles_assigned,
