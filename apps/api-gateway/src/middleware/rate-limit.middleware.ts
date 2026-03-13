@@ -194,6 +194,7 @@ export async function createAuthRateLimiter(): Promise<
     },
     handler: rateLimitHandler,
     skipSuccessfulRequests: true, // Only count failed auth attempts
+    skip: (req: Request) => req.path.endsWith('/callback'), // OAuth callbacks are Google-initiated redirects, not brute-forceable
   };
 
   if (client) {
