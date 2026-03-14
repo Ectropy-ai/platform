@@ -40,6 +40,11 @@ DELETE FROM project_roles WHERE project_id IN (
 );
 
 DELETE FROM projects WHERE name IN ('Demo Office Building', 'Sample Residential Complex');
+-- WS FIX 2026-03-14: Clean E2E test leftovers that pollute user project lists
+DELETE FROM project_roles WHERE project_id IN (
+  SELECT id FROM projects WHERE name IN ('My First Project', 'E2E Test Project')
+);
+DELETE FROM projects WHERE name IN ('My First Project', 'E2E Test Project');
 
 DELETE FROM users WHERE email IN ('demo@ectropy.com', 'admin@ectropy.com', 'test@ectropy.com');
 
