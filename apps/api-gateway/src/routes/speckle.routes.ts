@@ -356,6 +356,37 @@ export async function createSpeckleRouter(
   );
 
   /**
+   * GET /api/speckle/objects/:streamId/:objectId/single
+   * BFF proxy: fetch Speckle object data with server-side token injection
+   * BIM FIX 2026-03-14: ObjectLoader calls this route; was missing, causing 404
+   */
+  router.get('/objects/:streamId/:objectId/single', async (req: Request, res: Response) => {
+    const authReq = req;
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { streamId, objectId } = req.params;
+      const token = await getSpeckleToken();
+      const speckleBase = process.env['SPECKLE_SERVER_URL'] || 'http://ectropy-speckle-server:3000';
+      const url = `${speckleBase}/api/getobject?stream=${streamId}&object=${objectId}`;
+      const upstream = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+        return res.status(upstream.status).json({ error: 'Failed to fetch object from Speckle' });
+      }
+      const data = await upstream.text();
+      res.setHeader('Content-Type', 'application/json');
+      res.send(data);
+    } catch (error) {
+      logger.error('Failed to proxy Speckle object:', error);
+      res.status(500).json({ error: 'Failed to fetch Speckle object' });
+    }
+  });
+
+  /**
    * GET /api/speckle/streams/:streamId
    * Get information about a specific stream
    */
