@@ -882,6 +882,91 @@ router.get(
 );
 
 /**
+ * ================================================
+ * BIM FIX 2026-03-14: SINGLE OBJECT LOADER PROXY
+ * ================================================
+ * GET /api/speckle/objects/:streamId/:objectId/single
+ * Proxy single Speckle object requests for the viewer (BFF pattern)
+ *
+ * ObjectLoader in @speckle/viewer calls the /single suffix to fetch
+ * individual objects. This route was missing from enterprise routes,
+ * causing 404s in the BIM viewer.
+ *
+ * SECURITY:
+ * - Requires authentication
+ * - Backend injects token for object fetching
+ * - Used by @speckle/viewer ObjectLoader
+ */
+router.get(
+  '/objects/:streamId/:objectId/single',
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const serverUrl = process.env.SPECKLE_SERVER_URL || '';
+      const token = await getSpeckleToken();
+      const { streamId, objectId } = req.params;
+
+      if (
+        !serverUrl ||
+        !token ||
+        token === 'REPLACE_WITH_TOKEN_AFTER_ADMIN_SETUP'
+      ) {
+        return res.status(503).json({
+          status: 'error',
+          message: 'Speckle integration not configured',
+        });
+      }
+
+      // BIM FIX: Proxy to same Speckle Objects API — /single is a client-side convention
+      const objectsUrl = `${serverUrl}/objects/${streamId}/${objectId}`;
+
+      const proxyResponse = await fetch(objectsUrl, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // Stream the response back (objects can be large)
+      const contentType =
+        proxyResponse.headers.get('content-type') || 'application/json';
+      res.setHeader('Content-Type', contentType);
+      res.status(proxyResponse.status);
+
+      // For large objects, stream the response
+      if (proxyResponse.body) {
+        const reader = proxyResponse.body.getReader();
+        const pump = async (): Promise<void> => {
+          const { done, value } = await reader.read();
+          if (done) {
+            res.end();
+            return;
+          }
+          res.write(Buffer.from(value));
+          return pump();
+        };
+        await pump();
+      } else {
+        const data = await proxyResponse.text();
+        res.send(data);
+      }
+
+      logger.debug('[SpeckleProxy] Single object fetched', {
+        userId: req.user?.id,
+        streamId,
+        objectId: `${objectId.substring(0, 8)}...`,
+      });
+    } catch (error) {
+      logger.error('[SpeckleProxy] Object single proxy failed', { error });
+      res.status(502).json({
+        status: 'error',
+        message: 'Failed to fetch object from Speckle server',
+      });
+    }
+  }
+);
+
+/**
  * GET /api/speckle/health
  * Check Speckle integration health
  *
