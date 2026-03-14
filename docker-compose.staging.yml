@@ -170,6 +170,9 @@ services:
       # Required by @ectropy/database DatabaseManager for catalog/portfolio routes
       PLATFORM_DATABASE_URL: ${PLATFORM_DATABASE_URL}
       SHARED_DATABASE_URL: ${SHARED_DATABASE_URL}
+
+      # AI Assistant (SEPPA) — Claude API key
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
     ports:
       - '${API_GATEWAY_PORT:-4000}:4000' # API Gateway port (host nginx → container:4000)
     volumes:
@@ -262,6 +265,8 @@ services:
       EXPRESS_PORT: 3002
       # MCP API Key for external access
       MCP_API_KEY: ${MCP_API_KEY}
+      # AI Assistant (SEPPA) — Claude API key
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       # Trust proxy for accurate logging and request handling
       TRUST_PROXY: 'true'
       # API calls to gateway use Nginx with HTTPS
