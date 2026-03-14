@@ -362,6 +362,7 @@ export async function createSpeckleRouter(
    */
   router.get('/objects/:streamId/:objectId/single', async (req: Request, res: Response) => {
     const authReq = req;
+    if (authReq.user === undefined || authReq.user === null) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
     try {
@@ -375,6 +376,7 @@ export async function createSpeckleRouter(
           Accept: 'application/json',
         },
       });
+      if (upstream.ok === false) {
         return res.status(upstream.status).json({ error: 'Failed to fetch object from Speckle' });
       }
       const data = await upstream.text();
