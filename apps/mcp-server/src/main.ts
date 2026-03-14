@@ -17,6 +17,7 @@ import { pmDecisionTools } from './services/pm-decision-tools.js';
 import { councilVotingToolSchemas } from './services/council-voting-tools.js';
 import { udeTools } from './services/ude-tools.js';
 import { initializeAdapters } from './adapters/startup.js';
+import { initializeConversationStore } from './services/assistant/conversation-store-redis.js';
 import { getCurrentVersion, VERSION_STRATEGY } from './utils/version.js';
 
 // Validate configuration on startup
@@ -641,6 +642,9 @@ if (VALIDATION_ONLY) {
       );
     }
 
+    // Initialize Redis-backed conversation store (graceful fallback to in-memory)
+    await initializeConversationStore();
+
     const { setupGraphQL } = await import('./graphql/index.js');
     await setupGraphQL(expressApp, '/graphql');
 
@@ -733,6 +737,9 @@ if (VALIDATION_ONLY) {
           `⚠️  UDE Adapters failed: ${adapterResult.failed.join(', ')}`
         );
       }
+
+      // Initialize Redis-backed conversation store (graceful fallback to in-memory)
+      await initializeConversationStore();
 
       const { setupGraphQL } = await import('./graphql/index.js');
       const { createPrismaDataSource } =
