@@ -120,7 +120,7 @@
     "@typescript-eslint/parser": "8.41.0",
     "@vitest/coverage-v8": "2.1.9",
     "@vitest/ui": "2.1.9",
-    "ajv": "8.17.1",
+    "ajv": "8.18.0",
     "ajv-formats": "3.0.1",
     "concurrently": "9.2.1",
     "cross-env": "10.0.0",
@@ -334,7 +334,8 @@
       "tar@<=7.5.10": ">=7.5.11",
       "yauzl@<3.2.1": ">=3.2.1",
       "undici@>=6.0.0 <6.24.0": ">=6.24.0",
-      "undici@<6.24.0": ">=6.24.0"
+      "undici@<6.24.0": ">=6.24.0",
+      "serialize-javascript@<=7.0.2": ">=7.0.3"
     },
     "peerDependencyRules": {
       "allowedVersions": {
