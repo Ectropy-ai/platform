@@ -4,6 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { randomUUID } from 'crypto';
 import type { Pool } from 'pg';
 import type { SpeckleConfig, SpeckleStream } from '../interfaces/speckle.types.js';
 export class SpeckleStreamService extends EventEmitter {
@@ -40,14 +41,14 @@ export class SpeckleStreamService extends EventEmitter {
       // Store stream relationship in database
       await this.db.query(
         `
-        INSERT INTO speckle_streams (construction_project_id, stream_id, stream_name, created_at)
-        VALUES ($1, $2, $3, NOW())
+        INSERT INTO speckle_streams (id, construction_project_id, stream_id, stream_name, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, NOW(), NOW())
         ON CONFLICT (construction_project_id) DO UPDATE SET
-          stream_id = $2,
-          stream_name = $3,
+          stream_id = $3,
+          stream_name = $4,
           updated_at = NOW()
       `,
-        [constructionProjectId, streamId, streamName]
+        [randomUUID(), constructionProjectId, streamId, streamName]
       );
       this.emit('streamCreated', {
         constructionProjectId,

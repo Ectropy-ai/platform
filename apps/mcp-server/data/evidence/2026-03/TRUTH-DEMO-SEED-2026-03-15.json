@@ -1,0 +1,33 @@
+{
+  "reportId": "TRUTH-DEMO-SEED-2026-03-15",
+  "generatedAt": "2026-03-15T21:15:00.000Z",
+  "relatedDecision": "DEC-003",
+  "projectId": "dc1eaa5b-7553-46ec-92a5-e20762a60c71",
+  "storageArchitecture": "postgresql-only",
+  "filesystemJsonEliminated": true,
+  "postgresValidation": {
+    "voxelCount": { "expected": 4, "actual": 4, "pass": true },
+    "decisionCount": { "expected": 8, "actual": 8, "pass": true },
+    "inspectionCount": { "expected": 2, "actual": 2, "pass": true },
+    "pendingDecisions": { "expected": 4, "actual": 4, "pass": true },
+    "criticalVoxels": { "expected": 1, "actual": 1, "pass": true },
+    "blockedVoxels": { "expected": 1, "actual": 1, "pass": true },
+    "failedInspections": { "expected": 1, "actual": 1, "pass": true },
+    "allPassed": true
+  },
+  "seppaFunctionalTest": {
+    "queryDecisionHistory": { "status": "PASS", "decisionsReturned": 8 },
+    "navigateDecisionSurface": { "status": "PASS", "hvacVoxelDecisions": 3, "pendingAlerts": 2 },
+    "queryPendingDecisions": { "status": "PASS", "pendingReturned": 4 }
+  },
+  "n8nCanaryPre": "200",
+  "n8nCanaryPost": "200",
+  "overallStatus": "PASS",
+  "demoReadyForCanadianPilot": true,
+  "notes": {
+    "authorityLevels": "Auto-seeded L0-L6 (7 rows) — no prior seed existed",
+    "urnFormat": "Full UUID project ID (dc1eaa5b-7553-46ec-92a5-e20762a60c71) for buildURN compatibility",
+    "ciSecondDeploy": "DOCR push auth failure (transient) — first deploy containers running correctly",
+    "inspectionQuery": "No dedicated inspection query MCP tool — verified via direct DB query (2 rows, 1 FAILED)"
+  }
+}

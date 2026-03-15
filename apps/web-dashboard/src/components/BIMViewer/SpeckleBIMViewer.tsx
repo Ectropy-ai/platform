@@ -361,10 +361,11 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
 
       viewerRef.current = viewer;
 
-      // Load content
+      // Load content — loadSpeckleObject rethrows on failure so loadedObjectRef
+      // is only set when the object actually loaded successfully.
       if (effectiveStreamId && effectiveObjectId) {
         await loadSpeckleObject(viewer, effectiveStreamId, effectiveObjectId);
-        loadedObjectRef.current = objectKey; // Track what we loaded
+        loadedObjectRef.current = objectKey;
       } else {
         await loadDemoContent(viewer);
         loadedObjectRef.current = null;
@@ -405,6 +406,9 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       setLoading(false);
     } finally {
       // ENTERPRISE FIX (2026-01-13): Clear initialization flag in finally block
+      // NOTE: Do NOT call setLoading(false) here — it's already called in both try (line 377)
+      // and catch (line 405) paths. Calling it again triggers a redundant re-render that can
+      // race with the useEffect dependency on loading state.
       isInitializing.current = false;
       console.log('🏁 [BIM Viewer] Initialization flag cleared');
     }
@@ -588,7 +592,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       // No token passed - data already fetched via BFF proxy with server-side token injection
       const speckleLoader = new SpeckleLoaderClass(
         worldTree,
-        objectUrl,
+        proxyObjectUrl,
         '', // SPRINT 7: Empty token - BFF proxy handles authentication server-side
         false, // Disable caching - we already have the data
         objectData, // Pass pre-fetched data as 5th parameter
@@ -598,10 +602,15 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       // zoomToObject=true enables automatic camera initialization and positioning
       // TypeScript FIX: loadObject exists at runtime but TypeScript types may not include it
       logger.debug('[BIM Viewer] Calling viewer.loadObject with zoomToObject=true');
-      await (viewer.loadObject as (loader: unknown, zoom?: boolean) => Promise<void>)(
-        speckleLoader,
-        true,
-      );
+      await Promise.race([
+        (viewer.loadObject as (loader: unknown, zoom?: boolean) => Promise<void>)(
+          speckleLoader,
+          true,
+        ),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('viewer.loadObject timeout after 30s')), 30000),
+        ),
+      ]);
 
       logger.info('[BIM Viewer] Successfully loaded Speckle object with official loader', {
         objectUrl,
@@ -657,6 +666,9 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
 
       setError(`Failed to load 3D model: ${errorMessage}. Check browser console for details.`);
       setLoading(false);
+      // Rethrow so the caller (initializeViewer) knows loading failed and
+      // does NOT mark the object as successfully loaded in loadedObjectRef.
+      throw error;
     }
   };
 
@@ -952,37 +964,6 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         </Box>
       )}
 
-      {/* Error/Info Message - Not a full overlay */}
-      {showError && !showLoading && (
-        <Box
-          data-testid={isNoModelMessage ? 'bim-viewer-ready' : 'bim-viewer-error'}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flex: 1,
-            p: 2,
-          }}
-        >
-          <Alert
-            severity={isNoModelMessage ? 'info' : isTokenError ? 'warning' : 'error'}
-            sx={{
-              maxWidth: 400,
-              textAlign: 'center',
-            }}
-          >
-            <strong>
-              {isNoModelMessage
-                ? 'BIM Viewer Ready'
-                : isTokenError
-                  ? 'Speckle Configuration'
-                  : 'BIM Viewer Error'}
-            </strong>
-            <br />
-            {isNoModelMessage ? 'Upload an IFC file to view your building model in 3D.' : error}
-          </Alert>
-        </Box>
-      )}
       {/* Viewer Toolbar */}
       <Toolbar variant='dense' sx={{ minHeight: 48, borderBottom: '1px solid #ddd' }}>
         <Chip
@@ -1047,26 +1028,64 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         </Tooltip>
       </Toolbar>
 
-      {/* Viewer Container - ENTERPRISE FIX (2026-01-13): Always render to prevent DOM detachment */}
-      {/* ROOT CAUSE: Unmounting during loading caused viewer to attach to detached DOM node */}
-      {/* SOLUTION: Keep container mounted, use loading overlay to hide it during loading */}
-      <Box
-        ref={setContainerRef}
-        sx={{
-          flex: 1,
-          position: 'relative',
-          overflow: 'hidden',
-          minHeight: '400px',
-          backgroundColor: '#1a1a2e',
-          // Hide visually when showing error message, but keep in DOM
-          display: showError ? 'none' : 'flex',
-          '& canvas': {
-            display: 'block',
-            width: '100% !important',
-            height: '100% !important',
-          },
-        }}
-      />
+      {/* Viewer area — wrapper provides stable flex dimensions for the WebGL container */}
+      <Box sx={{ flex: 1, position: 'relative', minHeight: '400px', overflow: 'hidden' }}>
+        {/* Error/Info overlay — covers container visually without removing it from layout */}
+        {showError && !showLoading && (
+          <Box
+            data-testid={isNoModelMessage ? 'bim-viewer-ready' : 'bim-viewer-error'}
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'background.paper',
+              zIndex: 5,
+              p: 2,
+            }}
+          >
+            <Alert
+              severity={isNoModelMessage ? 'info' : isTokenError ? 'warning' : 'error'}
+              sx={{
+                maxWidth: 400,
+                textAlign: 'center',
+              }}
+            >
+              <strong>
+                {isNoModelMessage
+                  ? 'BIM Viewer Ready'
+                  : isTokenError
+                    ? 'Speckle Configuration'
+                    : 'BIM Viewer Error'}
+              </strong>
+              <br />
+              {isNoModelMessage ? 'Upload an IFC file to view your building model in 3D.' : error}
+            </Alert>
+          </Box>
+        )}
+
+        {/* WebGL container — ALWAYS rendered with valid dimensions.
+            display:none collapsed element to 0×0, breaking WebGL context init.
+            Container is now always visible; error overlay hides it visually. */}
+        <Box
+          ref={setContainerRef}
+          sx={{
+            width: '100%',
+            height: '100%',
+            overflow: 'hidden',
+            backgroundColor: '#1a1a2e',
+            '& canvas': {
+              display: 'block',
+              width: '100% !important',
+              height: '100% !important',
+            },
+          }}
+        />
+      </Box>
     </Paper>
   );
 };

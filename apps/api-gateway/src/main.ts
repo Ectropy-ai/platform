@@ -274,7 +274,7 @@ import {
 } from '../../../libs/shared/audit/src/index.js';
 
 // WebSocket modules
-import { initializeVoxelStream } from './websocket/voxel-stream.js';
+import { initializeVoxelStream, getVoxelStreamHandler } from './websocket/voxel-stream.js';
 import { initializeRedisPubSub } from './websocket/redis-pubsub.js';
 
 // P0 FIX (2026-01-05): Moved getEnvConfig() into bootstrap() function
@@ -890,6 +890,22 @@ async function bootstrap(): Promise<void> {
             validation: 'comprehensive',
             websockets: 'enabled',
           },
+          websocket: (() => {
+            const vsHandler = getVoxelStreamHandler();
+            if (vsHandler) {
+              const wsStats = vsHandler.getStats();
+              return {
+                voxelStream: {
+                  status: 'ok',
+                  connectedClients: wsStats.totalConnections,
+                  activeProjects: wsStats.activeProjects,
+                  uptime: wsStats.uptime,
+                  redisPubSub: wsStats.redisPubSub,
+                },
+              };
+            }
+            return { voxelStream: { status: 'not_initialized', connectedClients: 0 } };
+          })(),
           database: {
             status: dbHealth.status,
             latency: dbHealth.latency,
@@ -1017,6 +1033,22 @@ async function bootstrap(): Promise<void> {
             validation: 'comprehensive',
             websockets: 'enabled',
           },
+          websocket: (() => {
+            const vsHandler = getVoxelStreamHandler();
+            if (vsHandler) {
+              const wsStats = vsHandler.getStats();
+              return {
+                voxelStream: {
+                  status: 'ok',
+                  connectedClients: wsStats.totalConnections,
+                  activeProjects: wsStats.activeProjects,
+                  uptime: wsStats.uptime,
+                  redisPubSub: wsStats.redisPubSub,
+                },
+              };
+            }
+            return { voxelStream: { status: 'not_initialized', connectedClients: 0 } };
+          })(),
           database: {
             status: dbHealth.status,
             latency: dbHealth.latency,
@@ -2590,6 +2622,27 @@ async function bootstrap(): Promise<void> {
     logger.info('✅ Voxel stream WebSocket initialized', {
       path: '/ws/voxel-stream',
       stats: voxelStreamHandler.getStats(),
+    });
+
+    // WS UPGRADE ROUTER — replaces per-WSS server: mode
+    // ws v8.19.0 abortHandshake(400) on path mismatch kills the socket before
+    // a second WSS can handle it. Single upgrade listener routes by pathname.
+    server.on('upgrade', (req: import('http').IncomingMessage, socket: import('net').Socket, head: Buffer) => {
+      const { pathname } = new URL(req.url!, 'http://localhost');
+      if (pathname === '/ws/demo-playback') {
+        wsHandler.getWss().handleUpgrade(req, socket, head, (ws) => {
+          wsHandler.getWss().emit('connection', ws, req);
+        });
+      } else if (pathname === '/ws/voxel-stream') {
+        voxelStreamHandler.getWss().handleUpgrade(req, socket, head, (ws) => {
+          voxelStreamHandler.getWss().emit('connection', ws, req);
+        });
+      } else {
+        socket.destroy();
+      }
+    });
+    logger.info('✅ WebSocket upgrade router installed', {
+      paths: ['/ws/demo-playback', '/ws/voxel-stream'],
     });
 
     // M5.2 ENTERPRISE: Initialize Redis Pub/Sub adapter for horizontal WebSocket scaling

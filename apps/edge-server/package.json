@@ -1,0 +1,12 @@
+{
+  "name": "edge-server",
+  "version": "1.0.0",
+  "description": "Edge server for JtC Karbon 521 — IoT integration, offline sync, and local AI",
+  "private": true,
+  "type": "module",
+  "main": "dist/apps/edge-server/src/main.js",
+  "dependencies": {
+    "@ectropy/ai-provider": "workspace:*",
+    "mqtt": "*"
+  }
+}

@@ -193,7 +193,7 @@ test.describe('BIM Viewer Stream Integration - P1 Critical Path', () => {
               stream_id: 'test-stream-abc123',
               stream_name: 'Test Building Model',
               construction_project_id: 'test-project-001',
-              commit_count: 5,
+
               last_commit_date: new Date().toISOString(),
               created_at: new Date().toISOString(),
             },
@@ -277,7 +277,7 @@ test.describe('BIM Viewer Stream Integration - P1 Critical Path', () => {
               stream_id: 'test-stream-abc123',
               stream_name: 'Test Building Model',
               construction_project_id: 'test-project-001',
-              commit_count: 5,
+
               last_commit_date: new Date().toISOString(),
               created_at: new Date().toISOString(),
             },
@@ -359,7 +359,7 @@ test.describe('BIM Viewer Stream Integration - P1 Critical Path', () => {
               stream_id: 'test-stream-abc123',
               stream_name: 'Test Building Model',
               construction_project_id: 'test-project-001',
-              commit_count: 5,
+
               last_commit_date: new Date().toISOString(),
               created_at: new Date().toISOString(),
             },

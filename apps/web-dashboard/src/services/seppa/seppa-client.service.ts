@@ -351,9 +351,11 @@ class SEPPAAssistantService {
 export type StreamEventType =
   | 'start'
   | 'token'
+  | 'content'
   | 'tool_start'
   | 'tool_end'
   | 'complete'
+  | 'done'
   | 'error';
 
 /**
@@ -453,14 +455,20 @@ export async function streamChatResponse(
               callbacks.onToken?.(parsed.token || '', accumulatedContent);
               break;
 
+            case 'content':
+              accumulatedContent += parsed.delta || '';
+              callbacks.onToken?.(parsed.delta || '', accumulatedContent);
+              break;
+
             case 'tool_start':
               callbacks.onToolStart?.(parsed.toolName, parsed.input);
               break;
 
             case 'tool_end':
-              callbacks.onToolEnd?.(parsed.toolName, parsed.result);
+              callbacks.onToolEnd?.(parsed.toolName, parsed);
               break;
 
+            case 'done':
             case 'complete':
               callbacks.onComplete?.(parsed);
               break;

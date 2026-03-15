@@ -197,6 +197,47 @@ services:
         max-file: '3'
 
   # ==========================================================================
+  # Ollama - Port 11434 (Local AI Inference for SEPPA)
+  # Runs Qwen 2.5 7B locally — fully air-gapped, data never leaves jobsite.
+  # Required by edge-server when SEPPA_PROVIDER=ollama.
+  # ==========================================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ectropy-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_ORIGINS=*
+      - OLLAMA_KEEP_ALIVE=24h
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - ectropy-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 6144M
+        reservations:
+          cpus: '2.0'
+          memory: 4096M
+    labels:
+      - "com.luhtech.service=ollama"
+      - "com.luhtech.venture=jobsitecontrol"
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  # ==========================================================================
   # Edge Server - Port 3004 (IoT Integration & Offline Sync)
   # Core edge service: MQTT client, connectivity monitor, data queue
   # ==========================================================================
@@ -215,9 +256,15 @@ services:
       - SITE_ID=${SITE_ID:-pilot-canadian-plant}
       - SITE_NAME=${SITE_NAME:-Canadian Plant Facility}
       - OFFLINE_QUEUE_MAX_SIZE=10000
+      # SEPPA AI Provider — routed to local Ollama on edge
+      - SEPPA_PROVIDER=${SEPPA_PROVIDER:-ollama}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b-instruct-q4_K_M}
     depends_on:
       mqtt-broker:
         condition: service_started
+      ollama:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - ectropy-network
@@ -370,6 +417,8 @@ volumes:
     driver: local
   nginx-logs:
     driver: local
+  ollama_models:
+    driver: local
 
 # ==========================================================================
 # Edge Deployment Resource Summary (Karbon 521: 14 cores, 16GB RAM)
@@ -380,10 +429,11 @@ volumes:
 # web-dashboard     0.25       256M       0.1      128M
 # mcp-server        0.5        256M       0.25     128M
 # edge-server       0.5        256M       0.25     128M
+# ollama            4.0        6144M      2.0      4096M
 # mqtt-broker       0.25       128M       0.1      64M
 # postgres          1.0        1024M      0.5      512M
 # redis             0.25       384M       0.1      128M
 # ---------------------------------------------------------
-# TOTAL             4.0        3.5GB      1.9      1.7GB
-# HEADROOM          10 cores   12.5GB     12.1     14.3GB
+# TOTAL             8.0        9.6GB      3.9      5.8GB
+# HEADROOM          6 cores    6.4GB      10.1     10.2GB
 # ==========================================================================

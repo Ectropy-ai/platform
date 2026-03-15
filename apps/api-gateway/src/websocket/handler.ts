@@ -121,10 +121,10 @@ export class WebSocketHandler {
   private startTime = Date.now();
 
   constructor(httpServer: HTTPServer) {
-    // Create WebSocket server attached to HTTP server
+    // WS FIX 2026-03-14: noServer mode — upgrade routed by main.ts
+    // ws v8.19.0 abortHandshake(400) on path mismatch kills socket for other WSS instances
     this.wss = new WebSocketServer({
-      server: httpServer,
-      path: '/ws/demo-playback',
+      noServer: true,
       maxPayload: MAX_MESSAGE_SIZE,
     });
 
@@ -528,6 +528,13 @@ export class WebSocketHandler {
     this.clients.forEach((ws) => ws.close());
     this.clients.clear();
     this.instanceSubscribers.clear();
+  }
+
+  /**
+   * Exposes underlying WebSocketServer for noServer upgrade routing
+   */
+  public getWss(): WebSocketServer {
+    return this.wss;
   }
 
   /**
