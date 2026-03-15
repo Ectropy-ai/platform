@@ -24,14 +24,12 @@ import { PrismaClient } from '@prisma/client';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const PROJECT_ID = 'dc1eaa5b-7553-46ec-92a5-e20762a60c71';
-const SHORT_PID = 'dc1eaa5b';
-
 // Prisma client — only instantiated for live runs (dry-run skips DB)
 let prisma: PrismaClient;
 
-/** Build a URN from type and identifier (all lowercase) */
+/** Build a URN from type and identifier (all lowercase, full project UUID for buildURN compat) */
 function urn(nodeType: string, identifier: string): string {
-  return `urn:luhtech:${SHORT_PID}:${nodeType}:${identifier.toLowerCase()}`;
+  return `urn:luhtech:${PROJECT_ID}:${nodeType}:${identifier.toLowerCase()}`;
 }
 
 // ============================================================================
