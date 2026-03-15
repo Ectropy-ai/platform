@@ -222,7 +222,7 @@ const SEPPAMessage: React.FC<SEPPAMessageProps> = React.memo(({
                 {toolCalls.length} tool{toolCalls.length > 1 ? 's' : ''} called
               </Typography>
             </Box>
-            {toolCalls.map((tc, index) => (
+            {toolCalls.filter(Boolean).map((tc, index) => (
               <ToolCallDisplay key={`${tc.toolName}-${index}`} toolCall={tc} />
             ))}
           </Box>
