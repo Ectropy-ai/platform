@@ -406,6 +406,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
     } finally {
       // ENTERPRISE FIX (2026-01-13): Clear initialization flag in finally block
       isInitializing.current = false;
+      setLoading(false);
       console.log('🏁 [BIM Viewer] Initialization flag cleared');
     }
   }, [
@@ -588,7 +589,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       // No token passed - data already fetched via BFF proxy with server-side token injection
       const speckleLoader = new SpeckleLoaderClass(
         worldTree,
-        objectUrl,
+        proxyObjectUrl,
         '', // SPRINT 7: Empty token - BFF proxy handles authentication server-side
         false, // Disable caching - we already have the data
         objectData, // Pass pre-fetched data as 5th parameter
@@ -598,10 +599,15 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       // zoomToObject=true enables automatic camera initialization and positioning
       // TypeScript FIX: loadObject exists at runtime but TypeScript types may not include it
       logger.debug('[BIM Viewer] Calling viewer.loadObject with zoomToObject=true');
-      await (viewer.loadObject as (loader: unknown, zoom?: boolean) => Promise<void>)(
-        speckleLoader,
-        true,
-      );
+      await Promise.race([
+        (viewer.loadObject as (loader: unknown, zoom?: boolean) => Promise<void>)(
+          speckleLoader,
+          true,
+        ),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('viewer.loadObject timeout after 30s')), 30000),
+        ),
+      ]);
 
       logger.info('[BIM Viewer] Successfully loaded Speckle object with official loader', {
         objectUrl,
