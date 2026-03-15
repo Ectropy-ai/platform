@@ -379,10 +379,10 @@ export class EscalationScheduler extends EventEmitter {
       return this.config.loadPendingDecisions();
     }
 
-    // Default: load from JSON file storage via exported pm-decision-tools API
+    // Default: load from PostgreSQL via exported pm-decision-tools API
     try {
       const { loadDecisions } = await import('./pm-decision-tools.js');
-      const collection = loadDecisions(this.config.projectId ?? 'default');
+      const collection = await loadDecisions(this.config.projectId ?? 'default');
 
       // Filter to pending decisions (only PENDING is an actionable pre-resolution status in PMDecisionStatus)
       return collection.decisions.filter((d) => d.status === 'PENDING');

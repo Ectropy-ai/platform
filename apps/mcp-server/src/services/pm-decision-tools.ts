@@ -17,28 +17,30 @@
  * @version 2.0.0
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
-import { DATA_CONFIG } from '../config/data-paths.config.js';
+import {
+  loadDecisions,
+  saveDecisions,
+  loadVoxels,
+  saveVoxels,
+  loadInspections,
+  saveInspections,
+  loadConsequences,
+  saveConsequences,
+  loadToleranceOverrides,
+  saveToleranceOverrides,
+  disconnectDb,
+} from './pm-data-service.js';
 
 import type {
   PMDecision,
   PMDecisionStatus,
   Consequence,
-  ConsequenceCategory,
-  ConsequenceSeverity,
-  ConsequenceStatus,
   Inspection,
-  InspectionType,
-  InspectionStatus,
   InspectionOutcome,
   InspectionFinding,
   ScheduleProposal,
   PMURN,
   AuthorityLevel,
-  PMDecisionsCollection,
-  ConsequencesCollection,
-  InspectionsCollection,
   PMToolResult,
   CaptureDecisionInput,
   RouteDecisionInput,
@@ -53,14 +55,10 @@ import type {
   AuthorityThresholds,
   FindDecisionAuthorityResult,
   ValidateAuthorityResult,
-  // New M2 types
   ToleranceOverride,
-  ToleranceOverridesCollection,
   ToleranceType,
-  ToleranceValue,
   VoxelAlert,
   Voxel,
-  VoxelsCollection,
   VoxelStatus,
   NavigateDecisionSurfaceInput,
   ApplyToleranceOverrideInput,
@@ -72,7 +70,6 @@ import type {
 
 import {
   buildURN,
-  buildFileURN,
   generateDecisionId,
   generateConsequenceId,
   generateInspectionId,
@@ -81,7 +78,6 @@ import {
   createGraphMetadata,
   addOutEdge,
   parseURN,
-  setIdCounter,
 } from './pm-urn.utils.js';
 
 import {
@@ -113,350 +109,29 @@ import {
 } from './usf-decision.service.js';
 
 // ============================================================================
-// Storage Helpers
+// Storage: PostgreSQL via pm-data-service.ts (DEC-003)
+// All load/save functions imported from pm-data-service.ts
 // ============================================================================
 
-function getRepoRoot(): string {
-  return DATA_CONFIG.paths.repoRoot;
-}
-
-function getProjectDataDir(projectId: string): string {
-  return join(getRepoRoot(), '.roadmap', 'projects', projectId);
-}
-
-function getDecisionsPath(projectId: string): string {
-  return join(getProjectDataDir(projectId), 'decisions.json');
-}
-
-function getConsequencesPath(projectId: string): string {
-  return join(getProjectDataDir(projectId), 'consequences.json');
-}
-
-function getInspectionsPath(projectId: string): string {
-  return join(getProjectDataDir(projectId), 'inspections.json');
-}
-
-function getToleranceOverridesPath(projectId: string): string {
-  return join(getProjectDataDir(projectId), 'tolerance-overrides.json');
-}
-
-function getVoxelsPath(projectId: string): string {
-  return join(getProjectDataDir(projectId), 'voxels.json');
-}
-
-function ensureProjectDir(projectId: string): void {
-  const dir = getProjectDataDir(projectId);
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-}
-
 // ============================================================================
-// Collection Loaders/Savers
+// Collection Loaders/Savers — imported from pm-data-service.ts (DEC-003)
+// All functions are now async and backed by PostgreSQL.
+// Re-exported for backward compatibility with external consumers.
 // ============================================================================
 
-export function loadDecisions(projectId: string): PMDecisionsCollection {
-  const path = getDecisionsPath(projectId);
-
-  if (!existsSync(path)) {
-    const initial: PMDecisionsCollection = {
-      $schema: 'https://luhtech.dev/schemas/pm/decisions-collection.json',
-      $id: buildFileURN(projectId, 'decisions'),
-      schemaVersion: '3.0.0',
-      meta: {
-        projectId,
-        sourceOfTruth: `.roadmap/projects/${projectId}/decisions.json`,
-        lastUpdated: new Date().toISOString(),
-        totalDecisions: 0,
-      },
-      indexes: {
-        byStatus: {} as Record<PMDecisionStatus, string[]>,
-        byVoxel: {},
-        byAuthorityLevel: {},
-      },
-      decisions: [],
-    };
-    ensureProjectDir(projectId);
-    writeFileSync(path, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-
-  const collection = JSON.parse(readFileSync(path, 'utf-8'));
-  if (collection.decisions.length > 0) {
-    const maxId = Math.max(
-      ...collection.decisions.map((d: PMDecision) => {
-        const match = d.decisionId.match(/DEC-\d{4}-(\d{4})$/);
-        return match ? parseInt(match[1], 10) : 0;
-      })
-    );
-    setIdCounter('decision', maxId);
-  }
-  return collection;
-}
-
-function saveDecisions(
-  projectId: string,
-  collection: PMDecisionsCollection
-): void {
-  const path = getDecisionsPath(projectId);
-  collection.meta.lastUpdated = new Date().toISOString();
-  collection.meta.totalDecisions = collection.decisions.length;
-
-  // Rebuild indexes
-  const byStatus: Record<string, string[]> = {};
-  const byVoxel: Record<string, string[]> = {};
-  const byAuthorityLevel: Record<string, string[]> = {};
-
-  for (const d of collection.decisions) {
-    if (!byStatus[d.status]) {
-      byStatus[d.status] = [];
-    }
-    byStatus[d.status].push(d.decisionId);
-
-    const voxelId = parseURN(d.voxelRef)?.identifier;
-    if (voxelId) {
-      if (!byVoxel[voxelId]) {
-        byVoxel[voxelId] = [];
-      }
-      byVoxel[voxelId].push(d.decisionId);
-    }
-
-    const level = d.authorityLevel.required.toString();
-    if (!byAuthorityLevel[level]) {
-      byAuthorityLevel[level] = [];
-    }
-    byAuthorityLevel[level].push(d.decisionId);
-  }
-
-  collection.indexes = {
-    byStatus,
-    byVoxel,
-    byAuthorityLevel,
-  } as PMDecisionsCollection['indexes'];
-  ensureProjectDir(projectId);
-  writeFileSync(path, JSON.stringify(collection, null, 2));
-}
-
-function loadConsequences(projectId: string): ConsequencesCollection {
-  const path = getConsequencesPath(projectId);
-  if (!existsSync(path)) {
-    const initial: ConsequencesCollection = {
-      $schema: 'https://luhtech.dev/schemas/pm/consequences-collection.json',
-      $id: buildFileURN(projectId, 'consequences'),
-      schemaVersion: '3.0.0',
-      meta: {
-        projectId,
-        sourceOfTruth: `.roadmap/projects/${projectId}/consequences.json`,
-        lastUpdated: new Date().toISOString(),
-        totalConsequences: 0,
-      },
-      indexes: {
-        byStatus: {} as Record<ConsequenceStatus, string[]>,
-        byCategory: {} as Record<ConsequenceCategory, string[]>,
-        bySeverity: {} as Record<ConsequenceSeverity, string[]>,
-      },
-      consequences: [],
-    };
-    ensureProjectDir(projectId);
-    writeFileSync(path, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-  const collection = JSON.parse(readFileSync(path, 'utf-8'));
-  if (collection.consequences.length > 0) {
-    const maxId = Math.max(
-      ...collection.consequences.map((c: Consequence) => {
-        const match = c.consequenceId.match(/CONSQ-\d{4}-(\d{4})$/);
-        return match ? parseInt(match[1], 10) : 0;
-      })
-    );
-    setIdCounter('consequence', maxId);
-  }
-  return collection;
-}
-
-function saveConsequences(
-  projectId: string,
-  collection: ConsequencesCollection
-): void {
-  const path = getConsequencesPath(projectId);
-  collection.meta.lastUpdated = new Date().toISOString();
-  collection.meta.totalConsequences = collection.consequences.length;
-  ensureProjectDir(projectId);
-  writeFileSync(path, JSON.stringify(collection, null, 2));
-}
-
-function loadInspections(projectId: string): InspectionsCollection {
-  const path = getInspectionsPath(projectId);
-  if (!existsSync(path)) {
-    const initial: InspectionsCollection = {
-      $schema: 'https://luhtech.dev/schemas/pm/inspections-collection.json',
-      $id: buildFileURN(projectId, 'inspections'),
-      schemaVersion: '3.0.0',
-      meta: {
-        projectId,
-        sourceOfTruth: `.roadmap/projects/${projectId}/inspections.json`,
-        lastUpdated: new Date().toISOString(),
-        totalInspections: 0,
-      },
-      indexes: {
-        byStatus: {} as Record<InspectionStatus, string[]>,
-        byType: {} as Record<InspectionType, string[]>,
-        byVoxel: {},
-      },
-      inspections: [],
-    };
-    ensureProjectDir(projectId);
-    writeFileSync(path, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-  const collection = JSON.parse(readFileSync(path, 'utf-8'));
-  if (collection.inspections.length > 0) {
-    const maxId = Math.max(
-      ...collection.inspections.map((i: Inspection) => {
-        const match = i.inspectionId.match(/INSP-\d{4}-(\d{4})$/);
-        return match ? parseInt(match[1], 10) : 0;
-      })
-    );
-    setIdCounter('inspection', maxId);
-  }
-  return collection;
-}
-
-function saveInspections(
-  projectId: string,
-  collection: InspectionsCollection
-): void {
-  const path = getInspectionsPath(projectId);
-  collection.meta.lastUpdated = new Date().toISOString();
-  collection.meta.totalInspections = collection.inspections.length;
-  ensureProjectDir(projectId);
-  writeFileSync(path, JSON.stringify(collection, null, 2));
-}
-
-// --- Tolerance Overrides Storage (NEW M2) ---
-
-function loadToleranceOverrides(
-  projectId: string
-): ToleranceOverridesCollection {
-  const path = getToleranceOverridesPath(projectId);
-
-  if (!existsSync(path)) {
-    const initial: ToleranceOverridesCollection = {
-      $schema:
-        'https://luhtech.dev/schemas/pm/tolerance-overrides-collection.json',
-      $id: buildFileURN(projectId, 'tolerance-overrides'),
-      schemaVersion: '3.0.0',
-      meta: {
-        projectId,
-        sourceOfTruth: `.roadmap/projects/${projectId}/tolerance-overrides.json`,
-        lastUpdated: new Date().toISOString(),
-        totalOverrides: 0,
-      },
-      indexes: {
-        byType: {} as Record<ToleranceType, string[]>,
-        byVoxel: {},
-        byStatus: {},
-      },
-      overrides: [],
-    };
-    ensureProjectDir(projectId);
-    writeFileSync(path, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-
-  const collection = JSON.parse(readFileSync(path, 'utf-8'));
-  if (collection.overrides.length > 0) {
-    const maxId = Math.max(
-      ...collection.overrides.map((o: ToleranceOverride) => {
-        const match = o.overrideId.match(/TOL-\d{4}-(\d{4})$/);
-        return match ? parseInt(match[1], 10) : 0;
-      })
-    );
-    setIdCounter('tolerance-override', maxId);
-  }
-  return collection;
-}
-
-function saveToleranceOverrides(
-  projectId: string,
-  collection: ToleranceOverridesCollection
-): void {
-  const path = getToleranceOverridesPath(projectId);
-  collection.meta.lastUpdated = new Date().toISOString();
-  collection.meta.totalOverrides = collection.overrides.length;
-
-  // Rebuild indexes
-  const byType: Record<string, string[]> = {};
-  const byVoxel: Record<string, string[]> = {};
-  const byStatus: Record<string, string[]> = {};
-
-  for (const o of collection.overrides) {
-    if (!byType[o.toleranceType]) {
-      byType[o.toleranceType] = [];
-    }
-    byType[o.toleranceType].push(o.overrideId);
-
-    const voxelId = parseURN(o.voxelRef)?.identifier;
-    if (voxelId) {
-      if (!byVoxel[voxelId]) {
-        byVoxel[voxelId] = [];
-      }
-      byVoxel[voxelId].push(o.overrideId);
-    }
-
-    if (!byStatus[o.status]) {
-      byStatus[o.status] = [];
-    }
-    byStatus[o.status].push(o.overrideId);
-  }
-
-  collection.indexes = {
-    byType,
-    byVoxel,
-    byStatus,
-  } as ToleranceOverridesCollection['indexes'];
-  ensureProjectDir(projectId);
-  writeFileSync(path, JSON.stringify(collection, null, 2));
-}
-
-// --- Voxels Storage (NEW M2) ---
-
-function loadVoxels(projectId: string): VoxelsCollection {
-  const path = getVoxelsPath(projectId);
-
-  if (!existsSync(path)) {
-    const initial: VoxelsCollection = {
-      $schema: 'https://luhtech.dev/schemas/pm/voxels-collection.json',
-      $id: buildFileURN(projectId, 'voxels'),
-      schemaVersion: '3.0.0',
-      meta: {
-        projectId,
-        sourceOfTruth: `.roadmap/projects/${projectId}/voxels.json`,
-        lastUpdated: new Date().toISOString(),
-        totalVoxels: 0,
-      },
-      indexes: {
-        byStatus: {} as Record<VoxelStatus, string[]>,
-        byLevel: {},
-        byZone: {},
-      },
-      voxels: [],
-    };
-    ensureProjectDir(projectId);
-    writeFileSync(path, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-
-  return JSON.parse(readFileSync(path, 'utf-8'));
-}
-
-function saveVoxels(projectId: string, collection: VoxelsCollection): void {
-  const path = getVoxelsPath(projectId);
-  collection.meta.lastUpdated = new Date().toISOString();
-  collection.meta.totalVoxels = collection.voxels.length;
-  ensureProjectDir(projectId);
-  writeFileSync(path, JSON.stringify(collection, null, 2));
-}
+export {
+  loadDecisions,
+  saveDecisions,
+  loadVoxels,
+  saveVoxels,
+  loadInspections,
+  saveInspections,
+  loadConsequences,
+  saveConsequences,
+  loadToleranceOverrides,
+  saveToleranceOverrides,
+  disconnectDb,
+} from './pm-data-service.js';
 
 // ============================================================================
 // Tool Definition Interface
@@ -526,7 +201,7 @@ const captureDecisionTool: MCPToolDefinition = {
         schemaVersion: '3.0.0',
         meta: {
           projectId: input.projectId,
-          sourceOfTruth: `.roadmap/projects/${input.projectId}/decisions.json`,
+          sourceOfTruth: 'postgresql',
           lastUpdated: now,
           syncStatus: { syncDirection: 'v3-is-source-of-truth' },
         },
@@ -593,9 +268,9 @@ const captureDecisionTool: MCPToolDefinition = {
         }
       }
 
-      const collection = loadDecisions(input.projectId);
+      const collection = await loadDecisions(input.projectId);
       collection.decisions.push(decision);
-      saveDecisions(input.projectId, collection);
+      await saveDecisions(input.projectId, collection);
 
       // Phase 4: Log USF impact if significant
       if (usfProjection.severity !== 'minor') {
@@ -647,7 +322,7 @@ const routeDecisionTool: MCPToolDefinition = {
     const startTime = Date.now();
     try {
       const input = args as unknown as RouteDecisionInput;
-      const collection = loadDecisions(input.projectId);
+      const collection = await loadDecisions(input.projectId);
       const idx = collection.decisions.findIndex(
         (d) => d.decisionId === input.decisionId
       );
@@ -686,7 +361,7 @@ const routeDecisionTool: MCPToolDefinition = {
       decision.authorityLevel.current = targetAuthority;
       decision.updatedAt = new Date().toISOString();
       collection.decisions[idx] = decision;
-      saveDecisions(input.projectId, collection);
+      await saveDecisions(input.projectId, collection);
 
       // Phase 4: Get USF provider recommendations
       const providerRecommendations = getUSFProviderRecommendations(
@@ -755,7 +430,7 @@ const approveDecisionTool: MCPToolDefinition = {
     const startTime = Date.now();
     try {
       const input = args as unknown as ApproveDecisionInput;
-      const collection = loadDecisions(input.projectId);
+      const collection = await loadDecisions(input.projectId);
       const idx = collection.decisions.findIndex(
         (d) => d.decisionId === input.decisionId
       );
@@ -809,7 +484,7 @@ const approveDecisionTool: MCPToolDefinition = {
       }
 
       collection.decisions[idx] = decision;
-      saveDecisions(input.projectId, collection);
+      await saveDecisions(input.projectId, collection);
 
       // Phase 4: Emit USF decision outcome event
       let usfEventResults;
@@ -885,7 +560,7 @@ const rejectDecisionTool: MCPToolDefinition = {
     const startTime = Date.now();
     try {
       const input = args as unknown as RejectDecisionInput;
-      const collection = loadDecisions(input.projectId);
+      const collection = await loadDecisions(input.projectId);
       const idx = collection.decisions.findIndex(
         (d) => d.decisionId === input.decisionId
       );
@@ -926,7 +601,7 @@ const rejectDecisionTool: MCPToolDefinition = {
       }
 
       collection.decisions[idx] = decision;
-      saveDecisions(input.projectId, collection);
+      await saveDecisions(input.projectId, collection);
 
       // Phase 4: Emit USF decision rejection event
       let usfEventResults;
@@ -1000,7 +675,7 @@ const escalateDecisionTool: MCPToolDefinition = {
     const startTime = Date.now();
     try {
       const input = args as unknown as EscalateDecisionInput;
-      const collection = loadDecisions(input.projectId);
+      const collection = await loadDecisions(input.projectId);
       const idx = collection.decisions.findIndex(
         (d) => d.decisionId === input.decisionId
       );
@@ -1052,7 +727,7 @@ const escalateDecisionTool: MCPToolDefinition = {
       };
       decision.graphMetadata = addOutEdge(decision.graphMetadata, escalatorURN);
       collection.decisions[idx] = decision;
-      saveDecisions(input.projectId, collection);
+      await saveDecisions(input.projectId, collection);
 
       return {
         success: true,
@@ -1097,7 +772,7 @@ const queryDecisionHistoryTool: MCPToolDefinition = {
     const startTime = Date.now();
     try {
       const input = args as unknown as QueryDecisionHistoryInput;
-      const collection = loadDecisions(input.projectId);
+      const collection = await loadDecisions(input.projectId);
       let results = collection.decisions;
 
       if (input.voxelId) {
@@ -1298,7 +973,7 @@ const attachDecisionToVoxelTool: MCPToolDefinition = {
         decisionId: string;
         voxelId: string;
       };
-      const collection = loadDecisions(projectId);
+      const collection = await loadDecisions(projectId);
       const idx = collection.decisions.findIndex(
         (d) => d.decisionId === decisionId
       );
@@ -1323,7 +998,7 @@ const attachDecisionToVoxelTool: MCPToolDefinition = {
       decision.updatedAt = new Date().toISOString();
       decision.graphMetadata.inEdges = [newVoxelURN];
       collection.decisions[idx] = decision;
-      saveDecisions(projectId, collection);
+      await saveDecisions(projectId, collection);
 
       return {
         success: true,
@@ -1367,7 +1042,7 @@ const getVoxelDecisionsTool: MCPToolDefinition = {
     const startTime = Date.now();
     try {
       const input = args as unknown as GetVoxelDecisionsInput;
-      const collection = loadDecisions(input.projectId);
+      const collection = await loadDecisions(input.projectId);
       const voxelUrn = buildURN(input.projectId, 'voxel', input.voxelId);
       let results = collection.decisions.filter((d) => d.voxelRef === voxelUrn);
       if (input.status) {
@@ -1446,8 +1121,8 @@ const navigateDecisionSurfaceTool: MCPToolDefinition = {
     const startTime = Date.now();
     try {
       const input = args as unknown as NavigateDecisionSurfaceInput;
-      const decisionsCollection = loadDecisions(input.projectId);
-      const voxelsCollection = loadVoxels(input.projectId);
+      const decisionsCollection = await loadDecisions(input.projectId);
+      const voxelsCollection = await loadVoxels(input.projectId);
 
       const maxDepth = input.maxDepth ?? 3;
 
@@ -1597,7 +1272,7 @@ const queryVoxelsByStatusTool: MCPToolDefinition = {
         projectId: string;
         status?: PMDecisionStatus;
       };
-      const collection = loadDecisions(projectId);
+      const collection = await loadDecisions(projectId);
       let decisions = collection.decisions;
       if (status) {
         decisions = decisions.filter((d) => d.status === status);
@@ -1784,12 +1459,12 @@ const applyToleranceOverrideTool: MCPToolDefinition = {
       };
 
       // Save override
-      const overridesCollection = loadToleranceOverrides(input.projectId);
+      const overridesCollection = await loadToleranceOverrides(input.projectId);
       overridesCollection.overrides.push(override);
-      saveToleranceOverrides(input.projectId, overridesCollection);
+      await saveToleranceOverrides(input.projectId, overridesCollection);
 
       // Load or create voxel
-      const voxelsCollection = loadVoxels(input.projectId);
+      const voxelsCollection = await loadVoxels(input.projectId);
       let voxel = voxelsCollection.voxels.find(
         (v) => v.voxelId === input.voxelId
       );
@@ -1810,7 +1485,7 @@ const applyToleranceOverrideTool: MCPToolDefinition = {
         // Update existing voxel
         voxel.graphMetadata.inEdges.push(overrideURN);
       }
-      saveVoxels(input.projectId, voxelsCollection);
+      await saveVoxels(input.projectId, voxelsCollection);
 
       // Create alert for the override
       const alertsCreated: VoxelAlert[] = [
@@ -1905,7 +1580,7 @@ const queryToleranceOverridesTool: MCPToolDefinition = {
     const startTime = Date.now();
     try {
       const input = args as unknown as QueryToleranceOverridesInput;
-      const collection = loadToleranceOverrides(input.projectId);
+      const collection = await loadToleranceOverrides(input.projectId);
       let results = collection.overrides;
 
       // Filter by voxel
@@ -2069,12 +1744,12 @@ const trackConsequenceTool: MCPToolDefinition = {
         ),
       };
 
-      const collection = loadConsequences(input.projectId);
+      const collection = await loadConsequences(input.projectId);
       collection.consequences.push(consequence);
-      saveConsequences(input.projectId, collection);
+      await saveConsequences(input.projectId, collection);
 
       // Update decision with consequence reference
-      const decisionsCollection = loadDecisions(input.projectId);
+      const decisionsCollection = await loadDecisions(input.projectId);
       const decisionIdx = decisionsCollection.decisions.findIndex(
         (d) => d.decisionId === input.decisionId
       );
@@ -2089,7 +1764,7 @@ const trackConsequenceTool: MCPToolDefinition = {
           consequenceURN
         );
         decisionsCollection.decisions[decisionIdx] = decision;
-        saveDecisions(input.projectId, decisionsCollection);
+        await saveDecisions(input.projectId, decisionsCollection);
       }
 
       return {
@@ -2198,9 +1873,9 @@ const requestInspectionTool: MCPToolDefinition = {
         ),
       };
 
-      const collection = loadInspections(input.projectId);
+      const collection = await loadInspections(input.projectId);
       collection.inspections.push(inspection);
-      saveInspections(input.projectId, collection);
+      await saveInspections(input.projectId, collection);
 
       return {
         success: true,
@@ -2329,7 +2004,7 @@ const completeInspectionTool: MCPToolDefinition = {
       const now = new Date().toISOString();
 
       // Load inspection
-      const inspectionsCollection = loadInspections(input.projectId);
+      const inspectionsCollection = await loadInspections(input.projectId);
       const inspectionIdx = inspectionsCollection.inspections.findIndex(
         (i) => i.inspectionId === input.inspectionId
       );
@@ -2384,10 +2059,10 @@ const completeInspectionTool: MCPToolDefinition = {
       inspection.graphMetadata.outEdges.push(inspectorURN);
 
       inspectionsCollection.inspections[inspectionIdx] = inspection;
-      saveInspections(input.projectId, inspectionsCollection);
+      await saveInspections(input.projectId, inspectionsCollection);
 
       // Process decisions
-      const decisionsCollection = loadDecisions(input.projectId);
+      const decisionsCollection = await loadDecisions(input.projectId);
       const validatedDecisions: PMDecision[] = [];
       const failedDecisions: PMDecision[] = [];
       const consequencesCreated: Consequence[] = [];
@@ -2483,13 +2158,13 @@ const completeInspectionTool: MCPToolDefinition = {
         }
       }
 
-      saveDecisions(input.projectId, decisionsCollection);
+      await saveDecisions(input.projectId, decisionsCollection);
 
       // Save consequences
       if (consequencesCreated.length > 0) {
-        const consequencesCollection = loadConsequences(input.projectId);
+        const consequencesCollection = await loadConsequences(input.projectId);
         consequencesCollection.consequences.push(...consequencesCreated);
-        saveConsequences(input.projectId, consequencesCollection);
+        await saveConsequences(input.projectId, consequencesCollection);
       }
 
       // Phase 3 USF Integration: Emit inspection completion event
@@ -2587,7 +2262,7 @@ const linkConsequenceToDecisionTool: MCPToolDefinition = {
         consequenceId: string;
         decisionId: string;
       };
-      const collection = loadConsequences(projectId);
+      const collection = await loadConsequences(projectId);
       const idx = collection.consequences.findIndex(
         (c) => c.consequenceId === consequenceId
       );
@@ -2612,7 +2287,7 @@ const linkConsequenceToDecisionTool: MCPToolDefinition = {
       ];
       consequence.updatedAt = new Date().toISOString();
       collection.consequences[idx] = consequence;
-      saveConsequences(projectId, collection);
+      await saveConsequences(projectId, collection);
 
       return {
         success: true,
@@ -2656,7 +2331,7 @@ const queryConsequencesByVoxelTool: MCPToolDefinition = {
         projectId: string;
         voxelId: string;
       };
-      const collection = loadConsequences(projectId);
+      const collection = await loadConsequences(projectId);
       const voxelURN = buildURN(projectId, 'voxel', voxelId);
       const results = collection.consequences.filter((c) =>
         c.affectedVoxels?.includes(voxelURN)
