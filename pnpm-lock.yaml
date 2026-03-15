@@ -824,6 +824,15 @@ importers:
         specifier: ^5.9.0
         version: 5.9.3
 
+  apps/edge-server:
+    dependencies:
+      '@ectropy/ai-provider':
+        specifier: workspace:*
+        version: link:../../packages/ai-provider
+      mqtt:
+        specifier: '*'
+        version: 5.15.0
+
   apps/mcp-server:
     dependencies:
       '@anthropic-ai/sdk':
@@ -1477,6 +1486,19 @@ importers:
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
+
+  packages/ai-provider:
+    dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^0.32.1
+        version: 0.32.1(encoding@0.1.13)
+    devDependencies:
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.9
+        version: 2.1.9(@types/node@24.3.1)(@vitest/ui@2.1.9)(jsdom@27.4.0(@noble/hashes@1.8.0))(less@4.5.1)(msw@2.12.10(@types/node@24.3.1)(typescript@5.9.3))(sass-embedded@1.97.3)(sass@1.97.3)(terser@5.46.0)
 
   packages/clash: {}
 
