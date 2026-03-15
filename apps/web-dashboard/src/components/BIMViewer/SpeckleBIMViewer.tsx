@@ -361,10 +361,11 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
 
       viewerRef.current = viewer;
 
-      // Load content
+      // Load content — loadSpeckleObject rethrows on failure so loadedObjectRef
+      // is only set when the object actually loaded successfully.
       if (effectiveStreamId && effectiveObjectId) {
         await loadSpeckleObject(viewer, effectiveStreamId, effectiveObjectId);
-        loadedObjectRef.current = objectKey; // Track what we loaded
+        loadedObjectRef.current = objectKey;
       } else {
         await loadDemoContent(viewer);
         loadedObjectRef.current = null;
@@ -405,8 +406,10 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       setLoading(false);
     } finally {
       // ENTERPRISE FIX (2026-01-13): Clear initialization flag in finally block
+      // NOTE: Do NOT call setLoading(false) here — it's already called in both try (line 377)
+      // and catch (line 405) paths. Calling it again triggers a redundant re-render that can
+      // race with the useEffect dependency on loading state.
       isInitializing.current = false;
-      setLoading(false);
       console.log('🏁 [BIM Viewer] Initialization flag cleared');
     }
   }, [
@@ -663,6 +666,9 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
 
       setError(`Failed to load 3D model: ${errorMessage}. Check browser console for details.`);
       setLoading(false);
+      // Rethrow so the caller (initializeViewer) knows loading failed and
+      // does NOT mark the object as successfully loaded in loadedObjectRef.
+      throw error;
     }
   };
 

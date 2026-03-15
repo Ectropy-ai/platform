@@ -327,10 +327,11 @@ const SEPPAChatPanel: React.FC<SEPPAChatPanelProps> = ({
               );
             },
             onToolEnd: (_toolName, result) => {
-              toolCalls = [...toolCalls.filter((t) => t.toolName !== result.toolName), result];
+              if (!result) return;
+              toolCalls = [...toolCalls.filter(Boolean).filter((t) => t.toolName !== result.toolName), result];
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === streamingId ? { ...m, toolCalls } : m
+                  m.id === streamingId ? { ...m, toolCalls: [...toolCalls] } : m
                 )
               );
             },
@@ -341,8 +342,8 @@ const SEPPAChatPanel: React.FC<SEPPAChatPanelProps> = ({
                   m.id === streamingId
                     ? {
                         ...m,
-                        content: response.message.content,
-                        toolCalls: response.message.toolCalls,
+                        content: response.message?.content ?? m.content,
+                        toolCalls: response.message?.toolCalls?.filter(Boolean),
                         suggestedActions: response.suggestedActions,
                         isProcessing: false,
                       }
@@ -380,7 +381,7 @@ const SEPPAChatPanel: React.FC<SEPPAChatPanelProps> = ({
             addMessage({
               role: 'assistant',
               content: result.data.message.content,
-              toolCalls: result.data.message.toolCalls,
+              toolCalls: result.data.message.toolCalls?.filter(Boolean),
               suggestedActions: result.data.suggestedActions,
             });
           } else {
@@ -445,12 +446,12 @@ const SEPPAChatPanel: React.FC<SEPPAChatPanelProps> = ({
       if (result.success && result.data) {
         setConversationId(convId);
         // Convert conversation messages to ChatMessages
-        const loadedMessages: ChatMessage[] = result.data.messages.map((msg, idx) => ({
+        const loadedMessages: ChatMessage[] = result.data.messages.filter(Boolean).map((msg, idx) => ({
           id: `loaded-${convId}-${idx}`,
           role: msg.role,
           content: msg.content,
           timestamp: new Date(msg.timestamp),
-          toolCalls: msg.toolCalls,
+          toolCalls: msg.toolCalls?.filter(Boolean),
         }));
         setMessages(loadedMessages);
       }
@@ -610,7 +611,7 @@ const SEPPAChatPanel: React.FC<SEPPAChatPanelProps> = ({
             bgcolor: (theme) => theme.palette.grey[50],
           }}
         >
-          {messages.map((msg) => (
+          {messages.filter(Boolean).map((msg) => (
             <SEPPAMessage
               key={msg.id}
               role={msg.role}
