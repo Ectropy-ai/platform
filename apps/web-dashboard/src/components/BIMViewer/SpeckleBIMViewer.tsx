@@ -964,37 +964,6 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         </Box>
       )}
 
-      {/* Error/Info Message - Not a full overlay */}
-      {showError && !showLoading && (
-        <Box
-          data-testid={isNoModelMessage ? 'bim-viewer-ready' : 'bim-viewer-error'}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flex: 1,
-            p: 2,
-          }}
-        >
-          <Alert
-            severity={isNoModelMessage ? 'info' : isTokenError ? 'warning' : 'error'}
-            sx={{
-              maxWidth: 400,
-              textAlign: 'center',
-            }}
-          >
-            <strong>
-              {isNoModelMessage
-                ? 'BIM Viewer Ready'
-                : isTokenError
-                  ? 'Speckle Configuration'
-                  : 'BIM Viewer Error'}
-            </strong>
-            <br />
-            {isNoModelMessage ? 'Upload an IFC file to view your building model in 3D.' : error}
-          </Alert>
-        </Box>
-      )}
       {/* Viewer Toolbar */}
       <Toolbar variant='dense' sx={{ minHeight: 48, borderBottom: '1px solid #ddd' }}>
         <Chip
@@ -1059,26 +1028,64 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         </Tooltip>
       </Toolbar>
 
-      {/* Viewer Container - ENTERPRISE FIX (2026-01-13): Always render to prevent DOM detachment */}
-      {/* ROOT CAUSE: Unmounting during loading caused viewer to attach to detached DOM node */}
-      {/* SOLUTION: Keep container mounted, use loading overlay to hide it during loading */}
-      <Box
-        ref={setContainerRef}
-        sx={{
-          flex: 1,
-          position: 'relative',
-          overflow: 'hidden',
-          minHeight: '400px',
-          backgroundColor: '#1a1a2e',
-          // Hide visually when showing error message, but keep in DOM
-          display: showError ? 'none' : 'flex',
-          '& canvas': {
-            display: 'block',
-            width: '100% !important',
-            height: '100% !important',
-          },
-        }}
-      />
+      {/* Viewer area — wrapper provides stable flex dimensions for the WebGL container */}
+      <Box sx={{ flex: 1, position: 'relative', minHeight: '400px', overflow: 'hidden' }}>
+        {/* Error/Info overlay — covers container visually without removing it from layout */}
+        {showError && !showLoading && (
+          <Box
+            data-testid={isNoModelMessage ? 'bim-viewer-ready' : 'bim-viewer-error'}
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'background.paper',
+              zIndex: 5,
+              p: 2,
+            }}
+          >
+            <Alert
+              severity={isNoModelMessage ? 'info' : isTokenError ? 'warning' : 'error'}
+              sx={{
+                maxWidth: 400,
+                textAlign: 'center',
+              }}
+            >
+              <strong>
+                {isNoModelMessage
+                  ? 'BIM Viewer Ready'
+                  : isTokenError
+                    ? 'Speckle Configuration'
+                    : 'BIM Viewer Error'}
+              </strong>
+              <br />
+              {isNoModelMessage ? 'Upload an IFC file to view your building model in 3D.' : error}
+            </Alert>
+          </Box>
+        )}
+
+        {/* WebGL container — ALWAYS rendered with valid dimensions.
+            display:none collapsed element to 0×0, breaking WebGL context init.
+            Container is now always visible; error overlay hides it visually. */}
+        <Box
+          ref={setContainerRef}
+          sx={{
+            width: '100%',
+            height: '100%',
+            overflow: 'hidden',
+            backgroundColor: '#1a1a2e',
+            '& canvas': {
+              display: 'block',
+              width: '100% !important',
+              height: '100% !important',
+            },
+          }}
+        />
+      </Box>
     </Paper>
   );
 };
