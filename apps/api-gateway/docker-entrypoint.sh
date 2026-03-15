@@ -245,6 +245,39 @@ while [ $RETRY -lt $MAX_RETRIES ]; do
     echo "$MIGRATION_OUTPUT"
   fi
 
+  # ===================================
+  # ENTERPRISE FIX (2026-03-15): P3009 auto-resolve
+  # ===================================
+  # ROOT CAUSE: When a migration fails mid-execution (e.g., partial SQL error,
+  # transient DB issue), Prisma records it as "failed" in _prisma_migrations.
+  # All subsequent `prisma migrate deploy` calls see P3009 and refuse to proceed.
+  # Simply retrying is pointless — the failed record must be cleared first.
+  #
+  # FIX: Detect P3009, delete the failed migration record from _prisma_migrations,
+  # then retry. The migration SQL is idempotent (IF NOT EXISTS patterns) so
+  # re-running after a partial application is safe.
+  if echo "$MIGRATION_OUTPUT" | grep -q "P3009"; then
+    FAILED_MIGRATION=$(echo "$MIGRATION_OUTPUT" | grep 'The `' | sed "s/.*The \`\([^\`]*\)\` migration.*/\1/" | head -1)
+    if [ -n "$FAILED_MIGRATION" ]; then
+      echo "🔧 P3009: Removing failed migration record for '$FAILED_MIGRATION'..."
+      DELETE_SQL="DELETE FROM _prisma_migrations WHERE migration_name = '${FAILED_MIGRATION}' AND finished_at IS NULL;"
+      if echo "$DELETE_SQL" | DATABASE_URL="$EFFECTIVE_MIGRATION_URL" npx prisma db execute --stdin --schema=/app/prisma/schema.prisma 2>&1; then
+        echo "   ✅ Failed record removed — next attempt will re-run migration"
+      else
+        echo "   ⚠️  Could not remove failed migration record via prisma db execute"
+        # Fallback: try psql directly (postgresql-client installed in Dockerfile)
+        if command -v psql >/dev/null 2>&1; then
+          echo "   Trying psql fallback..."
+          if echo "$DELETE_SQL" | psql "$EFFECTIVE_MIGRATION_URL" 2>&1; then
+            echo "   ✅ Failed record removed via psql"
+          else
+            echo "   ⚠️  psql fallback also failed"
+          fi
+        fi
+      fi
+    fi
+  fi
+
   RETRY=$((RETRY + 1))
   if [ $RETRY -lt $MAX_RETRIES ]; then
     echo "⚠️  Migration failed (attempt $RETRY). Retrying in ${BACKOFF}s..."
