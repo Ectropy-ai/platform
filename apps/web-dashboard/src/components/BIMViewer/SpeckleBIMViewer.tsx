@@ -641,12 +641,32 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       viewer.resize?.();
       viewer.requestRender?.();
 
-      // Schedule another resize after a short delay (in case container size changed)
+      // FIX (2026-03-16): Explicit camera fit after loadObject
+      // ROOT CAUSE: viewer.loadObject Promise never settles naturally.
+      // Promise.race 3s timeout resolves instead, bypassing zoomToObject=true.
+      // Geometry loads but camera stays at default position.
+      const cameraController = viewer.getExtension?.(CameraController) as
+        | (CameraController & Partial<CameraControllerExtended>)
+        | null;
+      if (cameraController && typeof cameraController.setCameraView === 'function') {
+        logger.debug('[BIM Viewer] Fitting camera to loaded geometry');
+        cameraController.setCameraView([], true);
+      } else {
+        logger.debug('[BIM Viewer] CameraController unavailable — camera fit skipped');
+      }
+
+      // Schedule another resize + camera fit after a short delay (safety net)
       setTimeout(() => {
         if (viewerRef.current) {
-          logger.debug('[BIM Viewer] Delayed resize');
+          logger.debug('[BIM Viewer] Delayed resize + camera fit');
           viewerRef.current.resize?.();
           viewerRef.current.requestRender?.();
+          const cc = viewerRef.current.getExtension?.(CameraController) as
+            | (CameraController & Partial<CameraControllerExtended>)
+            | null;
+          if (cc && typeof cc.setCameraView === 'function') {
+            cc.setCameraView([], true);
+          }
         }
       }, 100);
 
@@ -891,6 +911,17 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
 
     // ENTERPRISE FIX (2025-11-23): Initialize/reload when we have new model data
     if (hasModelData) {
+      // FIX (2026-03-16): Guard against post-load reinit loop
+      // ROOT CAUSE: Dep changes (configLoading, speckleAvailable) re-fire this effect after
+      // loadObject completes. initializeViewer would be called again for the same object.
+      // SOLUTION: Skip if already initializing or this exact object is already loaded.
+      if (isInitializing.current || loadedObjectRef.current === `${effectiveStreamId}:${effectiveObjectId}`) {
+        console.log('⏸️ [BIM Viewer] Skipping reinit - already loaded or loading', {
+          isInitializing: isInitializing.current,
+          loadedObject: loadedObjectRef.current,
+        });
+        return;
+      }
       console.log('▶️ [BIM Viewer] Calling initializeViewer from useEffect', {
         streamId: effectiveStreamId,
         objectId: effectiveObjectId,

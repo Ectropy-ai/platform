@@ -55,12 +55,11 @@ function TabPanel(props: TabPanelProps) {
   return (
     <div
       role='tabpanel'
-      hidden={value !== index}
       id={`viewer-tabpanel-${index}`}
       aria-labelledby={`viewer-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+      <Box sx={{ py: 3, display: value === index ? 'block' : 'none' }}>{children}</Box>
     </div>
   );
 }
@@ -85,6 +84,7 @@ export function ViewerPage() {
   // PHASE 1: Role Switcher Removal (2026-02-09)
   // Project-specific role state - fetched from project_roles table
   const [projectRole, setProjectRole] = useState<string | null>(null);
+  const [projectPermissions, setProjectPermissions] = useState<string[]>([]);
   const [projectRoleLoading, setProjectRoleLoading] = useState(false);
   const [projectRoleError, setProjectRoleError] = useState<string | null>(null);
 
@@ -230,6 +230,7 @@ export function ViewerPage() {
     const fetchProjectRole = async () => {
       if (!selectedProjectId) {
         setProjectRole(null);
+        setProjectPermissions([]);
         return;
       }
 
@@ -239,6 +240,7 @@ export function ViewerPage() {
       try {
         const roleData = await apiService.getMyProjectRole(selectedProjectId);
         setProjectRole(roleData.role);
+        setProjectPermissions(roleData.permissions || []);
         console.log('✅ [ViewerPage] Fetched project role:', {
           projectId: selectedProjectId,
           role: roleData.role,
@@ -273,6 +275,9 @@ export function ViewerPage() {
 
   // Get the current project ID (selected or empty if none available)
   const projectId = selectedProjectId;
+
+  // FIX (2026-03-16): Derive write access from project permissions for Upload tab visibility
+  const hasWriteAccess = projectPermissions.includes('write') || projectPermissions.includes('admin');
 
   /**
    * Handle stream selection
@@ -443,8 +448,8 @@ export function ViewerPage() {
           >
             <Tab icon={<ViewInAr />} label='Viewer' id='viewer-tab-0' />
             <Tab icon={<GridView />} label='Coordination' id='viewer-tab-1' />
-            <Tab icon={<CloudUpload />} label='Upload' id='viewer-tab-2' />
-            <Tab icon={<Settings />} label='Settings' id='viewer-tab-3' />
+            {hasWriteAccess && <Tab icon={<CloudUpload />} label='Upload' id='viewer-tab-2' />}
+            <Tab icon={<Settings />} label='Settings' id={`viewer-tab-${hasWriteAccess ? 3 : 2}`} />
           </Tabs>
         </Box>
 
@@ -453,57 +458,8 @@ export function ViewerPage() {
           {/* Viewer Tab */}
           <TabPanel value={currentTab} index={0}>
             <Stack spacing={3}>
-              {/* Show content only when a project is selected */}
-              {projectId ? (
-                <>
-                  {/* Stream Selector */}
-                  <StreamSelector
-                    projectId={projectId}
-                    authToken={user?.accessToken}
-                    selectedStreamId={streamIdFromUrl || selectedStream?.stream_id}
-                    onStreamSelect={handleStreamSelect}
-                    onStreamInitialized={handleStreamInitialized}
-                    showActions={true}
-                    refreshTrigger={streamRefreshTrigger}
-                  />
-
-                  <Divider />
-
-                  {/* BIM Viewer */}
-                  {/* ENTERPRISE FIX (2026-01-13): Always render BIMViewer to prevent unmount/remount */}
-                  {/* ROOT CAUSE: Conditional rendering caused viewer disposal on stream changes */}
-                  {/* SOLUTION: Keep component mounted, pass undefined streamId when no stream */}
-                  {(() => {
-                    console.log('🎨 [ViewerPage] Rendering BIM Viewer, selectedStream:', {
-                      exists: !!selectedStream,
-                      stream_id: selectedStream?.stream_id || 'null',
-                      will_render_viewer: true, // Always render now
-                    });
-                    return null;
-                  })()}
-                  <BIMViewerErrorBoundary
-                    onError={(error, errorInfo) => {
-                      console.error('BIM Viewer Error:', error, errorInfo);
-                      // Track error for analytics
-                      if (typeof window !== 'undefined' && (window as any).gtag) {
-                        (window as any).gtag('event', 'exception', {
-                          description: `BIM Viewer Error: ${error.message}`,
-                          fatal: false,
-                        });
-                      }
-                    }}
-                  >
-                    <SpeckleBIMViewer
-                      streamId={selectedStream?.stream_id || undefined}
-                      objectId={selectedStream?.latest_object_id || undefined}
-                      stakeholderRole={(projectRole || 'contractor') as any}
-                      onElementSelect={handleElementSelect}
-                      height='600px'
-                      serverUrl={config.speckleApiUrl}
-                    />
-                  </BIMViewerErrorBoundary>
-                </>
-              ) : (
+              {/* No-project placeholder — shown when projectId is falsy */}
+              {!projectId && (
                 <Paper
                   variant='outlined'
                   sx={{
@@ -539,6 +495,42 @@ export function ViewerPage() {
                   </Stack>
                 </Paper>
               )}
+              {/* BIMViewer — always mounted, hidden when no project to prevent
+                  unmount/remount cycles destroying WebGL context */}
+              <Box sx={{ display: projectId ? 'block' : 'none' }}>
+                <StreamSelector
+                  projectId={projectId}
+                  authToken={user?.accessToken}
+                  selectedStreamId={streamIdFromUrl || selectedStream?.stream_id}
+                  onStreamSelect={handleStreamSelect}
+                  onStreamInitialized={handleStreamInitialized}
+                  showActions={true}
+                  refreshTrigger={streamRefreshTrigger}
+                />
+
+                <Divider />
+
+                <BIMViewerErrorBoundary
+                  onError={(error, errorInfo) => {
+                    console.error('BIM Viewer Error:', error, errorInfo);
+                    if (typeof window !== 'undefined' && (window as any).gtag) {
+                      (window as any).gtag('event', 'exception', {
+                        description: `BIM Viewer Error: ${error.message}`,
+                        fatal: false,
+                      });
+                    }
+                  }}
+                >
+                  <SpeckleBIMViewer
+                    streamId={selectedStream?.stream_id || undefined}
+                    objectId={selectedStream?.latest_object_id || undefined}
+                    stakeholderRole={(projectRole || 'contractor') as any}
+                    onElementSelect={handleElementSelect}
+                    height='600px'
+                    serverUrl={config.speckleApiUrl}
+                  />
+                </BIMViewerErrorBoundary>
+              </Box>
             </Stack>
           </TabPanel>
 
@@ -564,56 +556,58 @@ export function ViewerPage() {
             </Stack>
           </TabPanel>
 
-          {/* Upload Tab */}
-          <TabPanel value={currentTab} index={2}>
-            <Stack spacing={3}>
-              {projectId ? (
-                <>
-                  <Box>
-                    <Typography variant='h6' gutterBottom>
-                      Upload IFC File
-                    </Typography>
-                    <Typography variant='body2' color='text.secondary'>
-                      Upload an IFC file to import building elements into Speckle. Maximum file
-                      size: 1GB
-                    </Typography>
-                    {projects.length > 0 && (
-                      <Typography variant='body2' color='primary' sx={{ mt: 1 }}>
-                        <strong>Target project:</strong>{' '}
-                        {projects.find(p => p.id === projectId)?.name || projectId}
+          {/* Upload Tab — hidden for READ-only roles (tab removed from Tabs above) */}
+          {hasWriteAccess && (
+            <TabPanel value={currentTab} index={2}>
+              <Stack spacing={3}>
+                {projectId ? (
+                  <>
+                    <Box>
+                      <Typography variant='h6' gutterBottom>
+                        Upload IFC File
                       </Typography>
-                    )}
-                  </Box>
+                      <Typography variant='body2' color='text.secondary'>
+                        Upload an IFC file to import building elements into Speckle. Maximum file
+                        size: 1GB
+                      </Typography>
+                      {projects.length > 0 && (
+                        <Typography variant='body2' color='primary' sx={{ mt: 1 }}>
+                          <strong>Target project:</strong>{' '}
+                          {projects.find(p => p.id === projectId)?.name || projectId}
+                        </Typography>
+                      )}
+                    </Box>
 
-                  <IFCUploader
-                    projectId={projectId}
-                    authToken={user?.accessToken}
-                    onUploadComplete={handleUploadComplete}
-                    showAdvancedOptions={true}
-                  />
+                    <IFCUploader
+                      projectId={projectId}
+                      authToken={user?.accessToken}
+                      onUploadComplete={handleUploadComplete}
+                      showAdvancedOptions={true}
+                    />
 
-                  <Alert severity='info'>
+                    <Alert severity='info'>
+                      <Typography variant='body2'>
+                        <strong>Supported Format:</strong> IFC 2x3, IFC4
+                      </Typography>
+                      <Typography variant='body2'>
+                        <strong>Processing Time:</strong> Large files may take several minutes to
+                        process
+                      </Typography>
+                    </Alert>
+                  </>
+                ) : (
+                  <Alert severity='warning'>
                     <Typography variant='body2'>
-                      <strong>Supported Format:</strong> IFC 2x3, IFC4
-                    </Typography>
-                    <Typography variant='body2'>
-                      <strong>Processing Time:</strong> Large files may take several minutes to
-                      process
+                      Please select a project from the dropdown above before uploading IFC files.
                     </Typography>
                   </Alert>
-                </>
-              ) : (
-                <Alert severity='warning'>
-                  <Typography variant='body2'>
-                    Please select a project from the dropdown above before uploading IFC files.
-                  </Typography>
-                </Alert>
-              )}
-            </Stack>
-          </TabPanel>
+                )}
+              </Stack>
+            </TabPanel>
+          )}
 
-          {/* Settings Tab */}
-          <TabPanel value={currentTab} index={3}>
+          {/* Settings Tab — index shifts when Upload tab is hidden */}
+          <TabPanel value={currentTab} index={hasWriteAccess ? 3 : 2}>
             <Stack spacing={3}>
               <Box>
                 <Typography variant='h6' gutterBottom>
