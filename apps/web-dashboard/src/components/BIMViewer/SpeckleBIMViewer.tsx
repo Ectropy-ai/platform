@@ -641,12 +641,33 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       viewer.resize?.();
       viewer.requestRender?.();
 
-      // Schedule another resize after a short delay (in case container size changed)
+      // FIX (2026-03-16): Explicit camera fit after loadObject
+      // ROOT CAUSE: viewer.loadObject Promise never settles naturally.
+      // Promise.race 3s timeout resolves instead, bypassing zoomToObject=true.
+      // Geometry loads but camera stays at default position.
+      const cameraController = viewer.getExtension?.(CameraController) as
+        | (CameraController & Partial<CameraControllerExtended>)
+        | null;
+      if (cameraController && typeof cameraController.setCameraView === 'function') {
+        logger.debug('[BIM Viewer] Fitting camera to loaded geometry');
+        cameraController.setCameraView([], true);
+      } else {
+        logger.debug('[BIM Viewer] CameraController unavailable, trying viewer.zoom fallback');
+        viewer.zoom?.();
+      }
+
+      // Schedule another resize + camera fit after a short delay (safety net)
       setTimeout(() => {
         if (viewerRef.current) {
-          logger.debug('[BIM Viewer] Delayed resize');
+          logger.debug('[BIM Viewer] Delayed resize + camera fit');
           viewerRef.current.resize?.();
           viewerRef.current.requestRender?.();
+          const cc = viewerRef.current.getExtension?.(CameraController) as
+            | (CameraController & Partial<CameraControllerExtended>)
+            | null;
+          if (cc && typeof cc.setCameraView === 'function') {
+            cc.setCameraView([], true);
+          }
         }
       }, 100);
 
