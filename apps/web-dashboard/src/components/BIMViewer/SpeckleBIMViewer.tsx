@@ -600,34 +600,34 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         objectData, // Pass pre-fetched data as 5th parameter
       );
 
-      // Load the object using the official Speckle API with automatic camera positioning
-      // zoomToObject=true enables automatic camera initialization and positioning
-      // TypeScript FIX: loadObject exists at runtime but TypeScript types may not include it
-      //
-      // FIX (2026-03-16): Resolving timeout instead of rejecting.
-      // ROOT CAUSE: viewer.loadObject Promise never settles with pre-fetched data
-      // (SpeckleLoader 5th param), even though the SDK loads objects into the scene
-      // near-instantly ("Loaded 1 objects in: 0.021"). The old 30s rejecting timeout
-      // kept the spinner visible for 30s then showed a spurious error.
-      // SOLUTION: Resolve after 3s — data is pre-fetched, viewer already has it.
-      // If loadObject rejects (genuine error), the .catch swallows it as non-fatal.
+      // FIX (2026-03-16): Use ViewerEvent.LoadComplete instead of Promise.race timeout.
+      // ROOT CAUSE: viewer.loadObject() returns a Promise that never settles with pre-fetched
+      // data (SpeckleLoader 5th param). The SDK fires ViewerEvent.LoadComplete when done.
+      // Old approach: 3s timeout resolved the race, but execution continued before the scene
+      // was ready, causing downstream failures (camera fit on empty scene, unmount race).
+      // SOLUTION: Listen for the actual LoadComplete event from the viewer.
       logger.debug('[BIM Viewer] Calling viewer.loadObject with zoomToObject=true');
-      await Promise.race([
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('viewer.loadObject timeout after 10s'));
+        }, 10000);
+
+        viewer.on(ViewerEvent.LoadComplete, () => {
+          clearTimeout(timeout);
+          console.log('🟢 [BIM Viewer] ViewerEvent.LoadComplete fired');
+          resolve();
+        });
+
         (viewer.loadObject as (loader: unknown, zoom?: boolean) => Promise<void>)(
           speckleLoader,
           true,
         ).catch((err) => {
-          logger.warn('[BIM Viewer] viewer.loadObject error (non-fatal, data was pre-fetched)', {
+          clearTimeout(timeout);
+          logger.warn('[BIM Viewer] viewer.loadObject rejected (non-fatal if LoadComplete fires)', {
             error: err instanceof Error ? err.message : String(err),
           });
-        }),
-        new Promise<void>((resolve) =>
-          setTimeout(() => {
-            logger.info('[BIM Viewer] loadObject grace period elapsed — proceeding (data pre-fetched)');
-            resolve();
-          }, 3000),
-        ),
-      ]);
+        });
+      });
 
       logger.info('[BIM Viewer] Successfully loaded Speckle object with official loader', {
         objectUrl,
