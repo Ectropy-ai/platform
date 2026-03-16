@@ -85,6 +85,7 @@ export function ViewerPage() {
   // PHASE 1: Role Switcher Removal (2026-02-09)
   // Project-specific role state - fetched from project_roles table
   const [projectRole, setProjectRole] = useState<string | null>(null);
+  const [projectPermissions, setProjectPermissions] = useState<string[]>([]);
   const [projectRoleLoading, setProjectRoleLoading] = useState(false);
   const [projectRoleError, setProjectRoleError] = useState<string | null>(null);
 
@@ -230,6 +231,7 @@ export function ViewerPage() {
     const fetchProjectRole = async () => {
       if (!selectedProjectId) {
         setProjectRole(null);
+        setProjectPermissions([]);
         return;
       }
 
@@ -239,6 +241,7 @@ export function ViewerPage() {
       try {
         const roleData = await apiService.getMyProjectRole(selectedProjectId);
         setProjectRole(roleData.role);
+        setProjectPermissions(roleData.permissions || []);
         console.log('✅ [ViewerPage] Fetched project role:', {
           projectId: selectedProjectId,
           role: roleData.role,
@@ -273,6 +276,9 @@ export function ViewerPage() {
 
   // Get the current project ID (selected or empty if none available)
   const projectId = selectedProjectId;
+
+  // FIX (2026-03-16): Derive write access from project permissions for Upload tab visibility
+  const hasWriteAccess = projectPermissions.includes('write') || projectPermissions.includes('admin');
 
   /**
    * Handle stream selection
@@ -443,8 +449,8 @@ export function ViewerPage() {
           >
             <Tab icon={<ViewInAr />} label='Viewer' id='viewer-tab-0' />
             <Tab icon={<GridView />} label='Coordination' id='viewer-tab-1' />
-            <Tab icon={<CloudUpload />} label='Upload' id='viewer-tab-2' />
-            <Tab icon={<Settings />} label='Settings' id='viewer-tab-3' />
+            {hasWriteAccess && <Tab icon={<CloudUpload />} label='Upload' id='viewer-tab-2' />}
+            <Tab icon={<Settings />} label='Settings' id={`viewer-tab-${hasWriteAccess ? 3 : 2}`} />
           </Tabs>
         </Box>
 
@@ -564,56 +570,58 @@ export function ViewerPage() {
             </Stack>
           </TabPanel>
 
-          {/* Upload Tab */}
-          <TabPanel value={currentTab} index={2}>
-            <Stack spacing={3}>
-              {projectId ? (
-                <>
-                  <Box>
-                    <Typography variant='h6' gutterBottom>
-                      Upload IFC File
-                    </Typography>
-                    <Typography variant='body2' color='text.secondary'>
-                      Upload an IFC file to import building elements into Speckle. Maximum file
-                      size: 1GB
-                    </Typography>
-                    {projects.length > 0 && (
-                      <Typography variant='body2' color='primary' sx={{ mt: 1 }}>
-                        <strong>Target project:</strong>{' '}
-                        {projects.find(p => p.id === projectId)?.name || projectId}
+          {/* Upload Tab — hidden for READ-only roles (tab removed from Tabs above) */}
+          {hasWriteAccess && (
+            <TabPanel value={currentTab} index={2}>
+              <Stack spacing={3}>
+                {projectId ? (
+                  <>
+                    <Box>
+                      <Typography variant='h6' gutterBottom>
+                        Upload IFC File
                       </Typography>
-                    )}
-                  </Box>
+                      <Typography variant='body2' color='text.secondary'>
+                        Upload an IFC file to import building elements into Speckle. Maximum file
+                        size: 1GB
+                      </Typography>
+                      {projects.length > 0 && (
+                        <Typography variant='body2' color='primary' sx={{ mt: 1 }}>
+                          <strong>Target project:</strong>{' '}
+                          {projects.find(p => p.id === projectId)?.name || projectId}
+                        </Typography>
+                      )}
+                    </Box>
 
-                  <IFCUploader
-                    projectId={projectId}
-                    authToken={user?.accessToken}
-                    onUploadComplete={handleUploadComplete}
-                    showAdvancedOptions={true}
-                  />
+                    <IFCUploader
+                      projectId={projectId}
+                      authToken={user?.accessToken}
+                      onUploadComplete={handleUploadComplete}
+                      showAdvancedOptions={true}
+                    />
 
-                  <Alert severity='info'>
+                    <Alert severity='info'>
+                      <Typography variant='body2'>
+                        <strong>Supported Format:</strong> IFC 2x3, IFC4
+                      </Typography>
+                      <Typography variant='body2'>
+                        <strong>Processing Time:</strong> Large files may take several minutes to
+                        process
+                      </Typography>
+                    </Alert>
+                  </>
+                ) : (
+                  <Alert severity='warning'>
                     <Typography variant='body2'>
-                      <strong>Supported Format:</strong> IFC 2x3, IFC4
-                    </Typography>
-                    <Typography variant='body2'>
-                      <strong>Processing Time:</strong> Large files may take several minutes to
-                      process
+                      Please select a project from the dropdown above before uploading IFC files.
                     </Typography>
                   </Alert>
-                </>
-              ) : (
-                <Alert severity='warning'>
-                  <Typography variant='body2'>
-                    Please select a project from the dropdown above before uploading IFC files.
-                  </Typography>
-                </Alert>
-              )}
-            </Stack>
-          </TabPanel>
+                )}
+              </Stack>
+            </TabPanel>
+          )}
 
-          {/* Settings Tab */}
-          <TabPanel value={currentTab} index={3}>
+          {/* Settings Tab — index shifts when Upload tab is hidden */}
+          <TabPanel value={currentTab} index={hasWriteAccess ? 3 : 2}>
             <Stack spacing={3}>
               <Box>
                 <Typography variant='h6' gutterBottom>
