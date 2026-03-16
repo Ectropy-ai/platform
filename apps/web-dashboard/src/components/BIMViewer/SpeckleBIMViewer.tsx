@@ -600,34 +600,13 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         objectData, // Pass pre-fetched data as 5th parameter
       );
 
-      // FIX (2026-03-16): Use ViewerEvent.LoadComplete instead of Promise.race timeout.
-      // ROOT CAUSE: viewer.loadObject() returns a Promise that never settles with pre-fetched
-      // data (SpeckleLoader 5th param). The SDK fires ViewerEvent.LoadComplete when done.
-      // Old approach: 3s timeout resolved the race, but execution continued before the scene
-      // was ready, causing downstream failures (camera fit on empty scene, unmount race).
-      // SOLUTION: Listen for the actual LoadComplete event from the viewer.
+      // FIX (2026-03-16): Direct await on viewer.loadObject.
       logger.debug('[BIM Viewer] Calling viewer.loadObject with zoomToObject=true');
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('viewer.loadObject timeout after 10s'));
-        }, 10000);
-
-        viewer.on(ViewerEvent.LoadComplete, () => {
-          clearTimeout(timeout);
-          console.log('🟢 [BIM Viewer] ViewerEvent.LoadComplete fired');
-          resolve();
-        });
-
-        (viewer.loadObject as (loader: unknown, zoom?: boolean) => Promise<void>)(
-          speckleLoader,
-          true,
-        ).catch((err) => {
-          clearTimeout(timeout);
-          logger.warn('[BIM Viewer] viewer.loadObject rejected (non-fatal if LoadComplete fires)', {
-            error: err instanceof Error ? err.message : String(err),
-          });
-        });
-      });
+      await (viewer.loadObject as (loader: unknown, zoom?: boolean) => Promise<void>)(
+        speckleLoader,
+        true,
+      );
+      console.log('🟢 [BIM Viewer] viewer.loadObject completed');
 
       logger.info('[BIM Viewer] Successfully loaded Speckle object with official loader', {
         objectUrl,
