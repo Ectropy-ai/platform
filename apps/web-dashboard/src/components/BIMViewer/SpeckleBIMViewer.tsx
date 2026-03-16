@@ -891,6 +891,17 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
 
     // ENTERPRISE FIX (2025-11-23): Initialize/reload when we have new model data
     if (hasModelData) {
+      // FIX (2026-03-16): Guard against post-load reinit loop
+      // ROOT CAUSE: Dep changes (configLoading, speckleAvailable) re-fire this effect after
+      // loadObject completes. initializeViewer would be called again for the same object.
+      // SOLUTION: Skip if already initializing or this exact object is already loaded.
+      if (isInitializing.current || loadedObjectRef.current === `${effectiveStreamId}:${effectiveObjectId}`) {
+        console.log('⏸️ [BIM Viewer] Skipping reinit - already loaded or loading', {
+          isInitializing: isInitializing.current,
+          loadedObject: loadedObjectRef.current,
+        });
+        return;
+      }
       console.log('▶️ [BIM Viewer] Calling initializeViewer from useEffect', {
         streamId: effectiveStreamId,
         objectId: effectiveObjectId,
