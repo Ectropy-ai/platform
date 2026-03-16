@@ -55,12 +55,11 @@ function TabPanel(props: TabPanelProps) {
   return (
     <div
       role='tabpanel'
-      hidden={value !== index}
       id={`viewer-tabpanel-${index}`}
       aria-labelledby={`viewer-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+      <Box sx={{ py: 3, display: value === index ? 'block' : 'none' }}>{children}</Box>
     </div>
   );
 }
