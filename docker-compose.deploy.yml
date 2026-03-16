@@ -176,6 +176,7 @@ services:
       - EXPRESS_PORT=3002
       - MCP_API_KEY=${MCP_API_KEY}
       - VALIDATION_ONLY=false
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       # ENTERPRISE FIX (ROOT CAUSE #24): Add missing environment variables for API Gateway communication
       # Required for Docker container networking and request handling behind reverse proxy
       - TRUST_PROXY=true
