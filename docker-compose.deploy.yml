@@ -431,6 +431,8 @@ services:
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
       POSTGRES_DB: speckle
+      POSTGRES_PORT: ${DATABASE_PORT:-25060}
+      PGSSLMODE: require
 
       # Redis configuration (internal Redis, separate DB index)
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
@@ -464,7 +466,7 @@ services:
       FRONTEND_ORIGIN: ${SPECKLE_PUBLIC_URL:-https://ectropy.ai/speckle}
 
       # File import queue
-      FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}/speckle?sslmode=require
+      FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/speckle?sslmode=require
       FF_NEXT_GEN_FILE_IMPORTER_ENABLED: 'true'
 
       # Trust proxy (nginx reverse proxy)
@@ -723,7 +725,9 @@ services:
     environment:
       LOG_LEVEL: warn
       LOG_PRETTY: 'false'
-      PG_CONNECTION_STRING: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}/speckle?sslmode=require
+      PG_CONNECTION_STRING: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/speckle?sslmode=require
+      POSTGRES_PORT: ${DATABASE_PORT:-25060}
+      PGSSLMODE: require
     depends_on:
       - speckle-server
     deploy:
@@ -757,8 +761,10 @@ services:
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
       POSTGRES_DB: speckle
-      PG_CONNECTION_STRING: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}/speckle?sslmode=require
-      FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}/speckle?sslmode=require
+      POSTGRES_PORT: ${DATABASE_PORT:-25060}
+      PGSSLMODE: require
+      PG_CONNECTION_STRING: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/speckle?sslmode=require
+      FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/speckle?sslmode=require
     depends_on:
       - speckle-server
       - redis
