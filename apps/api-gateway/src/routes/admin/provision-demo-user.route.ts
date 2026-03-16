@@ -1,11 +1,14 @@
 /**
  * Demo User Provisioning Route
  *
- * Server-to-server endpoint for n8n demo-approval-pipeline.
- * Creates a tenant + user + invitation for approved demo requests.
+ * Provisions a new demo tenant + user for approved demo requests.
+ * Supports dual authentication: API key (n8n pipeline) OR platform admin session (console).
  *
- * Authentication: API key with scope-based authorization
+ * Authentication: API key with scope `provision_demo_user` OR platform admin session
  * Endpoint: POST /api/admin/provision-demo-user
+ *
+ * Dependencies: Prisma (shared singleton), api-key middleware, email service
+ * Mounted at: /api/admin in main.ts — route path is /provision-demo-user
  *
  * @module routes/admin/provision-demo-user
  */
@@ -27,6 +30,9 @@ import '../../../../../libs/shared/types/src/express.js';
 /**
  * Slugify a company name for tenant slug generation.
  * Produces URL-safe lowercase slugs: "Acme Corp" → "acme-corp"
+ *
+ * @param text - Raw company name
+ * @returns URL-safe slug
  */
 function slugify(text: string): string {
   return text
@@ -41,6 +47,8 @@ function slugify(text: string): string {
 /**
  * Create the demo provisioning router.
  * Mounted at /api/admin in main.ts — route path is /provision-demo-user.
+ *
+ * @returns Express Router with POST /provision-demo-user
  */
 export function createDemoProvisioningRoutes(): Router {
   const router = express.Router();
@@ -49,18 +57,35 @@ export function createDemoProvisioningRoutes(): Router {
   /**
    * POST /api/admin/provision-demo-user
    *
-   * Provision a new demo tenant + user from CRM approval.
+   * Provision a new demo tenant + user.
+   * Auth: API key (scope: provision_demo_user) OR platform admin session.
    *
-   * Request body:
-   *   { email: string, name: string, company: string, crm_contact_id?: string }
+   * @param req.body.email    - Google email of the prospect (required)
+   * @param req.body.name     - Full name (required)
+   * @param req.body.company  - Company name, used for tenant slug (required)
+   * @param req.body.crm_contact_id - Twenty CRM contact ID (optional)
    *
-   * Response:
-   *   { user_id, tenant_id, invitation_token, expires_at }
+   * @returns 201 { user_id, tenant_id, email, demo_url }
+   * @returns 400 missing required fields
+   * @returns 403 not platform admin (session auth only)
+   * @returns 409 email already exists
+   * @returns 500 DB failure
    */
   router.post(
     '/provision-demo-user',
     apiKeyMiddleware.dualAuth(['provision_demo_user', '*']),
     asyncHandler(async (req: Request, res: Response): Promise<void> => {
+      // --- Platform admin guard for session-based auth ---
+      // API key auth is scope-checked by dualAuth middleware already.
+      // Session auth needs explicit platform admin check.
+      if (req.user && !req.apiKey && !req.user.is_platform_admin) {
+        res.status(403).json({
+          error: 'Platform admin access required',
+          code: 'FORBIDDEN',
+        });
+        return;
+      }
+
       const { email, name, company, crm_contact_id } = req.body;
 
       // --- Validate required fields ---
@@ -87,61 +112,123 @@ export function createDemoProvisioningRoutes(): Router {
       }
 
       const normalizedEmail = email.toLowerCase().trim();
+
+      // --- Check for existing user (return 409 instead of upserting) ---
+      const existingUser = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+        select: {
+          id: true,
+          email: true,
+          tenant_id: true,
+          is_authorized: true,
+          company: true,
+        },
+      });
+
+      if (existingUser) {
+        logger.warn('[Demo Provisioning] User already exists', {
+          email: normalizedEmail,
+          userId: existingUser.id,
+          tenantId: existingUser.tenant_id,
+        });
+        res.status(409).json({
+          error: 'User already exists',
+          code: 'USER_EXISTS',
+          existing_user: {
+            user_id: existingUser.id,
+            email: existingUser.email,
+            tenant_id: existingUser.tenant_id,
+            is_authorized: existingUser.is_authorized,
+            company: existingUser.company,
+          },
+        });
+        return;
+      }
+
       const slug = `demo-${slugify(company)}-${crypto.randomUUID().slice(0, 8)}`;
 
       // --- Trial end date: 14 days from now ---
       const trialEndDate = new Date();
       trialEndDate.setDate(trialEndDate.getDate() + 14);
 
-      // --- Invitation token: 7-day expiry ---
-      const invitationToken = crypto.randomUUID();
-      const invitationExpiresAt = new Date();
-      invitationExpiresAt.setDate(invitationExpiresAt.getDate() + 7);
-
-      // --- Transactional: tenant + user ---
+      // --- Transactional: tenant + user + demo project roles ---
       const result = await prisma.$transaction(async (tx) => {
-        // 1. Create tenant
+        // 1. Create tenant with trial limits
         const tenant = await tx.tenant.create({
           data: {
             name: company,
             slug,
-            status: 'ACTIVE',
+            status: 'TRIAL',
             subscription_tier: 'FREE',
+            max_projects: 3,
+            max_users: 5,
+            max_storage_gb: 10,
+            primary_email: normalizedEmail,
             trial_ends_at: trialEndDate,
           },
         });
 
-        // 2. Upsert user (may already exist from waitlist/OAuth)
-        const user = await tx.user.upsert({
-          where: { email: normalizedEmail },
-          create: {
+        // 2. Create user
+        const user = await tx.user.create({
+          data: {
             email: normalizedEmail,
             full_name: name,
             company,
+            provider: 'google',
             is_authorized: true,
+            is_platform_admin: false,
             authorized_at: new Date(),
             tenant_id: tenant.id,
             role: 'consultant',
-          },
-          update: {
-            is_authorized: true,
-            authorized_at: new Date(),
-            tenant_id: tenant.id,
-            full_name: name,
-            company,
+            roles: ['consultant'],
           },
         });
 
-        return { tenant, user };
+        // 3. Assign CONSULTANT role on seeded demo projects
+        //    Look for projects with tenant_id='demo-seed' or name containing 'Demo'
+        const demoProjects = await tx.project.findMany({
+          where: {
+            OR: [
+              { tenant_id: 'demo-seed' },
+              { name: { contains: 'Demo', mode: 'insensitive' } },
+            ],
+          },
+          select: { id: true, name: true },
+        });
+
+        if (demoProjects.length > 0) {
+          for (const project of demoProjects) {
+            await tx.projectRole.create({
+              data: {
+                project_id: project.id,
+                user_id: user.id,
+                role: 'consultant',
+              },
+            });
+          }
+          logger.info('[Demo Provisioning] Demo project roles assigned', {
+            userId: user.id,
+            projectCount: demoProjects.length,
+            projectIds: demoProjects.map((p) => p.id),
+          });
+        } else {
+          logger.warn(
+            '[Demo Provisioning] No demo projects found for role assignment — user will start with empty project list',
+            { userId: user.id }
+          );
+        }
+
+        return { tenant, user, demoProjectCount: demoProjects.length };
       });
 
       // --- Send invitation email (fire-and-forget) ---
+      // TODO: Replace with Resend invitation template when ready
       emailService
         .sendUserInvitation(
           normalizedEmail,
           'Ectropy',
           company,
-          invitationToken,
+          crypto.randomUUID(), // invitation token
           'consultant'
         )
         .catch((err) => {
@@ -158,16 +245,16 @@ export function createDemoProvisioningRoutes(): Router {
         email: normalizedEmail,
         company,
         crmContactId: crm_contact_id || null,
+        demoProjectsAssigned: result.demoProjectCount,
         provisionedBy: req.apiKey?.name || req.user?.email || 'unknown',
       });
 
-      res.status(200).json(
+      res.status(201).json(
         createResponse.success({
           user_id: result.user.id,
           tenant_id: result.tenant.id,
-          tenant_slug: slug,
-          invitation_token: invitationToken,
-          expires_at: invitationExpiresAt.toISOString(),
+          email: normalizedEmail,
+          demo_url: 'https://ectropy.ai',
         })
       );
     })
