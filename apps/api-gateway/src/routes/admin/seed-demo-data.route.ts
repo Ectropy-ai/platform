@@ -282,13 +282,13 @@ export function createSeedDemoDataRoutes(): Router {
                 user_id_project_id_role: {
                   user_id: targetUser.id,
                   project_id: projectId,
-                  role: 'OWNER',
+                  role: 'owner',
                 },
               },
               create: {
                 user_id: targetUser.id,
                 project_id: projectId,
-                role: 'OWNER',
+                role: 'owner',
                 permissions: ['admin', 'read', 'write', 'delete', 'manage_members'],
                 voting_power: 100,
                 is_active: true,
