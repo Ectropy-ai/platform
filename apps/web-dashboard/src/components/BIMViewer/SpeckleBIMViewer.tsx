@@ -843,6 +843,14 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
     }
   };
 
+  // DIAGNOSTIC: Track mount/unmount lifecycle
+  useEffect(() => {
+    console.log('🟢 [BIM Viewer] COMPONENT MOUNTED');
+    return () => {
+      console.log('💀 [BIM Viewer] COMPONENT UNMOUNTING — viewer will dispose');
+    };
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
