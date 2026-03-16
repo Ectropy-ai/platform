@@ -67,6 +67,9 @@ function TabPanel(props: TabPanelProps) {
 
 export function ViewerPage() {
   const { user } = useAuth();
+  // FIX (2026-03-16): Stable primitive for useEffect deps — user object reference
+  // changes on every auth refresh, causing project fetch to re-fire and BIMViewer to unmount
+  const userId = user?.id;
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentTab, setCurrentTab] = useState(0);
   const [selectedStream, setSelectedStream] = useState<SpeckleStream | null>(null);
@@ -130,6 +133,16 @@ export function ViewerPage() {
 
         // AUTO-CREATE DEFAULT PROJECT with deduplication guard
         // Only create if user truly has zero projects AND no "My First Project" exists
+        // Platform admins (no tenant_id) skip auto-create — they manage tenants, not own projects
+        if (projectList.length === 0 && user?.is_platform_admin) {
+          console.log(
+            '🔒 [ViewerPage] Platform admin with no projects — skipping auto-create (no tenant_id)',
+          );
+          setProjects([]);
+          setProjectsLoading(false);
+          return;
+        }
+
         if (projectList.length === 0) {
           console.log(
             '🆕 [ViewerPage] No projects found - checking for deduplication before auto-create',
@@ -145,7 +158,7 @@ export function ViewerPage() {
             if (recheck.length > 0) {
               console.log('🔄 [ViewerPage] Projects found on recheck - skipping auto-create');
               setProjects(recheck);
-              setSelectedProjectId(recheck[0].id);
+              setSelectedProjectId(prev => prev || recheck[0].id);
               return;
             }
 
@@ -184,8 +197,8 @@ export function ViewerPage() {
         // Auto-select: prefer ?project= URL param, then first project in list
         if (projectIdFromUrl && projectList.find(p => p.id === projectIdFromUrl)) {
           setSelectedProjectId(projectIdFromUrl);
-        } else if (projectList.length > 0 && !selectedProjectId) {
-          setSelectedProjectId(projectList[0].id);
+        } else if (projectList.length > 0) {
+          setSelectedProjectId(prev => prev || projectList[0].id);
         }
       } catch (error) {
         if (cancelled) {
@@ -206,7 +219,7 @@ export function ViewerPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, projectIdFromUrl]); // Re-fetch when auth state or URL project param changes
+  }, [userId, projectIdFromUrl]); // Re-fetch when auth state or URL project param changes
 
   /**
    * Fetch project-specific role when selected project changes
@@ -399,7 +412,17 @@ export function ViewerPage() {
           )}
 
           {/* No Project Warning */}
-          {!projectsLoading && projects.length === 0 && (
+          {!projectsLoading && projects.length === 0 && user?.is_platform_admin && (
+            <Alert severity='info' sx={{ mt: 2 }}>
+              <Typography variant='body2'>
+                Platform admin view — no personal projects. Use the admin console to manage tenants and provision demo users.
+              </Typography>
+              <Button variant='contained' size='small' href='/admin/dashboard' sx={{ mt: 1 }}>
+                Admin Console
+              </Button>
+            </Alert>
+          )}
+          {!projectsLoading && projects.length === 0 && !user?.is_platform_admin && (
             <Alert severity='info' sx={{ mt: 2 }}>
               <Typography variant='body2'>
                 No projects found. Create a project first to use the BIM viewer.
