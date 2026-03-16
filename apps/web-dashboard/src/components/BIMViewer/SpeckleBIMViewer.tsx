@@ -652,8 +652,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         logger.debug('[BIM Viewer] Fitting camera to loaded geometry');
         cameraController.setCameraView([], true);
       } else {
-        logger.debug('[BIM Viewer] CameraController unavailable, trying viewer.zoom fallback');
-        viewer.zoom?.();
+        logger.debug('[BIM Viewer] CameraController unavailable — camera fit skipped');
       }
 
       // Schedule another resize + camera fit after a short delay (safety net)
