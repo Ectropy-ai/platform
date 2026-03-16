@@ -458,57 +458,8 @@ export function ViewerPage() {
           {/* Viewer Tab */}
           <TabPanel value={currentTab} index={0}>
             <Stack spacing={3}>
-              {/* Show content only when a project is selected */}
-              {projectId ? (
-                <>
-                  {/* Stream Selector */}
-                  <StreamSelector
-                    projectId={projectId}
-                    authToken={user?.accessToken}
-                    selectedStreamId={streamIdFromUrl || selectedStream?.stream_id}
-                    onStreamSelect={handleStreamSelect}
-                    onStreamInitialized={handleStreamInitialized}
-                    showActions={true}
-                    refreshTrigger={streamRefreshTrigger}
-                  />
-
-                  <Divider />
-
-                  {/* BIM Viewer */}
-                  {/* ENTERPRISE FIX (2026-01-13): Always render BIMViewer to prevent unmount/remount */}
-                  {/* ROOT CAUSE: Conditional rendering caused viewer disposal on stream changes */}
-                  {/* SOLUTION: Keep component mounted, pass undefined streamId when no stream */}
-                  {(() => {
-                    console.log('🎨 [ViewerPage] Rendering BIM Viewer, selectedStream:', {
-                      exists: !!selectedStream,
-                      stream_id: selectedStream?.stream_id || 'null',
-                      will_render_viewer: true, // Always render now
-                    });
-                    return null;
-                  })()}
-                  <BIMViewerErrorBoundary
-                    onError={(error, errorInfo) => {
-                      console.error('BIM Viewer Error:', error, errorInfo);
-                      // Track error for analytics
-                      if (typeof window !== 'undefined' && (window as any).gtag) {
-                        (window as any).gtag('event', 'exception', {
-                          description: `BIM Viewer Error: ${error.message}`,
-                          fatal: false,
-                        });
-                      }
-                    }}
-                  >
-                    <SpeckleBIMViewer
-                      streamId={selectedStream?.stream_id || undefined}
-                      objectId={selectedStream?.latest_object_id || undefined}
-                      stakeholderRole={(projectRole || 'contractor') as any}
-                      onElementSelect={handleElementSelect}
-                      height='600px'
-                      serverUrl={config.speckleApiUrl}
-                    />
-                  </BIMViewerErrorBoundary>
-                </>
-              ) : (
+              {/* No-project placeholder — shown when projectId is falsy */}
+              {!projectId && (
                 <Paper
                   variant='outlined'
                   sx={{
@@ -544,6 +495,42 @@ export function ViewerPage() {
                   </Stack>
                 </Paper>
               )}
+              {/* BIMViewer — always mounted, hidden when no project to prevent
+                  unmount/remount cycles destroying WebGL context */}
+              <Box sx={{ display: projectId ? 'block' : 'none' }}>
+                <StreamSelector
+                  projectId={projectId}
+                  authToken={user?.accessToken}
+                  selectedStreamId={streamIdFromUrl || selectedStream?.stream_id}
+                  onStreamSelect={handleStreamSelect}
+                  onStreamInitialized={handleStreamInitialized}
+                  showActions={true}
+                  refreshTrigger={streamRefreshTrigger}
+                />
+
+                <Divider />
+
+                <BIMViewerErrorBoundary
+                  onError={(error, errorInfo) => {
+                    console.error('BIM Viewer Error:', error, errorInfo);
+                    if (typeof window !== 'undefined' && (window as any).gtag) {
+                      (window as any).gtag('event', 'exception', {
+                        description: `BIM Viewer Error: ${error.message}`,
+                        fatal: false,
+                      });
+                    }
+                  }}
+                >
+                  <SpeckleBIMViewer
+                    streamId={selectedStream?.stream_id || undefined}
+                    objectId={selectedStream?.latest_object_id || undefined}
+                    stakeholderRole={(projectRole || 'contractor') as any}
+                    onElementSelect={handleElementSelect}
+                    height='600px'
+                    serverUrl={config.speckleApiUrl}
+                  />
+                </BIMViewerErrorBoundary>
+              </Box>
             </Stack>
           </TabPanel>
 
