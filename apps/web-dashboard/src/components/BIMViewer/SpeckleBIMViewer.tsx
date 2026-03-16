@@ -366,6 +366,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       if (effectiveStreamId && effectiveObjectId) {
         await loadSpeckleObject(viewer, effectiveStreamId, effectiveObjectId);
         loadedObjectRef.current = objectKey;
+        console.log('🟢 [BIM Viewer] loadObject resolved, starting render pass');
       } else {
         await loadDemoContent(viewer);
         loadedObjectRef.current = null;
@@ -399,6 +400,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         }
       }
     } catch (err) {
+      console.error('🔴 [BIM Viewer] initializeViewer caught:', err);
       logger.error('[BIM Viewer] Failed to initialize', { error: err });
       setError(
         `Failed to load BIM model: ${err instanceof Error ? err.message : String(err) || 'Unknown error'}`,

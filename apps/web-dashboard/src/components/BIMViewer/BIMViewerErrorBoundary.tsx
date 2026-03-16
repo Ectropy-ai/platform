@@ -64,6 +64,11 @@ export class BIMViewerErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    // DIAGNOSTIC (2026-03-16): Explicit console.error for unmount investigation
+    // If this fires, ErrorBoundary is catching a throw and unmounting SpeckleBIMViewer
+    console.error('[BIMViewerErrorBoundary] Caught error:', error);
+    console.error('[BIMViewerErrorBoundary] Component stack:', errorInfo.componentStack);
+
     // Log error using enterprise client logger
     // Automatically handles: Console, Remote API, Analytics
     clientLogger.error('BIM Viewer Error Boundary caught error', error, {
