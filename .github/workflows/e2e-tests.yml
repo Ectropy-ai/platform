@@ -1608,7 +1608,7 @@ jobs:
         if: success()
         uses: ./.github/actions/slack-notify
         with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
           status: success
           workflow-name: ${{ github.workflow }}
           custom-message: '✨ *E2E tests passed* - All test shards completed successfully. Enterprise excellence achieved!'
@@ -1617,7 +1617,7 @@ jobs:
         if: failure()
         uses: ./.github/actions/slack-notify
         with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
           status: failure
           workflow-name: ${{ github.workflow }}
           custom-message: '🧪 *E2E tests failed* - Test report merge or shard execution failed. Review test results.'

@@ -586,7 +586,7 @@ jobs:
         if: github.event_name == 'schedule' && (needs.phase-1-infrastructure.result == 'failure' || needs.phase-2-database.result == 'failure' || needs.phase-3-api.result == 'failure' || needs.phase-4-e2e.result == 'failure' || needs.phase-5-component-unit.result == 'failure')
         uses: ./.github/actions/slack-notify
         with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
           status: failure
           workflow-name: 'Enterprise Test Suite'
           custom-message: |

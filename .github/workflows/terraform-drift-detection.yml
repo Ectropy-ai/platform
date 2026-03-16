@@ -445,7 +445,7 @@ jobs:
         if: steps.drift.outputs.drift_detected == 'true'
         uses: ./.github/actions/slack-notify
         with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
           status: warning
           workflow-name: 'Terraform Drift Detection'
           custom-message: |
@@ -464,7 +464,7 @@ jobs:
         if: steps.drift.outputs.drift_detected == 'error'
         uses: ./.github/actions/slack-notify
         with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
           status: failure
           workflow-name: 'Terraform Drift Detection'
           custom-message: |

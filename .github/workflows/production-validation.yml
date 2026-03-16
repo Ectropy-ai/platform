@@ -108,7 +108,7 @@ jobs:
         if: steps.validation_tests.outcome == 'failure'
         uses: ./.github/actions/slack-notify
         with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
           status: warning
           workflow-name: 'Production Validation'
           custom-message: |
