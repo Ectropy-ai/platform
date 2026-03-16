@@ -1,0 +1,125 @@
+{
+  "report": "TRUTH-PROD-LAUNCH-2026-03-15",
+  "type": "production-launch-truth-report",
+  "date": "2026-03-15",
+  "session": "Production Launch — Blue/Green Deploy to ectropy.ai",
+  "outcome": "SUCCESS",
+  "deploy_attempts": 12,
+  "final_run_id": 23122057444,
+  "commit_sha": "4ec3034cbada4a1596bf91d03b4d5e144058fdc3",
+  "infrastructure": {
+    "blue_server": "143.198.48.156",
+    "green_server": "64.227.105.120",
+    "load_balancer": "209.38.174.111",
+    "database": "ectropy-production-db-do-user-10389677-0.d.db.ondigitalocean.com:25060",
+    "registry": "registry.digitalocean.com/ectropy-registry",
+    "images_deployed": ["api-gateway:latest", "mcp-server:latest", "web-dashboard:latest"]
+  },
+  "health_check_results": {
+    "frontend": {"url": "https://ectropy.ai/", "status": 200},
+    "api_gateway": {"url": "https://ectropy.ai/api/health", "status": 200, "score": 80, "database": "healthy", "redis": "healthy"},
+    "mcp_server": {"url": "https://ectropy.ai/mcp/health", "status": 200},
+    "lb_health": {"url": "https://ectropy.ai/lb-health", "status": 200}
+  },
+  "issues_resolved": [
+    {
+      "id": "PROD-LAUNCH-001",
+      "title": "GitHub Variables not configured",
+      "severity": "P0",
+      "symptom": "Validate Prerequisites failed: DATABASE_CLUSTER_ID not set",
+      "root_cause": "All 16 GitHub repository variables (vars.*) were empty — never configured",
+      "fix": "Set 16 variables via `gh variable set` using values queried from `doctl`: PROD_BLUE_IP, PROD_GREEN_IP, PROD_BLUE_DROPLET_ID, PROD_GREEN_DROPLET_ID, PROD_LB_ID, PROD_FIREWALL_ID, DATABASE_CLUSTER_ID, DATABASE_HOST, DATABASE_PORT, DATABASE_NAME, DATABASE_USER, API_URL, FRONTEND_URL",
+      "deploy_attempts_affected": [1]
+    },
+    {
+      "id": "PROD-LAUNCH-002",
+      "title": "SSH key environment scoping — repo-level vs production environment",
+      "severity": "P0",
+      "symptom": "Setup SSH key step failed with 'Error loading key (stdin): error in libcrypto'",
+      "root_cause": "deploy-blue job declares `environment: production`, so GitHub environment-level secrets override repo-level. All `gh secret set PROD_SSH_KEY` calls without `--env` went to repo-level, while the stale environment-level key (from March 12) was always used instead.",
+      "fix": "Generated new RSA 4096 PEM key, added public key to authorized_keys on both servers, set private key with `gh secret set PROD_SSH_KEY --env production`",
+      "five_why": "WHY-1: libcrypto error → WHY-2: stale ED25519 key in environment → WHY-3: environment secrets override repo-level → WHY-4: `gh secret set` defaults to repo-level → WHY-5: no --env flag used",
+      "deploy_attempts_affected": [2, 3, 4, 5, 6]
+    },
+    {
+      "id": "PROD-LAUNCH-003",
+      "title": "Missing docker-compose.deploy.yml",
+      "severity": "P0",
+      "symptom": "Deploy to blue server failed: docker-compose.deploy.yml not found",
+      "root_cause": "deploy-to-server.sh (line 233) expects docker-compose.deploy.yml but the file was never created. docker-compose.production.yml already uses image: directives (no build:), so it IS the deploy config.",
+      "fix": "Created docker-compose.deploy.yml as copy of docker-compose.production.yml. Added .gitignore exception (!docker-compose.deploy.yml). Committed to main.",
+      "commit": "1a4ad9b",
+      "deploy_attempts_affected": [7]
+    },
+    {
+      "id": "PROD-LAUNCH-004",
+      "title": "Stale DB passwords in production environment secrets",
+      "severity": "P0",
+      "symptom": "P1000: Authentication failed against database server, the provided database credentials for 'doadmin' are not valid",
+      "root_cause": "DB_ADMIN_PASSWORD and DB_PASSWORD in GitHub production environment were set on March 12 and had since been rotated by DigitalOcean managed database.",
+      "fix": "Queried current passwords via `doctl databases connection` and updated both secrets with `--env production`",
+      "deploy_attempts_affected": [8]
+    },
+    {
+      "id": "PROD-LAUNCH-005",
+      "title": "Prisma migration P3009 — failed migration blocks all retries",
+      "severity": "P0",
+      "symptom": "P3009: migrate found failed migrations in the target database, new migrations will not be applied. Migration 20260313000000_sprint5_ros_mro_schema_drift recorded as failed.",
+      "root_cause": "Sprint5 migration ran once, failed mid-execution (SQL error), and Prisma recorded a 'failed' row in _prisma_migrations. All subsequent retries (including container restarts) see P3009 and refuse to proceed. The original SQL error was lost because CI only captures last 50 lines of container logs.",
+      "fix_code": [
+        "Made migration SQL idempotent: DO/EXCEPTION for CREATE TYPE, IF NOT EXISTS for ADD VALUE/ADD COLUMN/CREATE TABLE/CREATE INDEX, exception guards for FK constraints",
+        "Added P3009 auto-resolve to docker-entrypoint.sh: detects P3009, deletes failed row from _prisma_migrations via prisma db execute (with psql fallback), then retries"
+      ],
+      "commit": "9dc0eab",
+      "deploy_attempts_affected": [9]
+    },
+    {
+      "id": "PROD-LAUNCH-006",
+      "title": "SESSION_SECRET too short (30 chars, min 32)",
+      "severity": "P0",
+      "symptom": "FATAL: Bootstrap Failed — SECURITY: SESSION_SECRET must be at least 32 characters (current: 30)",
+      "root_cause": "SESSION_SECRET in production environment was only 30 characters. The api-gateway config/index.ts validates minimum 32 characters in production.",
+      "fix": "Generated new 64-char hex SESSION_SECRET via `openssl rand -hex 32`, set with `--env production`",
+      "deploy_attempts_affected": [10]
+    },
+    {
+      "id": "PROD-LAUNCH-007",
+      "title": "JWT_SECRET too short (62 chars, min 64)",
+      "severity": "P0",
+      "symptom": "FATAL: Bootstrap Failed — SECURITY: JWT_SECRET should be at least 64 characters for production use (current: 62)",
+      "root_cause": "JWT_SECRET in production environment was 62 characters. The api-gateway config/index.ts validates minimum 64 characters for production.",
+      "fix": "Generated new 96-char hex secrets via `openssl rand -hex 48` for both JWT_SECRET and JWT_REFRESH_SECRET, set with `--env production`",
+      "deploy_attempts_affected": [11]
+    },
+    {
+      "id": "PROD-LAUNCH-008",
+      "title": "@luh-tech/crm 401 in CI post-deployment validation",
+      "severity": "P1",
+      "blocking": false,
+      "symptom": "ERR_PNPM_FETCH_401 GET https://npm.pkg.github.com/download/@luh-tech/crm/0.2.0: Unauthorized - 401",
+      "root_cause": "Post-Deployment Validation job runs `pnpm install` which needs LUHTECH_PKG_READ token for @luh-tech/crm GitHub Package. Token not set as a secret accessible to the deploy workflow.",
+      "fix": "TODO: Set LUHTECH_PKG_READ as a repository secret or production environment secret. Non-blocking — actual deployment succeeded.",
+      "deploy_attempts_affected": [12]
+    }
+  ],
+  "secondary_fixes": [
+    {
+      "id": "PROD-LAUNCH-FIX-REDIS",
+      "title": "MCP server Redis ECONNREFUSED 127.0.0.1",
+      "description": "MCP server code reads REDIS_HOST env var (defaulting to 127.0.0.1) but docker-compose only set REDIS_URL (which MCP ignores). Added REDIS_HOST=redis, REDIS_PORT=6379, REDIS_PASSWORD to MCP server environment in both docker-compose.deploy.yml and docker-compose.production.yml.",
+      "commit": "4ec3034"
+    }
+  ],
+  "commits_to_main": [
+    {"sha": "1a4ad9b", "message": "fix(deploy): add docker-compose.deploy.yml"},
+    {"sha": "9dc0eab", "message": "fix(deploy): make sprint5 migration idempotent + P3009 auto-resolve"},
+    {"sha": "4ec3034", "message": "fix(deploy): add REDIS_HOST/PORT to MCP server compose environment"}
+  ],
+  "pending_items": [
+    "Backport main commits to develop branch",
+    "Set LUHTECH_PKG_READ secret for deploy workflow (P1)",
+    "Speckle server DB connection timeout (speckle database may not exist on managed cluster)",
+    "Production data seeding (Canadian pilot demo data)",
+    "Migrate production deploy to Zero-SSH Watchtower pattern (matching staging)"
+  ]
+}
