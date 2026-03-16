@@ -232,9 +232,9 @@ class ConfigurationService {
       const stagingProtocol = process.env['REACT_APP_STAGING_SPECKLE_PROTOCOL'] || 'https';
       return `${stagingProtocol}://speckle.${stagingDomain}`;
     } else {
-      // Production deployment - use subdomain pattern
+      // Production deployment - path-based proxy (DO LB does not route subdomains)
       const productionProtocol = process.env['REACT_APP_PRODUCTION_PROTOCOL'] || currentProtocol;
-      return `${productionProtocol}://speckle.${hostname}`;
+      return `${productionProtocol}://${hostname}/speckle`;
     }
   }
 
