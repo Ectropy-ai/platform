@@ -601,14 +601,29 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       // Load the object using the official Speckle API with automatic camera positioning
       // zoomToObject=true enables automatic camera initialization and positioning
       // TypeScript FIX: loadObject exists at runtime but TypeScript types may not include it
+      //
+      // FIX (2026-03-16): Resolving timeout instead of rejecting.
+      // ROOT CAUSE: viewer.loadObject Promise never settles with pre-fetched data
+      // (SpeckleLoader 5th param), even though the SDK loads objects into the scene
+      // near-instantly ("Loaded 1 objects in: 0.021"). The old 30s rejecting timeout
+      // kept the spinner visible for 30s then showed a spurious error.
+      // SOLUTION: Resolve after 3s — data is pre-fetched, viewer already has it.
+      // If loadObject rejects (genuine error), the .catch swallows it as non-fatal.
       logger.debug('[BIM Viewer] Calling viewer.loadObject with zoomToObject=true');
       await Promise.race([
         (viewer.loadObject as (loader: unknown, zoom?: boolean) => Promise<void>)(
           speckleLoader,
           true,
-        ),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('viewer.loadObject timeout after 30s')), 30000),
+        ).catch((err) => {
+          logger.warn('[BIM Viewer] viewer.loadObject error (non-fatal, data was pre-fetched)', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }),
+        new Promise<void>((resolve) =>
+          setTimeout(() => {
+            logger.info('[BIM Viewer] loadObject grace period elapsed — proceeding (data pre-fetched)');
+            resolve();
+          }, 3000),
         ),
       ]);
 
