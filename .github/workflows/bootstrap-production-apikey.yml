@@ -16,13 +16,18 @@ jobs:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       - name: Add runner IP to firewall
+        id: add-firewall-rule
         run: |
           RUNNER_IP=$(curl -s https://api.ipify.org)
           echo "Runner IP: $RUNNER_IP"
-          doctl compute firewall add-rules ${{ vars.FIREWALL_ID || 'c5a5e529-e7e9-42e5-b154-19da80b498b7' }} \
-            --inbound-rules "protocol:tcp,ports:22,address:${RUNNER_IP}/32" || true
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          echo "Firewall ID: $FIREWALL_ID"
+          doctl compute firewall add-rules $FIREWALL_ID \
+            --inbound-rules "protocol:tcp,ports:22,address:${RUNNER_IP}/32"
+          echo "⏳ Waiting 5 seconds for firewall rule propagation..."
           sleep 5
           echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
 
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
@@ -32,11 +37,13 @@ jobs:
       - name: Add SSH known hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H 143.198.48.156 >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -H 143.198.48.156 >> ~/.ssh/known_hosts 2>&1 || true
+          # Fallback: accept any host key
+          echo "StrictHostKeyChecking no" >> ~/.ssh/config
 
       - name: Bootstrap API key on blue server
         run: |
-          ssh -o StrictHostKeyChecking=no root@143.198.48.156 'docker exec ectropy-api-gateway node -e "
+          ssh root@143.198.48.156 'docker exec ectropy-api-gateway node -e "
           const { PrismaClient } = require(\"@prisma/client\");
           const bcrypt = require(\"bcrypt\");
           const crypto = require(\"crypto\");
@@ -103,5 +110,6 @@ jobs:
       - name: Remove runner IP from firewall
         if: always()
         run: |
-          doctl compute firewall remove-rules ${{ vars.FIREWALL_ID || 'c5a5e529-e7e9-42e5-b154-19da80b498b7' }} \
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          doctl compute firewall remove-rules $FIREWALL_ID \
             --inbound-rules "protocol:tcp,ports:22,address:${RUNNER_IP}/32" || true
