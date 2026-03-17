@@ -50,7 +50,7 @@ jobs:
 
           echo "--- Step 2: Restart api-gateway ---"
           cd /opt/ectropy
-          docker compose -f /opt/ectropy/docker-compose.yml up -d --no-deps ectropy-api-gateway
+          docker compose -f /opt/ectropy/docker-compose.yml up -d --no-deps api-gateway
           echo "Waiting 10s for container startup..."
           sleep 10
 
@@ -77,7 +77,7 @@ jobs:
 
           echo "--- Step 2: Restart api-gateway ---"
           cd /opt/ectropy
-          docker compose -f /opt/ectropy/docker-compose.yml up -d --no-deps ectropy-api-gateway
+          docker compose -f /opt/ectropy/docker-compose.yml up -d --no-deps api-gateway
           echo "Waiting 10s for container startup..."
           sleep 10
 
