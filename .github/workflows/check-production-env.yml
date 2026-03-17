@@ -1,10 +1,10 @@
-name: Check Production Env (Read-Only)
+name: Update GOOGLE_CLIENT_SECRET on Production
 
 on:
   workflow_dispatch:
 
 jobs:
-  check-env:
+  update-secret:
     runs-on: ubuntu-latest
     steps:
       - name: Install doctl
@@ -32,16 +32,73 @@ jobs:
       - name: Add SSH known hosts
         run: |
           ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ vars.PROD_GREEN_IP }} >> ~/.ssh/known_hosts
 
-      - name: Check Blue - last 6 chars of GOOGLE_CLIENT_SECRET
+      # STEP 1 + 2 + 3: Blue server
+      - name: Update + restart + verify Blue
+        env:
+          NEW_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           echo "=== BLUE (${{ vars.PROD_BLUE_IP }}) ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash -s <<'REMOTE'
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash -s -- "$NEW_SECRET" <<'REMOTE'
+          set -euo pipefail
+          SECRET="$1"
+
+          echo "--- Step 1: Update /opt/ectropy/.env ---"
+          sed -i "s|^GOOGLE_CLIENT_SECRET=.*|GOOGLE_CLIENT_SECRET=${SECRET}|" /opt/ectropy/.env
+          echo "sed complete"
+
+          echo "--- Step 2: Restart api-gateway ---"
+          cd /opt/ectropy
+          docker compose -f /opt/ectropy/docker-compose.yml up -d --no-deps ectropy-api-gateway
+          echo "Waiting 10s for container startup..."
+          sleep 10
+
+          echo "--- Step 3: Verify last 6 chars ---"
           CONTAINER=$(docker ps --format '{{.Names}}' | grep api | head -1)
           echo "Container: $CONTAINER"
           LAST6=$(docker exec "$CONTAINER" printenv GOOGLE_CLIENT_SECRET | rev | cut -c1-6 | rev)
           echo "GOOGLE_CLIENT_SECRET last 6 chars: $LAST6"
           REMOTE
+
+      # STEP 1 + 2 + 3: Green server
+      - name: Update + restart + verify Green
+        env:
+          NEW_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: |
+          echo "=== GREEN (${{ vars.PROD_GREEN_IP }}) ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash -s -- "$NEW_SECRET" <<'REMOTE'
+          set -euo pipefail
+          SECRET="$1"
+
+          echo "--- Step 1: Update /opt/ectropy/.env ---"
+          sed -i "s|^GOOGLE_CLIENT_SECRET=.*|GOOGLE_CLIENT_SECRET=${SECRET}|" /opt/ectropy/.env
+          echo "sed complete"
+
+          echo "--- Step 2: Restart api-gateway ---"
+          cd /opt/ectropy
+          docker compose -f /opt/ectropy/docker-compose.yml up -d --no-deps ectropy-api-gateway
+          echo "Waiting 10s for container startup..."
+          sleep 10
+
+          echo "--- Step 3: Verify last 6 chars ---"
+          CONTAINER=$(docker ps --format '{{.Names}}' | grep api | head -1)
+          echo "Container: $CONTAINER"
+          LAST6=$(docker exec "$CONTAINER" printenv GOOGLE_CLIENT_SECRET | rev | cut -c1-6 | rev)
+          echo "GOOGLE_CLIENT_SECRET last 6 chars: $LAST6"
+          REMOTE
+
+      # STEP 5: n8n canary
+      - name: n8n canary check
+        run: |
+          echo "--- Step 5: n8n canary ---"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST https://n8n.luh.tech/webhook/lead-capture)
+          echo "n8n canary: $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "FAIL: expected 200, got $HTTP_CODE"
+            exit 1
+          fi
+          echo "PASS: n8n canary returned 200"
 
       - name: Remove runner IP from firewall (cleanup)
         if: always() && steps.add-firewall-rule.outputs.runner_ip
