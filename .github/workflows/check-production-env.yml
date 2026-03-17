@@ -1,0 +1,73 @@
+name: Check Production Env (Read-Only)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-env:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add SSH firewall rule
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "Runner IP: $RUNNER_IP"
+          curl -s -X POST \
+            -H "Authorization: Bearer $DIGITALOCEAN_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"inbound_rules\":[{\"protocol\":\"tcp\",\"ports\":\"22\",\"sources\":{\"addresses\":[\"${RUNNER_IP}/32\"]}}]}" \
+            "https://api.digitalocean.com/v2/firewalls/${{ vars.PROD_FIREWALL_ID }}/rules"
+          sleep 5
+
+      - name: Get SSH fingerprints
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -T 10 143.198.48.156 >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -T 10 64.227.105.120 >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Check Blue server env
+        env:
+          SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+        run: |
+          echo "$SSH_KEY" > /tmp/key && chmod 600 /tmp/key
+          echo "=== BLUE (143.198.48.156) ==="
+          ssh -i /tmp/key -o ConnectTimeout=15 root@143.198.48.156 bash -s <<'REMOTE'
+          echo "--- Google OAuth keys ---"
+          grep 'GOOGLE_CLIENT_SECRET\|GOOGLE_CLIENT_ID' /root/ectropy/.env | sed 's/=.*/=<REDACTED>/'
+          echo "--- .env stat ---"
+          stat /root/ectropy/.env
+          echo "--- OAuth-related env in running container ---"
+          docker exec ectropy-api-gateway env 2>/dev/null | grep -E 'GOOGLE_CLIENT|OAUTH|SESSION_SECRET' | sed 's/=.*/=<REDACTED>/'
+          REMOTE
+
+      - name: Check Green server env
+        env:
+          SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+        run: |
+          echo "$SSH_KEY" > /tmp/key && chmod 600 /tmp/key
+          echo "=== GREEN (64.227.105.120) ==="
+          ssh -i /tmp/key -o ConnectTimeout=15 root@64.227.105.120 bash -s <<'REMOTE'
+          echo "--- Google OAuth keys ---"
+          grep 'GOOGLE_CLIENT_SECRET\|GOOGLE_CLIENT_ID' /root/ectropy/.env | sed 's/=.*/=<REDACTED>/'
+          echo "--- .env stat ---"
+          stat /root/ectropy/.env
+          echo "--- OAuth-related env in running container ---"
+          docker exec ectropy-api-gateway env 2>/dev/null | grep -E 'GOOGLE_CLIENT|OAUTH|SESSION_SECRET' | sed 's/=.*/=<REDACTED>/'
+          REMOTE
+
+      - name: Remove SSH firewall rule
+        if: always()
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          curl -s -X DELETE \
+            -H "Authorization: Bearer $DIGITALOCEAN_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"inbound_rules\":[{\"protocol\":\"tcp\",\"ports\":\"22\",\"sources\":{\"addresses\":[\"${RUNNER_IP}/32\"]}}]}" \
+            "https://api.digitalocean.com/v2/firewalls/${{ vars.PROD_FIREWALL_ID }}/rules"
+
+      - name: Cleanup key
+        if: always()
+        run: rm -f /tmp/key
