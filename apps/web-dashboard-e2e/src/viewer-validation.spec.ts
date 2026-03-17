@@ -239,7 +239,7 @@ async function navigateToViewer(
   // - Viewer bundle not loaded (infrastructure issue)
   //
   // Reference: .roadmap/FIVE_WHY_E2E_AUTH_STAGING_FAILURES_2026-02-13.json (Why #5)
-  await page.locator('[data-testid="bim-viewer-container"]').waitFor({
+  await page.locator('[data-testid="bim-viewer-container"]').first().waitFor({
     state: 'attached',
     timeout: 30000, // 30s for staging: project list fetch + Speckle viewer init + network latency
   });
@@ -302,10 +302,10 @@ test.describe('Speckle Viewer Container', () => {
   test('viewer container renders in DOM', async ({ page }) => {
     await navigateToViewer(page);
 
-    // Look for the BIM viewer container
+    // Look for the BIM viewer container (use .first() — renders in multiple tab panels)
     const viewerContainer = page.locator(
       '[data-testid="bim-viewer-container"]'
-    );
+    ).first();
     await expect(viewerContainer).toBeAttached({ timeout: 10000 });
   });
 
@@ -355,7 +355,7 @@ test.describe('Speckle Viewer Container', () => {
 
     const viewerContainer = page.locator(
       '[data-testid="bim-viewer-container"]'
-    );
+    ).first();
     const box = await viewerContainer.boundingBox();
 
     // Viewer should have reasonable height (at least 400px)
@@ -537,7 +537,7 @@ test.describe('Responsive Layout', () => {
 
     const viewerContainer = page.locator(
       '[data-testid="bim-viewer-container"]'
-    );
+    ).first();
     await expect(viewerContainer).toBeVisible({ timeout: 10000 });
   });
 
@@ -547,7 +547,7 @@ test.describe('Responsive Layout', () => {
 
     const viewerContainer = page.locator(
       '[data-testid="bim-viewer-container"]'
-    );
+    ).first();
     await expect(viewerContainer).toBeVisible({ timeout: 10000 });
   });
 
@@ -606,9 +606,10 @@ test.describe('Performance', () => {
     const startTime = Date.now();
     await navigateToViewer(page);
 
-    // Wait for viewer container
+    // Wait for viewer container (use .first() — renders in multiple tab panels)
     await page
       .locator('[data-testid="bim-viewer-container"]')
+      .first()
       .waitFor({ timeout: 10000 });
 
     const loadTime = Date.now() - startTime;
