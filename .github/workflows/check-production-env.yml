@@ -38,24 +38,34 @@ jobs:
         run: |
           echo "=== BLUE (${{ vars.PROD_BLUE_IP }}) ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash -s <<'REMOTE'
-          echo "--- Google OAuth keys ---"
-          grep 'GOOGLE_CLIENT_SECRET\|GOOGLE_CLIENT_ID' /root/ectropy/.env | sed 's/=.*/=<REDACTED>/'
-          echo "--- .env stat ---"
-          stat /root/ectropy/.env
-          echo "--- OAuth-related env in running container ---"
-          docker exec ectropy-api-gateway env 2>/dev/null | grep -E 'GOOGLE_CLIENT|OAUTH|SESSION_SECRET' | sed 's/=.*/=<REDACTED>/'
+          echo "--- 1. OAuth keys in /opt/ectropy/.env ---"
+          grep 'GOOGLE_CLIENT_SECRET\|GOOGLE_CLIENT_ID\|OAUTH_CALLBACK_URL' /opt/ectropy/.env | sed 's/=.*/=<REDACTED>/' || echo "(not found)"
+
+          echo "--- 2. stat /opt/ectropy/.env ---"
+          stat /opt/ectropy/.env 2>&1 || echo "(file does not exist)"
+
+          echo "--- 3. Key name prefixes (first 40 chars) ---"
+          grep 'GOOGLE_CLIENT_SECRET\|GOOGLE_CLIENT_ID' /opt/ectropy/.env | cut -c1-40 | sed 's/=.*/=<REDACTED>/' || echo "(not found)"
+
+          echo "--- 4. Container env (for comparison) ---"
+          docker exec ectropy-api-gateway env 2>/dev/null | grep -E 'GOOGLE_CLIENT|OAUTH_CALLBACK_URL|SESSION_SECRET' | sed 's/=.*/=<REDACTED>/' || echo "(container not running)"
           REMOTE
 
       - name: Check Green server env
         run: |
           echo "=== GREEN (${{ vars.PROD_GREEN_IP }}) ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash -s <<'REMOTE'
-          echo "--- Google OAuth keys ---"
-          grep 'GOOGLE_CLIENT_SECRET\|GOOGLE_CLIENT_ID' /root/ectropy/.env | sed 's/=.*/=<REDACTED>/'
-          echo "--- .env stat ---"
-          stat /root/ectropy/.env
-          echo "--- OAuth-related env in running container ---"
-          docker exec ectropy-api-gateway env 2>/dev/null | grep -E 'GOOGLE_CLIENT|OAUTH|SESSION_SECRET' | sed 's/=.*/=<REDACTED>/'
+          echo "--- 1. OAuth keys in /opt/ectropy/.env ---"
+          grep 'GOOGLE_CLIENT_SECRET\|GOOGLE_CLIENT_ID\|OAUTH_CALLBACK_URL' /opt/ectropy/.env | sed 's/=.*/=<REDACTED>/' || echo "(not found)"
+
+          echo "--- 2. stat /opt/ectropy/.env ---"
+          stat /opt/ectropy/.env 2>&1 || echo "(file does not exist)"
+
+          echo "--- 3. Key name prefixes (first 40 chars) ---"
+          grep 'GOOGLE_CLIENT_SECRET\|GOOGLE_CLIENT_ID' /opt/ectropy/.env | cut -c1-40 | sed 's/=.*/=<REDACTED>/' || echo "(not found)"
+
+          echo "--- 4. Container env (for comparison) ---"
+          docker exec ectropy-api-gateway env 2>/dev/null | grep -E 'GOOGLE_CLIENT|OAUTH_CALLBACK_URL|SESSION_SECRET' | sed 's/=.*/=<REDACTED>/' || echo "(container not running)"
           REMOTE
 
       - name: Remove runner IP from firewall (cleanup)
