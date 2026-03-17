@@ -46,22 +46,37 @@ CREATE INDEX IF NOT EXISTS "speckle_sync_logs_status_idx" ON "speckle_sync_logs"
 CREATE INDEX IF NOT EXISTS "speckle_sync_logs_operation_idx" ON "speckle_sync_logs"("operation");
 CREATE INDEX IF NOT EXISTS "speckle_sync_logs_started_at_idx" ON "speckle_sync_logs"("started_at" DESC);
 
--- AddForeignKey: speckle_streams -> projects
-ALTER TABLE "speckle_streams" ADD CONSTRAINT "speckle_streams_construction_project_id_fkey" FOREIGN KEY ("construction_project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey: speckle_streams -> projects (idempotent — P3009 safe)
+DO $$ BEGIN
+    ALTER TABLE "speckle_streams" ADD CONSTRAINT "speckle_streams_construction_project_id_fkey"
+        FOREIGN KEY ("construction_project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
--- AddForeignKey: speckle_sync_logs -> projects
-ALTER TABLE "speckle_sync_logs" ADD CONSTRAINT "speckle_sync_logs_construction_project_id_fkey" FOREIGN KEY ("construction_project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey: speckle_sync_logs -> projects (idempotent — P3009 safe)
+DO $$ BEGIN
+    ALTER TABLE "speckle_sync_logs" ADD CONSTRAINT "speckle_sync_logs_construction_project_id_fkey"
+        FOREIGN KEY ("construction_project_id") REFERENCES "projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- EnableRLS: match existing tenant isolation pattern
+-- (ENABLE/FORCE RLS are inherently idempotent)
 ALTER TABLE "speckle_streams" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "speckle_streams" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "speckle_sync_logs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "speckle_sync_logs" FORCE ROW LEVEL SECURITY;
 
--- RLS policies: tenant isolation (matches existing pattern)
+-- RLS policies: tenant isolation (idempotent — drop-if-exists + create)
+DROP POLICY IF EXISTS "tenant_isolation_speckle_streams" ON "speckle_streams";
 CREATE POLICY "tenant_isolation_speckle_streams" ON "speckle_streams" FOR ALL USING (rls_check_project_tenant_access(construction_project_id));
+DROP POLICY IF EXISTS "tenant_isolation_speckle_sync_logs" ON "speckle_sync_logs";
 CREATE POLICY "tenant_isolation_speckle_sync_logs" ON "speckle_sync_logs" FOR ALL USING (rls_check_project_tenant_access(construction_project_id));
 
--- RLS policies: app-level access for ectropy user (auth enforced at API layer)
+-- RLS policies: app-level access for ectropy user (idempotent — drop-if-exists + create)
+DROP POLICY IF EXISTS "speckle_streams_app_access" ON "speckle_streams";
 CREATE POLICY "speckle_streams_app_access" ON "speckle_streams" FOR ALL TO ectropy USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "speckle_sync_logs_app_access" ON "speckle_sync_logs";
 CREATE POLICY "speckle_sync_logs_app_access" ON "speckle_sync_logs" FOR ALL TO ectropy USING (true) WITH CHECK (true);
