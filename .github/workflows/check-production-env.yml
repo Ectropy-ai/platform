@@ -34,18 +34,32 @@ jobs:
           ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
           ssh-keyscan -H ${{ vars.PROD_GREEN_IP }} >> ~/.ssh/known_hosts
 
-      # STEP 1 + 2 + 3: Blue server
-      - name: Update + restart + verify Blue
+      - name: Write secret to temp file
         env:
           NEW_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
+          echo -n "$NEW_SECRET" > /tmp/gcs_value
+          echo "Secret length: $(wc -c < /tmp/gcs_value) bytes"
+
+      # STEP 1 + 2 + 3: Blue server
+      - name: Update + restart + verify Blue
+        run: |
           echo "=== BLUE (${{ vars.PROD_BLUE_IP }}) ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash -s -- "$NEW_SECRET" <<'REMOTE'
+          scp /tmp/gcs_value root@${{ vars.PROD_BLUE_IP }}:/tmp/gcs_value
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
           set -euo pipefail
-          SECRET="$1"
+
+          SECRET=$(cat /tmp/gcs_value)
+          rm -f /tmp/gcs_value
 
           echo "--- Step 1: Update /opt/ectropy/.env ---"
+          echo "Before:"
+          grep '^GOOGLE_CLIENT_SECRET=' /opt/ectropy/.env | sed 's/=.*/=<REDACTED>/'
           sed -i "s|^GOOGLE_CLIENT_SECRET=.*|GOOGLE_CLIENT_SECRET=${SECRET}|" /opt/ectropy/.env
+          echo "After:"
+          grep '^GOOGLE_CLIENT_SECRET=' /opt/ectropy/.env | sed 's/=.*/=<REDACTED>/'
+          echo "After last 6:"
+          grep '^GOOGLE_CLIENT_SECRET=' /opt/ectropy/.env | rev | cut -c1-6 | rev
           echo "sed complete"
 
           echo "--- Step 2: Restart api-gateway ---"
@@ -54,7 +68,7 @@ jobs:
           echo "Waiting 10s for container startup..."
           sleep 10
 
-          echo "--- Step 3: Verify last 6 chars ---"
+          echo "--- Step 3: Verify last 6 chars in container ---"
           CONTAINER=$(docker ps --format '{{.Names}}' | grep api | head -1)
           echo "Container: $CONTAINER"
           LAST6=$(docker exec "$CONTAINER" printenv GOOGLE_CLIENT_SECRET | rev | cut -c1-6 | rev)
@@ -63,16 +77,23 @@ jobs:
 
       # STEP 1 + 2 + 3: Green server
       - name: Update + restart + verify Green
-        env:
-          NEW_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           echo "=== GREEN (${{ vars.PROD_GREEN_IP }}) ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash -s -- "$NEW_SECRET" <<'REMOTE'
+          scp /tmp/gcs_value root@${{ vars.PROD_GREEN_IP }}:/tmp/gcs_value
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash <<'REMOTE'
           set -euo pipefail
-          SECRET="$1"
+
+          SECRET=$(cat /tmp/gcs_value)
+          rm -f /tmp/gcs_value
 
           echo "--- Step 1: Update /opt/ectropy/.env ---"
+          echo "Before:"
+          grep '^GOOGLE_CLIENT_SECRET=' /opt/ectropy/.env | sed 's/=.*/=<REDACTED>/'
           sed -i "s|^GOOGLE_CLIENT_SECRET=.*|GOOGLE_CLIENT_SECRET=${SECRET}|" /opt/ectropy/.env
+          echo "After:"
+          grep '^GOOGLE_CLIENT_SECRET=' /opt/ectropy/.env | sed 's/=.*/=<REDACTED>/'
+          echo "After last 6:"
+          grep '^GOOGLE_CLIENT_SECRET=' /opt/ectropy/.env | rev | cut -c1-6 | rev
           echo "sed complete"
 
           echo "--- Step 2: Restart api-gateway ---"
@@ -81,7 +102,7 @@ jobs:
           echo "Waiting 10s for container startup..."
           sleep 10
 
-          echo "--- Step 3: Verify last 6 chars ---"
+          echo "--- Step 3: Verify last 6 chars in container ---"
           CONTAINER=$(docker ps --format '{{.Names}}' | grep api | head -1)
           echo "Container: $CONTAINER"
           LAST6=$(docker exec "$CONTAINER" printenv GOOGLE_CLIENT_SECRET | rev | cut -c1-6 | rev)
@@ -99,6 +120,10 @@ jobs:
             exit 1
           fi
           echo "PASS: n8n canary returned 200"
+
+      - name: Cleanup
+        if: always()
+        run: rm -f /tmp/gcs_value
 
       - name: Remove runner IP from firewall (cleanup)
         if: always() && steps.add-firewall-rule.outputs.runner_ip
