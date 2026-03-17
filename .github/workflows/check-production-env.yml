@@ -1,10 +1,10 @@
-name: Update GOOGLE_CLIENT_SECRET on Production
+name: Audit Google OAuth Secrets (Read-Only)
 
 on:
   workflow_dispatch:
 
 jobs:
-  update-secret:
+  audit:
     runs-on: ubuntu-latest
     steps:
       - name: Install doctl
@@ -34,97 +34,65 @@ jobs:
           ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
           ssh-keyscan -H ${{ vars.PROD_GREEN_IP }} >> ~/.ssh/known_hosts
 
-      - name: Write secret to temp file
-        env:
-          NEW_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-        run: |
-          echo -n "$NEW_SECRET" > /tmp/gcs_value
-          echo "Secret length: $(wc -c < /tmp/gcs_value) bytes"
-
-      # STEP 1 + 2 + 3: Blue server
-      # Root cause: compose uses GOOGLE_CLIENT_SECRET_PRODUCTION (not GOOGLE_CLIENT_SECRET)
-      # Must update BOTH keys in .env and force-recreate the container
-      - name: Update + restart + verify Blue
+      - name: Audit Blue server
         run: |
           echo "=== BLUE (${{ vars.PROD_BLUE_IP }}) ==="
-          scp /tmp/gcs_value root@${{ vars.PROD_BLUE_IP }}:/tmp/gcs_value
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
           set -euo pipefail
-
-          SECRET=$(cat /tmp/gcs_value)
-          rm -f /tmp/gcs_value
-
-          echo "--- Step 1: Update /opt/ectropy/.env ---"
-          echo "Keys before sed:"
-          grep -c 'GOOGLE_CLIENT_SECRET' /opt/ectropy/.env || echo "0 matches"
-          # Update both GOOGLE_CLIENT_SECRET and GOOGLE_CLIENT_SECRET_PRODUCTION
-          sed -i "s|^GOOGLE_CLIENT_SECRET=.*|GOOGLE_CLIENT_SECRET=${SECRET}|" /opt/ectropy/.env
-          sed -i "s|^GOOGLE_CLIENT_SECRET_PRODUCTION=.*|GOOGLE_CLIENT_SECRET_PRODUCTION=${SECRET}|" /opt/ectropy/.env
-          echo "Keys after sed:"
-          grep -c 'GOOGLE_CLIENT_SECRET' /opt/ectropy/.env || echo "0 matches"
-          echo "sed complete"
-
-          echo "--- Step 2: Force-recreate api-gateway ---"
-          cd /opt/ectropy
-          docker compose -f /opt/ectropy/docker-compose.yml up -d --no-deps --force-recreate api-gateway
-          echo "Waiting 15s for container startup..."
-          sleep 15
-
-          echo "--- Step 3: Verify last 6 chars in container ---"
           CONTAINER=$(docker ps --format '{{.Names}}' | grep api | head -1)
           echo "Container: $CONTAINER"
-          LAST6=$(docker exec "$CONTAINER" printenv GOOGLE_CLIENT_SECRET | rev | cut -c1-6 | rev)
-          echo "GOOGLE_CLIENT_SECRET last 6 chars: $LAST6"
+
+          echo "--- All GOOGLE_* env vars in container ---"
+          docker exec "$CONTAINER" printenv | grep -i google | sed 's/=.*/=<REDACTED>/' || echo "(none)"
+
+          echo "--- GOOGLE_CLIENT_SECRET last 6 ---"
+          docker exec "$CONTAINER" printenv GOOGLE_CLIENT_SECRET 2>/dev/null | rev | cut -c1-6 | rev || echo "(not set)"
+
+          echo "--- GOOGLE_CLIENT_ID last 6 ---"
+          docker exec "$CONTAINER" printenv GOOGLE_CLIENT_ID 2>/dev/null | rev | cut -c1-6 | rev || echo "(not set)"
+
+          echo "--- .env file: all GOOGLE_* keys ---"
+          grep -i 'GOOGLE' /opt/ectropy/.env | sed 's/=.*/=<REDACTED>/' || echo "(none in .env)"
+
+          echo "--- .env GOOGLE_CLIENT_SECRET_PRODUCTION last 6 ---"
+          grep '^GOOGLE_CLIENT_SECRET_PRODUCTION=' /opt/ectropy/.env | cut -d= -f2 | rev | cut -c1-6 | rev || echo "(not set)"
+
+          echo "--- .env GOOGLE_CLIENT_ID_PRODUCTION last 6 ---"
+          grep '^GOOGLE_CLIENT_ID_PRODUCTION=' /opt/ectropy/.env | cut -d= -f2 | rev | cut -c1-6 | rev || echo "(not set)"
+
+          echo "--- compose file: GOOGLE references ---"
+          grep -n 'GOOGLE' /opt/ectropy/docker-compose.yml || echo "(none in compose)"
           REMOTE
 
-      # STEP 1 + 2 + 3: Green server
-      - name: Update + restart + verify Green
+      - name: Audit Green server
         run: |
           echo "=== GREEN (${{ vars.PROD_GREEN_IP }}) ==="
-          scp /tmp/gcs_value root@${{ vars.PROD_GREEN_IP }}:/tmp/gcs_value
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash <<'REMOTE'
           set -euo pipefail
-
-          SECRET=$(cat /tmp/gcs_value)
-          rm -f /tmp/gcs_value
-
-          echo "--- Step 1: Update /opt/ectropy/.env ---"
-          echo "Keys before sed:"
-          grep -c 'GOOGLE_CLIENT_SECRET' /opt/ectropy/.env || echo "0 matches"
-          sed -i "s|^GOOGLE_CLIENT_SECRET=.*|GOOGLE_CLIENT_SECRET=${SECRET}|" /opt/ectropy/.env
-          sed -i "s|^GOOGLE_CLIENT_SECRET_PRODUCTION=.*|GOOGLE_CLIENT_SECRET_PRODUCTION=${SECRET}|" /opt/ectropy/.env
-          echo "Keys after sed:"
-          grep -c 'GOOGLE_CLIENT_SECRET' /opt/ectropy/.env || echo "0 matches"
-          echo "sed complete"
-
-          echo "--- Step 2: Force-recreate api-gateway ---"
-          cd /opt/ectropy
-          docker compose -f /opt/ectropy/docker-compose.yml up -d --no-deps --force-recreate api-gateway
-          echo "Waiting 15s for container startup..."
-          sleep 15
-
-          echo "--- Step 3: Verify last 6 chars in container ---"
           CONTAINER=$(docker ps --format '{{.Names}}' | grep api | head -1)
           echo "Container: $CONTAINER"
-          LAST6=$(docker exec "$CONTAINER" printenv GOOGLE_CLIENT_SECRET | rev | cut -c1-6 | rev)
-          echo "GOOGLE_CLIENT_SECRET last 6 chars: $LAST6"
+
+          echo "--- All GOOGLE_* env vars in container ---"
+          docker exec "$CONTAINER" printenv | grep -i google | sed 's/=.*/=<REDACTED>/' || echo "(none)"
+
+          echo "--- GOOGLE_CLIENT_SECRET last 6 ---"
+          docker exec "$CONTAINER" printenv GOOGLE_CLIENT_SECRET 2>/dev/null | rev | cut -c1-6 | rev || echo "(not set)"
+
+          echo "--- GOOGLE_CLIENT_ID last 6 ---"
+          docker exec "$CONTAINER" printenv GOOGLE_CLIENT_ID 2>/dev/null | rev | cut -c1-6 | rev || echo "(not set)"
+
+          echo "--- .env file: all GOOGLE_* keys ---"
+          grep -i 'GOOGLE' /opt/ectropy/.env | sed 's/=.*/=<REDACTED>/' || echo "(none in .env)"
+
+          echo "--- .env GOOGLE_CLIENT_SECRET_PRODUCTION last 6 ---"
+          grep '^GOOGLE_CLIENT_SECRET_PRODUCTION=' /opt/ectropy/.env | cut -d= -f2 | rev | cut -c1-6 | rev || echo "(not set)"
+
+          echo "--- .env GOOGLE_CLIENT_ID_PRODUCTION last 6 ---"
+          grep '^GOOGLE_CLIENT_ID_PRODUCTION=' /opt/ectropy/.env | cut -d= -f2 | rev | cut -c1-6 | rev || echo "(not set)"
+
+          echo "--- compose file: GOOGLE references ---"
+          grep -n 'GOOGLE' /opt/ectropy/docker-compose.yml || echo "(none in compose)"
           REMOTE
-
-      # STEP 5: n8n canary
-      - name: n8n canary check
-        run: |
-          echo "--- Step 5: n8n canary ---"
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST https://n8n.luh.tech/webhook/lead-capture)
-          echo "n8n canary: $HTTP_CODE"
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "FAIL: expected 200, got $HTTP_CODE"
-            exit 1
-          fi
-          echo "PASS: n8n canary returned 200"
-
-      - name: Cleanup
-        if: always()
-        run: rm -f /tmp/gcs_value
 
       - name: Remove runner IP from firewall (cleanup)
         if: always() && steps.add-firewall-rule.outputs.runner_ip
