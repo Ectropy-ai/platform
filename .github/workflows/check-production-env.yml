@@ -42,6 +42,8 @@ jobs:
           echo "Secret length: $(wc -c < /tmp/gcs_value) bytes"
 
       # STEP 1 + 2 + 3: Blue server
+      # Root cause: compose uses GOOGLE_CLIENT_SECRET_PRODUCTION (not GOOGLE_CLIENT_SECRET)
+      # Must update BOTH keys in .env and force-recreate the container
       - name: Update + restart + verify Blue
         run: |
           echo "=== BLUE (${{ vars.PROD_BLUE_IP }}) ==="
@@ -53,20 +55,20 @@ jobs:
           rm -f /tmp/gcs_value
 
           echo "--- Step 1: Update /opt/ectropy/.env ---"
-          echo "Before:"
-          grep '^GOOGLE_CLIENT_SECRET=' /opt/ectropy/.env | sed 's/=.*/=<REDACTED>/'
+          echo "Keys before sed:"
+          grep -c 'GOOGLE_CLIENT_SECRET' /opt/ectropy/.env || echo "0 matches"
+          # Update both GOOGLE_CLIENT_SECRET and GOOGLE_CLIENT_SECRET_PRODUCTION
           sed -i "s|^GOOGLE_CLIENT_SECRET=.*|GOOGLE_CLIENT_SECRET=${SECRET}|" /opt/ectropy/.env
-          echo "After:"
-          grep '^GOOGLE_CLIENT_SECRET=' /opt/ectropy/.env | sed 's/=.*/=<REDACTED>/'
-          echo "After last 6:"
-          grep '^GOOGLE_CLIENT_SECRET=' /opt/ectropy/.env | rev | cut -c1-6 | rev
+          sed -i "s|^GOOGLE_CLIENT_SECRET_PRODUCTION=.*|GOOGLE_CLIENT_SECRET_PRODUCTION=${SECRET}|" /opt/ectropy/.env
+          echo "Keys after sed:"
+          grep -c 'GOOGLE_CLIENT_SECRET' /opt/ectropy/.env || echo "0 matches"
           echo "sed complete"
 
-          echo "--- Step 2: Restart api-gateway ---"
+          echo "--- Step 2: Force-recreate api-gateway ---"
           cd /opt/ectropy
-          docker compose -f /opt/ectropy/docker-compose.yml up -d --no-deps api-gateway
-          echo "Waiting 10s for container startup..."
-          sleep 10
+          docker compose -f /opt/ectropy/docker-compose.yml up -d --no-deps --force-recreate api-gateway
+          echo "Waiting 15s for container startup..."
+          sleep 15
 
           echo "--- Step 3: Verify last 6 chars in container ---"
           CONTAINER=$(docker ps --format '{{.Names}}' | grep api | head -1)
@@ -87,20 +89,19 @@ jobs:
           rm -f /tmp/gcs_value
 
           echo "--- Step 1: Update /opt/ectropy/.env ---"
-          echo "Before:"
-          grep '^GOOGLE_CLIENT_SECRET=' /opt/ectropy/.env | sed 's/=.*/=<REDACTED>/'
+          echo "Keys before sed:"
+          grep -c 'GOOGLE_CLIENT_SECRET' /opt/ectropy/.env || echo "0 matches"
           sed -i "s|^GOOGLE_CLIENT_SECRET=.*|GOOGLE_CLIENT_SECRET=${SECRET}|" /opt/ectropy/.env
-          echo "After:"
-          grep '^GOOGLE_CLIENT_SECRET=' /opt/ectropy/.env | sed 's/=.*/=<REDACTED>/'
-          echo "After last 6:"
-          grep '^GOOGLE_CLIENT_SECRET=' /opt/ectropy/.env | rev | cut -c1-6 | rev
+          sed -i "s|^GOOGLE_CLIENT_SECRET_PRODUCTION=.*|GOOGLE_CLIENT_SECRET_PRODUCTION=${SECRET}|" /opt/ectropy/.env
+          echo "Keys after sed:"
+          grep -c 'GOOGLE_CLIENT_SECRET' /opt/ectropy/.env || echo "0 matches"
           echo "sed complete"
 
-          echo "--- Step 2: Restart api-gateway ---"
+          echo "--- Step 2: Force-recreate api-gateway ---"
           cd /opt/ectropy
-          docker compose -f /opt/ectropy/docker-compose.yml up -d --no-deps api-gateway
-          echo "Waiting 10s for container startup..."
-          sleep 10
+          docker compose -f /opt/ectropy/docker-compose.yml up -d --no-deps --force-recreate api-gateway
+          echo "Waiting 15s for container startup..."
+          sleep 15
 
           echo "--- Step 3: Verify last 6 chars in container ---"
           CONTAINER=$(docker ps --format '{{.Names}}' | grep api | head -1)
