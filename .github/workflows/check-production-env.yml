@@ -1,4 +1,4 @@
-name: Test Speckle Objects API — READ ONLY
+name: Test Speckle Objects API v2 — READ ONLY
 
 on:
   workflow_dispatch:
@@ -33,39 +33,49 @@ jobs:
         run: |
           ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
 
-      - name: Task 2a — Test Speckle Objects API directly (no auth)
+      - name: Task 2a — Direct Speckle Objects API (port 3100)
         run: |
-          echo "=== Direct Speckle server (port 3100) — no auth ==="
+          echo "=== Direct Speckle server (port 3100) ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
           set -euo pipefail
 
-          echo "--- Root object (no auth) ---"
-          curl -s -w "\nHTTP:%{http_code}\n" \
-            http://localhost:3100/objects/9a5215cc88/f9da96d1ddea381bb032bff0f12e7322 \
-            2>&1 | tail -5
+          TOKEN=$(cat /var/lib/docker/volumes/ectropy_speckle-tokens/_data/speckle-service-token)
+
+          echo "--- Root object f9da96d1 (NO auth) ---"
+          curl -s -o /dev/null -w "HTTP:%{http_code} size:%{size_download} type:%{content_type}\n" \
+            http://localhost:3100/objects/9a5215cc88/f9da96d1ddea381bb032bff0f12e7322
 
           echo ""
-          echo "--- Root object (with token) ---"
-          TOKEN=$(cat /var/lib/docker/volumes/ectropy_speckle-tokens/_data/speckle-service-token)
-          curl -s -w "\nHTTP:%{http_code}\n" \
-            -H "Authorization: Bearer $TOKEN" \
-            http://localhost:3100/objects/9a5215cc88/f9da96d1ddea381bb032bff0f12e7322 \
-            2>&1 | head -3
-          echo "..."
-          curl -s -o /dev/null -w "HTTP:%{http_code}" \
+          echo "--- Root object f9da96d1 (WITH token) ---"
+          curl -s -o /dev/null -w "HTTP:%{http_code} size:%{size_download} type:%{content_type}\n" \
             -H "Authorization: Bearer $TOKEN" \
             http://localhost:3100/objects/9a5215cc88/f9da96d1ddea381bb032bff0f12e7322
 
           echo ""
-          echo ""
-          echo "--- Child object 2734f853 (with token) ---"
-          curl -s -w "\nHTTP:%{http_code}\n" \
+          echo "--- Child object 2734f853 (WITH token) ---"
+          curl -s -o /dev/null -w "HTTP:%{http_code} size:%{size_download} type:%{content_type}\n" \
             -H "Authorization: Bearer $TOKEN" \
-            http://localhost:3100/objects/9a5215cc88/2734f8533e683356c72e10d47ab9dcc6 \
-            2>&1 | tail -5
+            http://localhost:3100/objects/9a5215cc88/2734f8533e683356c72e10d47ab9dcc6
+
+          echo ""
+          echo "--- Child object 2734f853 (NO auth) ---"
+          curl -s -o /dev/null -w "HTTP:%{http_code} size:%{size_download} type:%{content_type}\n" \
+            http://localhost:3100/objects/9a5215cc88/2734f8533e683356c72e10d47ab9dcc6
+
+          echo ""
+          echo "--- Non-existent object (expect 404) ---"
+          curl -s -o /dev/null -w "HTTP:%{http_code} size:%{size_download} type:%{content_type}\n" \
+            -H "Authorization: Bearer $TOKEN" \
+            http://localhost:3100/objects/9a5215cc88/0000000000000000000000000000dead
+
+          echo ""
+          echo "--- /objects/{stream}/{object}/single (WITH token) ---"
+          curl -s -o /dev/null -w "HTTP:%{http_code} size:%{size_download} type:%{content_type}\n" \
+            -H "Authorization: Bearer $TOKEN" \
+            http://localhost:3100/objects/9a5215cc88/f9da96d1ddea381bb032bff0f12e7322/single
           REMOTE
 
-      - name: Task 2b — Test BFF proxy endpoint (api-gateway, port 4000)
+      - name: Task 2b — BFF proxy endpoint (api-gateway, port 4000)
         run: |
           echo "=== BFF proxy via api-gateway (port 4000) ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
@@ -74,24 +84,24 @@ jobs:
           echo "--- /api/speckle/objects (no session — expect 401) ---"
           curl -s -w "\nHTTP:%{http_code}\n" \
             http://localhost:4000/api/speckle/objects/9a5215cc88/f9da96d1ddea381bb032bff0f12e7322 \
-            2>&1 | tail -5
+            2>&1
 
           echo ""
           echo "--- /api/speckle/config (no session — expect 401) ---"
           curl -s -w "\nHTTP:%{http_code}\n" \
             http://localhost:4000/api/speckle/config \
-            2>&1 | tail -5
+            2>&1
 
           echo ""
           echo "--- /api/speckle/health (public — expect 200) ---"
           curl -s -w "\nHTTP:%{http_code}\n" \
             http://localhost:4000/api/speckle/health \
-            2>&1 | tail -10
+            2>&1
           REMOTE
 
-      - name: Task 2c — Check SPECKLE_SERVER_URL in api-gateway
+      - name: Task 2c — SPECKLE env vars in api-gateway
         run: |
-          echo "=== SPECKLE_SERVER_URL in api-gateway container ==="
+          echo "=== SPECKLE env vars in api-gateway container ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
           API_CONTAINER=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
           echo "Container: $API_CONTAINER"
@@ -110,60 +120,73 @@ jobs:
           echo "--- Token file in shared-tokens volume ---"
           docker exec "$API_CONTAINER" cat /shared-tokens/speckle-service-token 2>/dev/null | head -c 8 || echo "FILE NOT FOUND"
           echo ""
+
+          echo "--- Do tokens match? ---"
+          ENV_TOKEN=$(docker exec "$API_CONTAINER" printenv SPECKLE_SERVER_TOKEN 2>/dev/null || echo "NONE")
+          FILE_TOKEN=$(docker exec "$API_CONTAINER" cat /shared-tokens/speckle-service-token 2>/dev/null || echo "NONE")
+          if [ "$ENV_TOKEN" = "$FILE_TOKEN" ]; then
+            echo "YES — env and file match"
+          else
+            echo "NO — env=${ENV_TOKEN:0:8}... file=${FILE_TOKEN:0:8}..."
+          fi
           REMOTE
 
-      - name: Task 2d — Speckle server container status + health
+      - name: Task 2d — Container status + health
         run: |
-          echo "=== Speckle server status ==="
+          echo "=== Container status ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
           docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' | grep -E 'speckle-server|api-gateway|minio'
 
           echo ""
           echo "--- Speckle server health (port 3100) ---"
-          curl -s -w "\nHTTP:%{http_code}\n" http://localhost:3100/api 2>&1 | tail -3
+          curl -s -o /dev/null -w "HTTP:%{http_code}\n" http://localhost:3100/api
 
           echo ""
           echo "--- Speckle GraphQL serverInfo ---"
           curl -s http://localhost:3100/graphql \
             -H "Content-Type: application/json" \
-            -d '{"query":"{serverInfo{version}}"}' 2>&1 | head -3
+            -d '{"query":"{serverInfo{version}}"}' 2>&1
           REMOTE
 
-      - name: Task 3 — Test Speckle getobject API format
+      - name: Task 3 — Alternative URL formats
         run: |
-          echo "=== Task 3: Speckle /api/getobject format ==="
+          echo "=== Task 3: Alternative Speckle URL formats ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
+          set -euo pipefail
           TOKEN=$(cat /var/lib/docker/volumes/ectropy_speckle-tokens/_data/speckle-service-token)
 
-          echo "--- /api/getobject (port 3100, with token) ---"
-          curl -s -w "\nHTTP:%{http_code}\n" \
+          echo "--- /api/getobject?streamId=&objectId= (port 3100, with token) ---"
+          curl -s -o /dev/null -w "HTTP:%{http_code} size:%{size_download}\n" \
             -H "Authorization: Bearer $TOKEN" \
-            "http://localhost:3100/api/getobject?streamId=9a5215cc88&objectId=f9da96d1ddea381bb032bff0f12e7322" \
-            2>&1 | tail -5
+            "http://localhost:3100/api/getobject?streamId=9a5215cc88&objectId=f9da96d1ddea381bb032bff0f12e7322"
 
           echo ""
           echo "--- /objects/{stream}/{object} (port 3100, with token) ---"
-          curl -s -w "\nHTTP:%{http_code}\n" \
+          curl -s -o /dev/null -w "HTTP:%{http_code} size:%{size_download}\n" \
             -H "Authorization: Bearer $TOKEN" \
-            "http://localhost:3100/objects/9a5215cc88/f9da96d1ddea381bb032bff0f12e7322" \
-            2>&1 | tail -5
+            "http://localhost:3100/objects/9a5215cc88/f9da96d1ddea381bb032bff0f12e7322"
 
           echo ""
-          echo "--- /api/stream/9a5215cc88/objects (port 3100, with token) ---"
-          curl -s -w "\nHTTP:%{http_code}\n" \
+          echo "--- /api/stream/{stream}/objects/{object} (port 3100, with token) ---"
+          curl -s -o /dev/null -w "HTTP:%{http_code} size:%{size_download}\n" \
             -H "Authorization: Bearer $TOKEN" \
-            "http://localhost:3100/api/stream/9a5215cc88/objects/f9da96d1ddea381bb032bff0f12e7322" \
-            2>&1 | tail -5
+            "http://localhost:3100/api/stream/9a5215cc88/objects/f9da96d1ddea381bb032bff0f12e7322"
 
           echo ""
           echo "--- Speckle frontend port 3101 /api/getobject ---"
-          curl -s -o /dev/null -w "HTTP:%{http_code}\n" \
+          curl -s -o /dev/null -w "HTTP:%{http_code} size:%{size_download}\n" \
             "http://localhost:3101/api/getobject?stream=9a5215cc88&object=2734f8533e683356c72e10d47ab9dcc6"
 
           echo ""
           echo "--- Speckle frontend port 3101 /objects ---"
-          curl -s -o /dev/null -w "HTTP:%{http_code}\n" \
+          curl -s -o /dev/null -w "HTTP:%{http_code} size:%{size_download}\n" \
             "http://localhost:3101/objects/9a5215cc88/f9da96d1ddea381bb032bff0f12e7322"
+
+          echo ""
+          echo "--- Content-Encoding header check (root object) ---"
+          curl -sI -H "Authorization: Bearer $TOKEN" \
+            "http://localhost:3100/objects/9a5215cc88/f9da96d1ddea381bb032bff0f12e7322" \
+            2>&1 | grep -iE 'content-type|content-encoding|content-length|transfer-encoding' || echo "No matching headers"
           REMOTE
 
       - name: Remove runner IP from firewall (cleanup)
