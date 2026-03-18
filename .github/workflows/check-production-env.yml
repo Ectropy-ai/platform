@@ -1,10 +1,10 @@
-name: Read MinIO Credentials — READ ONLY
+name: Read MinIO Secret Files — READ ONLY
 
 on:
   workflow_dispatch:
 
 jobs:
-  minio-read:
+  minio-secrets:
     runs-on: ubuntu-latest
     steps:
       - name: Install doctl
@@ -33,18 +33,45 @@ jobs:
         run: |
           ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
 
-      - name: Task 1 — MinIO container credentials
+      - name: Task 1 — Read MinIO secret files
         run: |
-          echo "=== TASK 1: MinIO container env vars ==="
+          echo "=== TASK 1: MinIO secret files ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          echo "--- docker inspect env vars ---"
-          docker inspect ectropy-minio \
-            --format '{{range .Config.Env}}{{println .}}{{end}}' \
-            | grep -E 'MINIO_ROOT|MINIO_ACCESS|MINIO_SECRET'
+          set -euo pipefail
+
+          echo "--- /run/secrets/ ---"
+          docker exec ectropy-minio ls -la /run/secrets/ 2>&1 || echo "/run/secrets/ not found"
 
           echo ""
-          echo "--- MinIO compose section from docker-compose.yml ---"
-          grep -A 30 'minio:' /opt/ectropy/docker-compose.yml | grep -E 'MINIO_ROOT|MINIO_ACCESS|MINIO_SECRET|image.*minio'
+          echo "--- access_key file ---"
+          docker exec ectropy-minio cat /run/secrets/access_key 2>/dev/null || echo "access_key file not found in /run/secrets/"
+
+          echo ""
+          echo "--- secret_key file ---"
+          docker exec ectropy-minio cat /run/secrets/secret_key 2>/dev/null || echo "secret_key file not found in /run/secrets/"
+
+          echo ""
+          echo "--- Check docker volumes for minio secrets ---"
+          docker inspect ectropy-minio --format '{{json .Mounts}}' | python3 -m json.tool 2>/dev/null || docker inspect ectropy-minio --format '{{json .Mounts}}'
+          REMOTE
+
+      - name: Task 2 — Test minioadmin credentials
+        run: |
+          echo "=== TASK 2: Test minioadmin/minioadmin ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
+          docker exec ectropy-minio mc alias set local http://localhost:9000 minioadmin minioadmin 2>&1 && echo "MINIOADMIN_WORKS" || echo "MINIOADMIN_FAILS"
+          REMOTE
+
+      - name: Task 3 — List buckets and check speckle-server bucket
+        run: |
+          echo "=== TASK 3: MinIO buckets ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
+          docker exec ectropy-minio mc alias set local http://localhost:9000 minioadmin minioadmin 2>/dev/null
+          echo "--- Bucket list ---"
+          docker exec ectropy-minio mc ls local/ 2>&1 || echo "mc ls failed"
+          echo ""
+          echo "--- speckle-server bucket stats ---"
+          docker exec ectropy-minio mc stat local/speckle-server 2>&1 || echo "speckle-server bucket not found"
           REMOTE
 
       - name: Remove runner IP from firewall (cleanup)
