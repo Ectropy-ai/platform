@@ -1,10 +1,10 @@
-name: Check OAuth Config — READ ONLY
+name: Fix GOOGLE_CLIENT_ID on production — WRITE
 
 on:
   workflow_dispatch:
 
 jobs:
-  check-oauth:
+  fix-oauth:
     runs-on: ubuntu-latest
     steps:
       - name: Install doctl
@@ -32,48 +32,90 @@ jobs:
       - name: Add SSH known hosts
         run: |
           ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ vars.PROD_GREEN_IP }} >> ~/.ssh/known_hosts
 
-      - name: Task 2 — OAuth-related env vars from .env
+      - name: Task 2 — Update .env on blue
         run: |
-          echo "=== OAuth/redirect vars from /opt/ectropy/.env ==="
+          echo "=== Updating GOOGLE_CLIENT_ID on blue ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          grep -iE 'NEXTAUTH|CALLBACK|REDIRECT|OAUTH|GOOGLE|BASE_URL|APP_URL|SITE_URL|NODE_ENV' \
-            /opt/ectropy/.env | sed 's/SECRET=.*/SECRET=REDACTED/' | sort
+          set -euo pipefail
+          NEW_ID="167049735635-rvu72sobgcsc1t79d0hjg3a08r4ptavo.apps.googleusercontent.com"
+
+          sed -i "s|^GOOGLE_CLIENT_ID=.*|GOOGLE_CLIENT_ID=${NEW_ID}|" /opt/ectropy/.env
+          sed -i "s|^GOOGLE_CLIENT_ID_PRODUCTION=.*|GOOGLE_CLIENT_ID_PRODUCTION=${NEW_ID}|" /opt/ectropy/.env
+
+          echo "--- Verify blue .env ---"
+          grep 'GOOGLE_CLIENT_ID' /opt/ectropy/.env | grep -v SECRET
           REMOTE
 
-      - name: Task 2b — Actual callback URL in api-gateway container
+      - name: Task 3 — Update .env on green
         run: |
-          echo "=== Callback URL resolved in api-gateway ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          API_CONTAINER=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
-          echo "Container: $API_CONTAINER"
+          echo "=== Updating GOOGLE_CLIENT_ID on green ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash <<'REMOTE'
+          set -euo pipefail
+          NEW_ID="167049735635-rvu72sobgcsc1t79d0hjg3a08r4ptavo.apps.googleusercontent.com"
 
-          echo "--- GOOGLE_CALLBACK_URL ---"
-          docker exec "$API_CONTAINER" printenv GOOGLE_CALLBACK_URL 2>/dev/null || echo "NOT SET"
+          sed -i "s|^GOOGLE_CLIENT_ID=.*|GOOGLE_CLIENT_ID=${NEW_ID}|" /opt/ectropy/.env
+          sed -i "s|^GOOGLE_CLIENT_ID_PRODUCTION=.*|GOOGLE_CLIENT_ID_PRODUCTION=${NEW_ID}|" /opt/ectropy/.env
 
-          echo "--- BASE_URL ---"
-          docker exec "$API_CONTAINER" printenv BASE_URL 2>/dev/null || echo "NOT SET"
-
-          echo "--- OAUTH_CALLBACK_URL ---"
-          docker exec "$API_CONTAINER" printenv OAUTH_CALLBACK_URL 2>/dev/null || echo "NOT SET"
-
-          echo "--- NODE_ENV ---"
-          docker exec "$API_CONTAINER" printenv NODE_ENV 2>/dev/null || echo "NOT SET"
-
-          echo "--- GOOGLE_CLIENT_ID (last 20 chars) ---"
-          VAL=$(docker exec "$API_CONTAINER" printenv GOOGLE_CLIENT_ID 2>/dev/null || echo "NOT SET")
-          echo "...${VAL: -20}"
-
-          echo "--- Startup log showing callback URL ---"
-          docker logs "$API_CONTAINER" 2>&1 | grep -i "callback\|OAUTH_CALLBACK" | tail -5
+          echo "--- Verify green .env ---"
+          grep 'GOOGLE_CLIENT_ID' /opt/ectropy/.env | grep -v SECRET
           REMOTE
 
-      - name: Task 2c — Google OAuth consent screen redirect test
+      - name: Task 4 — Restart api-gateway on blue
         run: |
-          echo "=== Test Google OAuth redirect URL ==="
+          echo "=== Restarting api-gateway on blue ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          echo "--- GET /api/auth/google (follow redirects, capture location) ---"
-          curl -s -o /dev/null -D - http://localhost:4000/api/auth/google 2>&1 | grep -iE 'location|redirect_uri'
+          cd /opt/ectropy
+          docker compose up -d --no-deps --force-recreate api-gateway
+          REMOTE
+
+      - name: Task 4b — Restart api-gateway on green
+        run: |
+          echo "=== Restarting api-gateway on green ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash <<'REMOTE'
+          cd /opt/ectropy
+          docker compose up -d --no-deps --force-recreate api-gateway
+          REMOTE
+
+      - name: Task 4c — Wait and verify containers healthy
+        run: |
+          echo "Waiting 15 seconds for containers to stabilize..."
+          sleep 15
+
+          echo "=== Blue api-gateway status ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} \
+            "docker ps --format 'table {{.Names}}\t{{.Status}}' | grep api-gateway"
+
+          echo ""
+          echo "=== Green api-gateway status ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} \
+            "docker ps --format 'table {{.Names}}\t{{.Status}}' | grep api-gateway"
+
+      - name: Task 5 — Verify correct client ID in running containers
+        run: |
+          echo "=== Blue — GOOGLE_CLIENT_ID in container ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
+          API=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
+          VAL=$(docker exec "$API" printenv GOOGLE_CLIENT_ID 2>/dev/null)
+          echo "First 30: ${VAL:0:30}"
+          echo "Last 20: ${VAL: -20}"
+          REMOTE
+
+          echo ""
+          echo "=== Green — GOOGLE_CLIENT_ID in container ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash <<'REMOTE'
+          API=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
+          VAL=$(docker exec "$API" printenv GOOGLE_CLIENT_ID 2>/dev/null)
+          echo "First 30: ${VAL:0:30}"
+          echo "Last 20: ${VAL: -20}"
+          REMOTE
+
+      - name: Task 5b — Verify OAuth redirect uses new client ID
+        run: |
+          echo "=== OAuth redirect from blue ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
+          curl -s -o /dev/null -D - http://localhost:4000/api/auth/google 2>&1 | grep -i 'location' | head -1
           REMOTE
 
       - name: Remove runner IP from firewall (cleanup)
