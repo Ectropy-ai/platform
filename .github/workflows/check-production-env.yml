@@ -7,55 +7,113 @@ jobs:
   db-query:
     runs-on: ubuntu-latest
     steps:
-      - name: Install psql
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      - name: Query project_roles for ectropytest
-        env:
-          PGHOST: ${{ secrets.PROD_DB_HOST }}
-          PGPORT: "25060"
-          PGDATABASE: "ectropy_production"
-          PGUSER: "ectropy"
-          PGPASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
-          PGSSLMODE: "require"
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add runner IP to firewall (temporary)
+        id: add-firewall-rule
         run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "Runner IP: $RUNNER_IP"
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          doctl compute firewall add-rules $FIREWALL_ID \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+          echo "Waiting 5s for firewall propagation..."
+          sleep 5
+
+      - name: Add SSH known hosts
+        run: |
+          ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+
+      - name: Query DB via node in api-gateway container
+        run: |
+          echo "=== BLUE (${{ vars.PROD_BLUE_IP }}) ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
+          set -euo pipefail
+
+          API_CONTAINER=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
+          echo "Container: $API_CONTAINER"
+
+          echo ""
           echo "=== QUERY 1: project_roles for ectropytest@gmail.com ==="
-          psql -c "
-          SELECT
-            u.email,
-            u.id as user_id,
-            pr.role,
-            pr.permissions,
-            pr.is_active,
-            p.name as project_name,
-            p.id as project_id
-          FROM project_roles pr
-          JOIN users u ON u.id = pr.user_id
-          JOIN projects p ON p.id = pr.project_id
-          WHERE u.email = 'ectropytest@gmail.com';
+          docker exec "$API_CONTAINER" node -e "
+          const { PrismaClient } = require('@prisma/client');
+          const p = new PrismaClient();
+          (async () => {
+            const rows = await p.\$queryRawUnsafe(\`
+              SELECT
+                u.email,
+                u.id as user_id,
+                pr.role,
+                pr.permissions,
+                pr.is_active,
+                p.name as project_name,
+                p.id as project_id
+              FROM project_roles pr
+              JOIN users u ON u.id = pr.user_id
+              JOIN projects p ON p.id = pr.project_id
+              WHERE u.email = 'ectropytest@gmail.com'
+            \`);
+            console.log(JSON.stringify(rows, null, 2));
+            console.log('Row count:', rows.length);
+            await p.\$disconnect();
+          })().catch(e => { console.error(e); process.exit(1); });
           "
 
           echo ""
           echo "=== QUERY 2: speckle_streams for Demo Office Building ==="
-          psql -c "
-          SELECT
-            ss.stream_id,
-            ss.stream_name,
-            ss.construction_project_id,
-            p.name as project_name
-          FROM speckle_streams ss
-          JOIN projects p ON p.id = ss.construction_project_id
-          WHERE p.name ILIKE '%demo%office%';
+          docker exec "$API_CONTAINER" node -e "
+          const { PrismaClient } = require('@prisma/client');
+          const p = new PrismaClient();
+          (async () => {
+            const rows = await p.\$queryRawUnsafe(\`
+              SELECT
+                ss.stream_id,
+                ss.stream_name,
+                ss.construction_project_id,
+                p.name as project_name
+              FROM speckle_streams ss
+              JOIN projects p ON p.id = ss.construction_project_id
+              WHERE p.name ILIKE '%demo%office%'
+            \`);
+            console.log(JSON.stringify(rows, null, 2));
+            console.log('Row count:', rows.length);
+            await p.\$disconnect();
+          })().catch(e => { console.error(e); process.exit(1); });
           "
 
           echo ""
           echo "=== QUERY 3: projects in ectropytest tenant ==="
-          psql -c "
-          SELECT p.id, p.name, p.tenant_id
-          FROM projects p
-          WHERE p.tenant_id IN (
-            SELECT tenant_id FROM users WHERE email = 'ectropytest@gmail.com'
-          );
+          docker exec "$API_CONTAINER" node -e "
+          const { PrismaClient } = require('@prisma/client');
+          const p = new PrismaClient();
+          (async () => {
+            const rows = await p.\$queryRawUnsafe(\`
+              SELECT p.id, p.name, p.tenant_id
+              FROM projects p
+              WHERE p.tenant_id IN (
+                SELECT tenant_id FROM users WHERE email = 'ectropytest@gmail.com'
+              )
+            \`);
+            console.log(JSON.stringify(rows, null, 2));
+            console.log('Row count:', rows.length);
+            await p.\$disconnect();
+          })().catch(e => { console.error(e); process.exit(1); });
           "
+          REMOTE
+
+      - name: Remove runner IP from firewall (cleanup)
+        if: always() && steps.add-firewall-rule.outputs.runner_ip
+        run: |
+          RUNNER_IP="${{ steps.add-firewall-rule.outputs.runner_ip }}"
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          doctl compute firewall remove-rules $FIREWALL_ID \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32" || true
