@@ -967,6 +967,95 @@ router.get(
 );
 
 /**
+ * ================================================
+ * BIM FIX 2026-03-18: BATCH OBJECT LOADER PROXY
+ * ================================================
+ * POST /api/speckle/api/getobjects/:streamId
+ * Proxy Speckle batch object requests for the viewer (BFF pattern)
+ *
+ * ObjectLoader in @speckle/viewer calls this endpoint to batch-fetch
+ * child objects after loading the root object. This route was missing,
+ * causing the "HIC SVNT DRACONES" timeout on child object resolution.
+ *
+ * ObjectLoader sends:
+ *   POST /api/getobjects/{streamId}
+ *   Body: JSON array of objectIds
+ *   Accept: text/plain
+ *
+ * SECURITY:
+ * - Requires authentication
+ * - Backend injects token for object fetching
+ */
+router.post(
+  '/api/getobjects/:streamId',
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const serverUrl = process.env.SPECKLE_SERVER_URL || '';
+      const token = await getSpeckleToken();
+      const { streamId } = req.params;
+
+      if (
+        !serverUrl ||
+        !token ||
+        token === 'REPLACE_WITH_TOKEN_AFTER_ADMIN_SETUP'
+      ) {
+        return res.status(503).json({
+          status: 'error',
+          message: 'Speckle integration not configured',
+        });
+      }
+
+      // Proxy batch object request to Speckle server
+      const getObjectsUrl = `${serverUrl}/api/getobjects/${streamId}`;
+
+      const proxyResponse = await fetch(getObjectsUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'text/plain',
+        },
+        body: JSON.stringify(req.body),
+      });
+
+      const contentType =
+        proxyResponse.headers.get('content-type') || 'text/plain';
+      res.setHeader('Content-Type', contentType);
+      res.status(proxyResponse.status);
+
+      if (proxyResponse.body) {
+        const reader = proxyResponse.body.getReader();
+        const pump = async (): Promise<void> => {
+          const { done, value } = await reader.read();
+          if (done) {
+            res.end();
+            return;
+          }
+          res.write(Buffer.from(value));
+          return pump();
+        };
+        await pump();
+      } else {
+        const data = await proxyResponse.text();
+        res.send(data);
+      }
+
+      logger.debug('[SpeckleProxy] Batch objects fetched', {
+        userId: req.user?.id,
+        streamId,
+      });
+    } catch (error) {
+      logger.error('[SpeckleProxy] Batch object proxy failed', { error });
+      res.status(502).json({
+        status: 'error',
+        message: 'Failed to batch fetch objects from Speckle server',
+      });
+    }
+  }
+);
+
+/**
  * GET /api/speckle/health
  * Check Speckle integration health
  *
