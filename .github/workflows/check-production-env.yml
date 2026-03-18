@@ -1,10 +1,10 @@
-name: Read MinIO Secret Files — READ ONLY
+name: Fix Speckle S3 — Set MinIO Creds + Restart
 
 on:
   workflow_dispatch:
 
 jobs:
-  minio-secrets:
+  fix-speckle:
     runs-on: ubuntu-latest
     steps:
       - name: Install doctl
@@ -32,47 +32,130 @@ jobs:
       - name: Add SSH known hosts
         run: |
           ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ vars.PROD_GREEN_IP }} >> ~/.ssh/known_hosts
 
-      - name: Task 1 — Read MinIO secret files
+      - name: Task 3 — Update .env on blue
         run: |
-          echo "=== TASK 1: MinIO secret files ==="
+          echo "=== TASK 3: Update .env on blue (${{ vars.PROD_BLUE_IP }}) ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
           set -euo pipefail
 
-          echo "--- /run/secrets/ ---"
-          docker exec ectropy-minio ls -la /run/secrets/ 2>&1 || echo "/run/secrets/ not found"
+          echo "--- Before ---"
+          grep -E 'MINIO_ACCESS_KEY|MINIO_SECRET_KEY' /opt/ectropy/.env
 
-          echo ""
-          echo "--- access_key file ---"
-          docker exec ectropy-minio cat /run/secrets/access_key 2>/dev/null || echo "access_key file not found in /run/secrets/"
+          sed -i 's/^MINIO_ACCESS_KEY=.*/MINIO_ACCESS_KEY=minioadmin/' /opt/ectropy/.env
+          sed -i 's/^MINIO_SECRET_KEY=.*/MINIO_SECRET_KEY=minioadmin/' /opt/ectropy/.env
 
-          echo ""
-          echo "--- secret_key file ---"
-          docker exec ectropy-minio cat /run/secrets/secret_key 2>/dev/null || echo "secret_key file not found in /run/secrets/"
-
-          echo ""
-          echo "--- Check docker volumes for minio secrets ---"
-          docker inspect ectropy-minio --format '{{json .Mounts}}' | python3 -m json.tool 2>/dev/null || docker inspect ectropy-minio --format '{{json .Mounts}}'
+          echo "--- After ---"
+          grep -E 'MINIO_ACCESS_KEY|MINIO_SECRET_KEY' /opt/ectropy/.env
           REMOTE
 
-      - name: Task 2 — Test minioadmin credentials
+      - name: Task 4 — Update .env on green
         run: |
-          echo "=== TASK 2: Test minioadmin/minioadmin ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          docker exec ectropy-minio mc alias set local http://localhost:9000 minioadmin minioadmin 2>&1 && echo "MINIOADMIN_WORKS" || echo "MINIOADMIN_FAILS"
+          echo "=== TASK 4: Update .env on green (${{ vars.PROD_GREEN_IP }}) ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash <<'REMOTE'
+          set -euo pipefail
+
+          echo "--- Before ---"
+          grep -E 'MINIO_ACCESS_KEY|MINIO_SECRET_KEY' /opt/ectropy/.env
+
+          sed -i 's/^MINIO_ACCESS_KEY=.*/MINIO_ACCESS_KEY=minioadmin/' /opt/ectropy/.env
+          sed -i 's/^MINIO_SECRET_KEY=.*/MINIO_SECRET_KEY=minioadmin/' /opt/ectropy/.env
+
+          echo "--- After ---"
+          grep -E 'MINIO_ACCESS_KEY|MINIO_SECRET_KEY' /opt/ectropy/.env
           REMOTE
 
-      - name: Task 3 — List buckets and check speckle-server bucket
+      - name: Task 5 — Restart speckle-server on blue
         run: |
-          echo "=== TASK 3: MinIO buckets ==="
+          echo "=== TASK 5: Restart speckle-server on blue ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          docker exec ectropy-minio mc alias set local http://localhost:9000 minioadmin minioadmin 2>/dev/null
-          echo "--- Bucket list ---"
-          docker exec ectropy-minio mc ls local/ 2>&1 || echo "mc ls failed"
-          echo ""
-          echo "--- speckle-server bucket stats ---"
-          docker exec ectropy-minio mc stat local/speckle-server 2>&1 || echo "speckle-server bucket not found"
+          set -euo pipefail
+          cd /opt/ectropy
+          docker compose up -d --no-deps --force-recreate speckle-server
+          echo "Waiting 20s for container startup..."
+          sleep 20
+
+          echo "--- Container status ---"
+          docker ps --format 'table {{.Names}}\t{{.Status}}' | grep speckle-server
+
+          STATUS=$(docker ps --format '{{.Status}}' --filter name=ectropy-speckle-server)
+          if echo "$STATUS" | grep -q "Restarting"; then
+            echo "STILL CRASHING — dumping logs"
+            docker logs ectropy-speckle-server --tail 30 2>&1
+            exit 1
+          fi
+
+          echo "--- Verify S3 env vars in container ---"
+          docker inspect ectropy-speckle-server --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E 'S3_ACCESS_KEY|S3_SECRET_KEY'
           REMOTE
+
+      - name: Task 6 — Restart speckle-server on green
+        run: |
+          echo "=== TASK 6: Restart speckle-server on green ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash <<'REMOTE'
+          set -euo pipefail
+          cd /opt/ectropy
+          docker compose up -d --no-deps --force-recreate speckle-server
+          echo "Waiting 20s for container startup..."
+          sleep 20
+
+          echo "--- Container status ---"
+          docker ps --format 'table {{.Names}}\t{{.Status}}' | grep speckle-server
+
+          STATUS=$(docker ps --format '{{.Status}}' --filter name=ectropy-speckle-server)
+          if echo "$STATUS" | grep -q "Restarting"; then
+            echo "STILL CRASHING — dumping logs"
+            docker logs ectropy-speckle-server --tail 30 2>&1
+            exit 1
+          fi
+
+          echo "--- Verify S3 env vars in container ---"
+          docker inspect ectropy-speckle-server --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E 'S3_ACCESS_KEY|S3_SECRET_KEY'
+          REMOTE
+
+      - name: Task 7 — Validate Speckle GraphQL on blue
+        run: |
+          echo "=== TASK 7: Speckle GraphQL validation ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
+          echo "--- GraphQL serverInfo ---"
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST http://localhost:3100/graphql \
+            -H "Content-Type: application/json" \
+            -d '{"query":"{serverInfo{version}}"}')
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "HTTP status: $HTTP_CODE"
+          echo "Body: $BODY"
+
+          echo ""
+          echo "--- Token validation (activeUser) ---"
+          TOKEN=$(cat /var/lib/docker/volumes/ectropy_speckle-tokens/_data/speckle-service-token 2>/dev/null || echo "")
+          if [ -n "$TOKEN" ]; then
+            RESPONSE2=$(curl -s -w "\n%{http_code}" \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"query":"{ activeUser { id name email } }"}' \
+              http://localhost:3100/graphql)
+            HTTP2=$(echo "$RESPONSE2" | tail -1)
+            BODY2=$(echo "$RESPONSE2" | head -n -1)
+            echo "activeUser HTTP: $HTTP2"
+            echo "activeUser Body: $BODY2"
+          else
+            echo "No token file found"
+          fi
+          REMOTE
+
+      - name: Gate 1 — n8n canary AFTER
+        run: |
+          echo "=== GATE 1: n8n canary AFTER ==="
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST https://n8n.luh.tech/webhook/lead-capture -H "Content-Type: application/json" -d '{"test":"minio-fix-canary-after"}')
+          echo "n8n canary: $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "FAIL: expected 200, got $HTTP_CODE"
+            exit 1
+          fi
+          echo "PASS: n8n canary returned 200"
 
       - name: Remove runner IP from firewall (cleanup)
         if: always() && steps.add-firewall-rule.outputs.runner_ip
