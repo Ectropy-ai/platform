@@ -1,10 +1,10 @@
-name: Speckle Token Diagnosis — READ ONLY
+name: Speckle Server Crashloop Diagnosis — READ ONLY
 
 on:
   workflow_dispatch:
 
 jobs:
-  speckle-check:
+  speckle-crash:
     runs-on: ubuntu-latest
     steps:
       - name: Install doctl
@@ -33,97 +33,45 @@ jobs:
         run: |
           ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
 
-      - name: Task 1 — Check token file
+      - name: Task 1 — Crash logs
         run: |
-          echo "=== TASK 1: Token file on blue ==="
+          echo "=== TASK 1: speckle-server crash logs (last 80 lines) ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          set -euo pipefail
-
-          echo "--- Check shared-tokens volume path ---"
-          VOLUME_PATH=$(docker volume inspect ectropy_speckle-tokens --format '{{.Mountpoint}}' 2>/dev/null || echo "VOLUME_NOT_FOUND")
-          echo "Volume mountpoint: $VOLUME_PATH"
-
-          if [ "$VOLUME_PATH" != "VOLUME_NOT_FOUND" ] && [ -f "$VOLUME_PATH/speckle-service-token" ]; then
-            echo "---FILE_EXISTS---"
-            TOKEN=$(cat "$VOLUME_PATH/speckle-service-token")
-            echo "First 8 chars: ${TOKEN:0:8}"
-            echo "Token length: ${#TOKEN}"
-            ls -la "$VOLUME_PATH/speckle-service-token"
-          else
-            echo "--- Checking alternative paths ---"
-            for P in /shared-tokens/speckle-service-token /var/lib/docker/volumes/ectropy_speckle-tokens/_data/speckle-service-token; do
-              if [ -f "$P" ]; then
-                echo "Found at: $P"
-                TOKEN=$(cat "$P")
-                echo "First 8 chars: ${TOKEN:0:8}"
-                echo "Token length: ${#TOKEN}"
-                ls -la "$P"
-              else
-                echo "Not found: $P"
-              fi
-            done
-          fi
+          docker logs ectropy-speckle-server --tail 80 2>&1
           REMOTE
 
-      - name: Task 2 — Speckle server health + token validity
+      - name: Task 2 — Speckle-server env vars
         run: |
-          echo "=== TASK 2: Speckle health + token check ==="
+          echo "=== TASK 2: speckle-server env vars ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          set -euo pipefail
-
-          VOLUME_PATH=$(docker volume inspect ectropy_speckle-tokens --format '{{.Mountpoint}}' 2>/dev/null || echo "")
-          TOKEN=""
-          if [ -n "$VOLUME_PATH" ] && [ -f "$VOLUME_PATH/speckle-service-token" ]; then
-            TOKEN=$(cat "$VOLUME_PATH/speckle-service-token")
-          elif [ -f "/var/lib/docker/volumes/ectropy_speckle-tokens/_data/speckle-service-token" ]; then
-            TOKEN=$(cat /var/lib/docker/volumes/ectropy_speckle-tokens/_data/speckle-service-token)
-          fi
-
-          echo "Token available: $([ -n "$TOKEN" ] && echo 'yes' || echo 'no')"
-
-          echo "--- Speckle server health (port 3100) ---"
-          HTTP_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3100/api 2>/dev/null || echo "CONN_FAIL")
-          echo "GET /api status: $HTTP_HEALTH"
-
-          echo "--- GraphQL activeUser with token ---"
-          if [ -n "$TOKEN" ]; then
-            RESPONSE=$(curl -s -w "\n%{http_code}" \
-              -H "Authorization: Bearer $TOKEN" \
-              -H "Content-Type: application/json" \
-              -d '{"query":"{ activeUser { id name email } }"}' \
-              http://localhost:3100/graphql 2>/dev/null || echo "CONN_FAIL")
-            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-            BODY=$(echo "$RESPONSE" | head -n -1)
-            echo "GraphQL status: $HTTP_CODE"
-            echo "GraphQL body: $BODY"
-          else
-            echo "SKIP: no token available"
-          fi
-
-          echo "--- Speckle frontend health (port 3101) ---"
-          HTTP_FE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3101 2>/dev/null || echo "CONN_FAIL")
-          echo "Frontend status: $HTTP_FE"
+          docker inspect ectropy-speckle-server \
+            --format '{{range .Config.Env}}{{println .}}{{end}}' \
+            | grep -iE 'REDIS|POSTGRES|DATABASE|SECRET|ORIGIN|CANONICAL|PORT|HOST|SSL' \
+            | sed 's/=.*/=REDACTED/'
           REMOTE
 
-      - name: Task 3 — Speckle container uptime
+      - name: Task 3 — Redis and Postgres reachability
         run: |
-          echo "=== TASK 3: Speckle containers ==="
+          echo "=== TASK 3: Network reachability from speckle network ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.CreatedAt}}' | head -1
-          docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.CreatedAt}}' | grep -i speckle || echo "No speckle containers found"
+          echo "--- Redis check (ectropy-redis:6379) ---"
+          docker exec ectropy-speckle-frontend sh -c 'nc -zv ectropy-redis 6379 2>&1' || echo "nc not available, trying wget..."
+          docker exec ectropy-speckle-frontend sh -c 'wget -q --spider --timeout=3 http://ectropy-redis:6379 2>&1 || echo "wget test done"'
+
+          echo ""
+          echo "--- Postgres check ---"
+          echo "Note: Speckle uses managed DO PostgreSQL, not a local container"
+          docker inspect ectropy-speckle-server \
+            --format '{{range .Config.Env}}{{println .}}{{end}}' \
+            | grep -i 'POSTGRES_URL\|DATABASE_URL' \
+            | sed 's|://[^@]*@|://REDACTED@|'
           REMOTE
 
-      - name: Task 4 — SPECKLE_SERVER_TOKEN in .env
+      - name: Task 3b — Check docker network connectivity
         run: |
-          echo "=== TASK 4: SPECKLE_SERVER_TOKEN in .env ==="
+          echo "=== TASK 3b: Docker networks for speckle-server ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          if grep -q 'SPECKLE_SERVER_TOKEN' /opt/ectropy/.env; then
-            LINE=$(grep 'SPECKLE_SERVER_TOKEN' /opt/ectropy/.env)
-            echo "Found: ${LINE:0:40}..."
-            echo "Full line length: ${#LINE}"
-          else
-            echo "SPECKLE_SERVER_TOKEN not found in /opt/ectropy/.env"
-          fi
+          docker inspect ectropy-speckle-server --format '{{json .NetworkSettings.Networks}}' | python3 -m json.tool 2>/dev/null || docker inspect ectropy-speckle-server --format '{{json .NetworkSettings.Networks}}'
           REMOTE
 
       - name: Remove runner IP from firewall (cleanup)
