@@ -33,52 +33,68 @@ jobs:
         run: |
           ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
 
-      - name: Query project_roles for ectropytest
+      - name: Query DB via api-gateway container
         run: |
           echo "=== BLUE (${{ vars.PROD_BLUE_IP }}) ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
           set -euo pipefail
 
-          echo "--- Finding postgres container ---"
-          PG_CONTAINER=$(docker ps --format '{{.Names}}' | grep postgres | head -1)
-          echo "Postgres container: $PG_CONTAINER"
+          echo "--- Finding api-gateway container ---"
+          API_CONTAINER=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
+          echo "Container: $API_CONTAINER"
 
-          echo "--- Query: project_roles for ectropytest@gmail.com ---"
-          docker exec "$PG_CONTAINER" psql -U ectropy -d ectropy_production -c "
-          SELECT
-            u.email,
-            u.id as user_id,
-            pr.role,
-            pr.permissions,
-            pr.is_active,
-            p.name as project_name,
-            p.id as project_id
-          FROM project_roles pr
-          JOIN users u ON u.id = pr.user_id
-          JOIN projects p ON p.id = pr.project_id
-          WHERE u.email = 'ectropytest@gmail.com';
-          "
+          echo "--- Extracting DATABASE_URL ---"
+          DB_URL=$(docker exec "$API_CONTAINER" printenv DATABASE_URL 2>/dev/null || echo "NOT SET")
+          echo "DATABASE_URL set: $([ "$DB_URL" != "NOT SET" ] && echo 'yes' || echo 'no')"
 
-          echo "--- Query: speckle_streams for Demo Office Building ---"
-          docker exec "$PG_CONTAINER" psql -U ectropy -d ectropy_production -c "
-          SELECT
-            ss.stream_id,
-            ss.stream_name,
-            ss.construction_project_id,
-            p.name as project_name
-          FROM speckle_streams ss
-          JOIN projects p ON p.id = ss.construction_project_id
-          WHERE p.name ILIKE '%demo%office%';
-          "
+          echo ""
+          echo "=== QUERY 1: project_roles for ectropytest@gmail.com ==="
+          docker exec "$API_CONTAINER" sh -c "
+            apt-get update -qq > /dev/null 2>&1 && apt-get install -y -qq postgresql-client > /dev/null 2>&1 || true
+            PGPASSWORD=\$(echo \$DATABASE_URL | sed 's|.*://[^:]*:\([^@]*\)@.*|\1|') \
+            psql \"\$DATABASE_URL\" -c \"
+            SELECT
+              u.email,
+              u.id as user_id,
+              pr.role,
+              pr.permissions,
+              pr.is_active,
+              p.name as project_name,
+              p.id as project_id
+            FROM project_roles pr
+            JOIN users u ON u.id = pr.user_id
+            JOIN projects p ON p.id = pr.project_id
+            WHERE u.email = 'ectropytest@gmail.com';
+            \"
+          " 2>&1 || echo "QUERY 1 FAILED"
 
-          echo "--- Query: all projects ectropytest has access to ---"
-          docker exec "$PG_CONTAINER" psql -U ectropy -d ectropy_production -c "
-          SELECT p.id, p.name, p.tenant_id
-          FROM projects p
-          WHERE p.tenant_id IN (
-            SELECT tenant_id FROM users WHERE email = 'ectropytest@gmail.com'
-          );
-          "
+          echo ""
+          echo "=== QUERY 2: speckle_streams for Demo Office Building ==="
+          docker exec "$API_CONTAINER" sh -c "
+            psql \"\$DATABASE_URL\" -c \"
+            SELECT
+              ss.stream_id,
+              ss.stream_name,
+              ss.construction_project_id,
+              p.name as project_name
+            FROM speckle_streams ss
+            JOIN projects p ON p.id = ss.construction_project_id
+            WHERE p.name ILIKE '%demo%office%';
+            \"
+          " 2>&1 || echo "QUERY 2 FAILED"
+
+          echo ""
+          echo "=== QUERY 3: projects in ectropytest tenant ==="
+          docker exec "$API_CONTAINER" sh -c "
+            psql \"\$DATABASE_URL\" -c \"
+            SELECT p.id, p.name, p.tenant_id
+            FROM projects p
+            WHERE p.tenant_id IN (
+              SELECT tenant_id FROM users WHERE email = 'ectropytest@gmail.com'
+            );
+            \"
+          " 2>&1 || echo "QUERY 3 FAILED"
+
           REMOTE
 
       - name: Remove runner IP from firewall (cleanup)
