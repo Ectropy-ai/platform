@@ -1,10 +1,10 @@
-name: Speckle Server Crashloop Diagnosis — READ ONLY
+name: Speckle S3 Fix — Read Before Write
 
 on:
   workflow_dispatch:
 
 jobs:
-  speckle-crash:
+  s3-read:
     runs-on: ubuntu-latest
     steps:
       - name: Install doctl
@@ -33,45 +33,38 @@ jobs:
         run: |
           ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
 
-      - name: Task 1 — Crash logs
+      - name: Task 1 — speckle-server compose block
         run: |
-          echo "=== TASK 1: speckle-server crash logs (last 80 lines) ==="
+          echo "=== TASK 1: speckle-server service block ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          docker logs ectropy-speckle-server --tail 80 2>&1
+          grep -n -A 80 'speckle-server:' /opt/ectropy/docker-compose.yml | head -100
           REMOTE
 
-      - name: Task 2 — Speckle-server env vars
+      - name: Task 2 — MinIO/S3 vars in .env
         run: |
-          echo "=== TASK 2: speckle-server env vars ==="
+          echo "=== TASK 2: MinIO/S3 vars in .env ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          docker inspect ectropy-speckle-server \
-            --format '{{range .Config.Env}}{{println .}}{{end}}' \
-            | grep -iE 'REDIS|POSTGRES|DATABASE|SECRET|ORIGIN|CANONICAL|PORT|HOST|SSL' \
-            | sed 's/=.*/=REDACTED/'
+          grep -inE 'minio|s3_|S3 |S3=' /opt/ectropy/.env || echo "No S3/MinIO vars found in .env"
           REMOTE
 
-      - name: Task 3 — Redis and Postgres reachability
+      - name: Task 3 — MinIO container status
         run: |
-          echo "=== TASK 3: Network reachability from speckle network ==="
+          echo "=== TASK 3: MinIO container ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          echo "--- Redis check (ectropy-redis:6379) ---"
-          docker exec ectropy-speckle-frontend sh -c 'nc -zv ectropy-redis 6379 2>&1' || echo "nc not available, trying wget..."
-          docker exec ectropy-speckle-frontend sh -c 'wget -q --spider --timeout=3 http://ectropy-redis:6379 2>&1 || echo "wget test done"'
-
+          docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' | grep -i minio || echo "No MinIO container found"
           echo ""
-          echo "--- Postgres check ---"
-          echo "Note: Speckle uses managed DO PostgreSQL, not a local container"
-          docker inspect ectropy-speckle-server \
-            --format '{{range .Config.Env}}{{println .}}{{end}}' \
-            | grep -i 'POSTGRES_URL\|DATABASE_URL' \
-            | sed 's|://[^@]*@|://REDACTED@|'
+          echo "--- All S3-related env vars in speckle-server container ---"
+          docker inspect ectropy-speckle-server --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -iE 's3_|minio|bucket' || echo "No S3/MinIO vars in container"
           REMOTE
 
-      - name: Task 3b — Check docker network connectivity
+      - name: Task 3b — Check other speckle containers for S3 vars
         run: |
-          echo "=== TASK 3b: Docker networks for speckle-server ==="
+          echo "=== TASK 3b: S3 vars in other speckle containers ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          docker inspect ectropy-speckle-server --format '{{json .NetworkSettings.Networks}}' | python3 -m json.tool 2>/dev/null || docker inspect ectropy-speckle-server --format '{{json .NetworkSettings.Networks}}'
+          for C in ectropy-speckle-fileimport ectropy-speckle-preview ectropy-speckle-webhook; do
+            echo "--- $C ---"
+            docker inspect "$C" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | grep -iE 's3_|minio|bucket' || echo "  No S3/MinIO vars"
+          done
           REMOTE
 
       - name: Remove runner IP from firewall (cleanup)
