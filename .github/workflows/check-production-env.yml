@@ -1,10 +1,10 @@
-name: Update GOOGLE_CLIENT_SECRET — WRITE
+name: Console Server State — READ ONLY
 
 on:
   workflow_dispatch:
 
 jobs:
-  update-secret:
+  check-console:
     runs-on: ubuntu-latest
     steps:
       - name: Install doctl
@@ -17,126 +17,112 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
 
-      - name: Add runner IP to firewall (temporary)
+      - name: List all firewalls
+        run: |
+          echo "=== All DO firewalls ==="
+          doctl compute firewall list --format ID,Name,Status --no-header
+
+      - name: List all droplets
+        run: |
+          echo "=== All DO droplets ==="
+          doctl compute droplet list --format ID,Name,PublicIPv4,Status --no-header
+
+      - name: Check if console droplet is in firewall
+        run: |
+          echo "=== Firewall details for PROD_FIREWALL_ID ==="
+          doctl compute firewall get ${{ vars.PROD_FIREWALL_ID }} --format DropletIDs
+
+          echo ""
+          echo "=== All firewalls with droplet membership ==="
+          doctl compute firewall list --format ID,Name,DropletIDs
+
+      - name: Add runner IP to ALL firewalls (temporary)
         id: add-firewall-rule
         run: |
           RUNNER_IP=$(curl -s https://api.ipify.org)
           echo "Runner IP: $RUNNER_IP"
           echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+
+          # Add to prod firewall
           FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
           doctl compute firewall add-rules $FIREWALL_ID \
             --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+
+          # Try to find and add to any other firewalls
+          ALL_FW=$(doctl compute firewall list --format ID --no-header)
+          for fw in $ALL_FW; do
+            if [ "$fw" != "$FIREWALL_ID" ]; then
+              echo "Adding rule to firewall: $fw"
+              doctl compute firewall add-rules $fw \
+                --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32" || true
+            fi
+          done
+
           echo "Waiting 5s for firewall propagation..."
           sleep 5
 
       - name: Add SSH known hosts
         run: |
-          ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
-          ssh-keyscan -H ${{ vars.PROD_GREEN_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H 209.38.174.111 >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Task 3a — Update .env on blue
+      - name: Task 2 — Container state on console server
         run: |
-          echo "=== Updating GOOGLE_CLIENT_SECRET on blue ==="
-          # SCP the secret value as a file to avoid shell escaping issues
-          echo "$SECRET_VAL" > /tmp/newsecret
-          scp -o ConnectTimeout=15 /tmp/newsecret root@${{ vars.PROD_BLUE_IP }}:/tmp/newsecret
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          set -euo pipefail
-          NEW_SECRET=$(cat /tmp/newsecret)
-          rm -f /tmp/newsecret
+          echo "=== Containers on 209.38.174.111 ==="
+          ssh -o ConnectTimeout=15 root@209.38.174.111 \
+            "docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}\t{{.CreatedAt}}'" \
+            2>&1 || echo "SSH FAILED"
 
-          sed -i "s|^GOOGLE_CLIENT_SECRET=.*|GOOGLE_CLIENT_SECRET=${NEW_SECRET}|" /opt/ectropy/.env
-          sed -i "s|^GOOGLE_CLIENT_SECRET_PRODUCTION=.*|GOOGLE_CLIENT_SECRET_PRODUCTION=${NEW_SECRET}|" /opt/ectropy/.env
-
-          echo "--- Verify blue .env (redacted) ---"
-          grep "GOOGLE_CLIENT_SECRET" /opt/ectropy/.env | sed 's/=.*/=REDACTED/'
-          REMOTE
-          rm -f /tmp/newsecret
-        env:
-          SECRET_VAL: ${{ secrets.GOOGLE_CLIENT_SECRET_PRODUCTION }}
-
-      - name: Task 3b — Update .env on green
+      - name: Task 3 — Logs of failed/exited containers
         run: |
-          echo "=== Updating GOOGLE_CLIENT_SECRET on green ==="
-          echo "$SECRET_VAL" > /tmp/newsecret
-          scp -o ConnectTimeout=15 /tmp/newsecret root@${{ vars.PROD_GREEN_IP }}:/tmp/newsecret
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash <<'REMOTE'
-          set -euo pipefail
-          NEW_SECRET=$(cat /tmp/newsecret)
-          rm -f /tmp/newsecret
-
-          sed -i "s|^GOOGLE_CLIENT_SECRET=.*|GOOGLE_CLIENT_SECRET=${NEW_SECRET}|" /opt/ectropy/.env
-          sed -i "s|^GOOGLE_CLIENT_SECRET_PRODUCTION=.*|GOOGLE_CLIENT_SECRET_PRODUCTION=${NEW_SECRET}|" /opt/ectropy/.env
-
-          echo "--- Verify green .env (redacted) ---"
-          grep "GOOGLE_CLIENT_SECRET" /opt/ectropy/.env | sed 's/=.*/=REDACTED/'
-          REMOTE
-          rm -f /tmp/newsecret
-        env:
-          SECRET_VAL: ${{ secrets.GOOGLE_CLIENT_SECRET_PRODUCTION }}
-
-      - name: Task 4a — Restart api-gateway on blue
-        run: |
-          echo "=== Restarting api-gateway on blue ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          cd /opt/ectropy
-          docker compose up -d --no-deps --force-recreate api-gateway
+          echo "=== Logs of non-running containers ==="
+          ssh -o ConnectTimeout=15 root@209.38.174.111 bash <<'REMOTE' 2>&1 || echo "SSH FAILED"
+          EXITED=$(docker ps -a --format '{{.Names}}\t{{.Status}}' | grep -v 'Up ' | awk '{print $1}')
+          if [ -z "$EXITED" ]; then
+            echo "All containers are running"
+          else
+            for c in $EXITED; do
+              echo "=== Logs: $c ==="
+              docker logs "$c" --tail 30 2>&1
+              echo ""
+            done
+          fi
           REMOTE
 
-      - name: Task 4b — Restart api-gateway on green
+      - name: Task 4 — Compose file and nginx config
         run: |
-          echo "=== Restarting api-gateway on green ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash <<'REMOTE'
-          cd /opt/ectropy
-          docker compose up -d --no-deps --force-recreate api-gateway
-          REMOTE
-
-      - name: Task 4c — Wait and verify containers healthy
-        run: |
-          echo "Waiting 15 seconds for containers to stabilize..."
-          sleep 15
-
-          echo "=== Blue api-gateway status ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} \
-            "docker ps --format 'table {{.Names}}\t{{.Status}}' | grep api-gateway"
+          echo "=== Compose and config files ==="
+          ssh -o ConnectTimeout=15 root@209.38.174.111 bash <<'REMOTE' 2>&1 || echo "SSH FAILED"
+          echo "--- Find compose files ---"
+          find / -name "docker-compose*" -o -name "compose.yml" -o -name "compose.yaml" 2>/dev/null | head -10
 
           echo ""
-          echo "=== Green api-gateway status ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} \
-            "docker ps --format 'table {{.Names}}\t{{.Status}}' | grep api-gateway"
-
-      - name: Task 5 — Verify secret in container (first 8 only)
-        run: |
-          echo "=== Blue — GOOGLE_CLIENT_SECRET check ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          API=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
-          VAL=$(docker exec "$API" printenv GOOGLE_CLIENT_SECRET 2>/dev/null || echo "NOT SET")
-          echo "First 8: ${VAL:0:8}"
-          echo "Last 6: ${VAL: -6}"
-          echo "Length: ${#VAL}"
-          REMOTE
+          echo "--- Find nginx config ---"
+          find / -name "nginx.conf" -o -name "*.conf" -path "*/nginx/*" 2>/dev/null | head -10
 
           echo ""
-          echo "=== Green — GOOGLE_CLIENT_SECRET check ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash <<'REMOTE'
-          API=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
-          VAL=$(docker exec "$API" printenv GOOGLE_CLIENT_SECRET 2>/dev/null || echo "NOT SET")
-          echo "First 8: ${VAL:0:8}"
-          echo "Last 6: ${VAL: -6}"
-          echo "Length: ${#VAL}"
+          echo "--- Check what's listening on port 80/443 ---"
+          ss -tlnp | grep -E ':80|:443' || echo "Nothing on 80/443"
+
+          echo ""
+          echo "--- Disk usage ---"
+          df -h / | tail -1
           REMOTE
 
-      - name: Task 5b — Test OAuth redirect (sanity check)
-        run: |
-          echo "=== OAuth redirect from blue ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          curl -s -o /dev/null -D - http://localhost:4000/api/auth/google 2>&1 | grep -i 'location' | head -1
-          REMOTE
-
-      - name: Remove runner IP from firewall (cleanup)
+      - name: Remove runner IP from ALL firewalls (cleanup)
         if: always() && steps.add-firewall-rule.outputs.runner_ip
         run: |
           RUNNER_IP="${{ steps.add-firewall-rule.outputs.runner_ip }}"
+
+          # Remove from prod firewall
           FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
           doctl compute firewall remove-rules $FIREWALL_ID \
             --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32" || true
+
+          # Remove from all other firewalls
+          ALL_FW=$(doctl compute firewall list --format ID --no-header)
+          for fw in $ALL_FW; do
+            if [ "$fw" != "$FIREWALL_ID" ]; then
+              doctl compute firewall remove-rules $fw \
+                --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32" || true
+            fi
+          done
