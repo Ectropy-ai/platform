@@ -1,10 +1,10 @@
-name: Fix GOOGLE_CLIENT_ID on production — WRITE
+name: OAuth Debug — READ ONLY
 
 on:
   workflow_dispatch:
 
 jobs:
-  fix-oauth:
+  debug-oauth:
     runs-on: ubuntu-latest
     steps:
       - name: Install doctl
@@ -32,90 +32,71 @@ jobs:
       - name: Add SSH known hosts
         run: |
           ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
-          ssh-keyscan -H ${{ vars.PROD_GREEN_IP }} >> ~/.ssh/known_hosts
 
-      - name: Task 2 — Update .env on blue
+      - name: Task 2 — Client secret first 8 chars in container
         run: |
-          echo "=== Updating GOOGLE_CLIENT_ID on blue ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          set -euo pipefail
-          NEW_ID="167049735635-rvu72sobgcsc1t79d0hjg3a08r4ptavo.apps.googleusercontent.com"
-
-          sed -i "s|^GOOGLE_CLIENT_ID=.*|GOOGLE_CLIENT_ID=${NEW_ID}|" /opt/ectropy/.env
-          sed -i "s|^GOOGLE_CLIENT_ID_PRODUCTION=.*|GOOGLE_CLIENT_ID_PRODUCTION=${NEW_ID}|" /opt/ectropy/.env
-
-          echo "--- Verify blue .env ---"
-          grep 'GOOGLE_CLIENT_ID' /opt/ectropy/.env | grep -v SECRET
-          REMOTE
-
-      - name: Task 3 — Update .env on green
-        run: |
-          echo "=== Updating GOOGLE_CLIENT_ID on green ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash <<'REMOTE'
-          set -euo pipefail
-          NEW_ID="167049735635-rvu72sobgcsc1t79d0hjg3a08r4ptavo.apps.googleusercontent.com"
-
-          sed -i "s|^GOOGLE_CLIENT_ID=.*|GOOGLE_CLIENT_ID=${NEW_ID}|" /opt/ectropy/.env
-          sed -i "s|^GOOGLE_CLIENT_ID_PRODUCTION=.*|GOOGLE_CLIENT_ID_PRODUCTION=${NEW_ID}|" /opt/ectropy/.env
-
-          echo "--- Verify green .env ---"
-          grep 'GOOGLE_CLIENT_ID' /opt/ectropy/.env | grep -v SECRET
-          REMOTE
-
-      - name: Task 4 — Restart api-gateway on blue
-        run: |
-          echo "=== Restarting api-gateway on blue ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          cd /opt/ectropy
-          docker compose up -d --no-deps --force-recreate api-gateway
-          REMOTE
-
-      - name: Task 4b — Restart api-gateway on green
-        run: |
-          echo "=== Restarting api-gateway on green ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash <<'REMOTE'
-          cd /opt/ectropy
-          docker compose up -d --no-deps --force-recreate api-gateway
-          REMOTE
-
-      - name: Task 4c — Wait and verify containers healthy
-        run: |
-          echo "Waiting 15 seconds for containers to stabilize..."
-          sleep 15
-
-          echo "=== Blue api-gateway status ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} \
-            "docker ps --format 'table {{.Names}}\t{{.Status}}' | grep api-gateway"
-
-          echo ""
-          echo "=== Green api-gateway status ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} \
-            "docker ps --format 'table {{.Names}}\t{{.Status}}' | grep api-gateway"
-
-      - name: Task 5 — Verify correct client ID in running containers
-        run: |
-          echo "=== Blue — GOOGLE_CLIENT_ID in container ==="
+          echo "=== GOOGLE_CLIENT_SECRET in api-gateway container ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
           API=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
-          VAL=$(docker exec "$API" printenv GOOGLE_CLIENT_ID 2>/dev/null)
-          echo "First 30: ${VAL:0:30}"
-          echo "Last 20: ${VAL: -20}"
-          REMOTE
+          echo "Container: $API"
+
+          echo "--- GOOGLE_CLIENT_SECRET (first 8 + last 6) ---"
+          VAL=$(docker exec "$API" printenv GOOGLE_CLIENT_SECRET 2>/dev/null || echo "NOT SET")
+          if [ "$VAL" != "NOT SET" ]; then
+            echo "First 8: ${VAL:0:8}"
+            echo "Last 6: ${VAL: -6}"
+            echo "Length: ${#VAL}"
+          else
+            echo "NOT SET"
+          fi
 
           echo ""
-          echo "=== Green — GOOGLE_CLIENT_ID in container ==="
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash <<'REMOTE'
-          API=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
-          VAL=$(docker exec "$API" printenv GOOGLE_CLIENT_ID 2>/dev/null)
-          echo "First 30: ${VAL:0:30}"
-          echo "Last 20: ${VAL: -20}"
+          echo "--- GOOGLE_CLIENT_ID (full) ---"
+          docker exec "$API" printenv GOOGLE_CLIENT_ID 2>/dev/null || echo "NOT SET"
+
+          echo ""
+          echo "--- Recent OAuth logs (last 20 lines with PASSPORT or OAUTH) ---"
+          docker logs "$API" 2>&1 | grep -iE 'PASSPORT|OAUTH|oauth_error|server_error|Unauthorized|pending|Not registered' | tail -20
           REMOTE
 
-      - name: Task 5b — Verify OAuth redirect uses new client ID
+      - name: Task 3 — ectropytest user in DB
         run: |
-          echo "=== OAuth redirect from blue ==="
+          echo "=== ectropytest user record ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
-          curl -s -o /dev/null -D - http://localhost:4000/api/auth/google 2>&1 | grep -i 'location' | head -1
+          API=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
+          docker exec "$API" node -e "
+            const { PrismaClient } = require('@prisma/client');
+            const prisma = new PrismaClient();
+            async function main() {
+              const user = await prisma.\$queryRawUnsafe(
+                \"SELECT id, email, is_authorized, is_platform_admin, tenant_id, role, roles, provider, last_login, created_at FROM users WHERE email = 'ectropytest@gmail.com'\"
+              );
+              console.log(JSON.stringify(user, null, 2));
+
+              const user2 = await prisma.\$queryRawUnsafe(
+                \"SELECT id, email, is_authorized, is_platform_admin, tenant_id, role, roles, provider, last_login, created_at FROM users WHERE email = 'erik@luh.tech'\"
+              );
+              console.log('--- erik@luh.tech ---');
+              console.log(JSON.stringify(user2, null, 2));
+            }
+            main().catch(console.error).finally(() => prisma.\$disconnect());
+          "
+          REMOTE
+
+      - name: Task 3b — AUTHORIZED_USERS env var
+        run: |
+          echo "=== AUTHORIZED_USERS in container ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
+          API=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
+          docker exec "$API" printenv AUTHORIZED_USERS 2>/dev/null || echo "NOT SET"
+
+          echo ""
+          echo "--- ADMIN_DOMAIN ---"
+          docker exec "$API" printenv ADMIN_DOMAIN 2>/dev/null || echo "NOT SET"
+
+          echo ""
+          echo "--- FRONTEND_URL ---"
+          docker exec "$API" printenv FRONTEND_URL 2>/dev/null || echo "NOT SET"
           REMOTE
 
       - name: Remove runner IP from firewall (cleanup)
