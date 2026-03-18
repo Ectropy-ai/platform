@@ -1,10 +1,10 @@
-name: DB State Check — ectropytest project_roles
+name: Speckle Token Diagnosis — READ ONLY
 
 on:
   workflow_dispatch:
 
 jobs:
-  db-query:
+  speckle-check:
     runs-on: ubuntu-latest
     steps:
       - name: Install doctl
@@ -33,81 +33,97 @@ jobs:
         run: |
           ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
 
-      - name: Query DB via node in api-gateway container
+      - name: Task 1 — Check token file
         run: |
-          echo "=== BLUE (${{ vars.PROD_BLUE_IP }}) ==="
+          echo "=== TASK 1: Token file on blue ==="
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
           set -euo pipefail
 
-          API_CONTAINER=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
-          echo "Container: $API_CONTAINER"
+          echo "--- Check shared-tokens volume path ---"
+          VOLUME_PATH=$(docker volume inspect ectropy_speckle-tokens --format '{{.Mountpoint}}' 2>/dev/null || echo "VOLUME_NOT_FOUND")
+          echo "Volume mountpoint: $VOLUME_PATH"
 
-          echo ""
-          echo "=== QUERY 1: project_roles for ectropytest@gmail.com ==="
-          docker exec "$API_CONTAINER" node -e "
-          const { PrismaClient } = require('@prisma/client');
-          const p = new PrismaClient();
-          (async () => {
-            const rows = await p.\$queryRawUnsafe(\`
-              SELECT
-                u.email,
-                u.id as user_id,
-                pr.role,
-                pr.permissions,
-                pr.is_active,
-                p.name as project_name,
-                p.id as project_id
-              FROM project_roles pr
-              JOIN users u ON u.id = pr.user_id
-              JOIN projects p ON p.id = pr.project_id
-              WHERE u.email = 'ectropytest@gmail.com'
-            \`);
-            console.log(JSON.stringify(rows, null, 2));
-            console.log('Row count:', rows.length);
-            await p.\$disconnect();
-          })().catch(e => { console.error(e); process.exit(1); });
-          "
+          if [ "$VOLUME_PATH" != "VOLUME_NOT_FOUND" ] && [ -f "$VOLUME_PATH/speckle-service-token" ]; then
+            echo "---FILE_EXISTS---"
+            TOKEN=$(cat "$VOLUME_PATH/speckle-service-token")
+            echo "First 8 chars: ${TOKEN:0:8}"
+            echo "Token length: ${#TOKEN}"
+            ls -la "$VOLUME_PATH/speckle-service-token"
+          else
+            echo "--- Checking alternative paths ---"
+            for P in /shared-tokens/speckle-service-token /var/lib/docker/volumes/ectropy_speckle-tokens/_data/speckle-service-token; do
+              if [ -f "$P" ]; then
+                echo "Found at: $P"
+                TOKEN=$(cat "$P")
+                echo "First 8 chars: ${TOKEN:0:8}"
+                echo "Token length: ${#TOKEN}"
+                ls -la "$P"
+              else
+                echo "Not found: $P"
+              fi
+            done
+          fi
+          REMOTE
 
-          echo ""
-          echo "=== QUERY 2: speckle_streams for Demo Office Building ==="
-          docker exec "$API_CONTAINER" node -e "
-          const { PrismaClient } = require('@prisma/client');
-          const p = new PrismaClient();
-          (async () => {
-            const rows = await p.\$queryRawUnsafe(\`
-              SELECT
-                ss.stream_id,
-                ss.stream_name,
-                ss.construction_project_id,
-                p.name as project_name
-              FROM speckle_streams ss
-              JOIN projects p ON p.id = ss.construction_project_id
-              WHERE p.name ILIKE '%demo%office%'
-            \`);
-            console.log(JSON.stringify(rows, null, 2));
-            console.log('Row count:', rows.length);
-            await p.\$disconnect();
-          })().catch(e => { console.error(e); process.exit(1); });
-          "
+      - name: Task 2 — Speckle server health + token validity
+        run: |
+          echo "=== TASK 2: Speckle health + token check ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
+          set -euo pipefail
 
-          echo ""
-          echo "=== QUERY 3: projects in ectropytest tenant ==="
-          docker exec "$API_CONTAINER" node -e "
-          const { PrismaClient } = require('@prisma/client');
-          const p = new PrismaClient();
-          (async () => {
-            const rows = await p.\$queryRawUnsafe(\`
-              SELECT p.id, p.name, p.tenant_id
-              FROM projects p
-              WHERE p.tenant_id IN (
-                SELECT tenant_id FROM users WHERE email = 'ectropytest@gmail.com'
-              )
-            \`);
-            console.log(JSON.stringify(rows, null, 2));
-            console.log('Row count:', rows.length);
-            await p.\$disconnect();
-          })().catch(e => { console.error(e); process.exit(1); });
-          "
+          VOLUME_PATH=$(docker volume inspect ectropy_speckle-tokens --format '{{.Mountpoint}}' 2>/dev/null || echo "")
+          TOKEN=""
+          if [ -n "$VOLUME_PATH" ] && [ -f "$VOLUME_PATH/speckle-service-token" ]; then
+            TOKEN=$(cat "$VOLUME_PATH/speckle-service-token")
+          elif [ -f "/var/lib/docker/volumes/ectropy_speckle-tokens/_data/speckle-service-token" ]; then
+            TOKEN=$(cat /var/lib/docker/volumes/ectropy_speckle-tokens/_data/speckle-service-token)
+          fi
+
+          echo "Token available: $([ -n "$TOKEN" ] && echo 'yes' || echo 'no')"
+
+          echo "--- Speckle server health (port 3100) ---"
+          HTTP_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3100/api 2>/dev/null || echo "CONN_FAIL")
+          echo "GET /api status: $HTTP_HEALTH"
+
+          echo "--- GraphQL activeUser with token ---"
+          if [ -n "$TOKEN" ]; then
+            RESPONSE=$(curl -s -w "\n%{http_code}" \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"query":"{ activeUser { id name email } }"}' \
+              http://localhost:3100/graphql 2>/dev/null || echo "CONN_FAIL")
+            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+            BODY=$(echo "$RESPONSE" | head -n -1)
+            echo "GraphQL status: $HTTP_CODE"
+            echo "GraphQL body: $BODY"
+          else
+            echo "SKIP: no token available"
+          fi
+
+          echo "--- Speckle frontend health (port 3101) ---"
+          HTTP_FE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3101 2>/dev/null || echo "CONN_FAIL")
+          echo "Frontend status: $HTTP_FE"
+          REMOTE
+
+      - name: Task 3 — Speckle container uptime
+        run: |
+          echo "=== TASK 3: Speckle containers ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
+          docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.CreatedAt}}' | head -1
+          docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.CreatedAt}}' | grep -i speckle || echo "No speckle containers found"
+          REMOTE
+
+      - name: Task 4 — SPECKLE_SERVER_TOKEN in .env
+        run: |
+          echo "=== TASK 4: SPECKLE_SERVER_TOKEN in .env ==="
+          ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
+          if grep -q 'SPECKLE_SERVER_TOKEN' /opt/ectropy/.env; then
+            LINE=$(grep 'SPECKLE_SERVER_TOKEN' /opt/ectropy/.env)
+            echo "Found: ${LINE:0:40}..."
+            echo "Full line length: ${#LINE}"
+          else
+            echo "SPECKLE_SERVER_TOKEN not found in /opt/ectropy/.env"
+          fi
           REMOTE
 
       - name: Remove runner IP from firewall (cleanup)
