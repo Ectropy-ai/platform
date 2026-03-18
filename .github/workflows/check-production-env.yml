@@ -1,10 +1,10 @@
-name: Add ANTHROPIC_API_KEY to Production
+name: DB State Check — ectropytest project_roles
 
 on:
   workflow_dispatch:
 
 jobs:
-  add-anthropic-key:
+  db-query:
     runs-on: ubuntu-latest
     steps:
       - name: Install doctl
@@ -32,113 +32,54 @@ jobs:
       - name: Add SSH known hosts
         run: |
           ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
-          ssh-keyscan -H ${{ vars.PROD_GREEN_IP }} >> ~/.ssh/known_hosts
 
-      - name: Write key to temp file
-        env:
-          API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          echo -n "$API_KEY" > /tmp/anthropic_key
-          echo "Key length: $(wc -c < /tmp/anthropic_key) bytes"
-
-      # Compose refs: api-gateway line 179, mcp-server line 229
-      # Both use ${ANTHROPIC_API_KEY} (no _PRODUCTION suffix)
-      - name: Update + restart + verify Blue
+      - name: Query project_roles for ectropytest
         run: |
           echo "=== BLUE (${{ vars.PROD_BLUE_IP }}) ==="
-          scp /tmp/anthropic_key root@${{ vars.PROD_BLUE_IP }}:/tmp/anthropic_key
           ssh -o ConnectTimeout=15 root@${{ vars.PROD_BLUE_IP }} bash <<'REMOTE'
           set -euo pipefail
-          KEY=$(cat /tmp/anthropic_key)
-          rm -f /tmp/anthropic_key
 
-          echo "--- Step 1: Add/update ANTHROPIC_API_KEY in .env ---"
-          if grep -q '^ANTHROPIC_API_KEY=' /opt/ectropy/.env; then
-            sed -i "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=${KEY}|" /opt/ectropy/.env
-            echo "Updated existing key"
-          else
-            echo "" >> /opt/ectropy/.env
-            echo "ANTHROPIC_API_KEY=${KEY}" >> /opt/ectropy/.env
-            echo "Appended new key"
-          fi
+          echo "--- Finding postgres container ---"
+          PG_CONTAINER=$(docker ps --format '{{.Names}}' | grep postgres | head -1)
+          echo "Postgres container: $PG_CONTAINER"
 
-          echo "--- Step 2: Force-recreate api-gateway + mcp-server ---"
-          cd /opt/ectropy
-          docker compose -f /opt/ectropy/docker-compose.yml up -d --no-deps --force-recreate api-gateway mcp-server
-          echo "Waiting 15s for container startup..."
-          sleep 15
+          echo "--- Query: project_roles for ectropytest@gmail.com ---"
+          docker exec "$PG_CONTAINER" psql -U ectropy -d ectropy_production -c "
+          SELECT
+            u.email,
+            u.id as user_id,
+            pr.role,
+            pr.permissions,
+            pr.is_active,
+            p.name as project_name,
+            p.id as project_id
+          FROM project_roles pr
+          JOIN users u ON u.id = pr.user_id
+          JOIN projects p ON p.id = pr.project_id
+          WHERE u.email = 'ectropytest@gmail.com';
+          "
 
-          echo "--- Step 3: Verify ANTHROPIC_API_KEY present in containers ---"
-          API_CONTAINER=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
-          MCP_CONTAINER=$(docker ps --format '{{.Names}}' | grep mcp | head -1)
+          echo "--- Query: speckle_streams for Demo Office Building ---"
+          docker exec "$PG_CONTAINER" psql -U ectropy -d ectropy_production -c "
+          SELECT
+            ss.stream_id,
+            ss.stream_name,
+            ss.construction_project_id,
+            p.name as project_name
+          FROM speckle_streams ss
+          JOIN projects p ON p.id = ss.construction_project_id
+          WHERE p.name ILIKE '%demo%office%';
+          "
 
-          echo "api-gateway container: $API_CONTAINER"
-          API_LAST6=$(docker exec "$API_CONTAINER" printenv ANTHROPIC_API_KEY 2>/dev/null | rev | cut -c1-6 | rev || echo "NOT SET")
-          echo "api-gateway ANTHROPIC_API_KEY last 6: $API_LAST6"
-
-          echo "mcp-server container: $MCP_CONTAINER"
-          MCP_LAST6=$(docker exec "$MCP_CONTAINER" printenv ANTHROPIC_API_KEY 2>/dev/null | rev | cut -c1-6 | rev || echo "NOT SET")
-          echo "mcp-server ANTHROPIC_API_KEY last 6: $MCP_LAST6"
-
-          echo "--- Container health ---"
-          docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E 'api-gateway|mcp'
+          echo "--- Query: all projects ectropytest has access to ---"
+          docker exec "$PG_CONTAINER" psql -U ectropy -d ectropy_production -c "
+          SELECT p.id, p.name, p.tenant_id
+          FROM projects p
+          WHERE p.tenant_id IN (
+            SELECT tenant_id FROM users WHERE email = 'ectropytest@gmail.com'
+          );
+          "
           REMOTE
-
-      - name: Update + restart + verify Green
-        run: |
-          echo "=== GREEN (${{ vars.PROD_GREEN_IP }}) ==="
-          scp /tmp/anthropic_key root@${{ vars.PROD_GREEN_IP }}:/tmp/anthropic_key
-          ssh -o ConnectTimeout=15 root@${{ vars.PROD_GREEN_IP }} bash <<'REMOTE'
-          set -euo pipefail
-          KEY=$(cat /tmp/anthropic_key)
-          rm -f /tmp/anthropic_key
-
-          echo "--- Step 1: Add/update ANTHROPIC_API_KEY in .env ---"
-          if grep -q '^ANTHROPIC_API_KEY=' /opt/ectropy/.env; then
-            sed -i "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=${KEY}|" /opt/ectropy/.env
-            echo "Updated existing key"
-          else
-            echo "" >> /opt/ectropy/.env
-            echo "ANTHROPIC_API_KEY=${KEY}" >> /opt/ectropy/.env
-            echo "Appended new key"
-          fi
-
-          echo "--- Step 2: Force-recreate api-gateway + mcp-server ---"
-          cd /opt/ectropy
-          docker compose -f /opt/ectropy/docker-compose.yml up -d --no-deps --force-recreate api-gateway mcp-server
-          echo "Waiting 15s for container startup..."
-          sleep 15
-
-          echo "--- Step 3: Verify ANTHROPIC_API_KEY present in containers ---"
-          API_CONTAINER=$(docker ps --format '{{.Names}}' | grep api-gateway | head -1)
-          MCP_CONTAINER=$(docker ps --format '{{.Names}}' | grep mcp | head -1)
-
-          echo "api-gateway container: $API_CONTAINER"
-          API_LAST6=$(docker exec "$API_CONTAINER" printenv ANTHROPIC_API_KEY 2>/dev/null | rev | cut -c1-6 | rev || echo "NOT SET")
-          echo "api-gateway ANTHROPIC_API_KEY last 6: $API_LAST6"
-
-          echo "mcp-server container: $MCP_CONTAINER"
-          MCP_LAST6=$(docker exec "$MCP_CONTAINER" printenv ANTHROPIC_API_KEY 2>/dev/null | rev | cut -c1-6 | rev || echo "NOT SET")
-          echo "mcp-server ANTHROPIC_API_KEY last 6: $MCP_LAST6"
-
-          echo "--- Container health ---"
-          docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E 'api-gateway|mcp'
-          REMOTE
-
-      - name: n8n canary check
-        run: |
-          echo "--- Step 5: n8n canary ---"
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST https://n8n.luh.tech/webhook/lead-capture)
-          echo "n8n canary: $HTTP_CODE"
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "FAIL: expected 200, got $HTTP_CODE"
-            exit 1
-          fi
-          echo "PASS: n8n canary returned 200"
-
-      - name: Cleanup
-        if: always()
-        run: rm -f /tmp/anthropic_key
 
       - name: Remove runner IP from firewall (cleanup)
         if: always() && steps.add-firewall-rule.outputs.runner_ip
