@@ -33,28 +33,51 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      - name: Configure SSH
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add runner IP to firewall (temporary)
+        id: add-firewall-rule
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/ectropy_prod
-          chmod 600 ~/.ssh/ectropy_prod
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "Runner IP: $RUNNER_IP"
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          CURRENT_RULES=$(doctl compute firewall get "$FIREWALL_ID" --format InboundRules --no-header)
+          CURRENT_SSH_IPS=$(echo "$CURRENT_RULES" | grep -oP 'address:\K[0-9./]+' | grep -v "$RUNNER_IP" | sort -u | paste -sd',' -)
+          NEW_SSH_IPS="${CURRENT_SSH_IPS},${RUNNER_IP}/32"
+          doctl compute firewall update "$FIREWALL_ID" \
+            --name "ectropy-production-tf-managed" \
+            --inbound-rules "protocol:tcp,ports:22,address:${NEW_SSH_IPS} protocol:tcp,ports:80,address:0.0.0.0/0 protocol:tcp,ports:443,address:0.0.0.0/0" \
+            --outbound-rules "protocol:tcp,ports:all,address:0.0.0.0/0 protocol:udp,ports:all,address:0.0.0.0/0 protocol:icmp,address:0.0.0.0/0" \
+            --droplet-ids "${{ env.PROD_BLUE_DROPLET_ID }},${{ env.PROD_GREEN_DROPLET_ID }}"
+          sleep 5
+
+      - name: Add SSH known hosts
+        run: |
           ssh-keyscan -H ${{ env.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
 
       - name: Run cleanup on blue server
         run: |
           echo "========================================="
           echo "Cleaning up Blue Production Server"
-          echo "IP: ${{ env.PROD_BLUE_IP }}"
           echo "========================================="
+          ssh root@${{ env.PROD_BLUE_IP }} "docker system prune -af --volumes && df -h"
 
-          # Transfer cleanup script
-          scp -i ~/.ssh/ectropy_prod \
-            scripts/deployment/cleanup-production-server.sh \
-            root@${{ env.PROD_BLUE_IP }}:/tmp/cleanup.sh
-
-          # Execute cleanup script
-          ssh -i ~/.ssh/ectropy_prod root@${{ env.PROD_BLUE_IP }} \
-            "chmod +x /tmp/cleanup.sh && /tmp/cleanup.sh"
+      - name: Remove runner IP from firewall (cleanup)
+        if: always()
+        run: |
+          RUNNER_IP="${{ steps.add-firewall-rule.outputs.runner_ip }}"
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          CURRENT_RULES=$(doctl compute firewall get "$FIREWALL_ID" --format InboundRules --no-header)
+          REMAINING_IPS=$(echo "$CURRENT_RULES" | grep -oP 'address:\K[0-9./]+' | grep -v "$RUNNER_IP" | sort -u | paste -sd',' -)
+          doctl compute firewall update "$FIREWALL_ID" \
+            --name "ectropy-production-tf-managed" \
+            --inbound-rules "protocol:tcp,ports:22,address:${REMAINING_IPS} protocol:tcp,ports:80,address:0.0.0.0/0 protocol:tcp,ports:443,address:0.0.0.0/0" \
+            --outbound-rules "protocol:tcp,ports:all,address:0.0.0.0/0 protocol:udp,ports:all,address:0.0.0.0/0 protocol:icmp,address:0.0.0.0/0" \
+            --droplet-ids "${{ env.PROD_BLUE_DROPLET_ID }},${{ env.PROD_GREEN_DROPLET_ID }}"
 
   cleanup-green:
     name: Cleanup Green Production Server
@@ -70,28 +93,51 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      - name: Configure SSH
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add runner IP to firewall (temporary)
+        id: add-firewall-rule
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/ectropy_prod
-          chmod 600 ~/.ssh/ectropy_prod
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "Runner IP: $RUNNER_IP"
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          CURRENT_RULES=$(doctl compute firewall get "$FIREWALL_ID" --format InboundRules --no-header)
+          CURRENT_SSH_IPS=$(echo "$CURRENT_RULES" | grep -oP 'address:\K[0-9./]+' | grep -v "$RUNNER_IP" | sort -u | paste -sd',' -)
+          NEW_SSH_IPS="${CURRENT_SSH_IPS},${RUNNER_IP}/32"
+          doctl compute firewall update "$FIREWALL_ID" \
+            --name "ectropy-production-tf-managed" \
+            --inbound-rules "protocol:tcp,ports:22,address:${NEW_SSH_IPS} protocol:tcp,ports:80,address:0.0.0.0/0 protocol:tcp,ports:443,address:0.0.0.0/0" \
+            --outbound-rules "protocol:tcp,ports:all,address:0.0.0.0/0 protocol:udp,ports:all,address:0.0.0.0/0 protocol:icmp,address:0.0.0.0/0" \
+            --droplet-ids "${{ env.PROD_BLUE_DROPLET_ID }},${{ env.PROD_GREEN_DROPLET_ID }}"
+          sleep 5
+
+      - name: Add SSH known hosts
+        run: |
           ssh-keyscan -H ${{ env.PROD_GREEN_IP }} >> ~/.ssh/known_hosts
 
       - name: Run cleanup on green server
         run: |
           echo "========================================="
           echo "Cleaning up Green Production Server"
-          echo "IP: ${{ env.PROD_GREEN_IP }}"
           echo "========================================="
+          ssh root@${{ env.PROD_GREEN_IP }} "docker system prune -af --volumes && df -h"
 
-          # Transfer cleanup script
-          scp -i ~/.ssh/ectropy_prod \
-            scripts/deployment/cleanup-production-server.sh \
-            root@${{ env.PROD_GREEN_IP }}:/tmp/cleanup.sh
-
-          # Execute cleanup script
-          ssh -i ~/.ssh/ectropy_prod root@${{ env.PROD_GREEN_IP }} \
-            "chmod +x /tmp/cleanup.sh && /tmp/cleanup.sh"
+      - name: Remove runner IP from firewall (cleanup)
+        if: always()
+        run: |
+          RUNNER_IP="${{ steps.add-firewall-rule.outputs.runner_ip }}"
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          CURRENT_RULES=$(doctl compute firewall get "$FIREWALL_ID" --format InboundRules --no-header)
+          REMAINING_IPS=$(echo "$CURRENT_RULES" | grep -oP 'address:\K[0-9./]+' | grep -v "$RUNNER_IP" | sort -u | paste -sd',' -)
+          doctl compute firewall update "$FIREWALL_ID" \
+            --name "ectropy-production-tf-managed" \
+            --inbound-rules "protocol:tcp,ports:22,address:${REMAINING_IPS} protocol:tcp,ports:80,address:0.0.0.0/0 protocol:tcp,ports:443,address:0.0.0.0/0" \
+            --outbound-rules "protocol:tcp,ports:all,address:0.0.0.0/0 protocol:udp,ports:all,address:0.0.0.0/0 protocol:icmp,address:0.0.0.0/0" \
+            --droplet-ids "${{ env.PROD_BLUE_DROPLET_ID }},${{ env.PROD_GREEN_DROPLET_ID }}"
 
   summary:
     name: Cleanup Summary
