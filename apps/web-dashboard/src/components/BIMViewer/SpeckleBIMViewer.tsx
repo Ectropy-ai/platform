@@ -531,13 +531,12 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         keys: Object.keys(objectData).slice(0, 15),
       });
 
-      // FIX (2026-03-18): WorldTree is synchronously available after new Viewer().
-      // In @speckle/viewer 2.28.0, Viewer initializes `tree = new WorldTree()` as a
-      // property default — getWorldTree() never returns undefined. The previous
-      // 10-attempt exponential-backoff retry was unnecessary.
-      const worldTree = (viewer as any).getWorldTree?.() ?? (viewer as any).tree;
+      // FIX (2026-03-19): Access viewer.tree directly — getWorldTree() does not exist
+      // in the @speckle/viewer 2.28.0 bundle. The protected `tree` property is set
+      // synchronously at Viewer construction: `protected tree: WorldTree = new WorldTree()`.
+      const worldTree = (viewer as any).tree;
       if (!worldTree) {
-        throw new Error('Viewer.getWorldTree() and viewer.tree both unavailable — check @speckle/viewer version');
+        throw new Error('viewer.tree unavailable — check @speckle/viewer version');
       }
 
       // Access SpeckleLoader from runtime exports (not in TypeScript defs but confirmed in package exports)
@@ -568,7 +567,6 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
 
       logger.info('[BIM Viewer] Successfully loaded Speckle object with official loader', {
         objectUrl,
-        hasWorldTree: !!worldTree,
       });
 
       // ENTERPRISE FIX (2026-01-14): Camera positioning now handled automatically by SpeckleLoader
