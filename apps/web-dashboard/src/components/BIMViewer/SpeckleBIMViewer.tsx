@@ -535,9 +535,9 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       // In @speckle/viewer 2.28.0, Viewer initializes `tree = new WorldTree()` as a
       // property default — getWorldTree() never returns undefined. The previous
       // 10-attempt exponential-backoff retry was unnecessary.
-      const worldTree = (viewer as any).getWorldTree();
+      const worldTree = (viewer as any).getWorldTree?.() ?? (viewer as any).tree;
       if (!worldTree) {
-        throw new Error('Viewer.getWorldTree() returned undefined — unexpected for @speckle/viewer 2.28.0');
+        throw new Error('Viewer.getWorldTree() and viewer.tree both unavailable — check @speckle/viewer version');
       }
 
       // Access SpeckleLoader from runtime exports (not in TypeScript defs but confirmed in package exports)
