@@ -565,14 +565,16 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         throw new Error('SpeckleLoader class not found - check @speckle/viewer version');
       }
 
-      // SPRINT 7: Create SpeckleLoader with pre-fetched data
-      // No token passed - data already fetched via BFF proxy with server-side token injection
+      // FIX (2026-03-19): SpeckleLoader resource must be full Speckle URL format:
+      // https://{server}/streams/{streamId}/objects/{objectId}
+      // NOT the BFF proxy path. Data is pre-fetched via 5th arg so no fetch occurs,
+      // but SpeckleLoader parses the URL to extract streamId/objectId internally.
       const speckleLoader = new SpeckleLoaderClass(
         viewerTree,
-        proxyObjectUrl,
-        '', // SPRINT 7: Empty token - BFF proxy handles authentication server-side
-        false, // Disable caching - we already have the data
-        objectData, // Pass pre-fetched data as 5th parameter
+        objectUrl,
+        '', // Token not needed — data already fetched via BFF proxy
+        false, // Disable caching — data already in memory
+        objectData, // Pre-fetched data bypasses SpeckleLoader's own fetch
       );
 
       // FIX (2026-03-16): Direct await on viewer.loadObject.
