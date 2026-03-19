@@ -1150,6 +1150,43 @@ speckleRootProxy.get(
   }
 );
 
+// Proxy: GET /objects/:streamId/:objectId/single → Speckle server (root object fetch)
+// ObjectLoader2 fetches the root object at this endpoint before streaming geometry
+speckleRootProxy.get(
+  '/objects/:streamId/:objectId/single',
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const { streamId, objectId } = req.params;
+      const serverUrl = process.env.SPECKLE_SERVER_URL || '';
+      const token = await getSpeckleToken();
+
+      if (!serverUrl || !token || token === 'REPLACE_WITH_TOKEN_AFTER_ADMIN_SETUP') {
+        return res.status(503).json({ error: 'Speckle integration not configured' });
+      }
+
+      const upstream = await fetch(
+        `${serverUrl}/objects/${streamId}/${objectId}/single`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      res.status(upstream.status);
+      const contentType = upstream.headers.get('content-type');
+      if (contentType) res.setHeader('Content-Type', contentType);
+      const body = await upstream.arrayBuffer();
+      res.send(Buffer.from(body));
+    } catch (error) {
+      logger.error('[SpeckleRootProxy] Object single fetch failed', { error });
+      res.status(502).json({ error: 'Failed to proxy Speckle object single request' });
+    }
+  }
+);
+
 // Proxy: POST /graphql → Speckle server (for ObjectLoader2 GraphQL queries)
 speckleRootProxy.post(
   '/graphql',
