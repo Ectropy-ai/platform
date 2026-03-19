@@ -338,6 +338,12 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       // Use type assertion for ViewerParams to handle Speckle's optional parameter requirements
       viewer = new Viewer(containerRef.current, { showStats: false } as any) as SpeckleViewer;
       await viewer.init();
+      console.log('[BIM Viewer] viewer instance check:', {
+        constructor: viewer?.constructor?.name,
+        hasGetWorldTree: typeof (viewer as any)?.getWorldTree,
+        hasTree: typeof (viewer as any)?.tree,
+        keys: Object.keys(viewer || {}).slice(0, 30)
+      });
 
       // Add essential extensions
       viewer.createExtension(CameraController);
