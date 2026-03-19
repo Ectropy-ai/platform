@@ -107,6 +107,11 @@ module.exports = (config, { configuration: _configuration }) => {
       '@pages': path.resolve(__dirname, 'src/pages'),
       '@services': path.resolve(__dirname, 'src/services'),
       '@types': path.resolve(__dirname, 'src/types'),
+      // FIX (2026-03-19): Force @speckle/viewer to resolve from node_modules.
+      // Without this, webpack picks up src/__mocks__/@speckle/viewer.ts (a Jest
+      // stub with an empty Viewer) instead of the real package.
+      '@speckle/viewer': path.resolve(__dirname, '../../node_modules/@speckle/viewer'),
+      '@speckle/objectloader': path.resolve(__dirname, '../../node_modules/@speckle/objectloader'),
       // Enterprise browser-safe utilities (exclude server-only winston/async_hooks)
       '@ectropy/shared/utils/browser': path.resolve(__dirname, '../../libs/shared/utils/src/browser.ts'),
     },
