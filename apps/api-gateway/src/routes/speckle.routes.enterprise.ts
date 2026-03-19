@@ -1100,4 +1100,85 @@ router.get('/health', async (req: Request, res: Response) => {
   }
 });
 
+// ============================================================================
+// Root-level Speckle proxy routes (mounted at / not /api/speckle)
+// ============================================================================
+// FIX (2026-03-19): @speckle/viewer 2.28.0 SpeckleLoader uses url.origin as
+// the server base for all HTTP requests. When the resource URL is
+// https://ectropy.ai/streams/{id}/objects/{id}, ObjectLoader2 makes requests to:
+//   GET https://ectropy.ai/streams/{id}/objects/{id}  (object data)
+//   POST https://ectropy.ai/graphql                    (GraphQL queries)
+// These root-level proxy routes intercept those requests and forward them to
+// the Speckle server with the service token injected server-side.
+// ============================================================================
+export const speckleRootProxy: ExpressRouter = Router();
+
+// Proxy: GET /streams/:streamId/objects/:objectId → Speckle server
+speckleRootProxy.get(
+  '/streams/:streamId/objects/:objectId',
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const { streamId, objectId } = req.params;
+      const serverUrl = process.env.SPECKLE_SERVER_URL || '';
+      const token = await getSpeckleToken();
+
+      if (!serverUrl || !token || token === 'REPLACE_WITH_TOKEN_AFTER_ADMIN_SETUP') {
+        return res.status(503).json({ error: 'Speckle integration not configured' });
+      }
+
+      const upstream = await fetch(
+        `${serverUrl}/streams/${streamId}/objects/${objectId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      res.status(upstream.status);
+      // Forward content-type and stream the response body
+      const contentType = upstream.headers.get('content-type');
+      if (contentType) res.setHeader('Content-Type', contentType);
+      const body = await upstream.arrayBuffer();
+      res.send(Buffer.from(body));
+    } catch (error) {
+      logger.error('[SpeckleRootProxy] Object fetch failed', { error });
+      res.status(502).json({ error: 'Failed to proxy Speckle object request' });
+    }
+  }
+);
+
+// Proxy: POST /graphql → Speckle server (for ObjectLoader2 GraphQL queries)
+speckleRootProxy.post(
+  '/graphql',
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const serverUrl = process.env.SPECKLE_SERVER_URL || '';
+      const token = await getSpeckleToken();
+
+      if (!serverUrl || !token || token === 'REPLACE_WITH_TOKEN_AFTER_ADMIN_SETUP') {
+        return res.status(503).json({ error: 'Speckle integration not configured' });
+      }
+
+      const upstream = await fetch(`${serverUrl}/graphql`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(req.body),
+      });
+
+      const data = await upstream.json();
+      res.status(upstream.status).json(data);
+    } catch (error) {
+      logger.error('[SpeckleRootProxy] GraphQL proxy failed', { error });
+      res.status(502).json({ error: 'Failed to proxy Speckle GraphQL request' });
+    }
+  }
+);
+
 export default router;

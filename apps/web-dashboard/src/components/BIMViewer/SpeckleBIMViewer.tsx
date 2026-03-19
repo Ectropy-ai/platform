@@ -565,16 +565,18 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         throw new Error('SpeckleLoader class not found - check @speckle/viewer version');
       }
 
-      // FIX (2026-03-19): SpeckleLoader resource must be full Speckle URL format:
-      // https://{server}/streams/{streamId}/objects/{objectId}
-      // NOT the BFF proxy path. Data is pre-fetched via 5th arg so no fetch occurs,
-      // but SpeckleLoader parses the URL to extract streamId/objectId internally.
+      // FIX (2026-03-19): Route SpeckleLoader through root-level BFF proxy.
+      // SpeckleLoader uses url.origin as server base for all HTTP requests.
+      // By using window.location.origin as the server in the resource URL,
+      // ObjectLoader2 requests go to /streams/:id/objects/:id and /graphql
+      // on OUR server, where root-level proxy routes inject the service token
+      // and forward to the Speckle server. Token never reaches the client.
+      const proxyResourceUrl = `${window.location.origin}/streams/${streamId}/objects/${objectId}`;
       const speckleLoader = new SpeckleLoaderClass(
         viewerTree,
-        objectUrl,
-        '', // Token not needed — data already fetched via BFF proxy
-        false, // Disable caching — data already in memory
-        objectData, // Pre-fetched data bypasses SpeckleLoader's own fetch
+        proxyResourceUrl,
+        '', // No token — root proxy injects service token server-side
+        true, // Enable caching
       );
 
       // FIX (2026-03-16): Direct await on viewer.loadObject.

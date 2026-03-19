@@ -242,7 +242,7 @@ import { GovernanceRoutes } from './routes/governance.routes.js';
 import { DAORoutes } from './routes/dao.routes.js';
 import { ManufacturerRoutes } from './routes/manufacturer.routes.js';
 import { createIFCRoutes } from './routes/ifc.routes.js';
-import speckleEnterpriseRoutes from './routes/speckle.routes.enterprise.js';
+import speckleEnterpriseRoutes, { speckleRootProxy } from './routes/speckle.routes.enterprise.js';
 import aiRoutes from './routes/ai.routes.js';
 import { AdminRoutes } from './routes/admin.routes.js';
 import { ConsoleRoutes } from './routes/console/index.js';
@@ -1243,6 +1243,13 @@ async function bootstrap(): Promise<void> {
         logger.info(
           '✅ Speckle enterprise routes mounted at /api/speckle (BIM viewer support enabled)'
         );
+        // FIX (2026-03-19): Root-level proxy for @speckle/viewer ObjectLoader2.
+        // SpeckleLoader uses url.origin as server base, so requests go to
+        // /streams/:id/objects/:id and /graphql at the root, not /api/speckle/...
+        if (speckleRootProxy) {
+          app.use(speckleRootProxy as unknown as express.Router);
+          logger.info('✅ Speckle root proxy mounted (ObjectLoader2 support)');
+        }
       } else {
         logger.warn(
           '⚠️  Speckle routes module loaded but no default export found'
