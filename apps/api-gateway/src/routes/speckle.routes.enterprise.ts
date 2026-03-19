@@ -917,8 +917,8 @@ router.get(
         });
       }
 
-      // BIM FIX: Proxy to same Speckle Objects API — /single is a client-side convention
-      const objectsUrl = `${serverUrl}/objects/${streamId}/${objectId}`;
+      // Proxy to Speckle /single endpoint — returns only the root object JSON
+      const objectsUrl = `${serverUrl}/objects/${streamId}/${objectId}/single`;
 
       const proxyResponse = await fetch(objectsUrl, {
         method: 'GET',
