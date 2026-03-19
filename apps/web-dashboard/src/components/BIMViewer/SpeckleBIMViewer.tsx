@@ -531,56 +531,14 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         keys: Object.keys(objectData).slice(0, 15),
       });
 
-      // ENTERPRISE FIX (2026-01-14): WorldTree Availability Check with Retry Pattern
-      // ROOT CAUSE: WorldTree initialization is asynchronous after viewer.init()
-      // SOLUTION: Retry with exponential backoff up to 5 seconds max
-      // TypeScript definitions don't include getWorldTree, but it exists at runtime
-      const waitForWorldTree = async (maxAttempts = 10, initialDelay = 50): Promise<any> => {
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-          const worldTree = viewer.getWorldTree?.();
-          if (worldTree) {
-            logger.info('[BIM Viewer] WorldTree available', {
-              attempt,
-              totalWaitMs: initialDelay * (Math.pow(2, attempt - 1) - 1),
-            });
-            return worldTree;
-          }
-
-          if (attempt < maxAttempts) {
-            const delayMs = initialDelay * Math.pow(2, attempt - 1); // Exponential backoff
-            logger.debug(`[BIM Viewer] WorldTree not ready, retrying in ${delayMs}ms`, {
-              attempt,
-              maxAttempts,
-            });
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-          }
-        }
-
-        // Final check after all retries
-        const worldTree = viewer.getWorldTree?.();
-        if (!worldTree) {
-          logger.error('[BIM Viewer] WorldTree not available after retries', {
-            maxAttempts,
-            maxWaitMs: initialDelay * (Math.pow(2, maxAttempts) - 1),
-            viewerState: {
-              hasInit: typeof viewer.init === 'function',
-              hasGetWorldTree: typeof viewer.getWorldTree === 'function',
-              hasLoadObject: typeof viewer.loadObject === 'function',
-            },
-          });
-          throw new Error(
-            `Viewer WorldTree not initialized after ${maxAttempts} attempts - viewer may not be fully ready`,
-          );
-        }
-        return worldTree;
-      };
-
-      const worldTree = await waitForWorldTree();
-
-      logger.debug('[BIM Viewer] WorldTree retrieved successfully', {
-        hasWorldTree: !!worldTree,
-        worldTreeType: typeof worldTree,
-      });
+      // FIX (2026-03-18): WorldTree is synchronously available after new Viewer().
+      // In @speckle/viewer 2.28.0, Viewer initializes `tree = new WorldTree()` as a
+      // property default — getWorldTree() never returns undefined. The previous
+      // 10-attempt exponential-backoff retry was unnecessary.
+      const worldTree = (viewer as any).getWorldTree();
+      if (!worldTree) {
+        throw new Error('Viewer.getWorldTree() returned undefined — unexpected for @speckle/viewer 2.28.0');
+      }
 
       // Access SpeckleLoader from runtime exports (not in TypeScript defs but confirmed in package exports)
       // SpeckleLoader constructor: (targetTree: WorldTree, resource: string, authToken?: string, enableCaching?: boolean, resourceData?: unknown)
