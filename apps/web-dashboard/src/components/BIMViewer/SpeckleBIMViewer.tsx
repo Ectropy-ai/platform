@@ -531,12 +531,18 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         keys: Object.keys(objectData).slice(0, 15),
       });
 
-      // FIX (2026-03-19): Access viewer.tree directly — getWorldTree() does not exist
-      // in the @speckle/viewer 2.28.0 bundle. The protected `tree` property is set
-      // synchronously at Viewer construction: `protected tree: WorldTree = new WorldTree()`.
-      const worldTree = (viewer as any).tree;
-      if (!worldTree) {
-        throw new Error('viewer.tree unavailable — check @speckle/viewer version');
+      // FIX (2026-03-19): Duck-type the WorldTree instance on the viewer.
+      // getWorldTree() does not exist in the 2.28.0 bundle and the protected
+      // `tree` property name may be minified. Locate it by shape instead.
+      console.log('[BIM Viewer] viewer keys:', Object.keys(viewer));
+      console.log('[BIM Viewer] viewer values count:', Object.values(viewer).length);
+      const viewerTree = Object.values(viewer).find(
+        (v: any) => v && typeof v === 'object' && typeof v.getRenderTree === 'function'
+      );
+      if (!viewerTree) {
+        throw new Error(
+          'Could not locate WorldTree on viewer instance — @speckle/viewer 2.28.0 bundle may have minified the property name'
+        );
       }
 
       // Access SpeckleLoader from runtime exports (not in TypeScript defs but confirmed in package exports)
@@ -550,7 +556,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       // SPRINT 7: Create SpeckleLoader with pre-fetched data
       // No token passed - data already fetched via BFF proxy with server-side token injection
       const speckleLoader = new SpeckleLoaderClass(
-        worldTree,
+        viewerTree,
         proxyObjectUrl,
         '', // SPRINT 7: Empty token - BFF proxy handles authentication server-side
         false, // Disable caching - we already have the data
