@@ -739,6 +739,8 @@ jobs:
           pnpm --version
 
       - name: Install dependencies
+        env:
+          LUHTECH_PKG_READ: ${{ secrets.LUHTECH_PKG_READ }}
         run: |
           echo "📦 Installing dependencies..."
           pnpm install --frozen-lockfile
