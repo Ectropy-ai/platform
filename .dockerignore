@@ -96,6 +96,7 @@ build
 
 # === CACHE ===
 .cache
+.nx
 .parcel-cache
 .next/cache
 .eslintcache

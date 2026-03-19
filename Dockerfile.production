@@ -56,9 +56,10 @@ COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile
 
 # Build applications for production
-RUN pnpm nx build web-dashboard --configuration=production
-RUN pnpm nx build api-gateway --configuration=production
-RUN pnpm nx build mcp-server --configuration=production
+# --skip-nx-cache: force fresh builds — nx cache has shipped stale bundles
+RUN pnpm nx build web-dashboard --configuration=production --skip-nx-cache
+RUN pnpm nx build api-gateway --configuration=production --skip-nx-cache
+RUN pnpm nx build mcp-server --configuration=production --skip-nx-cache
 
 # Production stage
 FROM node:20-bullseye-slim AS production
