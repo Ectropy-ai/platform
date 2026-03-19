@@ -53,8 +53,7 @@
       "@ectropy/shared/types": ["libs/shared/types/src/index.ts"],
       "@ectropy/shared": ["libs/shared/src/index.ts"],
       "@ectropy/shared/*": ["libs/shared/src/*"],
-      "@libs/*": ["libs/*"],
-      "@speckle/viewer": ["apps/web-dashboard/src/types/speckle-stubs.ts"]
+      "@libs/*": ["libs/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.js", "src/**/*.jsx"],
