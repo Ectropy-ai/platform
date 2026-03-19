@@ -336,14 +336,20 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
 
       // ENTERPRISE FIX: Type assertion - Viewer is compatible with SpeckleViewer at runtime
       // Use type assertion for ViewerParams to handle Speckle's optional parameter requirements
-      viewer = new Viewer(containerRef.current, { showStats: false } as any) as SpeckleViewer;
-      await viewer.init();
-      console.log('[BIM Viewer] viewer instance check:', {
-        constructor: viewer?.constructor?.name,
-        hasGetWorldTree: typeof (viewer as any)?.getWorldTree,
-        hasTree: typeof (viewer as any)?.tree,
-        keys: Object.keys(viewer || {}).slice(0, 30)
-      });
+      const viewerRaw = new Viewer(containerRef.current, { showStats: false } as any);
+      console.log('[BIM] pre-init constructor:', viewerRaw?.constructor?.name);
+      console.log('[BIM] pre-init own props:', Object.getOwnPropertyNames(viewerRaw));
+      console.log('[BIM] pre-init keys:', Object.keys(viewerRaw));
+      await viewerRaw.init();
+      viewer = viewerRaw as SpeckleViewer;
+      console.log('[BIM] constructor name:', (viewer as any)?.constructor?.name);
+      console.log('[BIM] proto methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(viewer || {})));
+      console.log('[BIM] own props:', Object.getOwnPropertyNames(viewer || {}));
+      console.log('[BIM] has getWorldTree:', typeof (viewer as any)?.getWorldTree);
+      console.log('[BIM] has tree:', typeof (viewer as any)?.tree);
+      console.log('[BIM] tree value:', (viewer as any)?.tree);
+      console.log('[BIM] Viewer import type:', typeof Viewer, Viewer);
+      console.log('[BIM] instanceof Viewer:', viewerRaw instanceof Viewer);
 
       // Add essential extensions
       viewer.createExtension(CameraController);
