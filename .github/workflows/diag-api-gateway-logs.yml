@@ -1,0 +1,45 @@
+name: Diagnostic - API Gateway Logs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-logs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add runner IP to firewall (temporary)
+        id: fw
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          doctl compute firewall add-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+          sleep 5
+
+      - name: Add SSH known hosts
+        run: ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+
+      - name: Check api-gateway logs for DIAG and object-stream
+        run: |
+          echo "=== Last 100 lines matching DIAG/api/v2/object-stream ==="
+          ssh root@${{ vars.PROD_BLUE_IP }} \
+            "docker logs \$(docker ps --filter name=api-gateway --format '{{.Names}}' | head -1) --tail=200 2>&1 | grep -iE 'DIAG|api/v2|object-stream|speckleRootProxy|root proxy' || echo 'NO MATCHING LINES FOUND'"
+          echo "=== Last 20 lines of api-gateway logs ==="
+          ssh root@${{ vars.PROD_BLUE_IP }} \
+            "docker logs \$(docker ps --filter name=api-gateway --format '{{.Names}}' | head -1) --tail=20 2>&1"
+
+      - name: Remove runner IP from firewall (cleanup)
+        if: always()
+        run: |
+          doctl compute firewall remove-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:${{ steps.fw.outputs.runner_ip }}/32"
