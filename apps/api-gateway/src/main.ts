@@ -1247,6 +1247,11 @@ async function bootstrap(): Promise<void> {
         // SpeckleLoader uses url.origin as server base, so requests go to
         // /streams/:id/objects/:id and /graphql at the root, not /api/speckle/...
         if (speckleRootProxy) {
+          // DIAG: Log all /api/v2 requests to confirm path routing
+          app.use('/api/v2', (req: Request, _res: Response, next: NextFunction) => {
+            console.log('[DIAG] /api/v2 hit:', req.method, req.path, req.originalUrl);
+            next();
+          });
           app.use(speckleRootProxy as unknown as express.Router);
           logger.info('✅ Speckle root proxy mounted (ObjectLoader2 support)');
         }
