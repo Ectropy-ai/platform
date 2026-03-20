@@ -1,0 +1,90 @@
+name: Diag — Speckle v2 endpoint test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-speckle-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add runner IP to firewall (temporary)
+        id: fw
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          doctl compute firewall add-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+          sleep 5
+
+      - name: Add SSH known hosts
+        run: ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+
+      - name: Test Speckle v2 endpoint from production
+        run: |
+          ssh root@${{ vars.PROD_BLUE_IP }} bash -s <<'REMOTE'
+          set -euo pipefail
+
+          echo "=== Speckle containers ==="
+          docker ps --filter name=speckle --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+
+          echo ""
+          echo "=== Speckle server version ==="
+          SPECKLE_CTR=$(docker ps --filter name=speckle-server --format "{{.Names}}" | head -1)
+          if [ -n "$SPECKLE_CTR" ]; then
+            docker exec "$SPECKLE_CTR" cat /speckleserver/package.json 2>/dev/null | \
+              python3 -c "import sys,json; d=json.load(sys.stdin); print('VERSION:', d.get('version','NOT_FOUND'))" \
+              2>/dev/null || echo "VERSION_CHECK_FAILED (no package.json at /speckleserver/)"
+          else
+            echo "NO SPECKLE SERVER CONTAINER FOUND"
+          fi
+
+          echo ""
+          echo "=== Direct Speckle v2 test (localhost:3000) ==="
+          curl -s -w "\nHTTP_STATUS: %{http_code}\n" \
+            -X POST http://localhost:3000/api/v2/projects/9a5215cc88/object-stream/ \
+            -H "Content-Type: application/json" \
+            -d '{"objects":"[]"}' 2>&1 | tail -10
+
+          echo ""
+          echo "=== Direct Speckle v1 test (localhost:3000) ==="
+          curl -s -w "\nHTTP_STATUS: %{http_code}\n" \
+            -X POST http://localhost:3000/api/getobjects/9a5215cc88 \
+            -H "Content-Type: application/json" \
+            -d '{"objects":"[]"}' 2>&1 | tail -10
+
+          echo ""
+          echo "=== SPECKLE env in api-gateway (redacted) ==="
+          AG_CTR=$(docker ps --filter name=api-gateway --format "{{.Names}}" | head -1)
+          if [ -n "$AG_CTR" ]; then
+            docker exec "$AG_CTR" env | grep SPECKLE | sed 's/=.*/=***REDACTED***/'
+          else
+            echo "NO API-GATEWAY CONTAINER FOUND"
+          fi
+
+          echo ""
+          echo "=== Through api-gateway v2 test (localhost:4000) ==="
+          curl -s -w "\nHTTP_STATUS: %{http_code}\n" \
+            -X POST http://localhost:4000/api/v2/projects/9a5215cc88/object-stream/ \
+            -H "Content-Type: application/json" \
+            -d '{"objects":"[]"}' 2>&1 | tail -10
+
+          echo ""
+          echo "=== api-gateway last 30 log lines ==="
+          docker logs "$AG_CTR" --tail 30 2>&1
+          REMOTE
+
+      - name: Remove runner IP from firewall (cleanup)
+        if: always()
+        run: |
+          doctl compute firewall remove-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:${{ steps.fw.outputs.runner_ip }}/32"
