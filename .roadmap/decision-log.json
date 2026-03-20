@@ -1,8 +1,8 @@
 {
   "$schema": "https://luhtech.dev/schemas/decision-log-v2.json",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "ventureId": "ectropy",
-  "lastUpdated": "2026-03-20T00:00:00Z",
+  "lastUpdated": "2026-03-20T12:00:00Z",
   "decisions": [
     {
       "decisionId": "DEC-002",
@@ -4914,6 +4914,82 @@
         "cloudflare",
         "nginx",
         "demo-gate"
+      ],
+      "supersededBy": null,
+      "reviewDate": "2026-06-30"
+    },
+    {
+      "decisionId": "d-2026-03-20-demo-bundle-cache-architecture",
+      "timestamp": "2026-03-20T12:00:00Z",
+      "title": "Demo Bundle Cache Architecture \u2014 Project Type Namespacing and S3-Backed Templates",
+      "context": "DEC-005 established the subdomain provisioner MVP and the first tenant slug (inca-boardline-alberta.job.site). As that architecture was reviewed, a deeper pattern emerged: the slug is not merely a URL identifier \u2014 it is a project TYPE namespace. 'boardline' represents a reusable construction template (IFC files, seed decisions, voxel scenarios, authority cascade configuration) that any future board line plant client would need. Without a bundle architecture, each new client requires manual IFC upload, manual seed, and manual demo setup \u2014 not scalable. Additionally, partners (lumber companies, industrial contractors) will contribute their own project types as bundles. The demo must be architecturally identical to real projects \u2014 not a separate system. Self-serve users need a path to provision from templates without operator involvement.",
+      "alternatives": [
+        {
+          "option": "Hardcoded seed per tenant (current interim approach)",
+          "pros": [
+            "Fastest to implement",
+            "No S3 dependency",
+            "Works for single pilot"
+          ],
+          "cons": [
+            "Not replicable \u2014 every new client requires manual work",
+            "Demo and real projects diverge architecturally",
+            "Partners cannot contribute project types",
+            "No self-serve path"
+          ],
+          "estimatedEffort": "Hours per client",
+          "riskLevel": "high"
+        },
+        {
+          "option": "Demo Bundle Cache Architecture (this decision)",
+          "pros": [
+            "Replicable \u2014 provisioner clones bundle per tenant",
+            "Demo is architecturally identical to real projects",
+            "Partners contribute bundles to shared library",
+            "Self-serve path: user picks type, provisioner clones bundle",
+            "Speckle streams forked per tenant from bundle template",
+            "IFC assets versioned in S3 per bundle"
+          ],
+          "cons": [
+            "More upfront architecture than hardcoded seed",
+            "Requires S3 bundle structure and provisioner extension",
+            "Bundle schema must be defined and validated"
+          ],
+          "estimatedEffort": "3-5 days for MVP bundle reader",
+          "riskLevel": "medium"
+        }
+      ],
+      "decision": "Adopt the Demo Bundle Cache Architecture. Project types are namespaced as {instance}.{project-type}.job.site. The provisioner reads a bundle from DO Spaces (/project-bundles/{project-type}/) containing: manifest.json, IFC assets, Speckle stream config, and seed data (decisions, voxels, authority cascade). The provisioner clones the bundle per tenant. The demo instance is demo.{project-type}.job.site \u2014 architecturally identical to any client instance. The current seed script (seed-canadian-pilot-demo.ts) is the interim bridge until the bundle reader is built.",
+      "rationale": "The slug namespace makes every project type a reusable template. 'boardline' as a type means: Inca Alberta, every future board line plant client, and the live demo all provision from the same bundle \u2014 same IFC, same decision scenarios, same voxel layout, different tenant ID. Partners who want their project type on the platform contribute a bundle PR. Self-serve users pick a type and provision their instance. The demo is always live at demo.boardline.job.site as proof the platform works. This is the architecture that scales from one pilot to a global platform.",
+      "status": "approved",
+      "category": "architecture",
+      "impact": "critical",
+      "approvedBy": [
+        "erik-luhtala"
+      ],
+      "impactedDeliverables": [
+        "p5b-d11",
+        "seed-canadian-pilot-demo",
+        "speckle-demo-setup.sh",
+        "subdomain-provisioner"
+      ],
+      "evidence": [
+        "LUHTECH-DEC-005-JOB-SITE-PROVISIONING-2026-03-20.md",
+        ".roadmap/evidence/2026-03/BIM-VIEWER-LIVE-2026-03-20.md"
+      ],
+      "relatedDecisions": [
+        "d-2026-03-20-job-site-subdomain-provisioning"
+      ],
+      "tags": [
+        "architecture",
+        "multi-tenant",
+        "demo-bundle-cache",
+        "s3",
+        "project-type-namespace",
+        "provisioner",
+        "job-site",
+        "partner-ecosystem",
+        "self-serve"
       ],
       "supersededBy": null,
       "reviewDate": "2026-06-30"
