@@ -82,7 +82,7 @@ types/external-stubs.d.ts
 .env.local
 .env.production
 .env.test
-!.env.development
+.env.development
 !.env.example
 !.env.template
 !.env.test.template
