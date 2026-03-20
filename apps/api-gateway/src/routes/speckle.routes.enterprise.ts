@@ -179,7 +179,7 @@ async function getSpeckleServiceAsync(): Promise<SpeckleIntegrationService> {
 router.post(
   '/projects/:projectId/initialize',
   requireAuth,
-  requireProjectAccess('ADMIN'),
+  requireProjectAccess('MEMBER'),
   async (req: Request, res: Response) => {
     const { projectId } = req.params;
     // ENTERPRISE: user and project properties are globally augmented via Express namespace

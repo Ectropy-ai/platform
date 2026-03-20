@@ -103,6 +103,10 @@ services:
         LUHTECH_PKG_READ: ${LUHTECH_PKG_READ}
       cache_from:
         - node:20-alpine
+    env_file:
+      - .env
+      - .env.development
+      - .env.local
     environment:
       <<: *common-variables
       # MCP Server dual-port configuration

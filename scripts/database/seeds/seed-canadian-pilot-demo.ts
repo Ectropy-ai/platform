@@ -353,14 +353,51 @@ async function main() {
   }
   console.log(`✓ authority_levels: ${await prisma.authorityLevel.count()} rows`);
 
-  // ── Prerequisite: demo project must exist ───────────────────────────
-  const project = await prisma.project.findUnique({
-    where: { id: PROJECT_ID },
+  // ── Self-contained: Ensure tenant, user, project exist ──────────────
+  // INTERIM FIX: Makes seed portable across environments without
+  // depending on create-demo-tenant.ts → create-demo-projects.ts chain.
+  // Will be replaced by Demo Bundle Cache (DEC-006) in Phase 5.
+
+  const tenant = await prisma.tenant.upsert({
+    where: { slug: 'ectropy-demo' },
+    create: {
+      slug: 'ectropy-demo',
+      name: 'Ectropy Demo',
+      status: 'ACTIVE',
+      subscription_tier: 'PROFESSIONAL',
+      data_region: 'us-west-2',
+    },
+    update: {},
   });
-  if (!project) {
-    console.error('✗ Demo project not found. Run create-demo-projects.ts first.');
-    process.exit(1);
-  }
+  console.log(`✓ Tenant: ${tenant.name} (${tenant.id})`);
+
+  const demoUser = await prisma.user.upsert({
+    where: { email: 'erik@luh.tech' },
+    create: {
+      email: 'erik@luh.tech',
+      full_name: 'Erik Luhtala',
+      role: 'admin',
+      roles: ['admin'],
+      is_authorized: true,
+      is_platform_admin: false,
+      tenant_id: tenant.id,
+    },
+    update: {},
+  });
+  console.log(`✓ User: ${demoUser.email} (${demoUser.id})`);
+
+  const project = await prisma.project.upsert({
+    where: { id: PROJECT_ID },
+    create: {
+      id: PROJECT_ID,
+      tenant_id: tenant.id,
+      owner_id: demoUser.id,
+      name: 'Construction Site Alpha',
+      description: 'Multi-story office building — BIM coordination, decision lifecycle, ROS MRO demo.',
+      status: 'active',
+    },
+    update: {},
+  });
   console.log(`✓ Project: ${project.name} (${PROJECT_ID})`);
 
   // ── Build authority level → ID map ──────────────────────────────────

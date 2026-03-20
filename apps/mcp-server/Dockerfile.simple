@@ -18,13 +18,40 @@ COPY prisma ./prisma
 
 # Copy app-specific package.json files
 COPY apps/mcp-server/package.json ./apps/mcp-server/
-COPY libs/*/package.json ./libs/*/
+
+# Copy workspace libs package.json files (explicit per-directory to preserve structure)
+COPY libs/ai-agents/package.json ./libs/ai-agents/
+COPY libs/auth/package.json ./libs/auth/
+COPY libs/blockchain/package.json ./libs/blockchain/
+COPY libs/database/package.json ./libs/database/
+COPY libs/demo-scenarios/package.json ./libs/demo-scenarios/
+COPY libs/embeddings/package.json ./libs/embeddings/
+COPY libs/ifc-processing/package.json ./libs/ifc-processing/
+COPY libs/iot-edge/package.json ./libs/iot-edge/
+COPY libs/secrets-management/package.json ./libs/secrets-management/
+COPY libs/shared/package.json ./libs/shared/
+COPY libs/speckle-integration/package.json ./libs/speckle-integration/
+
+# Copy workspace packages package.json files
+COPY packages/ai-provider/package.json ./packages/ai-provider/
+COPY packages/clash/package.json ./packages/clash/
+COPY packages/database/package.json ./packages/database/
+COPY packages/federation/package.json ./packages/federation/
+COPY packages/ifc/package.json ./packages/ifc/
+COPY packages/mcp-client/package.json ./packages/mcp-client/
+COPY packages/sdk-javascript/package.json ./packages/sdk-javascript/
+
+# GitHub Packages auth for @luh-tech scoped packages
+ARG LUHTECH_PKG_READ
+COPY .npmrc ./
 
 # Install dependencies with scripts disabled
 RUN pnpm install --no-frozen-lockfile --ignore-scripts
 
 # Generate Prisma Client (since we skipped install scripts)
-RUN pnpm prisma generate
+RUN npx prisma generate --schema=prisma/schema.prisma
+RUN npx prisma generate --schema=prisma/schema.platform.prisma
+RUN npx prisma generate --schema=prisma/schema.shared.prisma
 
 # Copy source code
 COPY . .
