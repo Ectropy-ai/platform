@@ -1,0 +1,130 @@
+name: Diagnose — Production DB State
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target node (blue/green/both)'
+        required: true
+        default: 'blue'
+        type: choice
+        options:
+          - blue
+          - green
+          - both
+
+jobs:
+  diagnose-db:
+    name: Read-Only Production DB Queries
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add runner IP to firewall (temporary)
+        id: fw
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          doctl compute firewall add-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+          sleep 5
+
+      - name: Add SSH known hosts
+        run: |
+          sleep 5
+          ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H 64.227.105.120 >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Query Blue Node DB
+        if: inputs.target == 'blue' || inputs.target == 'both'
+        run: |
+          echo "=== PRODUCTION BLUE — DB STATE ==="
+          ssh root@${{ vars.PROD_BLUE_IP }} bash -s <<'ENDSSH'
+          set -euo pipefail
+
+          echo "--- CONTAINER STATUS ---"
+          docker ps --format "table {{.Names}}\t{{.Status}}" | head -20
+
+          echo ""
+          PG_CTR=$(docker ps --filter name=postgres --format "{{.Names}}" | head -1)
+          echo "PG_CONTAINER: $PG_CTR"
+
+          echo ""
+          echo "--- DATABASES ---"
+          docker exec "$PG_CTR" psql -U doadmin -d defaultdb -c "\l" 2>&1 | head -15 || echo "DB_LIST_FAILED"
+
+          echo ""
+          echo "--- PROJECTS ---"
+          docker exec "$PG_CTR" psql -U doadmin -d ectropy_production \
+            -c "SELECT id, name, status, created_at FROM projects ORDER BY created_at DESC LIMIT 10;" \
+            2>&1 || \
+          docker exec "$PG_CTR" psql -U postgres -d ectropy_dev \
+            -c "SELECT id, name, status, created_at FROM projects ORDER BY created_at DESC LIMIT 10;" \
+            2>&1 || echo "PROJECTS_QUERY_FAILED"
+
+          echo ""
+          echo "--- VOXEL COUNT ---"
+          docker exec "$PG_CTR" psql -U doadmin -d ectropy_production \
+            -c "SELECT COUNT(*) as voxel_count FROM voxels;" \
+            2>&1 || echo "VOXELS_QUERY_FAILED"
+
+          echo ""
+          echo "--- DECISION COUNT ---"
+          docker exec "$PG_CTR" psql -U doadmin -d ectropy_production \
+            -c "SELECT COUNT(*) as decision_count FROM pm_decisions;" \
+            2>&1 || echo "DECISIONS_QUERY_FAILED"
+
+          echo ""
+          echo "--- USERS (email + role) ---"
+          docker exec "$PG_CTR" psql -U doadmin -d ectropy_production \
+            -c "SELECT email, role, \"isAuthorized\", \"isPlatformAdmin\" FROM users ORDER BY created_at DESC LIMIT 10;" \
+            2>&1 || echo "USERS_QUERY_FAILED"
+
+          echo ""
+          echo "--- TENANTS ---"
+          docker exec "$PG_CTR" psql -U doadmin -d ectropy_production \
+            -c "SELECT id, slug, name, status, subscription_tier FROM tenants LIMIT 10;" \
+            2>&1 || echo "TENANTS_QUERY_FAILED"
+
+          echo ""
+          echo "--- SPECKLE STREAMS ---"
+          docker exec "$PG_CTR" psql -U doadmin -d ectropy_production \
+            -c "SELECT id, stream_id, stream_name, construction_project_id FROM speckle_streams LIMIT 10;" \
+            2>&1 || echo "SPECKLE_STREAMS_QUERY_FAILED"
+
+          echo ""
+          echo "--- MIGRATION STATUS (last 5) ---"
+          docker exec "$PG_CTR" psql -U doadmin -d ectropy_production \
+            -c "SELECT migration_name, finished_at FROM _prisma_migrations ORDER BY finished_at DESC LIMIT 5;" \
+            2>&1 || echo "MIGRATIONS_QUERY_FAILED"
+          ENDSSH
+
+      - name: Query Green Node DB
+        if: inputs.target == 'green' || inputs.target == 'both'
+        run: |
+          echo "=== PRODUCTION GREEN — DB STATE ==="
+          ssh root@64.227.105.120 bash -s <<'ENDSSH'
+          set -euo pipefail
+          PG_CTR=$(docker ps --filter name=postgres --format "{{.Names}}" | head -1)
+          echo "PG_CONTAINER: $PG_CTR"
+          echo "--- PROJECT COUNT ---"
+          docker exec "$PG_CTR" psql -U doadmin -d ectropy_production \
+            -c "SELECT COUNT(*) as project_count FROM projects;" \
+            2>&1 || echo "QUERY_FAILED"
+          ENDSSH
+
+      - name: Remove runner IP from firewall (cleanup)
+        if: always()
+        run: |
+          doctl compute firewall remove-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:${{ steps.fw.outputs.runner_ip }}/32"
