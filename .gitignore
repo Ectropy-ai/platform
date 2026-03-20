@@ -513,3 +513,6 @@ infrastructure/scripts/
 *.tfvars
 .roadmap/generate-api-key-inline.js
 **/.terraform-generated/ # PHASE P3.6: Generated .env files with secrets (never commit)
+
+# IFC demo assets — stored in DO Spaces, not git
+demo-assets/
