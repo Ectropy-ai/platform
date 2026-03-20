@@ -1218,4 +1218,60 @@ speckleRootProxy.post(
   }
 );
 
+// Proxy: POST /api/v2/projects/:streamId/object-stream/ → Speckle server
+// ObjectLoader2 uses this v2 endpoint for batch geometry streaming
+speckleRootProxy.post(
+  '/api/v2/projects/:streamId/object-stream/',
+  requireAuth,
+  async (req: Request, res: Response) => {
+    try {
+      const { streamId } = req.params;
+      const serverUrl = process.env.SPECKLE_SERVER_URL || '';
+      const token = await getSpeckleToken();
+
+      if (!serverUrl || !token || token === 'REPLACE_WITH_TOKEN_AFTER_ADMIN_SETUP') {
+        return res.status(503).json({ error: 'Speckle integration not configured' });
+      }
+
+      const upstream = await fetch(
+        `${serverUrl}/api/v2/projects/${streamId}/object-stream/`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'text/plain',
+          },
+          body: JSON.stringify(req.body),
+        }
+      );
+
+      res.status(upstream.status);
+      const contentType = upstream.headers.get('content-type');
+      if (contentType) res.setHeader('Content-Type', contentType);
+
+      // Stream the response body (batch geometry can be large)
+      if (upstream.body) {
+        const reader = upstream.body.getReader();
+        const pump = async (): Promise<void> => {
+          const { done, value } = await reader.read();
+          if (done) {
+            res.end();
+            return;
+          }
+          res.write(Buffer.from(value));
+          return pump();
+        };
+        await pump();
+      } else {
+        const data = await upstream.text();
+        res.send(data);
+      }
+    } catch (error) {
+      logger.error('[SpeckleRootProxy] Object stream proxy failed', { error });
+      res.status(502).json({ error: 'Failed to proxy Speckle object stream request' });
+    }
+  }
+);
+
 export default router;
