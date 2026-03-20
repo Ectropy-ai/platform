@@ -22,6 +22,7 @@ services:
       dockerfile: Dockerfile.development
       args:
         NODE_ENV: development
+        LUHTECH_PKG_READ: ${LUHTECH_PKG_READ}
       cache_from:
         - node:20-alpine
     # ENTERPRISE PATTERN: Explicit load order (last file wins)
@@ -99,6 +100,7 @@ services:
       dockerfile: apps/mcp-server/Dockerfile.simple
       args:
         NODE_ENV: development
+        LUHTECH_PKG_READ: ${LUHTECH_PKG_READ}
       cache_from:
         - node:20-alpine
     environment:
@@ -211,6 +213,7 @@ services:
       dockerfile: apps/web-dashboard/Dockerfile
       args:
         NODE_ENV: development
+        LUHTECH_PKG_READ: ${LUHTECH_PKG_READ}
         # Pass React environment variables as build args (required for build-time injection)
         REACT_APP_SPECKLE_FRONTEND_PORT: ${REACT_APP_SPECKLE_FRONTEND_PORT:-8080}
         REACT_APP_DEMO_SPECKLE_STREAM_ID: ${REACT_APP_DEMO_SPECKLE_STREAM_ID}
@@ -308,7 +311,7 @@ services:
   # =========================================================================
 
   speckle-server:
-    image: speckle/speckle-server:2
+    image: speckle/speckle-server:2.29.0
     container_name: ectropy-speckle-server
     restart: unless-stopped
     environment:
@@ -390,7 +393,7 @@ services:
       - ectropy-network
 
   speckle-frontend:
-    image: speckle/speckle-frontend-2:2
+    image: speckle/speckle-frontend-2:2.29.0
     container_name: ectropy-speckle-frontend
     restart: unless-stopped
     environment:
@@ -433,7 +436,7 @@ services:
       - ectropy-network
 
   speckle-preview:
-    image: speckle/speckle-preview-service:2
+    image: speckle/speckle-preview-service:2.29.0
     container_name: ectropy-speckle-preview
     restart: unless-stopped
     mem_limit: 3000m
@@ -450,7 +453,7 @@ services:
       - ectropy-network
 
   speckle-webhook:
-    image: speckle/speckle-webhook-service:2
+    image: speckle/speckle-webhook-service:2.29.0
     container_name: ectropy-speckle-webhook
     restart: unless-stopped
     environment:
@@ -464,7 +467,7 @@ services:
       - ectropy-network
 
   speckle-fileimport:
-    image: speckle/speckle-fileimport-service:2
+    image: speckle/speckle-fileimport-service:2.29.0
     container_name: ectropy-speckle-fileimport
     restart: unless-stopped
     environment:

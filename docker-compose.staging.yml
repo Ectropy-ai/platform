@@ -636,7 +636,7 @@ services:
       - ectropy-network
 
   speckle-server:
-    image: speckle/speckle-server:2
+    image: speckle/speckle-server:2.29.0
     container_name: ectropy-speckle-server
     restart: unless-stopped
     environment:
@@ -758,7 +758,7 @@ services:
       - ectropy-network
 
   speckle-frontend:
-    image: speckle/speckle-frontend-2:2
+    image: speckle/speckle-frontend-2:2.29.0
     container_name: ectropy-speckle-frontend
     restart: unless-stopped
     environment:
@@ -809,7 +809,7 @@ services:
       - ectropy-network
 
   speckle-preview:
-    image: speckle/speckle-preview-service:2
+    image: speckle/speckle-preview-service:2.29.0
     container_name: ectropy-speckle-preview
     restart: unless-stopped
     # Memory managed by deploy.resources.limits.memory: 4096M
@@ -839,7 +839,7 @@ services:
       - ectropy-network
 
   speckle-webhook:
-    image: speckle/speckle-webhook-service:2
+    image: speckle/speckle-webhook-service:2.29.0
     container_name: ectropy-speckle-webhook
     restart: unless-stopped
     environment:
@@ -861,7 +861,7 @@ services:
       - ectropy-network
 
   speckle-fileimport:
-    image: speckle/speckle-fileimport-service:2
+    image: speckle/speckle-fileimport-service:2.29.0
     container_name: ectropy-speckle-fileimport
     restart: unless-stopped
     environment:
