@@ -43,7 +43,7 @@ jobs:
 
           echo ""
           echo "=== FORCE-RECREATE MCP-SERVER ==="
-          docker-compose up -d --force-recreate --no-deps ectropy-mcp
+          docker-compose up -d --force-recreate --no-deps mcp-server
           sleep 10
 
           echo ""
