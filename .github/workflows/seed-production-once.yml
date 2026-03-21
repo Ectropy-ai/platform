@@ -29,7 +29,7 @@ jobs:
       - name: Run seed
         run: npx tsx scripts/database/seeds/seed-canadian-pilot-demo.ts
         env:
-          DATABASE_URL: ${{ secrets.PLATFORM_DATABASE_URL }}
+          DATABASE_URL: postgresql://${{ vars.DATABASE_USER }}:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}?sslmode=require
 
       - name: Verify seed
         run: |
@@ -39,4 +39,4 @@ jobs:
              UNION ALL SELECT 'pm_decisions', COUNT(*) FROM pm_decisions
              UNION ALL SELECT 'inspections', COUNT(*) FROM inspections;"
         env:
-          DATABASE_URL: ${{ secrets.PLATFORM_DATABASE_URL }}
+          DATABASE_URL: postgresql://${{ vars.DATABASE_USER }}:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}?sslmode=require
