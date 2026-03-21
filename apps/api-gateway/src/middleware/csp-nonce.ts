@@ -57,6 +57,7 @@ export interface CSPDirectives {
   mediaSrc: string[];
   frameSrc: string[];
   frameAncestors: string[];
+  workerSrc: string[];
   baseUri: string[];
   formAction: string[];
   upgradeInsecureRequests?: boolean;
@@ -105,6 +106,7 @@ export const productionCSPConfig: CSPConfig = {
     frameAncestors: ["'self'"],
     baseUri: ["'self'"],
     formAction: ["'self'"],
+    workerSrc: ["'self'", 'blob:'],
     upgradeInsecureRequests: true,
     blockAllMixedContent: true,
   },
@@ -148,6 +150,7 @@ export const developmentCSPConfig: CSPConfig = {
     frameAncestors: ["'self'"],
     baseUri: ["'self'"],
     formAction: ["'self'"],
+    workerSrc: ["'self'", 'blob:'],
     upgradeInsecureRequests: false, // Don't upgrade in dev
     blockAllMixedContent: false,
   },
@@ -212,6 +215,9 @@ function buildCSPHeader(directives: CSPDirectives, nonce: string): string {
   }
   if (directives.formAction.length) {
     parts.push(`form-action ${directives.formAction.join(' ')}`);
+  }
+  if (directives.workerSrc?.length) {
+    parts.push(`worker-src ${directives.workerSrc.join(' ')}`);
   }
   if (directives.upgradeInsecureRequests) {
     parts.push('upgrade-insecure-requests');
