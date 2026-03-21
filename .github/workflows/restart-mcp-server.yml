@@ -1,0 +1,63 @@
+name: Restart MCP Server (force-recreate)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  restart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add runner IP to firewall
+        id: fw
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          doctl compute firewall add-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+          sleep 5
+
+      - name: Add SSH known hosts
+        run: |
+          sleep 5
+          ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+
+      - name: Force-recreate mcp-server on blue
+        run: |
+          ssh root@${{ vars.PROD_BLUE_IP }} bash -s <<'ENDSSH'
+          set -euo pipefail
+          cd /opt/ectropy
+
+          echo "=== CURRENT MCP ENV (ANTHROPIC check) ==="
+          grep ANTHROPIC .env | sed 's/=.*/=<REDACTED>/' || echo "NOT_IN_ENV_FILE"
+
+          echo ""
+          echo "=== FORCE-RECREATE MCP-SERVER ==="
+          docker-compose up -d --force-recreate --no-deps ectropy-mcp
+          sleep 10
+
+          echo ""
+          echo "=== MCP-SERVER STATUS ==="
+          docker ps --filter name=mcp --format "table {{.Names}}\t{{.Status}}"
+
+          echo ""
+          echo "=== VERIFY ANTHROPIC IN CONTAINER ENV ==="
+          MCP=$(docker ps --filter name=mcp --format "{{.Names}}" | head -1)
+          docker exec "$MCP" env | grep ANTHROPIC | sed 's/=.*/=<REDACTED>/'
+          ENDSSH
+
+      - name: Remove runner IP from firewall
+        if: always()
+        run: |
+          doctl compute firewall remove-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:${{ steps.fw.outputs.runner_ip }}/32"
