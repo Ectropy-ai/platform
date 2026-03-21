@@ -1,8 +1,8 @@
 {
   "$schema": "https://luhtech.dev/schemas/decision-log-v2.json",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "ventureId": "ectropy",
-  "lastUpdated": "2026-03-20T12:00:00Z",
+  "lastUpdated": "2026-03-21T00:00:00Z",
   "decisions": [
     {
       "decisionId": "DEC-002",
@@ -4993,6 +4993,212 @@
       ],
       "supersededBy": null,
       "reviewDate": "2026-06-30"
+    },
+    {
+      "decisionId": "d-2026-03-21-platform-architecture-server-tenant-mcp",
+      "timestamp": "2026-03-21T00:00:00Z",
+      "title": "Platform Architecture: Server Topology, Tenant Model, Template Library, and MCP Agent Split",
+      "context": "As the platform matured toward the Canadian pilot and multi-tenant production, several architectural questions required a single coherent decision: how servers are typed and named, how tenants are partitioned across tiers, where demo/template data lives, and most critically \u2014 how the MCP intelligence layer is split between construction-scoped SEPPA and platform-scoped governance tools. Without this decision, data drift between tenant spaces was producing incorrect SEPPA responses (surfacing codebase architecture decisions instead of construction PM decisions), and the template library had no clear home. The fork model for venture agents also needed to be established before other ventures built their own SEPPA instances.",
+      "constraints": [
+        "ectropy-ai/platform is open core (Apache 2.0) \u2014 no LuhTech proprietary data or tooling",
+        "Construction tenant data must never cross tenant boundaries",
+        "Platform governance data (.roadmap) must never be accessible to construction field users",
+        "Template library must be schema-level only at Stage 1 \u2014 no raw construction data",
+        "Data-level sharing (DAO/smart contracts) is explicitly deferred to a future decision"
+      ],
+      "alternatives": [
+        {
+          "option": "Single MCP server serving all contexts with permission gates",
+          "pros": [
+            "Single codebase",
+            "Simpler deployment"
+          ],
+          "cons": [
+            "Permission gates are fragile \u2014 a misconfiguration exposes platform data to tenants",
+            "Cannot be open-sourced without leaking LuhTech proprietary tooling",
+            "Conflates construction intelligence with platform governance permanently"
+          ],
+          "estimatedEffort": "1 week",
+          "riskLevel": "high"
+        },
+        {
+          "option": "Three MCP agents in three repos with hard data domain separation (this decision)",
+          "pros": [
+            "SEPPA in open core \u2014 forkable by ventures and community",
+            "Platform governance tools in private repos \u2014 LuhTech IP protected",
+            "Hard data boundary \u2014 construction tenant data physically cannot reach platform tools",
+            "Clean fork model for venture agents"
+          ],
+          "cons": [
+            "Three codebases to maintain",
+            "Initial split effort"
+          ],
+          "estimatedEffort": "1-2 sprints",
+          "riskLevel": "low"
+        }
+      ],
+      "decision": "Adopt a three-MCP, three-repo, three-data-domain architecture. Four server types with explicit URL patterns. Three tenant tiers with distinct isolation models. Template library in DO Spaces at schema level only. Community sharing opted-in at schema level, curated before S3 promotion. Data-level sharing deferred to DAO/smart contract decision.",
+      "rationale": "Hard data domain separation between construction intelligence (tenant-scoped, open core) and platform governance (LuhTech-internal, private) is the only model that can be open-sourced safely, forked cleanly by ventures, and scaled to multi-tenant production without risk of cross-tenant data exposure. The template library in S3 avoids the antipattern of a 'demo tenant' in the DB \u2014 templates are schema artifacts, not tenant data. The fork model makes SEPPA in ectropy-ai/platform the canonical pattern for every venture intelligence agent.",
+      "status": "approved",
+      "category": "architecture",
+      "impact": "critical",
+      "approvedBy": [
+        "erik-luhtala"
+      ],
+      "impactedDeliverables": [
+        "p5b-d11",
+        "mcp-server",
+        "subdomain-provisioner",
+        "seed-canadian-pilot-demo",
+        "console.ectropy.ai"
+      ],
+      "evidence": [
+        "Session conversation 2026-03-21 \u2014 strategic alignment discussion",
+        "LUHTECH-DEC-005-JOB-SITE-PROVISIONING-2026-03-20.md",
+        ".roadmap/evidence/2026-03/BIM-VIEWER-LIVE-2026-03-20.md"
+      ],
+      "relatedDecisions": [
+        "d-2026-03-20-job-site-subdomain-provisioning",
+        "d-2026-03-20-demo-bundle-cache-architecture"
+      ],
+      "tags": [
+        "architecture",
+        "multi-tenant",
+        "server-topology",
+        "mcp-split",
+        "seppa",
+        "template-library",
+        "open-core",
+        "fork-model",
+        "community-sharing",
+        "tenant-isolation"
+      ],
+      "supersededBy": null,
+      "reviewDate": "2026-09-01",
+      "appendix": {
+        "serverTopology": {
+          "templateDevelopment": {
+            "urlPattern": "{domain}-template-{id}.ectropy.ai",
+            "examples": [
+              "boardline-template-01.ectropy.ai",
+              "biotech-template-01.ectropy.ai"
+            ],
+            "access": "luh.tech team only",
+            "purpose": "Build and validate templates, export schema bundles to S3"
+          },
+          "shared": {
+            "customerUrl": "ectropy.ai (session-scoped by tenantId)",
+            "adminUrl": "server-{id}.ectropy.ai",
+            "tenantModel": "Many tenants, RLS-isolated, same PostgreSQL cluster",
+            "adminAccess": "luh.tech has full access on any server (gated further in future)",
+            "communitySharing": "opt-in schema-level template sharing, curated before S3 promotion"
+          },
+          "dedicated": {
+            "urlPattern": "{slug}.job.site",
+            "firstInstance": "inca-boardline-alberta.job.site",
+            "provisioning": "DEC-005/006 provisioner from S3 template library",
+            "isolation": "full tenant isolation"
+          },
+          "console": {
+            "url": "console.ectropy.ai",
+            "access": "luh.tech super admin only",
+            "scope": "all servers, all tenants, full portfolio",
+            "poweredBy": "MCP-ECTROPY-BUSINESS + MCP-LUHTECH-PORTFOLIO"
+          }
+        },
+        "mcpAgents": {
+          "mcpConstruction": {
+            "name": "SEPPA \u2014 Construction Intelligence",
+            "repo": "ectropy-ai/platform (open core, Apache 2.0)",
+            "path": "apps/mcp-server/",
+            "auth": "tenantId from JWT \u2014 hard RLS boundary",
+            "dataScope": "pmDecision, Voxel, Inspection, AuthorityLevel \u2014 scoped to one tenant+project",
+            "cannotAccess": [
+              ".roadmap files",
+              "venture data",
+              "CRM",
+              "other tenants"
+            ],
+            "surfaces": [
+              "ectropy.ai",
+              "job.site subdomains"
+            ],
+            "forkModel": "canonical pattern for all venture intelligence agents",
+            "forks": [
+              "jobsitecontrol \u2014 edge-aware, offline-capable",
+              "qullqa \u2014 cloud-first, BYOD",
+              "viiva \u2014 manufacturing extension",
+              "hilja \u2014 sensor layer"
+            ]
+          },
+          "mcpEctropyBusiness": {
+            "name": "Code Guidance Agent \u2014 Ectropy Platform",
+            "repo": "luh-tech/Ectropy-Business (private)",
+            "path": "apps/platform-mcp/",
+            "auth": "isPlatformAdmin = true",
+            "dataScope": "ectropy-ai/platform .roadmap files, decision-log.json, architecture.json, roadmap.json",
+            "purpose": "Guides development of Ectropy platform. Answers DEC-NNN queries, phase status, open DEPs",
+            "cannotAccess": [
+              "construction tenant data"
+            ],
+            "surfaces": [
+              "console.ectropy.ai \u2014 developer mode"
+            ]
+          },
+          "mcpLuhtechPortfolio": {
+            "name": "Portfolio Intelligence Agent",
+            "repo": "luh-tech/LuhTech-business (private)",
+            "path": "apps/portfolio-mcp/",
+            "auth": "isPlatformAdmin = true, LuhTech team only",
+            "dataScope": "all venture .roadmap files, venture-summary.json, deliverables, CRM, investor data, server telemetry",
+            "purpose": "Full portfolio visibility, deliverable pipeline tracking, feeds investor dataroom",
+            "cannotAccess": [
+              "construction tenant data"
+            ],
+            "surfaces": [
+              "console.ectropy.ai \u2014 portfolio mode",
+              "dash.luh.tech",
+              "invest.luh.tech"
+            ],
+            "childAgents": [
+              "Dashboard Agent \u2014 venture KPIs \u2014 dash.luh.tech",
+              "Dataroom Agent \u2014 investor data \u2014 invest.luh.tech",
+              "Venture Agent \u2014 cross-portfolio analysis \u2014 CEO tools"
+            ]
+          }
+        },
+        "templateLibrary": {
+          "location": "DO Spaces /project-bundles/",
+          "scope": "schema-level only \u2014 no raw construction data",
+          "contents": [
+            "manifest.json",
+            "schema/voxel-zones.json",
+            "schema/decision-types.json",
+            "schema/authority-cascade.json",
+            "ifc/ (reference geometry)",
+            "seed/ (minimal demo data)"
+          ],
+          "domains": [
+            "construction",
+            "manufacturing (future)",
+            "biotech (future)",
+            "community (curated opt-ins)"
+          ],
+          "buildFlow": "luh.tech team builds on template server \u2192 validates \u2192 exports bundle to S3"
+        },
+        "communitySharing": {
+          "stage1": {
+            "scope": "Template-level only \u2014 voxel zone patterns, decision type configs, authority cascade",
+            "mechanism": "opt-in RLS per tenant, reviewed by luh.tech before S3 promotion",
+            "dataDoesNotShare": "actual decisions, voxel events, construction site data"
+          },
+          "stage2": {
+            "status": "DEFERRED \u2014 separate decision required",
+            "mechanism": "DAO governance and smart contracts",
+            "purpose": "trustless, incentivized knowledge network \u2014 Open Library at network scale"
+          }
+        }
+      }
     }
   ]
 }
