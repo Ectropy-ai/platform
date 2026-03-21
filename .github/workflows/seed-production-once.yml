@@ -32,32 +32,32 @@ jobs:
           sleep 5
           ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
 
-      - name: Run seed on production blue node
+      - name: Checkout code for seed script
+        uses: actions/checkout@v4
+
+      - name: Copy seed script to production and run
         run: |
+          # Copy seed file to production node
+          scp scripts/database/seeds/seed-canadian-pilot-demo.ts \
+            root@${{ vars.PROD_BLUE_IP }}:/tmp/seed-canadian-pilot-demo.ts
+
           ssh root@${{ vars.PROD_BLUE_IP }} bash -s <<'ENDSSH'
           set -euo pipefail
 
           GATEWAY=$(docker ps --filter name=api-gateway --format "{{.Names}}" | head -1)
           echo "Gateway container: $GATEWAY"
 
-          echo "=== PRE-SEED COUNTS ==="
-          docker exec "$GATEWAY" npx prisma db execute \
-            --schema=/app/prisma/schema.prisma --stdin \
-            <<< "SELECT 'projects' as tbl, COUNT(*) FROM projects UNION ALL SELECT 'voxels', COUNT(*) FROM voxels UNION ALL SELECT 'pm_decisions', COUNT(*) FROM pm_decisions UNION ALL SELECT 'inspections', COUNT(*) FROM inspections;" \
-            2>&1 || echo "COUNT_QUERY_FAILED"
+          # Copy seed into container
+          docker cp /tmp/seed-canadian-pilot-demo.ts \
+            "$GATEWAY":/app/scripts/database/seeds/seed-canadian-pilot-demo.ts
 
-          echo ""
           echo "=== RUNNING SEED ==="
           docker exec "$GATEWAY" npx tsx \
             /app/scripts/database/seeds/seed-canadian-pilot-demo.ts \
             2>&1
 
-          echo ""
-          echo "=== POST-SEED COUNTS ==="
-          docker exec "$GATEWAY" npx prisma db execute \
-            --schema=/app/prisma/schema.prisma --stdin \
-            <<< "SELECT 'projects' as tbl, COUNT(*) FROM projects UNION ALL SELECT 'voxels', COUNT(*) FROM voxels UNION ALL SELECT 'pm_decisions', COUNT(*) FROM pm_decisions UNION ALL SELECT 'inspections', COUNT(*) FROM inspections;" \
-            2>&1 || echo "COUNT_QUERY_FAILED"
+          # Cleanup
+          rm -f /tmp/seed-canadian-pilot-demo.ts
           ENDSSH
 
       - name: Remove runner IP from firewall
