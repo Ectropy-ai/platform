@@ -47,13 +47,13 @@ jobs:
           GATEWAY=$(docker ps --filter name=api-gateway --format "{{.Names}}" | head -1)
           echo "Gateway container: $GATEWAY"
 
-          # Copy seed into container /tmp (scripts dir excluded by .dockerignore)
+          # Copy seed into container /app/ (must be under /app for node_modules resolution)
           docker cp /tmp/seed-canadian-pilot-demo.ts \
-            "$GATEWAY":/tmp/seed-canadian-pilot-demo.ts
+            "$GATEWAY":/app/seed-canadian-pilot-demo.ts
 
           echo "=== RUNNING SEED ==="
-          docker exec "$GATEWAY" npx tsx \
-            /tmp/seed-canadian-pilot-demo.ts \
+          docker exec -w /app "$GATEWAY" npx tsx \
+            /app/seed-canadian-pilot-demo.ts \
             2>&1
 
           # Cleanup
