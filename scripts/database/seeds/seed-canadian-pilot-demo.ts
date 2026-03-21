@@ -400,6 +400,18 @@ async function main() {
   });
   console.log(`✓ Project: ${project.name} (${PROJECT_ID})`);
 
+  // ── SpeckleStream linkage (BIM viewer needs this to resolve project → stream) ──
+  const speckleStream = await prisma.speckleStream.upsert({
+    where: { construction_project_id: project.id },
+    create: {
+      construction_project_id: project.id,
+      stream_id: '9a5215cc88',
+      stream_name: 'Demo Office Building',
+    },
+    update: {},
+  });
+  console.log(`✓ SpeckleStream: ${speckleStream.stream_name} (${speckleStream.stream_id})`);
+
   // ── Build authority level → ID map ──────────────────────────────────
   const authorityLevels = await prisma.authorityLevel.findMany({
     select: { id: true, level: true, name: true },
