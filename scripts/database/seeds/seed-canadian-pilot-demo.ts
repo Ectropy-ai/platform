@@ -406,7 +406,7 @@ async function main() {
     create: {
       construction_project_id: project.id,
       stream_id: '9a5215cc88',
-      stream_name: 'Demo Office Building',
+      stream_name: 'Demo Office Building',  // The actual BIM geometry stream loaded by the viewer
     },
     update: {},
   });
