@@ -1,0 +1,42 @@
+name: Seed Production DB (one-shot)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.14.0
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+        env:
+          LUHTECH_PKG_READ: ${{ secrets.LUHTECH_PKG_READ }}
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema=prisma/schema.prisma
+
+      - name: Run seed
+        run: npx tsx scripts/database/seeds/seed-canadian-pilot-demo.ts
+        env:
+          DATABASE_URL: ${{ secrets.PLATFORM_DATABASE_URL }}
+
+      - name: Verify seed
+        run: |
+          npx prisma db execute --stdin --schema=prisma/schema.prisma <<< \
+            "SELECT 'projects' as tbl, COUNT(*) FROM projects
+             UNION ALL SELECT 'voxels', COUNT(*) FROM voxels
+             UNION ALL SELECT 'pm_decisions', COUNT(*) FROM pm_decisions
+             UNION ALL SELECT 'inspections', COUNT(*) FROM inspections;"
+        env:
+          DATABASE_URL: ${{ secrets.PLATFORM_DATABASE_URL }}
