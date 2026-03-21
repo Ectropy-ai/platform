@@ -1,0 +1,124 @@
+name: Diagnose DB — Full State 2026-03-21
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add runner IP to firewall
+        id: fw
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          doctl compute firewall add-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+          sleep 5
+
+      - name: Add host keys
+        run: |
+          sleep 5
+          ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+
+      - name: Query production DB via Prisma
+        run: |
+          ssh root@${{ vars.PROD_BLUE_IP }} bash -s <<'ENDSSH'
+          set -euo pipefail
+          GATEWAY=$(docker ps --filter name=api-gateway --format "{{.Names}}" | head -1)
+          echo "GATEWAY: $GATEWAY"
+
+          echo "=== ALL TENANTS ==="
+          docker exec "$GATEWAY" node -e "
+          const { PrismaClient } = require('@prisma/client');
+          const p = new PrismaClient();
+          p.tenant.findMany({ select: { id: true, slug: true, name: true, status: true } })
+            .then(r => console.log(JSON.stringify(r, null, 2)))
+            .catch(e => console.error('FAILED:', e.message))
+            .finally(() => p.\$disconnect());
+          " 2>&1
+
+          echo ""
+          echo "=== ALL PROJECTS ==="
+          docker exec "$GATEWAY" node -e "
+          const { PrismaClient } = require('@prisma/client');
+          const p = new PrismaClient();
+          p.project.findMany({ select: { id: true, name: true, status: true, tenant_id: true, owner_id: true, created_at: true } })
+            .then(r => console.log(JSON.stringify(r, null, 2)))
+            .catch(e => console.error('FAILED:', e.message))
+            .finally(() => p.\$disconnect());
+          " 2>&1
+
+          echo ""
+          echo "=== ALL SPECKLE STREAMS ==="
+          docker exec "$GATEWAY" node -e "
+          const { PrismaClient } = require('@prisma/client');
+          const p = new PrismaClient();
+          p.speckleStream.findMany()
+            .then(r => console.log(JSON.stringify(r, null, 2)))
+            .catch(e => console.error('FAILED:', e.message))
+            .finally(() => p.\$disconnect());
+          " 2>&1
+
+          echo ""
+          echo "=== USERS (email + tenant) ==="
+          docker exec "$GATEWAY" node -e "
+          const { PrismaClient } = require('@prisma/client');
+          const p = new PrismaClient();
+          p.user.findMany({ select: { id: true, email: true, role: true, tenant_id: true, is_authorized: true, is_platform_admin: true } })
+            .then(r => console.log(JSON.stringify(r, null, 2)))
+            .catch(e => console.error('FAILED:', e.message))
+            .finally(() => p.\$disconnect());
+          " 2>&1
+
+          echo ""
+          echo "=== VOXELS BY PROJECT ==="
+          docker exec "$GATEWAY" node -e "
+          const { PrismaClient } = require('@prisma/client');
+          const p = new PrismaClient();
+          p.\$queryRaw\`SELECT project_id, COUNT(*)::int as count FROM voxels GROUP BY project_id\`
+            .then(r => console.log(JSON.stringify(r, null, 2)))
+            .catch(e => console.error('FAILED:', e.message))
+            .finally(() => p.\$disconnect());
+          " 2>&1
+
+          echo ""
+          echo "=== DECISIONS BY PROJECT ==="
+          docker exec "$GATEWAY" node -e "
+          const { PrismaClient } = require('@prisma/client');
+          const p = new PrismaClient();
+          p.\$queryRaw\`SELECT project_id, COUNT(*)::int as count FROM pm_decisions GROUP BY project_id\`
+            .then(r => console.log(JSON.stringify(r, null, 2)))
+            .catch(e => console.error('FAILED:', e.message))
+            .finally(() => p.\$disconnect());
+          " 2>&1
+
+          echo ""
+          echo "=== INSPECTIONS BY PROJECT ==="
+          docker exec "$GATEWAY" node -e "
+          const { PrismaClient } = require('@prisma/client');
+          const p = new PrismaClient();
+          p.\$queryRaw\`SELECT project_id, COUNT(*)::int as count FROM inspections GROUP BY project_id\`
+            .then(r => console.log(JSON.stringify(r, null, 2)))
+            .catch(e => console.error('FAILED:', e.message))
+            .finally(() => p.\$disconnect());
+          " 2>&1
+          ENDSSH
+
+      - name: Remove runner IP from firewall
+        if: always()
+        run: |
+          doctl compute firewall remove-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:${{ steps.fw.outputs.runner_ip }}/32"
