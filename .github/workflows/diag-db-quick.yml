@@ -1,0 +1,70 @@
+name: Diag DB Quick Query
+
+on:
+  workflow_dispatch:
+
+jobs:
+  query:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add runner IP to firewall
+        id: fw
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          doctl compute firewall add-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+          sleep 5
+
+      - name: Add host keys
+        run: |
+          sleep 5
+          ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+
+      - name: Query DB
+        run: |
+          ssh root@${{ vars.PROD_BLUE_IP }} bash -s <<'ENDSSH'
+          GATEWAY=$(docker ps --filter name=api-gateway --format "{{.Names}}" | head -1)
+
+          echo "=== SPECKLE STREAM 9a5215cc88 ==="
+          docker exec "$GATEWAY" node -e "
+          const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();
+          p.speckleStream.findFirst({where:{stream_id:'9a5215cc88'}})
+          .then(r=>console.log(JSON.stringify(r,null,2)))
+          .catch(e=>console.error(e.message))
+          .finally(()=>p.\$disconnect());" 2>&1
+
+          echo ""
+          echo "=== PROJECT ROLES FOR dc1eaa5b ==="
+          docker exec "$GATEWAY" node -e "
+          const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();
+          p.projectRole.findMany({where:{project_id:'dc1eaa5b-7553-46ec-92a5-e20762a60c71'}})
+          .then(r=>console.log(JSON.stringify(r,null,2)))
+          .catch(e=>console.error(e.message))
+          .finally(()=>p.\$disconnect());" 2>&1
+
+          echo ""
+          echo "=== PROJECT ROLES FOR 0bb62702 ==="
+          docker exec "$GATEWAY" node -e "
+          const{PrismaClient}=require('@prisma/client');const p=new PrismaClient();
+          p.projectRole.findMany({where:{project_id:'0bb62702-419e-41e3-a88d-af9a466c5e3a'}})
+          .then(r=>console.log(JSON.stringify(r,null,2)))
+          .catch(e=>console.error(e.message))
+          .finally(()=>p.\$disconnect());" 2>&1
+          ENDSSH
+
+      - name: Remove runner IP from firewall
+        if: always()
+        run: |
+          doctl compute firewall remove-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:${{ steps.fw.outputs.runner_ip }}/32"
