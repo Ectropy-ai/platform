@@ -412,6 +412,27 @@ async function main() {
   });
   console.log(`✓ SpeckleStream: ${speckleStream.stream_name} (${speckleStream.stream_id})`);
 
+  // ── Assign demo user as project owner (required for /my-role and voxel access) ──
+  const projectRole = await prisma.projectRole.upsert({
+    where: {
+      user_id_project_id_role: {
+        user_id: demoUser.id,
+        project_id: project.id,
+        role: 'owner',
+      },
+    },
+    create: {
+      user_id: demoUser.id,
+      project_id: project.id,
+      role: 'owner',
+      permissions: ['read', 'write', 'admin'],
+      voting_power: 100,
+      is_active: true,
+    },
+    update: {},
+  });
+  console.log(`✓ ProjectRole: ${projectRole.role} for ${demoUser.email} on ${project.name}`);
+
   // ── Build authority level → ID map ──────────────────────────────────
   const authorityLevels = await prisma.authorityLevel.findMany({
     select: { id: true, level: true, name: true },
