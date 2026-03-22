@@ -89,6 +89,9 @@ services:
       - SPECKLE_SERVER_TOKEN=${SPECKLE_SERVER_TOKEN}
       - SPECKLE_ADMIN_EMAIL=${SPECKLE_ADMIN_EMAIL:-speckle-admin@ectropy.ai}
       - SPECKLE_ADMIN_PASSWORD=${SPECKLE_ADMIN_PASSWORD}
+      # Demo BIM viewer defaults (canonical stream + object for /api/speckle/config)
+      - DEMO_SPECKLE_STREAM_ID=${DEMO_SPECKLE_STREAM_ID:-}
+      - DEMO_SPECKLE_OBJECT_ID=${DEMO_SPECKLE_OBJECT_ID:-}
 
       # Email Service - Resend (ENTERPRISE FIX 2025-12-21)
       # Transactional email for waitlist, password reset, email verification
