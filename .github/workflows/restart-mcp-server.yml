@@ -42,18 +42,23 @@ jobs:
           grep ANTHROPIC .env | sed 's/=.*/=<REDACTED>/' || echo "NOT_IN_ENV_FILE"
 
           echo ""
-          echo "=== FORCE-RECREATE MCP-SERVER ==="
-          docker-compose up -d --force-recreate --no-deps mcp-server
-          sleep 10
+          echo "=== FORCE-RECREATE MCP-SERVER + API-GATEWAY ==="
+          docker-compose up -d --force-recreate --no-deps mcp-server api-gateway
+          sleep 15
 
           echo ""
-          echo "=== MCP-SERVER STATUS ==="
-          docker ps --filter name=mcp --format "table {{.Names}}\t{{.Status}}"
+          echo "=== CONTAINER STATUS ==="
+          docker ps --filter name=mcp --filter name=api-gateway --format "table {{.Names}}\t{{.Status}}"
 
           echo ""
-          echo "=== VERIFY ANTHROPIC IN CONTAINER ENV ==="
+          echo "=== VERIFY ENV IN MCP ==="
           MCP=$(docker ps --filter name=mcp --format "{{.Names}}" | head -1)
-          docker exec "$MCP" env | grep ANTHROPIC | sed 's/=.*/=<REDACTED>/'
+          docker exec "$MCP" env | grep -E "ANTHROPIC|DEMO_SPECKLE" | sed 's/=.*/=<REDACTED>/'
+
+          echo ""
+          echo "=== VERIFY ENV IN API-GATEWAY ==="
+          AG=$(docker ps --filter name=api-gateway --format "{{.Names}}" | head -1)
+          docker exec "$AG" env | grep -E "DEMO_SPECKLE" | sed 's/=.*/=<REDACTED>/'
           ENDSSH
 
       - name: Remove runner IP from firewall
