@@ -209,27 +209,20 @@ jobs:
           echo "✅ Docker image built successfully"
           docker images | grep "${{ matrix.service }}"
 
-      # ENTERPRISE FIX (2026-03-12): Isolated DOCKER_CONFIG for DOCR push
-      # ROOT CAUSE: Ubuntu 24 GitHub Actions runners may have a Docker credential
-      # helper (docker-credential-pass/desktop) that intercepts doctl registry login
-      # and silently fails to store credentials. The subsequent docker push then has
-      # no valid auth. Fix: Use doctl registry docker-config to write credentials
-      # directly to an isolated config dir, bypassing the credential helper entirely.
+      - name: Log in to DOCR
+        run: doctl registry login --expiry-seconds 3600
+
       - name: Push Docker image to DOCR
         run: |
           echo "📤 Pushing ${{ matrix.service }} images to DOCR..."
-
-          # Write DOCR credentials directly — bypasses Docker credential helper
-          mkdir -p /tmp/docker-creds
-          doctl registry docker-config --read-write --expiry-seconds 3600 > /tmp/docker-creds/config.json
 
           # Tag for DOCR
           docker tag ${{ matrix.service }}:staging ${{ env.REGISTRY }}/${{ matrix.service }}:staging
           docker tag ${{ matrix.service }}:staging ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
 
-          # Push with isolated config — no credential helper in path
-          DOCKER_CONFIG=/tmp/docker-creds docker push ${{ env.REGISTRY }}/${{ matrix.service }}:staging
-          DOCKER_CONFIG=/tmp/docker-creds docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
+          # Push using default docker config (doctl registry login above)
+          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:staging
+          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
 
           echo "✅ Images pushed to DOCR"
           echo "  - ${{ env.REGISTRY }}/${{ matrix.service }}:staging"
