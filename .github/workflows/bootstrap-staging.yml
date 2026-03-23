@@ -99,8 +99,6 @@ jobs:
             rm -f /etc/nginx/sites-enabled/default
             nginx -t
             systemctl enable nginx
-            systemctl restart nginx
-            echo "nginx status: $(systemctl is-active nginx)"
 
             # ── 6. Authenticate with DOCR ───────────────────────────────
             echo "--- Authenticating with DOCR ---"
@@ -131,6 +129,8 @@ jobs:
             docker compose pull
             docker compose up -d
             echo "Stack started"
+            systemctl restart nginx
+            echo "nginx status: $(systemctl is-active nginx)"
 
             # ── 9. Validation ───────────────────────────────────────────
             echo "--- Waiting 30s for services to stabilise ---"
