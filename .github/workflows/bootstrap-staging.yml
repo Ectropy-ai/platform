@@ -16,6 +16,7 @@ jobs:
           username: root
           key: ${{ secrets.STAGING_SSH_KEY }}
           timeout: 600s
+          envs: SPACES_ACCESS_KEY_ID,SPACES_SECRET_ACCESS_KEY,DIGITALOCEAN_ACCESS_TOKEN
           script: |
             set -euo pipefail
             echo "=== BOOTSTRAP START ==="
