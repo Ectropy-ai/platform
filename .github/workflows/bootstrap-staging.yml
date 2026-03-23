@@ -83,6 +83,10 @@ jobs:
               /etc/nginx/nginx.conf \
               --endpoint-url https://sfo3.digitaloceanspaces.com
 
+            # Fix nginx user for Ubuntu (Spaces config uses nginx,
+            # Ubuntu uses www-data)
+            sed -i 's/^user nginx;/user www-data;/' /etc/nginx/nginx.conf
+
             echo "Configs pulled. Verifying..."
             ls -lh /opt/ectropy/
             ls -lh /etc/nginx/sites-available/
