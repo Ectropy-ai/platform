@@ -4,7 +4,7 @@
  * and SEPPA AI assistant integration.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Container,
@@ -34,7 +34,15 @@ import {
   ArrowBack,
   SmartToy as AssistantIcon,
 } from '@mui/icons-material';
+import * as THREE from 'three';
 import SpeckleBIMViewer from '../components/BIMViewer/SpeckleBIMViewer';
+import {
+  VoxelOverlay,
+  VoxelColorScheme,
+  VoxelVisualizationMode,
+} from '../components/BIMViewer/VoxelOverlay';
+import type { VoxelOverlayConfig } from '../components/BIMViewer/VoxelOverlay';
+import { useVoxels } from '../hooks/queries/useVoxels';
 import { ProjectMembersDialog, ProjectCard } from '../components/ProjectManagement';
 import {
   ProposalCreationDialog,
@@ -111,6 +119,46 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
   const [proposals, setProposals] = useState<DAOProposal[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedVoxelId, setSelectedVoxelId] = useState<string | undefined>();
+
+  // Voxel overlay state — Three.js scene/camera from SpeckleBIMViewer
+  const [threeScene, setThreeScene] = useState<THREE.Scene | null>(null);
+  const [threeCamera, setThreeCamera] = useState<THREE.Camera | null>(null);
+  const [showVoxelOverlay, setShowVoxelOverlay] = useState(true);
+  const [voxelConfig] = useState<VoxelOverlayConfig>({
+    mode: VoxelVisualizationMode.SOLID,
+    colorScheme: VoxelColorScheme.BY_STATUS,
+    opacity: 0.35,
+    showWireframe: true,
+    showLabels: false,
+  });
+
+  // Fetch real voxel data from API
+  const { voxels: rawVoxels } = useVoxels({
+    projectId: projectId || undefined,
+    enabled: !!projectId,
+  });
+
+  // Map API response to VoxelOverlay's expected shape
+  const voxelOverlayData = rawVoxels.map((v) => ({
+    id: v.id,
+    voxelId: v.voxelId,
+    center: v.center,
+    resolution: v.resolution,
+    system: v.system,
+    status: v.status,
+    healthStatus: v.healthStatus,
+    decisionCount: v.decisionCount,
+    percentComplete: v.percentComplete,
+  }));
+
+  // Callback for SpeckleBIMViewer to provide Three.js internals
+  const handleSceneReady = useCallback(
+    (scene: THREE.Scene, camera: THREE.Camera) => {
+      setThreeScene(scene);
+      setThreeCamera(camera);
+    },
+    []
+  );
 
   // SEPPA Chat state
   const [seppaOpen, setSeppaOpen] = useState(false);
@@ -329,14 +377,24 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
             <CardContent>
               <Box display='flex' justifyContent='space-between' alignItems='center' sx={{ mb: 2 }}>
                 <Typography variant='h6'>BIM Model Viewer</Typography>
-                {selectedVoxelId && (
-                  <Chip
-                    label={`Selected: ${selectedVoxelId}`}
-                    color='secondary'
-                    size='small'
-                    onDelete={() => setSelectedVoxelId(undefined)}
-                  />
-                )}
+                <Stack direction='row' spacing={1} alignItems='center'>
+                  {voxelOverlayData.length > 0 && (
+                    <Chip
+                      label={`Voxels: ${voxelOverlayData.length}`}
+                      color={showVoxelOverlay ? 'primary' : 'default'}
+                      size='small'
+                      onClick={() => setShowVoxelOverlay(!showVoxelOverlay)}
+                    />
+                  )}
+                  {selectedVoxelId && (
+                    <Chip
+                      label={`Selected: ${selectedVoxelId}`}
+                      color='secondary'
+                      size='small'
+                      onDelete={() => setSelectedVoxelId(undefined)}
+                    />
+                  )}
+                </Stack>
               </Box>
               <Box sx={{ height: '600px', bgcolor: '#f5f5f5', borderRadius: 1 }}>
                 <SpeckleBIMViewer
@@ -346,7 +404,19 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
                   onElementSelect={handleElementSelect}
                   height='600px'
                   serverUrl={config.speckleApiUrl}
+                  onSceneReady={handleSceneReady}
                 />
+                {/* Voxel 3D overlay — renders into Three.js scene, no DOM output */}
+                {threeScene && threeCamera && voxelOverlayData.length > 0 && (
+                  <VoxelOverlay
+                    voxels={voxelOverlayData}
+                    config={voxelConfig}
+                    scene={threeScene}
+                    camera={threeCamera}
+                    visible={showVoxelOverlay}
+                    onVoxelClick={(voxelId) => setSelectedVoxelId(voxelId)}
+                  />
+                )}
               </Box>
             </CardContent>
           </Card>
