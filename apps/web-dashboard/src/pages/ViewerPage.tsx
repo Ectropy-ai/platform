@@ -541,7 +541,7 @@ export function ViewerPage() {
                 <ROSMROView
                   projectId={projectId}
                   streamId={selectedStream?.stream_id}
-                  objectId={selectedStream?.latest_object_id}
+                  objectId={selectedStream?.latest_object_id || undefined}
                   serverUrl={config.speckleApiUrl}
                   stakeholderRole={
                     (['architect', 'engineer', 'contractor', 'owner'].includes(projectRole || '')
