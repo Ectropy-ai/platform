@@ -102,7 +102,7 @@ RUN apk del .build-deps
 RUN echo "=== BUILD-TIME ENVIRONMENT VARIABLES ===" && \
     env | grep REACT_APP || echo "No REACT_APP variables found!"
 
-RUN pnpm nx build web-dashboard
+RUN pnpm nx reset && pnpm nx build web-dashboard --skip-nx-cache
 
 FROM node:20-alpine AS runner
 WORKDIR /app
