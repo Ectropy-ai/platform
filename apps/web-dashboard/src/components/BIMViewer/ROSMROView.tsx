@@ -595,25 +595,6 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
       containerRef.current = container;
       setSceneReady(true);
       console.log('[ROSMROView] Scene ready for VoxelOverlay integration');
-
-      // TEMP DEBUG: log scene bounding box to locate model in world-space
-      // Remove after voxel coordinate calibration — VOXEL-COORD-001
-      try {
-        const _debugBox = new THREE.Box3();
-        scene.traverse((obj: any) => {
-          if (obj.isMesh) {
-            _debugBox.expandByObject(obj);
-          }
-        });
-        const _debugCenter = _debugBox.getCenter(new THREE.Vector3());
-        const _debugSize = _debugBox.getSize(new THREE.Vector3());
-        console.warn('[VOXEL-COORD-001] Scene BBox min:', JSON.stringify(_debugBox.min));
-        console.warn('[VOXEL-COORD-001] Scene BBox max:', JSON.stringify(_debugBox.max));
-        console.warn('[VOXEL-COORD-001] Scene BBox center:', JSON.stringify(_debugCenter));
-        console.warn('[VOXEL-COORD-001] Scene BBox size:', JSON.stringify(_debugSize));
-      } catch (e) {
-        console.warn('[VOXEL-COORD-001] BBox probe failed:', e);
-      }
     },
     [],
   );
@@ -795,14 +776,6 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
               height='100%'
             />
           )}
-
-          {/* TEMP DEBUG: log voxel positions — VOXEL-COORD-001 */}
-          {sceneReady && voxels.length > 0 && (() => {
-            console.warn('[VOXEL-COORD-001] Voxel positions:', voxels.map(v => ({
-              id: v.voxelId, x: v.center.x, y: v.center.y, z: v.center.z, res: v.resolution,
-            })));
-            return null;
-          })()}
 
           {/* Voxel Overlay - renders when Three.js scene is ready */}
           {viewState.showVoxels && sceneReady && sceneRef.current && cameraRef.current && (
