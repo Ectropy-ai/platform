@@ -197,6 +197,7 @@ jobs:
           echo "🐳 Building staging Docker image for ${{ matrix.service }}..."
 
           docker build \
+            --no-cache \
             -f apps/${{ matrix.service }}/Dockerfile \
             -t ${{ matrix.service }}:staging \
             --build-arg BUILD_SHA=${{ github.sha }} \
