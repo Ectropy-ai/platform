@@ -124,7 +124,7 @@ interface SpeckleBIMViewerProps {
    * SPRINT 5 ROS MRO: Callback when Three.js scene is ready for overlay integration.
    * Provides access to the internal Three.js scene and camera for VoxelOverlay.
    */
-  onSceneReady?: (scene: THREE.Scene, camera: THREE.Camera, container: HTMLDivElement) => void;
+  onSceneReady?: (scene: THREE.Scene, camera: THREE.Camera, container: HTMLDivElement, requestRender?: () => void) => void;
   height?: string;
   serverUrl?: string;
 }
