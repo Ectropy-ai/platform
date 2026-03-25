@@ -407,7 +407,8 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
 
           if (scene && camera) {
             logger.info('[BIM Viewer] Calling onSceneReady with Three.js internals');
-            onSceneReady(scene as THREE.Scene, camera as THREE.Camera, containerRef.current);
+            const requestRender = () => viewer.requestRender();
+            onSceneReady(scene as THREE.Scene, camera as THREE.Camera, containerRef.current, requestRender);
           } else {
             logger.warn('[BIM Viewer] Could not access Three.js scene/camera from viewer');
           }

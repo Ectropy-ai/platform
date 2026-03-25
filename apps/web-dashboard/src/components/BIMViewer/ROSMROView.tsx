@@ -594,14 +594,16 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
   // Three.js refs for VoxelOverlay integration
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.Camera | null>(null);
+  const requestRenderRef = useRef<(() => void) | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // SPRINT 5: onSceneReady callback to capture Three.js internals from SpeckleBIMViewer
   const handleSceneReady = useCallback(
-    (scene: THREE.Scene, camera: THREE.Camera, container: HTMLDivElement) => {
+    (scene: THREE.Scene, camera: THREE.Camera, container: HTMLDivElement, requestRender?: () => void) => {
       sceneRef.current = scene;
       cameraRef.current = camera;
       containerRef.current = container;
+      if (requestRender) requestRenderRef.current = requestRender;
       setSceneReady(true);
       console.log('[ROSMROView] Scene ready for VoxelOverlay integration');
     },
@@ -794,6 +796,7 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
               scene={sceneRef.current}
               camera={cameraRef.current}
               visible={viewState.showVoxels}
+              onRequestRender={requestRenderRef.current || undefined}
               onVoxelClick={handleVoxelClick}
               onVoxelHover={handleVoxelHover}
             />

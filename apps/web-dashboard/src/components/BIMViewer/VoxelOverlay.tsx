@@ -63,6 +63,7 @@ export interface VoxelOverlayProps {
   scene: THREE.Scene;
   camera: THREE.Camera;
   visible?: boolean;
+  onRequestRender?: () => void;
   onVoxelClick?: (voxelId: string) => void;
   onVoxelHover?: (voxelId: string | null) => void;
 }
@@ -299,7 +300,8 @@ export function useVoxelOverlay(
   voxels: VoxelData[],
   config: VoxelOverlayConfig,
   scene: THREE.Scene | null,
-  visible: boolean = true
+  visible: boolean = true,
+  onRequestRender?: () => void
 ) {
   const meshRef = useRef<THREE.InstancedMesh | null>(null);
   const wireframeRef = useRef<THREE.LineSegments | null>(null);
@@ -367,6 +369,9 @@ export function useVoxelOverlay(
       scene.add(wireframe);
     }
 
+    // Trigger Speckle render pass after injecting meshes into scene
+    if (onRequestRender) onRequestRender();
+
     // Cleanup on unmount
     return () => {
       if (meshRef.current && scene) {
@@ -384,7 +389,7 @@ export function useVoxelOverlay(
         (wireframeRef.current.material as THREE.Material).dispose();
       }
     };
-  }, [scene, filteredVoxels, config, visible]);
+  }, [scene, filteredVoxels, config, visible, onRequestRender]);
 
   // Get voxel ID from instance index
   const getVoxelIdFromInstance = useCallback((instanceId: number): string | null => {
@@ -414,6 +419,7 @@ export const VoxelOverlay: React.FC<VoxelOverlayProps> = ({
   scene,
   camera,
   visible = true,
+  onRequestRender,
   onVoxelClick,
   onVoxelHover,
 }) => {
@@ -423,7 +429,8 @@ export const VoxelOverlay: React.FC<VoxelOverlayProps> = ({
     voxels,
     config,
     scene,
-    visible
+    visible,
+    onRequestRender
   );
 
   // Raycaster for voxel picking
