@@ -770,7 +770,7 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
       </Paper>
 
       {/* Main Content */}
-      <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 600 }}>
         {/* 3D Viewer */}
         <Box sx={{ flex: 1, position: 'relative' }}>
           {/* BIM Mesh Viewer with VoxelOverlay integration */}
