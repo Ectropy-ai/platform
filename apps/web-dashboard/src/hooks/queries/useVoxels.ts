@@ -165,7 +165,7 @@ async function fetchVoxels(
     const url = `/api/v1/projects/${projectId}/voxels${queryString ? `?${queryString}` : ''}`;
 
     const response = await apiService.get<{ voxels: VoxelData[]; total: number }>(url);
-    return (response as any) || { voxels: [], total: 0 };
+    return (response as any)?.data || { voxels: [], total: 0 };
   } catch (error) {
     logger.warn('[Voxels] Fetch error, returning mock data', { error });
     // Return mock data as fallback
@@ -182,7 +182,7 @@ async function fetchVoxelAggregations(
     const response = await apiService.get<{ aggregations: VoxelAggregation[] }>(
       `/api/v1/projects/${projectId}/voxels/aggregation?groupBy=${groupBy}`
     );
-    return (response as any) || { aggregations: [] };
+    return (response as any)?.data || { aggregations: [] };
   } catch (error) {
     logger.warn('[Voxels] Aggregations fetch error, returning mock data', { error });
     // Return mock aggregations
@@ -199,7 +199,7 @@ async function fetchVoxelActivity(
     const response = await apiService.get<{ activities: VoxelActivity[]; count: number }>(
       `/api/v1/projects/${projectId}/voxels/activity?limit=${limit}`
     );
-    return (response as any) || { activities: [], count: 0 };
+    return (response as any)?.data || { activities: [], count: 0 };
   } catch (error) {
     logger.warn('[Voxels] Activity fetch error, returning mock data', { error });
     return { activities: generateMockActivity(), count: 5 };
