@@ -33,6 +33,8 @@ import {
 // ENTERPRISE FIX (2026-01-14): SpeckleLoader and WorldTree are exported at runtime but not in TypeScript defs
 // Import namespace for runtime access with proper type safety via our interfaces below
 import * as SpeckleViewerModule from '@speckle/viewer';
+import type { IViewer } from '@speckle/viewer';
+import { VoxelDecisionSurfaceExtension } from './VoxelDecisionSurfaceExtension';
 import ObjectLoader from '@speckle/objectloader';
 import * as THREE from 'three';
 import { logger } from '../../services/logger';
@@ -125,6 +127,7 @@ interface SpeckleBIMViewerProps {
    * Provides access to the internal Three.js scene and camera for VoxelOverlay.
    */
   onSceneReady?: (scene: THREE.Scene, camera: THREE.Camera, container: HTMLDivElement, requestRender?: () => void) => void;
+  onViewerReady?: (viewer: IViewer) => void;
   height?: string;
   serverUrl?: string;
 }
@@ -142,6 +145,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
   stakeholderRole,
   onElementSelect,
   onSceneReady,
+  onViewerReady,
   height = '600px',
   serverUrl,
 }) => {
@@ -355,6 +359,10 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       viewer.createExtension(CameraController);
       viewer.createExtension(SelectionExtension);
       viewer.createExtension(ViewModes);
+      viewer.createExtension(VoxelDecisionSurfaceExtension);
+
+      // Notify parent that viewer is ready for extension access
+      onViewerReady?.(viewer);
 
       // Set up selection handling
       viewer.on(ViewerEvent.ObjectClicked, (selectionEvent: SelectionEvent | null) => {

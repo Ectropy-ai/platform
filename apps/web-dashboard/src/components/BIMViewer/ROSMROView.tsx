@@ -80,13 +80,13 @@ import * as THREE from 'three';
 
 import SpeckleBIMViewer from './SpeckleBIMViewer';
 import {
-  VoxelOverlay,
-  VoxelLegend,
   VoxelColorScheme,
   VoxelVisualizationMode,
-  VoxelOverlayConfig,
-  VoxelData,
-} from './VoxelOverlay';
+  type VoxelData,
+} from './VoxelTypes';
+import { VoxelLegend } from './VoxelLegend';
+import { VoxelDecisionSurfaceExtension } from './VoxelDecisionSurfaceExtension';
+import type { IViewer } from '@speckle/viewer';
 // SPRINT 5: Import React Query hooks for real data (2026-01-24)
 import {
   useROSMROData,
@@ -580,8 +580,8 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
   const [selectedVoxel, setSelectedVoxel] = useState<VoxelData | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [showControlPanel, setShowControlPanel] = useState(true);
-  const [sceneReady, setSceneReady] = useState(false);
   const [hasBeenActive, setHasBeenActive] = useState(isActive);
+  const [voxelExt, setVoxelExt] = useState<VoxelDecisionSurfaceExtension | null>(null);
 
   // Defer SpeckleBIMViewer mount until tab is visible (non-zero canvas dimensions)
   useEffect(() => {
@@ -591,39 +591,22 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
   // M6: SEPPA AI Assistant state
   const [seppaOpen, setSeppaOpen] = useState(false);
 
-  // Three.js refs for VoxelOverlay integration
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.Camera | null>(null);
-  const requestRenderRef = useRef<(() => void) | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  // DEC-008: Get extension ref when viewer is ready
+  const handleViewerReady = useCallback((viewer: IViewer) => {
+    setVoxelExt(viewer.getExtension(VoxelDecisionSurfaceExtension));
+  }, []);
 
-  // SPRINT 5: onSceneReady callback to capture Three.js internals from SpeckleBIMViewer
-  const handleSceneReady = useCallback(
-    (scene: THREE.Scene, camera: THREE.Camera, container: HTMLDivElement, requestRender?: () => void) => {
-      sceneRef.current = scene;
-      cameraRef.current = camera;
-      containerRef.current = container;
-      if (requestRender) requestRenderRef.current = requestRender;
-      setSceneReady(true);
-      console.log('[ROSMROView] Scene ready for VoxelOverlay integration');
-    },
-    [],
-  );
+  // DEC-008: Sync voxel data to extension when data loads/changes
+  useEffect(() => {
+    if (!voxelExt || !voxels?.length) return;
+    voxelExt.updateVoxels(voxels);
+  }, [voxelExt, voxels]);
 
-  // Voxel overlay config
-  const voxelConfig = useMemo<VoxelOverlayConfig>(
-    () => ({
-      mode: viewState.visualizationMode,
-      colorScheme: viewState.colorScheme,
-      opacity: 0.7,
-      showWireframe: viewState.visualizationMode === VoxelVisualizationMode.WIREFRAME,
-      showLabels: false,
-      filterSystems: viewState.filterSystems.length > 0 ? viewState.filterSystems : undefined,
-      filterStatuses: viewState.filterStatuses.length > 0 ? viewState.filterStatuses : undefined,
-      highlightedVoxels: viewState.selectedVoxelId ? [viewState.selectedVoxelId] : undefined,
-    }),
-    [viewState],
-  );
+  // DEC-008: Sync visibility toggle
+  useEffect(() => {
+    voxelExt?.setVisible(viewState.showVoxels ?? true);
+  }, [voxelExt, viewState.showVoxels]);
+
 
   // Handle voxel click
   const handleVoxelClick = useCallback(
@@ -783,22 +766,8 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
               stakeholderRole={stakeholderRole}
               serverUrl={serverUrl}
               onElementSelect={handleBIMElementSelect}
-              onSceneReady={handleSceneReady}
+              onViewerReady={handleViewerReady}
               height='100%'
-            />
-          )}
-
-          {/* Voxel Overlay - renders when Three.js scene is ready */}
-          {viewState.showVoxels && sceneReady && sceneRef.current && cameraRef.current && (
-            <VoxelOverlay
-              voxels={voxels}
-              config={voxelConfig}
-              scene={sceneRef.current}
-              camera={cameraRef.current}
-              visible={viewState.showVoxels}
-              onRequestRender={requestRenderRef.current || undefined}
-              onVoxelClick={handleVoxelClick}
-              onVoxelHover={handleVoxelHover}
             />
           )}
 
