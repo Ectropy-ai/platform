@@ -118,6 +118,8 @@ export interface ROSMROViewProps {
   userName?: string;
   /** User authority level (0-6) for SEPPA decision routing */
   userAuthority?: AuthorityLevel;
+  /** Whether this tab is currently visible — defers BIM mount until active */
+  isActive?: boolean;
 }
 
 interface VoxelAggregation {
@@ -509,6 +511,7 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
   userId = 'anonymous',
   userName,
   userAuthority = 3, // Default to PM level
+  isActive = true,
 }) => {
   // SPRINT 5: Use React Query hooks for real data (2026-01-24)
   // Replaces local state + useEffect with centralized data fetching
@@ -578,6 +581,12 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
   const [activeTab, setActiveTab] = useState(0);
   const [showControlPanel, setShowControlPanel] = useState(true);
   const [sceneReady, setSceneReady] = useState(false);
+  const [hasBeenActive, setHasBeenActive] = useState(isActive);
+
+  // Defer SpeckleBIMViewer mount until tab is visible (non-zero canvas dimensions)
+  useEffect(() => {
+    if (isActive) setHasBeenActive(true);
+  }, [isActive]);
 
   // M6: SEPPA AI Assistant state
   const [seppaOpen, setSeppaOpen] = useState(false);
@@ -765,7 +774,7 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
         {/* 3D Viewer */}
         <Box sx={{ flex: 1, position: 'relative' }}>
           {/* BIM Mesh Viewer with VoxelOverlay integration */}
-          {viewState.showMesh && (
+          {viewState.showMesh && hasBeenActive && (
             <SpeckleBIMViewer
               streamId={streamId}
               objectId={objectId}
