@@ -394,12 +394,16 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       // This enables VoxelOverlay integration for the coordination view
       if (onSceneReady && containerRef.current) {
         try {
-          // Access Three.js scene and camera from Speckle viewer internals
-          // The viewer exposes these via World and cameraHandler properties
+          // Access Three.js scene and camera from Speckle Viewer v2.28.0 internals
+          // FIX (2026-03-25): viewer.World.scene and viewer.cameraHandler do not exist.
+          // Correct API: getRenderer().scene + CameraController.renderingCamera
+          // CameraController extension name is minified in bundle — find by property.
           const viewerAny = viewer as any;
-          const scene = viewerAny.World?.scene || viewerAny.getRenderer?.()?.scene;
-          const camera =
-            viewerAny.cameraHandler?.camera || viewerAny.cameraHandler?.activeCam?.camera;
+          const speckleRenderer = viewerAny.getRenderer();
+          const scene = speckleRenderer?.scene;
+          const cameraExt = Object.values(viewerAny.extensions || {})
+            .find((ext: any) => ext?.renderingCamera !== undefined);
+          const camera = (cameraExt as any)?.renderingCamera;
 
           if (scene && camera) {
             logger.info('[BIM Viewer] Calling onSceneReady with Three.js internals');
