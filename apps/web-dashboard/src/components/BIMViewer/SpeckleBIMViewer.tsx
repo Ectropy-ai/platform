@@ -361,9 +361,6 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       viewer.createExtension(ViewModes);
       viewer.createExtension(VoxelDecisionSurfaceExtension);
 
-      // Notify parent that viewer is ready for extension access
-      onViewerReady?.(viewer);
-
       // Set up selection handling
       viewer.on(ViewerEvent.ObjectClicked, (selectionEvent: SelectionEvent | null) => {
         if (selectionEvent && selectionEvent.hits && selectionEvent.hits.length > 0) {
@@ -387,9 +384,13 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         await loadSpeckleObject(viewer, effectiveStreamId, effectiveObjectId);
         loadedObjectRef.current = objectKey;
         console.log('🟢 [BIM Viewer] loadObject resolved, starting render pass');
+        // Notify parent AFTER scene is fully loaded — extensions that call
+        // scene.add() need the post-loadObject scene, not the pre-load one.
+        onViewerReady?.(viewer);
       } else {
         await loadDemoContent(viewer);
         loadedObjectRef.current = null;
+        onViewerReady?.(viewer);
       }
 
       // Apply stakeholder-specific view settings
