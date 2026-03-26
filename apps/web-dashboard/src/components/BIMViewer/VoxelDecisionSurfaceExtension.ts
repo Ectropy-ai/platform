@@ -22,7 +22,7 @@
  * @module BIMViewer
  */
 
-import { Extension, type IViewer, ObjectLayers } from '@speckle/viewer';
+import { Extension, type IViewer } from '@speckle/viewer';
 import * as THREE from 'three';
 import type { VoxelData } from './VoxelTypes';
 
@@ -104,13 +104,10 @@ export class VoxelDecisionSurfaceExtension extends Extension {
       this._voxelData.length,
     );
 
-    /**
-     * THE FIX (DEC-008):
-     * Use layers.enable() to ADD overlay layer while keeping default layer 0.
-     * layers.set() would REPLACE all layers — camera must also have layer 4
-     * enabled. enable() is additive and works with the default camera.
-     */
-    this._mesh.layers.enable(ObjectLayers.OVERLAY);
+    // DEFAULT layer (0) — standard render pass the camera always processes.
+    // OVERLAY layer was incorrect: Speckle uses it for internal UI elements,
+    // not custom external meshes.
+    this._mesh.layers.set(0);
     this._mesh.visible = true;
 
     const matrix = new THREE.Matrix4();
@@ -132,19 +129,6 @@ export class VoxelDecisionSurfaceExtension extends Extension {
     if (this._mesh.instanceColor) this._mesh.instanceColor.needsUpdate = true;
 
     this.viewer.getRenderer().scene.add(this._mesh);
-
-    // Enable OVERLAY layer on the rendering camera so it renders our mesh.
-    // Speckle's camera only has DEFAULT layer enabled — objects on OVERLAY
-    // are culled unless the camera also has that layer enabled.
-    try {
-      const cam = (this.viewer as any).getRenderer?.()?.renderingCamera;
-      if (cam) cam.layers.enable(ObjectLayers.OVERLAY);
-    } catch (_) {}
-    try {
-      const cam = (this.viewer as any).cameraHandler?.activeCam?.camera;
-      if (cam) cam.layers.enable(ObjectLayers.OVERLAY);
-    } catch (_) {}
-
     this.viewer.requestRender();
   }
 }
