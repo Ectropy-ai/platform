@@ -593,9 +593,7 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
 
   // DEC-008: Get extension ref when viewer is ready
   const handleViewerReady = useCallback((viewer: IViewer) => {
-    const ext = viewer.getExtension(VoxelDecisionSurfaceExtension) as VoxelDecisionSurfaceExtension;
-    console.log('[DEC-008] handleViewerReady called, ext:', !!ext);
-    setVoxelExt(ext);
+    setVoxelExt(viewer.getExtension(VoxelDecisionSurfaceExtension) as VoxelDecisionSurfaceExtension);
   }, []);
 
   // DEC-008: Sync voxel data to extension when data loads/changes
