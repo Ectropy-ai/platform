@@ -210,10 +210,30 @@ jobs:
           echo "✅ Docker image built successfully"
           docker images | grep "${{ matrix.service }}"
 
-      - name: Log in to DOCR
-        run: doctl registry login --expiry-seconds 3600
+      - name: Log in to DOCR (with retry + verification)
+        run: |
+          # FIVE WHY (2026-03-26): doctl registry login intermittently exits 0
+          # but writes stale/invalid Docker credentials. Root cause: DO API token
+          # exchange returns cached credential. Fix: retry with verification.
+          for attempt in 1 2 3; do
+            echo "🔐 DOCR login attempt $attempt/3..."
+            doctl registry login --expiry-seconds 3600
 
-      - name: Push Docker image to DOCR
+            # Verify credentials are valid by pulling a manifest
+            if docker manifest inspect ${{ env.REGISTRY }}/web-dashboard:staging > /dev/null 2>&1; then
+              echo "✅ DOCR login verified (manifest inspect succeeded)"
+              break
+            else
+              echo "⚠️  DOCR login may be stale (manifest inspect failed), attempt $attempt"
+              if [ "$attempt" -eq 3 ]; then
+                echo "❌ DOCR login failed after 3 attempts"
+                exit 1
+              fi
+              sleep 5
+            fi
+          done
+
+      - name: Push Docker image to DOCR (with retry)
         run: |
           echo "📤 Pushing ${{ matrix.service }} images to DOCR..."
 
@@ -221,13 +241,26 @@ jobs:
           docker tag ${{ matrix.service }}:staging ${{ env.REGISTRY }}/${{ matrix.service }}:staging
           docker tag ${{ matrix.service }}:staging ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
 
-          # Push using default docker config (doctl registry login above)
-          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:staging
-          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
-
-          echo "✅ Images pushed to DOCR"
-          echo "  - ${{ env.REGISTRY }}/${{ matrix.service }}:staging"
-          echo "  - ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}"
+          # Push with retry — DOCR can transiently reject even valid credentials
+          for attempt in 1 2 3; do
+            echo "📤 Push attempt $attempt/3..."
+            if docker push ${{ env.REGISTRY }}/${{ matrix.service }}:staging && \
+               docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}; then
+              echo "✅ Images pushed to DOCR"
+              echo "  - ${{ env.REGISTRY }}/${{ matrix.service }}:staging"
+              echo "  - ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}"
+              break
+            else
+              echo "⚠️  Push failed on attempt $attempt"
+              if [ "$attempt" -eq 3 ]; then
+                echo "❌ Push failed after 3 attempts"
+                exit 1
+              fi
+              echo "🔐 Re-authenticating before retry..."
+              doctl registry login --expiry-seconds 3600
+              sleep 5
+            fi
+          done
 
   # =========================================================================
   # DOCR GARBAGE COLLECTION: Clean old images to prevent registry bloat
