@@ -362,6 +362,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       viewer.createExtension(VoxelDecisionSurfaceExtension);
 
       // Notify parent that viewer is ready for extension access
+      console.log('[DEC-008] onViewerReady firing, viewer:', !!viewer);
       onViewerReady?.(viewer);
 
       // Set up selection handling
