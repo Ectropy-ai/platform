@@ -22,7 +22,7 @@
  * @module BIMViewer
  */
 
-import { Extension, type IViewer } from '@speckle/viewer';
+import { Extension, type IViewer, ObjectLayers } from '@speckle/viewer';
 import * as THREE from 'three';
 import type { VoxelData } from './VoxelTypes';
 
@@ -104,10 +104,10 @@ export class VoxelDecisionSurfaceExtension extends Extension {
       this._voxelData.length,
     );
 
-    // DEFAULT layer (0) — standard render pass the camera always processes.
-    // OVERLAY layer was incorrect: Speckle uses it for internal UI elements,
-    // not custom external meshes.
-    this._mesh.layers.set(0);
+    // OVERLAY layer (4) — rendered by overlayPass in Speckle's DefaultPipeline.
+    // Layer 0 is ObjectLayers.NONE — no pipeline pass processes it.
+    // OVERLAY is the correct layer for custom content rendered on top of BIM.
+    this._mesh.layers.set(ObjectLayers.OVERLAY);
     this._mesh.visible = true;
 
     const matrix = new THREE.Matrix4();
