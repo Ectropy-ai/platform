@@ -131,14 +131,20 @@ export class VoxelDecisionSurfaceExtension extends Extension {
     this._mesh.instanceMatrix.needsUpdate = true;
     if (this._mesh.instanceColor) this._mesh.instanceColor.needsUpdate = true;
 
-    const scene = this.viewer.getRenderer().scene;
-    scene.add(this._mesh);
+    this.viewer.getRenderer().scene.add(this._mesh);
 
-    // TEMP: coordinate space diagnostic — compare voxel positions vs scene bounds
-    const sceneBounds = new THREE.Box3().setFromObject(scene);
-    console.log('[DEC-008 pos] voxel0:', JSON.stringify(this._voxelData[0]?.center),
-      'sceneBBox min:', JSON.stringify(sceneBounds.min), 'max:', JSON.stringify(sceneBounds.max),
-      'mesh.visible:', this._mesh.visible, 'mesh.layers.mask:', this._mesh.layers.mask);
+    // Enable OVERLAY layer on the rendering camera so it renders our mesh.
+    // Speckle's camera only has DEFAULT layer enabled — objects on OVERLAY
+    // are culled unless the camera also has that layer enabled.
+    try {
+      const cam = (this.viewer as any).getRenderer?.()?.renderingCamera;
+      if (cam) cam.layers.enable(ObjectLayers.OVERLAY);
+    } catch (_) {}
+    try {
+      const cam = (this.viewer as any).cameraHandler?.activeCam?.camera;
+      if (cam) cam.layers.enable(ObjectLayers.OVERLAY);
+    } catch (_) {}
+
     this.viewer.requestRender();
   }
 }
