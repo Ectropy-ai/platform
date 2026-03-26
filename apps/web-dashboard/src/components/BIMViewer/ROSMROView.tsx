@@ -593,11 +593,13 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
 
   // DEC-008: Get extension ref when viewer is ready
   const handleViewerReady = useCallback((viewer: IViewer) => {
+    console.log('[DEC-008 wiring] handleViewerReady called, ext:', viewer.getExtension(VoxelDecisionSurfaceExtension));
     setVoxelExt(viewer.getExtension(VoxelDecisionSurfaceExtension) as VoxelDecisionSurfaceExtension);
   }, []);
 
   // DEC-008: Sync voxel data to extension when data loads/changes
   useEffect(() => {
+    console.log('[DEC-008 wiring] updateVoxels effect firing, voxelExt:', !!voxelExt, 'voxels:', voxels?.length);
     if (!voxelExt || !voxels?.length) return;
     voxelExt.updateVoxels(voxels);
   }, [voxelExt, voxels]);

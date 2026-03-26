@@ -52,6 +52,7 @@ export class VoxelDecisionSurfaceExtension extends Extension {
    * Triggers a full InstancedMesh rebuild — O(n) where n = voxel count.
    */
   updateVoxels(voxels: VoxelData[]): void {
+    console.log('[DEC-008 ext] updateVoxels called, count:', voxels.length);
     this._voxelData = voxels;
     this._rebuildMesh();
   }
@@ -86,6 +87,7 @@ export class VoxelDecisionSurfaceExtension extends Extension {
 
   private _rebuildMesh(): void {
     this._clearMesh();
+    console.log('[DEC-008 ext] _rebuildMesh, renderer:', !!(this.viewer as any).getRenderer?.(), 'scene:', !!(this.viewer as any).getRenderer?.()?.scene, 'voxelData:', this._voxelData.length);
 
     if (!this._voxelData.length) return;
 
