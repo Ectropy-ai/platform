@@ -131,7 +131,14 @@ export class VoxelDecisionSurfaceExtension extends Extension {
     this._mesh.instanceMatrix.needsUpdate = true;
     if (this._mesh.instanceColor) this._mesh.instanceColor.needsUpdate = true;
 
-    this.viewer.getRenderer().scene.add(this._mesh);
+    const scene = this.viewer.getRenderer().scene;
+    scene.add(this._mesh);
+
+    // TEMP: coordinate space diagnostic — compare voxel positions vs scene bounds
+    const sceneBounds = new THREE.Box3().setFromObject(scene);
+    console.log('[DEC-008 pos] voxel0:', JSON.stringify(this._voxelData[0]?.center),
+      'sceneBBox min:', JSON.stringify(sceneBounds.min), 'max:', JSON.stringify(sceneBounds.max),
+      'mesh.visible:', this._mesh.visible, 'mesh.layers.mask:', this._mesh.layers.mask);
     this.viewer.requestRender();
   }
 }
