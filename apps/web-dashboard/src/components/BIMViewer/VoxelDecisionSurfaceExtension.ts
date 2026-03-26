@@ -45,6 +45,7 @@ export class VoxelDecisionSurfaceExtension extends Extension {
 
   constructor(viewer: IViewer) {
     super(viewer);
+    this._enabled = true;
   }
 
   /**
@@ -87,8 +88,6 @@ export class VoxelDecisionSurfaceExtension extends Extension {
   private _rebuildMesh(): void {
     this._clearMesh();
 
-    console.log('[DEC-008 _rebuildMesh] entry, voxelData:', this._voxelData?.length, 'isArray:', Array.isArray(this._voxelData), 'enabled:', this.enabled);
-
     if (!this._voxelData.length) return;
 
     const geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -105,8 +104,6 @@ export class VoxelDecisionSurfaceExtension extends Extension {
       material,
       this._voxelData.length,
     );
-
-    console.log('[DEC-008 _rebuildMesh] mesh created, count:', this._mesh.count, 'geometry:', !!geometry, 'material:', !!material);
 
     /**
      * THE FIX (DEC-008):
@@ -135,10 +132,7 @@ export class VoxelDecisionSurfaceExtension extends Extension {
     this._mesh.instanceMatrix.needsUpdate = true;
     if (this._mesh.instanceColor) this._mesh.instanceColor.needsUpdate = true;
 
-    const scene = this.viewer.getRenderer().scene;
-    scene.add(this._mesh);
-    console.log('[DEC-008 _rebuildMesh] added to scene, scene.children:', scene.children.length, 'mesh.layers.mask:', this._mesh.layers.mask, 'mesh.visible:', this._mesh.visible);
-
+    this.viewer.getRenderer().scene.add(this._mesh);
     this.viewer.requestRender();
   }
 }
