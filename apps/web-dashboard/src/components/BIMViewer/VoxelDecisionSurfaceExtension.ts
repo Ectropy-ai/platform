@@ -45,7 +45,6 @@ export class VoxelDecisionSurfaceExtension extends Extension {
 
   constructor(viewer: IViewer) {
     super(viewer);
-    this._enabled = true;
   }
 
   /**
@@ -112,7 +111,7 @@ export class VoxelDecisionSurfaceExtension extends Extension {
      * enabled. enable() is additive and works with the default camera.
      */
     this._mesh.layers.enable(ObjectLayers.OVERLAY);
-    this._mesh.visible = this.enabled;
+    this._mesh.visible = true;
 
     const matrix = new THREE.Matrix4();
     const position = new THREE.Vector3();
