@@ -285,6 +285,7 @@ model Project {
   start_date          DateTime?     @map("start_date") @db.Date
   expected_completion DateTime?     @map("expected_completion") @db.Date
   dao_address         String?       @map("dao_address") @db.VarChar(42)
+  seppa_context       Json?         @map("seppa_context") @db.JsonB
   created_at          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updated_at          DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
