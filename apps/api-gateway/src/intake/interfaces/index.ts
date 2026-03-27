@@ -11,3 +11,6 @@ export * from './intake-stage.interface';
 export type { SpacesClientConfig } from '../spaces-client';
 export { SpacesClient, SpacesClientError, SpacesKeyNotFoundError, spacesConfigFromEnv } from '../spaces-client';
 export { SpacesBundleLoader } from '../spaces-bundle-loader';
+export { IFCExtractionClient, IFCExtractionClientError, ifcExtractionConfigFromEnv } from '../ifc-extraction-client';
+export { ConsoleIntakeLogger, MockIntakeLogger } from '../intake-logger';
+export type { LogEntry } from '../intake-logger';
