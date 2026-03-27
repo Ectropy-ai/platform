@@ -1,0 +1,58 @@
+{
+  "project_id_ref": "test-project-id",
+  "takt_cycle_weeks": 2,
+  "zones": [
+    {
+      "zone_id": "Zone-A-L0",
+      "name": "Level 0 — Foundation",
+      "takt_week": 1,
+      "status": "COMPLETE",
+      "percent_complete": 100,
+      "z_range": { "min": -0.1, "max": 1.1 },
+      "x_range": null,
+      "y_range": null,
+      "actual_start": "2026-01-15",
+      "actual_end": "2026-02-28",
+      "trades": ["STRUCT"],
+      "predecessor_zones": []
+    },
+    {
+      "zone_id": "Zone-B-L1",
+      "name": "Level 1 — MEP",
+      "takt_week": 3,
+      "status": "IN_PROGRESS",
+      "percent_complete": 50,
+      "z_range": { "min": 1.1, "max": 2.1 },
+      "x_range": null,
+      "y_range": null,
+      "planned_start": "2026-02-20",
+      "trades": ["HVAC", "PLUMB", "ELEC"],
+      "predecessor_zones": ["Zone-A-L0"]
+    },
+    {
+      "zone_id": "Zone-B-L1-Clash",
+      "name": "Level 1 — Clash Cluster",
+      "takt_week": 3,
+      "status": "BLOCKED",
+      "percent_complete": 0,
+      "z_range": { "min": 1.4, "max": 1.9 },
+      "x_range": { "min": 1.5, "max": 3.5 },
+      "y_range": { "min": -1.5, "max": 1.5 },
+      "blocking_decision_ref": "HVAC-B3-CLASH-001",
+      "predecessor_zones": ["Zone-B-L1"]
+    },
+    {
+      "zone_id": "Zone-C-L2",
+      "name": "Level 2 — Framing",
+      "takt_week": 5,
+      "status": "PLANNED",
+      "percent_complete": 0,
+      "z_range": { "min": 2.1, "max": 3.2 },
+      "x_range": null,
+      "y_range": null,
+      "planned_start": "2026-03-20",
+      "trades": ["STRUCT"],
+      "predecessor_zones": ["Zone-B-L1"]
+    }
+  ]
+}

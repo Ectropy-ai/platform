@@ -14,3 +14,6 @@ export { SpacesBundleLoader } from '../spaces-bundle-loader';
 export { IFCExtractionClient, IFCExtractionClientError, ifcExtractionConfigFromEnv } from '../ifc-extraction-client';
 export { ConsoleIntakeLogger, MockIntakeLogger } from '../intake-logger';
 export type { LogEntry } from '../intake-logger';
+export { Stage5ContractTaktService } from '../stages/stage-5-contract-takt';
+export type { TaktSchedule, TaktZoneDef, VoxelStatus } from '../stages/takt-schedule.types';
+export { sortZonesBySpecificity, zoneSpecificity } from '../stages/takt-schedule.types';
