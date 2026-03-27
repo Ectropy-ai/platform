@@ -229,7 +229,6 @@ export class VoxelDecisionSurfaceExtension extends Extension {
       transparent: true,
       opacity: OVERLAY_OPACITY,
       depthTest: false, // render on top of BIM geometry
-      vertexColors: true,
     });
     (material as any).onBuild = () => {};
 
