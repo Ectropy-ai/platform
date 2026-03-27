@@ -46,7 +46,7 @@ export function createIntakeRoutes(): Router {
     asyncHandler(async (req: Request, res: Response): Promise<void> => {
       // Platform admin guard for session-based auth
       if (!req.apiKey && !req.user?.is_platform_admin) {
-        res.status(403).json(createResponse(false, 'Platform admin access required'));
+        res.status(403).json(createResponse.error('Platform admin access required'));
         return;
       }
 
@@ -54,7 +54,7 @@ export function createIntakeRoutes(): Router {
 
       if (!bundle_id || !bundle_version) {
         res.status(400).json(
-          createResponse(false, 'Missing required fields: bundle_id, bundle_version'),
+          createResponse.error('Missing required fields: bundle_id, bundle_version'),
         );
         return;
       }
@@ -111,14 +111,14 @@ export function createIntakeRoutes(): Router {
     apiKeyMiddleware.dualAuth(['provision_project', '*']),
     asyncHandler(async (req: Request, res: Response): Promise<void> => {
       if (!req.apiKey && !req.user?.is_platform_admin) {
-        res.status(403).json(createResponse(false, 'Platform admin access required'));
+        res.status(403).json(createResponse.error('Platform admin access required'));
         return;
       }
 
       const projectId = req.params.id;
 
       if (!projectId || !/^[0-9a-f-]{36}$/i.test(projectId)) {
-        res.status(400).json(createResponse(false, 'Invalid project ID'));
+        res.status(400).json(createResponse.error('Invalid project ID'));
         return;
       }
 
