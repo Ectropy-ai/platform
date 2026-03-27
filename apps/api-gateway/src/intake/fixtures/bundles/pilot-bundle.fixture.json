@@ -1,0 +1,36 @@
+{
+  "bundle_id": "inca-boardline-alberta",
+  "bundle_version": "1.0.0",
+  "bundle_type": "PILOT",
+  "schema_version": "1.0.0",
+  "created_at": "2026-03-27T00:00:00Z",
+  "created_by": "erik@luh.tech",
+  "tenant": {
+    "slug": "inca-boardline-alberta",
+    "name": "Inca Board Line Plant — Alberta",
+    "region": "TOR1",
+    "tier": "PILOT",
+    "pipeda_compliant": true
+  },
+  "project": {
+    "name": "Inca Board Line Plant — Alberta",
+    "type": "INDUSTRIAL",
+    "currency": "CAD"
+  },
+  "ifc": null,
+  "staff_ref": "project-bundles/inca-boardline-alberta/seed/staff.json",
+  "contract_ref": null,
+  "takt_ref": null,
+  "decisions_ref": null,
+  "pipeline_flags": {
+    "voxelize": false,
+    "apply_takt": false,
+    "seed_decisions": false,
+    "inject_seppa_context": true,
+    "precompute_ai_analysis": false,
+    "assign_demo_user": false
+  },
+  "metadata": {
+    "tags": ["industrial", "PILOT", "PIPEDA", "TOR1"]
+  }
+}

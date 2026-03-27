@@ -1,0 +1,36 @@
+{
+  "bundle_id": "ci-baseline",
+  "bundle_version": "1.0.0",
+  "bundle_type": "CI",
+  "schema_version": "1.0.0",
+  "created_at": "2026-03-27T00:00:00Z",
+  "created_by": "erik@luh.tech",
+  "tenant": {
+    "slug": "ci-test-tenant",
+    "name": "CI Test Tenant",
+    "region": "nyc3",
+    "tier": "CI",
+    "pipeda_compliant": false
+  },
+  "project": {
+    "name": "CI Baseline Project",
+    "type": "COMMERCIAL",
+    "currency": "CAD"
+  },
+  "ifc": null,
+  "staff_ref": "project-bundles/ci-baseline/seed/staff.json",
+  "contract_ref": null,
+  "takt_ref": "project-bundles/ci-baseline/seed/takt-simple.json",
+  "decisions_ref": "project-bundles/ci-baseline/seed/decisions.json",
+  "pipeline_flags": {
+    "voxelize": false,
+    "apply_takt": true,
+    "seed_decisions": true,
+    "inject_seppa_context": true,
+    "precompute_ai_analysis": false,
+    "assign_demo_user": false
+  },
+  "metadata": {
+    "tags": ["ci", "baseline", "fast"]
+  }
+}
