@@ -4,7 +4,7 @@
   "meta": {
     "ventureId": "ectropy",
     "ventureName": "Ectropy Platform",
-    "lastUpdated": "2026-03-07T14:50:00Z",
+    "lastUpdated": "2026-03-27T00:00:00Z",
     "author": "erik",
     "status": "active",
     "sourceDoc": ".roadmap/roadmap.json",
@@ -15,6 +15,21 @@
       "syncDirection": "v3-is-source-of-truth"
     },
     "schemaChangelog": [
+      {
+        "version": "3.1.3",
+        "date": "2026-03-27",
+        "changes": [
+          "TRUE-UP: meta.lastUpdated and metricsReporting.lastUpdated advanced to 2026-03-27",
+          "TRUE-UP: cicdHealth.foundationHealth marked unknown-pending-verification (was 'failing' 2026-03-07, not re-read)",
+          "TRUE-UP: Past-due keyMilestones (repo-split, prisma-n8n, graphql-api, mobile-voxel, pilot-ready, pilot-launch) annotated — status requires git/CI verification",
+          "TRUE-UP: repo-split milestone — split evidence confirmed (commits 81dab61, fe00494; ../Ectropy-Business exists)",
+          "ADD: features.box-architecture — DEC-009, BOX-ARCHITECTURE-2026-03-26.docx canonical",
+          "ADD: features.ifc-extraction-service — DEC-010, Stage 4 of Project Intake Pipeline",
+          "ADD: features.project-intake-pipeline — DEC-010, INTAKE-ARCHITECTURE-2026-03-27.md",
+          "UPDATE: p5b-d1 Multi-Format Ingestion status planned -> in-progress",
+          "Source: INTAKE-ARCHITECTURE-2026-03-27.md, BOX-ARCHITECTURE-2026-03-26.docx"
+        ]
+      },
       {
         "version": "3.0.0",
         "date": "2026-02-14",
@@ -37,7 +52,9 @@
       {
         "version": "2.0.0",
         "date": "2026-01-06",
-        "changes": ["Initial roadmap schema v2"]
+        "changes": [
+          "Initial roadmap schema v2"
+        ]
       },
       {
         "version": "2.3.0",
@@ -145,6 +162,22 @@
   },
   "features": [
     {
+      "id": "box-architecture",
+      "name": "BOX — BIM + BOM + VOX Spatial Decision Container",
+      "category": "data-platform",
+      "description": "The fundamental unit of construction intelligence. Convergence of BIM geometry, BOM materials, and VOX spatial decision surface into a single addressable 3D cell. Three resolution tiers: COARSE (100mm), STANDARD (40mm), FINE (10mm). Parent-child hierarchy with PostGIS spatial index. Canonical schema defined in BOX-ARCHITECTURE-2026-03-26.docx.",
+      "status": "in-progress",
+      "priority": 1,
+      "featureRef": ".roadmap/features/box-architecture/FEATURE.json",
+      "featureUrn": "urn:luhtech:ectropy:feature:box-architecture",
+      "specVersion": "1.0.0",
+      "decisionRef": "DEC-009",
+      "targetQuarter": "q1_2026",
+      "dependsOnFeatures": [
+        "urn:luhtech:ectropy:feature:foundation-layer"
+      ]
+    },
+    {
       "id": "closeout",
       "name": "Closeout Management",
       "category": "construction-ops",
@@ -187,11 +220,15 @@
       "featureRef": ".roadmap/features/decision-lifecycle/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:decision-lifecycle",
       "specVersion": "1.0.0",
-      "dependsOnFeatures": ["urn:luhtech:ectropy:feature:foundation-layer"],
+      "dependsOnFeatures": [
+        "urn:luhtech:ectropy:feature:foundation-layer"
+      ],
       "targetQuarter": "q1_2026",
       "completionMilestoneId": "pilot-ready",
       "milestoneUrn": "urn:luhtech:ectropy:milestone:pilot-ready",
-      "deliverableIds": ["p5b-decision-lifecycle"]
+      "deliverableIds": [
+        "p5b-decision-lifecycle"
+      ]
     },
     {
       "id": "dual-process-decision",
@@ -203,7 +240,9 @@
       "featureRef": ".roadmap/features/dual-process-decision/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:dual-process-decision",
       "specVersion": "1.0.0",
-      "dependsOnFeatures": ["urn:luhtech:ectropy:feature:decision-lifecycle"]
+      "dependsOnFeatures": [
+        "urn:luhtech:ectropy:feature:decision-lifecycle"
+      ]
     },
     {
       "id": "efas",
@@ -237,7 +276,25 @@
       "featureRef": ".roadmap/features/gaas-caas-paas/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:gaas-caas-paas",
       "specVersion": "1.0.0",
-      "dependsOnFeatures": ["urn:luhtech:ectropy:feature:foundation-layer"]
+      "dependsOnFeatures": [
+        "urn:luhtech:ectropy:feature:foundation-layer"
+      ]
+    },
+    {
+      "id": "ifc-extraction-service",
+      "name": "IFC Extraction Service",
+      "category": "data-platform",
+      "description": "Python/IfcOpenShell microservice that converts IFC files into structured ElementManifests. Extracts: IfcBuildingStorey levels and elevations, element bounding boxes, system type classification (ARCH/STRUCT/HVAC/PLUMB/ELEC/CIVIL), IFC GlobalIds. Output is cached in DO Spaces. Feeds Phase 2 BOX voxelization with real level names and system types.",
+      "status": "in-progress",
+      "priority": 1,
+      "featureRef": ".roadmap/features/ifc-extraction-service/FEATURE.json",
+      "featureUrn": "urn:luhtech:ectropy:feature:ifc-extraction-service",
+      "specVersion": "1.0.0",
+      "decisionRef": "DEC-010",
+      "targetQuarter": "q1_2026",
+      "dependsOnFeatures": [
+        "urn:luhtech:ectropy:feature:box-architecture"
+      ]
     },
     {
       "id": "ipd-governance",
@@ -260,8 +317,27 @@
       "featureRef": ".roadmap/features/multi-tenant-foundation/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:multi-tenant-foundation",
       "specVersion": "1.0.0",
-      "dependsOnFeatures": ["urn:luhtech:ectropy:feature:foundation-layer"],
-      "deliverableIds": ["p5b-d6"]
+      "dependsOnFeatures": [
+        "urn:luhtech:ectropy:feature:foundation-layer"
+      ],
+      "deliverableIds": [
+        "p5b-d6"
+      ]
+    },
+    {
+      "id": "phone-agent",
+      "name": "Phone Agent System",
+      "category": "ai-ml",
+      "description": "Zero-friction field data capture via SMS/voice using Twilio + Claude integration",
+      "status": "planned",
+      "priority": 2,
+      "featureRef": ".roadmap/features/eil/phone-agent/FEATURE.json",
+      "featureUrn": "urn:luhtech:ectropy:feature:phone-agent",
+      "specVersion": "1.0.0",
+      "targetQuarter": "q1_2026",
+      "deliverableIds": [
+        "p5b-d10"
+      ]
     },
     {
       "id": "platform-agent",
@@ -275,6 +351,24 @@
       "specVersion": "1.0.0"
     },
     {
+      "id": "project-intake-pipeline",
+      "name": "Project Intake Pipeline",
+      "category": "infrastructure",
+      "description": "Seven-stage pipeline (Tenant > Project > Team > IFC Ingestion > Contract+Takt > Decisions > SEPPA Context) driven by versioned bundle descriptors stored in DO Spaces. Three bundle types: DEMO (full pipeline), PILOT (stages 1-3+7), CI (fast baseline <60s). Replaces all direct DB seed scripts. The demo is the first customer — same code path as pilot provisioning.",
+      "status": "in-progress",
+      "priority": 1,
+      "featureRef": ".roadmap/features/project-intake-pipeline/FEATURE.json",
+      "featureUrn": "urn:luhtech:ectropy:feature:project-intake-pipeline",
+      "specVersion": "1.0.0",
+      "decisionRef": "DEC-010",
+      "targetQuarter": "q1_2026",
+      "dependsOnFeatures": [
+        "urn:luhtech:ectropy:feature:box-architecture",
+        "urn:luhtech:ectropy:feature:ifc-extraction-service",
+        "urn:luhtech:ectropy:feature:multi-tenant-foundation"
+      ]
+    },
+    {
       "id": "punch-list",
       "name": "Punch List Management",
       "category": "construction-ops",
@@ -283,6 +377,17 @@
       "priority": 2,
       "featureRef": ".roadmap/features/punch-list/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:punch-list",
+      "specVersion": "1.0.0"
+    },
+    {
+      "id": "rag-layer",
+      "name": "RAG Layer",
+      "category": "ai-ml",
+      "description": "Retrieval-Augmented Generation layer for construction document intelligence",
+      "status": "planned",
+      "priority": 2,
+      "featureRef": ".roadmap/features/eil/rag-layer/FEATURE.json",
+      "featureUrn": "urn:luhtech:ectropy:feature:rag-layer",
       "specVersion": "1.0.0"
     },
     {
@@ -295,6 +400,21 @@
       "featureRef": ".roadmap/features/ros-mro/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:ros-mro",
       "specVersion": "1.0.0"
+    },
+    {
+      "id": "seppa-agent",
+      "name": "Seppa Construction Intelligence Agent",
+      "category": "ai-ml",
+      "description": "AI-powered construction intelligence agent with Claude API, RAG, and multi-channel access",
+      "status": "planned",
+      "priority": 2,
+      "featureRef": ".roadmap/features/eil/seppa-agent/FEATURE.json",
+      "featureUrn": "urn:luhtech:ectropy:feature:seppa-agent",
+      "specVersion": "1.0.0",
+      "dependsOnFeatures": [
+        "urn:luhtech:ectropy:feature:rag-layer",
+        "urn:luhtech:ectropy:feature:phone-agent"
+      ]
     },
     {
       "id": "siltana",
@@ -331,45 +451,6 @@
       "featureRef": ".roadmap/features/warranty-operations/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:warranty-operations",
       "specVersion": "1.0.0"
-    },
-    {
-      "id": "phone-agent",
-      "name": "Phone Agent System",
-      "category": "ai-ml",
-      "description": "Zero-friction field data capture via SMS/voice using Twilio + Claude integration",
-      "status": "planned",
-      "priority": 2,
-      "featureRef": ".roadmap/features/eil/phone-agent/FEATURE.json",
-      "featureUrn": "urn:luhtech:ectropy:feature:phone-agent",
-      "specVersion": "1.0.0",
-      "targetQuarter": "q1_2026",
-      "deliverableIds": ["p5b-d10"]
-    },
-    {
-      "id": "rag-layer",
-      "name": "RAG Layer",
-      "category": "ai-ml",
-      "description": "Retrieval-Augmented Generation layer for construction document intelligence",
-      "status": "planned",
-      "priority": 2,
-      "featureRef": ".roadmap/features/eil/rag-layer/FEATURE.json",
-      "featureUrn": "urn:luhtech:ectropy:feature:rag-layer",
-      "specVersion": "1.0.0"
-    },
-    {
-      "id": "seppa-agent",
-      "name": "Seppa Construction Intelligence Agent",
-      "category": "ai-ml",
-      "description": "AI-powered construction intelligence agent with Claude API, RAG, and multi-channel access",
-      "status": "planned",
-      "priority": 2,
-      "featureRef": ".roadmap/features/eil/seppa-agent/FEATURE.json",
-      "featureUrn": "urn:luhtech:ectropy:feature:seppa-agent",
-      "specVersion": "1.0.0",
-      "dependsOnFeatures": [
-        "urn:luhtech:ectropy:feature:rag-layer",
-        "urn:luhtech:ectropy:feature:phone-agent"
-      ]
     }
   ],
   "flagshipFeatures": [
@@ -395,8 +476,8 @@
     }
   ],
   "metricsReporting": {
-    "lastUpdated": "2026-03-07T14:50:00Z",
-    "sourceDocument": ".roadmap/state-audit-20260307.json",
+    "lastUpdated": "2026-03-27T00:00:00Z",
+    "sourceDocument": ".roadmap/INTAKE-ARCHITECTURE-2026-03-27.md",
     "testCoverage": {
       "overall": 14.2,
       "e2e": 100.0,
@@ -440,14 +521,15 @@
       "deploymentStatus": "production-deploying"
     },
     "cicdHealth": {
-      "foundationHealth": "failing",
+      "foundationHealth": "unknown-pending-verification",
       "e2eStaging": "unknown",
       "e2eSmoke": "passing",
       "securityAudit": "passing",
       "buildProduction": "passing",
       "terraformDrift": "passing",
       "lastWorkflowRun": "2026-03-07T14:21:25Z",
-      "workflowRunId": "22800719990"
+      "workflowRunId": "22800719990",
+      "verificationNote": "Status was 'failing' on 2026-03-07. Not re-read 2026-03-27. Rerun CI to confirm."
     },
     "blockers": {
       "p0": [],
@@ -661,7 +743,9 @@
     "q4_2025": {
       "focus": "Demo Readiness & Foundation",
       "theme": "Complete Phase 5a - BIM viewer, OAuth, landing page operational for partner demo",
-      "phases": ["Phase 5a completion"],
+      "phases": [
+        "Phase 5a completion"
+      ],
       "status": "complete",
       "milestones": [
         {
@@ -764,7 +848,10 @@
     "q1_2026": {
       "focus": "Repository Split + Pilot Preparation",
       "theme": "Phase 5b - Multi-format ingestion, phone agents, multi-tenant RLS for Canadian pilot",
-      "phases": ["Phase 5a completion", "Phase 5b start"],
+      "phases": [
+        "Phase 5a completion",
+        "Phase 5b start"
+      ],
       "status": "active",
       "milestones": [
         {
@@ -857,8 +944,9 @@
           "id": "p5b-d1",
           "name": "Multi-Format Ingestion (IFC, RVT, STP, OBJ)",
           "owner": "erik",
-          "status": "planned",
-          "hours": 160
+          "status": "in-progress",
+          "hours": 160,
+          "note": "IFC Extraction Service in active design as of 2026-03-27. See DEC-010 and INTAKE-ARCHITECTURE-2026-03-27.md."
         },
         {
           "id": "p5b-d6",
@@ -920,7 +1008,9 @@
     "q2_2026": {
       "focus": "Validation + Pre-Seed",
       "theme": "Prove forecasting accuracy with pilot data, close pre-seed funding round",
-      "phases": ["Phase 5b completion"],
+      "phases": [
+        "Phase 5b completion"
+      ],
       "status": "planned",
       "milestones": [
         {
@@ -1002,7 +1092,9 @@
     "q3_2026": {
       "focus": "Public Launch & SaaS",
       "theme": "Open-source announcement, SaaS operations begin",
-      "phases": ["Phase 6 start"],
+      "phases": [
+        "Phase 6 start"
+      ],
       "status": "planned",
       "milestones": [
         {
@@ -1067,7 +1159,9 @@
     "q4_2026": {
       "focus": "Scale & AR POC",
       "theme": "10-20 paying customers, AR proof of concept",
-      "phases": ["Phase 6 continuation"],
+      "phases": [
+        "Phase 6 continuation"
+      ],
       "status": "planned",
       "milestones": [
         {
@@ -1255,7 +1349,8 @@
           "urn:luhtech:qullqa:milestone:fork-ready"
         ]
       },
-      "note": "LEAD milestone - changes cascade to 2 downstream ventures (JobsiteControl, Qullqa). Requires L4 (Architect) authority to modify. Viiva removed: launches standalone Phase 1, Ectropy integration is Phase 6."
+      "note": "LEAD milestone - changes cascade to 2 downstream ventures (JobsiteControl, Qullqa). Requires L4 (Architect) authority to modify. Viiva removed: launches standalone Phase 1, Ectropy integration is Phase 6. | PAST DUE as of 2026-03-27. Status requires CI/git verification before marking complete.",
+      "splitEvidence": "CONFIRMED — git commits 81dab61 (remove console — moved to Ectropy-Business, DEC-002) and fe00494 (resolve DEC-002). Directory ../Ectropy-Business exists locally (last modified 2026-03-17). Repos ectropy-ai/platform and luh-tech/Ectropy-Business both exist."
     },
     {
       "id": "prisma-n8n",
@@ -1276,7 +1371,8 @@
           }
         ],
         "successors": []
-      }
+      },
+      "note": "PAST DUE as of 2026-03-27. Status requires CI/git verification before marking complete."
     },
     {
       "id": "graphql-api",
@@ -1297,7 +1393,8 @@
           }
         ],
         "successors": []
-      }
+      },
+      "note": "PAST DUE as of 2026-03-27. Status requires CI/git verification before marking complete."
     },
     {
       "id": "mobile-voxel",
@@ -1319,7 +1416,8 @@
           }
         ],
         "successors": []
-      }
+      },
+      "note": "PAST DUE as of 2026-03-27. Status requires CI/git verification before marking complete."
     },
     {
       "id": "pilot-ready",
@@ -1341,7 +1439,8 @@
           }
         ],
         "successors": []
-      }
+      },
+      "note": "PAST DUE as of 2026-03-27. Status requires CI/git verification before marking complete."
     },
     {
       "id": "pilot-launch",
@@ -1366,7 +1465,7 @@
         ],
         "successors": []
       },
-      "note": "EXTERNAL milestone - date set by pilot partner. Requires L5 (Owner) authority to modify. Adjusted to mid-March to accommodate Feb 28 repo split."
+      "note": "EXTERNAL milestone - date set by pilot partner. Requires L5 (Owner) authority to modify. Adjusted to mid-March to accommodate Feb 28 repo split. | PAST DUE as of 2026-03-27. Status requires CI/git verification before marking complete."
     },
     {
       "id": "pilot-validation",
