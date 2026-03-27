@@ -231,6 +231,7 @@ export class VoxelDecisionSurfaceExtension extends Extension {
       depthTest: false, // render on top of BIM geometry
       vertexColors: true,
     });
+    (material as any).onBuild = () => {};
 
     this._mesh = new THREE.InstancedMesh(
       geometry,
