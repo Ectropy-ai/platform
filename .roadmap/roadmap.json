@@ -294,7 +294,20 @@
       "targetQuarter": "q1_2026",
       "dependsOnFeatures": [
         "urn:luhtech:ectropy:feature:box-architecture"
-      ]
+      ],
+      "serviceRepo": "luh-tech/Ectropy-Business",
+      "servicePort": 4010,
+      "reusedBy": [
+        "ectropy",
+        "jobsitecontrol",
+        "qullqa",
+        "viiva",
+        "siltana"
+      ],
+      "clientRepo": "ectropy-ai/platform",
+      "clientPath": "apps/api-gateway/src/intake/ifc-extraction-client.ts",
+      "halfBStatus": "NOT_STARTED",
+      "halfBNotes": "Python FastAPI + IfcOpenShell. Dockerfile + service registration in luh-tech/Ectropy-Business. See INTAKE-ARCHITECTURE-2026-03-27.md Part III."
     },
     {
       "id": "ipd-governance",
