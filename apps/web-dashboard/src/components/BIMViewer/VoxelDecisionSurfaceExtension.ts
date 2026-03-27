@@ -150,7 +150,23 @@ export class VoxelDecisionSurfaceExtension extends Extension {
       return;
     }
 
-    console.log(`[BOX] Starting BOX generation for project ${projectId}`);
+    // Idempotency: BOX cells are permanent records in pm_voxels.
+    // Only generate if none exist for this project yet.
+    try {
+      const check = await fetch(`/api/v1/projects/${projectId}/voxels?limit=1`);
+      if (check.ok) {
+        const data = await check.json();
+        const total = data.total ?? data.voxels?.length ?? 0;
+        if (total > 0) {
+          console.log(`[BOX] ${total} cells exist — skipping generation`);
+          return;
+        }
+      }
+    } catch {
+      // If check fails, proceed with generation attempt
+    }
+
+    console.log(`[BOX] No BOX cells found — generating from WorldTree...`);
     const elements = this.extractElementsFromWorldTree();
     if (!elements.length) {
       console.warn('[BOX] No elements extracted — aborting');

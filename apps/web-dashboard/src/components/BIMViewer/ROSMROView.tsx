@@ -591,6 +591,10 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
   // M6: SEPPA AI Assistant state
   const [seppaOpen, setSeppaOpen] = useState(false);
 
+  // DEC-009: Ref for projectId to avoid stale closure in handleViewerReady
+  const projectIdRef = React.useRef(projectId);
+  projectIdRef.current = projectId;
+
   // DEC-008: Get extension ref when viewer is ready
   // DEC-009: Trigger BOX generation after model load
   const handleViewerReady = useCallback((viewer: IViewer) => {
@@ -598,8 +602,9 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
     const ext = viewer.getExtension(VoxelDecisionSurfaceExtension) as VoxelDecisionSurfaceExtension;
     setVoxelExt(ext);
     // DEC-009: Generate BOX cells from WorldTree after model load completes
-    if (ext) {
-      ext.generateAndPersistBoxes(projectId).catch((err: unknown) => {
+    const pid = projectIdRef.current;
+    if (ext && pid) {
+      ext.generateAndPersistBoxes(pid).catch((err: unknown) => {
         console.error('[BOX] generateAndPersistBoxes failed:', err);
       });
     }
