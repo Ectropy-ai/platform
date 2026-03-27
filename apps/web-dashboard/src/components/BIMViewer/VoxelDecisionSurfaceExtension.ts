@@ -144,12 +144,9 @@ export class VoxelDecisionSurfaceExtension extends Extension {
    * Server runs VoxelDecompositionService, writes voxel_grids + pm_voxels.
    * BOX = BIM + BOM + VOX. DEC-009 BOX Pipeline Phase 1.
    */
-  async generateAndPersistBoxes(): Promise<void> {
-    const segs = window.location.pathname.split('/');
-    const idx = segs.findIndex((s) => s === 'projects');
-    const projectId = idx >= 0 ? segs[idx + 1] : null;
+  async generateAndPersistBoxes(projectId: string): Promise<void> {
     if (!projectId?.match(/^[0-9a-f-]{36}$/)) {
-      console.warn('[BOX] Cannot extract projectId from URL:', window.location.pathname);
+      console.warn('[BOX] Invalid projectId:', projectId);
       return;
     }
 

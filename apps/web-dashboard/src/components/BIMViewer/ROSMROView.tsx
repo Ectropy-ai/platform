@@ -599,7 +599,7 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
     setVoxelExt(ext);
     // DEC-009: Generate BOX cells from WorldTree after model load completes
     if (ext) {
-      ext.generateAndPersistBoxes().catch((err: unknown) => {
+      ext.generateAndPersistBoxes(projectId).catch((err: unknown) => {
         console.error('[BOX] generateAndPersistBoxes failed:', err);
       });
     }
