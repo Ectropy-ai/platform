@@ -17,3 +17,5 @@ export type { LogEntry } from '../intake-logger';
 export { Stage5ContractTaktService } from '../stages/stage-5-contract-takt';
 export type { TaktSchedule, TaktZoneDef, VoxelStatus } from '../stages/takt-schedule.types';
 export { sortZonesBySpecificity, zoneSpecificity } from '../stages/takt-schedule.types';
+export { Stage6DecisionService } from '../stages/stage-6-decisions';
+export type { DecisionDef, DecisionSeedFile, AIAnalysis, ClashLocation } from '../stages/decision-seed.types';
