@@ -20,3 +20,5 @@ export { sortZonesBySpecificity, zoneSpecificity } from '../stages/takt-schedule
 export { Stage6DecisionService } from '../stages/stage-6-decisions';
 export type { DecisionDef, DecisionSeedFile, AIAnalysis, ClashLocation } from '../stages/decision-seed.types';
 export { Stage7SeppaContextService } from '../stages/stage-7-seppa-context';
+export { IntakePipeline, refreshSeppaContext } from '../intake-pipeline';
+export type { PipelineResult, PipelineOptions, PipelineStageOutcome } from '../intake-pipeline';
