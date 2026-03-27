@@ -39,6 +39,18 @@ const STATUS_COLORS_HEX: Record<string, number> = {
 const DEFAULT_COLOR = 0x888888;
 const OVERLAY_OPACITY = 0.7;
 
+/** Element sent to POST /projects/:id/voxels/generate. DEC-009 BOX. */
+interface VoxelIFCElement {
+  globalId: string;
+  type: string;
+  containedInStorey: string;
+  materials: never[];
+  boundingBox: {
+    min: { x: number; y: number; z: number };
+    max: { x: number; y: number; z: number };
+  };
+}
+
 export class VoxelDecisionSurfaceExtension extends Extension {
   private _mesh: THREE.InstancedMesh | null = null;
   private _voxelData: VoxelData[] = [];
@@ -74,6 +86,113 @@ export class VoxelDecisionSurfaceExtension extends Extension {
   }
 
   onRender(): void {}
+
+  // ─── DEC-009 BOX Pipeline ────────────────────────────────────────────────
+
+  /**
+   * Extract element bounding boxes from the renderer batch objects.
+   * Uses renderer.getObjects() → BatchObject[].aabb (world-space, meters).
+   *
+   * API note: getWorldTree() is minified away in @speckle/viewer 2.28.0.
+   * renderer.getObjects() is the confirmed working path.
+   * DEC-009 BOX Pipeline Phase 1.
+   */
+  private extractElementsFromWorldTree(): VoxelIFCElement[] {
+    const renderer = (this.viewer as any).getRenderer?.();
+    if (!renderer) {
+      console.warn('[BOX] No renderer available');
+      return [];
+    }
+
+    const batchObjects: any[] = renderer.getObjects?.() ?? [];
+    console.log(`[BOX] Batch objects from renderer: ${batchObjects.length}`);
+
+    const elements: VoxelIFCElement[] = [];
+    let nullCount = 0;
+
+    for (const bObj of batchObjects) {
+      const b = bObj?.aabb;
+      if (!b) { nullCount++; continue; }
+
+      // Guard: reject infinite or zero-volume boxes
+      if (
+        !isFinite(b.min?.x) || !isFinite(b.max?.x) ||
+        (b.min.x === b.max.x && b.min.y === b.max.y && b.min.z === b.max.z)
+      ) { nullCount++; continue; }
+
+      // Extract identity from renderView.renderData (confirmed in Speckle source)
+      const rd = bObj?.renderView?.renderData ?? {};
+
+      elements.push({
+        globalId: rd?.id ?? `gen-${elements.length}`,
+        type: 'Objects.BuiltElements.Unknown', // speckleType is enum, not string — Phase 2
+        containedInStorey: 'Unknown', // Not on renderData — Phase 2 via WorldTree
+        materials: [],
+        boundingBox: {
+          min: { x: b.min.x, y: b.min.y, z: b.min.z },
+          max: { x: b.max.x, y: b.max.y, z: b.max.z },
+        },
+      });
+    }
+
+    console.log(`[BOX] Extracted ${elements.length} elements, skipped ${nullCount}`);
+    return elements;
+  }
+
+  /**
+   * Send WorldTree elements to the server-side generate route.
+   * Server runs VoxelDecompositionService, writes voxel_grids + pm_voxels.
+   * BOX = BIM + BOM + VOX. DEC-009 BOX Pipeline Phase 1.
+   */
+  async generateAndPersistBoxes(): Promise<void> {
+    const segs = window.location.pathname.split('/');
+    const idx = segs.findIndex((s) => s === 'projects');
+    const projectId = idx >= 0 ? segs[idx + 1] : null;
+    if (!projectId?.match(/^[0-9a-f-]{36}$/)) {
+      console.warn('[BOX] Cannot extract projectId from URL:', window.location.pathname);
+      return;
+    }
+
+    console.log(`[BOX] Starting BOX generation for project ${projectId}`);
+    const elements = this.extractElementsFromWorldTree();
+    if (!elements.length) {
+      console.warn('[BOX] No elements extracted — aborting');
+      return;
+    }
+
+    // Convert bboxes from meters (aabb) to millimeters (engine expects mm)
+    const M_TO_MM = 1000;
+    const mmElements = elements.map((e) => ({
+      ...e,
+      boundingBox: {
+        min: { x: e.boundingBox.min.x * M_TO_MM, y: e.boundingBox.min.y * M_TO_MM, z: e.boundingBox.min.z * M_TO_MM },
+        max: { x: e.boundingBox.max.x * M_TO_MM, y: e.boundingBox.max.y * M_TO_MM, z: e.boundingBox.max.z * M_TO_MM },
+      },
+    }));
+
+    console.log(`[BOX] Sending ${mmElements.length} elements to generate route (mm)...`);
+    const resp = await fetch(
+      `/api/v1/projects/${projectId}/voxels/generate`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          elements: mmElements,
+          resolution: 100, // COARSE = 100mm
+          streamId: '302d48b34c',
+          objectId: '0fa195cea220c7192c7579678af64b5f',
+        }),
+      },
+    );
+
+    if (!resp.ok) {
+      console.error(`[BOX] Generate route failed: ${resp.status}`, await resp.text());
+      return;
+    }
+
+    const { gridId, voxelCount } = await resp.json();
+    console.log(`[BOX] Complete — gridId: ${gridId}, voxelCount: ${voxelCount}`);
+  }
 
   // ─── Private ──────────────────────────────────────────────────────────────
 

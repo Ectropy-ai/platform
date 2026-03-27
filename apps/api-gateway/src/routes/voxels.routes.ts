@@ -111,6 +111,134 @@ interface VoxelStatusHistoryEntry {
 }
 
 // ============================================================================
+// BOX RASTERIZER (inlined) — DEC-009 SEPPA Stage S
+// Source: apps/mcp-server/src/services/voxel-decomposition.service.ts:395-560
+// Inlined: cross-app import fails in Docker production container —
+// api-gateway dist/ does not include mcp-server/.
+// ============================================================================
+
+interface BoxBBox {
+  min: { x: number; y: number; z: number };
+  max: { x: number; y: number; z: number };
+}
+interface BoxElement {
+  globalId: string;
+  type: string;
+  containedInStorey: string;
+  boundingBox: BoxBBox;
+}
+interface BoxCell {
+  center: { x: number; y: number; z: number };
+  bounds: BoxBBox;
+  system: string;
+  level: string;
+  ifcElements: string[];
+}
+
+function classifySystem(entityType: string): string {
+  const t = entityType.toLowerCase();
+  if (t.includes('pipe') || t.includes('plumb') || t.includes('sanitary')) return 'PLUMB';
+  if (t.includes('elec') || t.includes('light') || t.includes('cable')) return 'ELEC';
+  if (t.includes('hvac') || t.includes('duct') || t.includes('air') || t.includes('ventil')) return 'HVAC';
+  if (t.includes('sprinkler') || t.includes('fire') || t.includes('alarm')) return 'FIRE';
+  if (t.includes('column') || t.includes('beam') || t.includes('slab') || t.includes('foundation')) return 'STRUCT';
+  if (t.includes('wall') || t.includes('door') || t.includes('window') || t.includes('stair')) return 'ARCH';
+  return 'UNK';
+}
+
+/**
+ * Conservative AABB voxelization. Input coordinates in millimeters.
+ * Output center/bounds also in millimeters (caller applies MM_TO_M).
+ */
+function rasterizeElements(
+  elements: BoxElement[],
+  resolution: number,
+): { voxels: BoxCell[] } {
+  let gMinX = Infinity, gMinY = Infinity, gMinZ = Infinity;
+  let gMaxX = -Infinity, gMaxY = -Infinity, gMaxZ = -Infinity;
+
+  for (const el of elements) {
+    if (!el.boundingBox) continue;
+    const { min, max } = el.boundingBox;
+    gMinX = Math.min(gMinX, min.x); gMinY = Math.min(gMinY, min.y); gMinZ = Math.min(gMinZ, min.z);
+    gMaxX = Math.max(gMaxX, max.x); gMaxY = Math.max(gMaxY, max.y); gMaxZ = Math.max(gMaxZ, max.z);
+  }
+
+  // Padding
+  const pad = resolution * 2;
+  gMinX -= pad; gMinY -= pad; gMinZ -= pad;
+  gMaxX += pad; gMaxY += pad; gMaxZ += pad;
+
+  // Safety: cap total grid cells to prevent stack overflow.
+  // At 100mm (COARSE), a 90m building = 900 cells per axis.
+  // Phase 1 cap: 500K total cells max. If exceeded, increase resolution.
+  const MAX_CELLS = 500_000;
+  let effectiveRes = resolution;
+  const xSteps = Math.ceil((gMaxX - gMinX) / effectiveRes);
+  const ySteps = Math.ceil((gMaxY - gMinY) / effectiveRes);
+  const zSteps = Math.ceil((gMaxZ - gMinZ) / effectiveRes);
+  const estimatedCells = xSteps * ySteps * zSteps;
+  if (estimatedCells > MAX_CELLS) {
+    // Auto-coarsen: find the minimum resolution that fits under cap
+    const volume = (gMaxX - gMinX) * (gMaxY - gMinY) * (gMaxZ - gMinZ);
+    effectiveRes = Math.cbrt(volume / MAX_CELLS);
+    console.log(`[BOX:rasterizer] Auto-coarsened: ${resolution}mm → ${Math.round(effectiveRes)}mm (estimated ${estimatedCells} cells > ${MAX_CELLS} cap)`);
+  }
+  // Use effectiveRes from here
+  const res = effectiveRes;
+
+  // Track occupied cells and their contributing element IDs
+  const cellMap = new Map<string, Set<string>>();
+
+  for (const el of elements) {
+    if (!el.boundingBox) continue;
+    const { min, max } = el.boundingBox;
+    const i0 = Math.floor((min.x - gMinX) / res);
+    const i1 = Math.ceil((max.x - gMinX) / res);
+    const j0 = Math.floor((min.y - gMinY) / res);
+    const j1 = Math.ceil((max.y - gMinY) / res);
+    const k0 = Math.floor((min.z - gMinZ) / res);
+    const k1 = Math.ceil((max.z - gMinZ) / res);
+
+    for (let i = i0; i <= i1; i++) {
+      for (let j = j0; j <= j1; j++) {
+        for (let k = k0; k <= k1; k++) {
+          const key = `${i},${j},${k}`;
+          if (!cellMap.has(key)) cellMap.set(key, new Set());
+          cellMap.get(key)!.add(el.globalId);
+        }
+      }
+    }
+  }
+
+  // Convert occupied cells to BoxCell array
+  const voxels: BoxCell[] = [];
+  for (const [key, ids] of cellMap.entries()) {
+    const [i, j, k] = key.split(',').map(Number);
+    const primaryId = ids.values().next().value!;
+    const primaryEl = elements.find(e => e.globalId === primaryId);
+    if (!primaryEl) continue;
+
+    voxels.push({
+      center: {
+        x: gMinX + (i + 0.5) * res,
+        y: gMinY + (j + 0.5) * res,
+        z: gMinZ + (k + 0.5) * res,
+      },
+      bounds: {
+        min: { x: gMinX + i * res, y: gMinY + j * res, z: gMinZ + k * res },
+        max: { x: gMinX + (i + 1) * res, y: gMinY + (j + 1) * res, z: gMinZ + (k + 1) * res },
+      },
+      system: classifySystem(primaryEl.type),
+      level: primaryEl.containedInStorey || 'Unknown',
+      ifcElements: [...ids],
+    });
+  }
+
+  return { voxels };
+}
+
+// ============================================================================
 // ROUTES CLASS
 // ============================================================================
 
@@ -558,6 +686,124 @@ export class VoxelRoutes {
         });
 
         res.json(results);
+      })
+    );
+
+    // ========================================================================
+    // POST /projects/:projectId/voxels/generate
+    // DEC-009 SEPPA Stage S — BOX Pipeline Phase 1 (Path C: server-side)
+    //
+    // Browser sends IFC element bounding boxes extracted from WorldTree.
+    // Server runs VoxelDecompositionService → voxel_grids + pm_voxels.
+    // Returns { gridId, voxelCount, resolutionTier }.
+    // ========================================================================
+    this.router.post(
+      '/projects/:projectId/voxels/generate',
+      asyncHandler(async (req: Request, res: Response, _next: NextFunction) => {
+        const projectId = req.params['projectId'];
+        const {
+          elements,
+          resolution = 100,
+          streamId = '',
+          objectId,
+        } = req.body as {
+          elements: Array<{
+            globalId: string;
+            type: string;
+            containedInStorey: string;
+            materials: never[];
+            boundingBox: {
+              min: { x: number; y: number; z: number };
+              max: { x: number; y: number; z: number };
+            };
+          }>;
+          resolution?: number;
+          streamId?: string;
+          objectId?: string;
+        };
+
+        if (!projectId || !elements?.length) {
+          throw new AppError('projectId and elements[] required', 400);
+        }
+
+        logger.info(`[BOX:generate] ${elements.length} elements, res=${resolution}mm, project=${projectId}`);
+
+        // Rasterize using inlined conservative AABB algorithm
+        const result = rasterizeElements(elements, resolution);
+
+        if (!result?.voxels?.length) {
+          throw new AppError('Engine produced 0 voxels', 422);
+        }
+
+        const vs = result.voxels;
+        const MM = 0.001; // engine mm → DB meters
+
+        // Create voxel_grids record (not in Prisma — raw SQL)
+        const gridResult = await this.db.query(
+          `INSERT INTO voxel_grids
+             (project_id, stream_id, object_id, resolution, resolution_tier,
+              source_type, status, voxel_count,
+              bbox_min_x, bbox_max_x, bbox_min_y, bbox_max_y, bbox_min_z, bbox_max_z,
+              generated_at)
+           VALUES ($1,$2,$3,$4,'COARSE','BIM','COMPLETE',$5,$6,$7,$8,$9,$10,$11,NOW())
+           RETURNING id`,
+          [
+            projectId, streamId, objectId ?? null,
+            resolution * MM, vs.length,
+            Math.min(...vs.map((v: any) => v.bounds.min.x)) * MM,
+            Math.max(...vs.map((v: any) => v.bounds.max.x)) * MM,
+            Math.min(...vs.map((v: any) => v.bounds.min.y)) * MM,
+            Math.max(...vs.map((v: any) => v.bounds.max.y)) * MM,
+            Math.min(...vs.map((v: any) => v.bounds.min.z)) * MM,
+            Math.max(...vs.map((v: any) => v.bounds.max.z)) * MM,
+          ]
+        );
+        const gridId = gridResult.rows[0].id;
+
+        // Batch insert pm_voxels — chunks of 200 to stay within param limits
+        const CHUNK = 100;
+        for (let i = 0; i < vs.length; i += CHUNK) {
+          const chunk = vs.slice(i, i + CHUNK);
+          const vals: any[] = [];
+          const placeholders = chunk.map((v: any, j: number) => {
+            const b = j * 18 + 1;
+            const ifcArr = `{${(v.ifcElements ?? []).join(',')}}`;
+            const voxelId = v.voxelId ?? `VOX-BOX-${String(i + j).padStart(4, '0')}`;
+            const urn = v.urn ?? `urn:ectropy:${projectId}:voxel:${voxelId}`;
+            vals.push(
+              urn, voxelId,
+              projectId, gridId, null,  // parent_voxel_id = null for COARSE
+              v.center.x * MM, v.center.y * MM, v.center.z * MM,
+              v.bounds.min.x * MM, v.bounds.max.x * MM,
+              v.bounds.min.y * MM, v.bounds.max.y * MM,
+              v.bounds.min.z * MM, v.bounds.max.z * MM,
+              resolution * MM,
+              v.system ?? 'UNKNOWN',
+              v.level ?? 'Unknown',
+              ifcArr,
+            );
+            return `(gen_random_uuid(),$${b},$${b+1},$${b+2},$${b+3},$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},'PLANNED','HEALTHY',$${b+15},$${b+16},$${b+17})`;
+          });
+          await this.db.query(
+            `INSERT INTO voxels
+               (id, urn, voxel_id,
+                project_id, voxel_grid_id, parent_voxel_id,
+                coord_x, coord_y, coord_z,
+                min_x, max_x, min_y, max_y, min_z, max_z,
+                resolution, status, health_status, system, level, ifc_elements)
+             VALUES ${placeholders.join(',')}`,
+            vals
+          );
+        }
+
+        logger.info(`[BOX:generate] Complete — gridId=${gridId}, voxels=${vs.length}`);
+
+        res.status(201).json({
+          gridId,
+          voxelCount: vs.length,
+          resolutionTier: 'COARSE',
+          resolution: resolution * MM,
+        });
       })
     );
   }
