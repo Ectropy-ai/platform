@@ -391,34 +391,51 @@ export function createSeedDemoDataRoutes(): Router {
         for (let i = 0; i < DEMO_PROJECTS.length; i++) {
           const def = DEMO_PROJECTS[i];
 
-          // Create project
-          const project = await tx.project.create({
-            data: {
-              name: def.name,
-              description: def.description,
-              tenant_id,
-              owner_id: user_id,
-              status: def.status,
-              total_budget: def.total_budget,
-              currency: 'USD',
-            },
+          // Find or create project (idempotent: match on tenant_id + name)
+          let project = await tx.project.findFirst({
+            where: { tenant_id, name: def.name },
           });
+          if (!project) {
+            project = await tx.project.create({
+              data: {
+                name: def.name,
+                description: def.description,
+                tenant_id,
+                owner_id: user_id,
+                status: def.status,
+                total_budget: def.total_budget,
+                currency: 'USD',
+              },
+            });
+          }
 
-          // Assign consultant role
-          await tx.projectRole.create({
-            data: {
+          // Assign consultant role (idempotent: upsert on unique(user_id, project_id, role))
+          await tx.projectRole.upsert({
+            where: {
+              user_id_project_id_role: {
+                user_id,
+                project_id: project.id,
+                role: 'consultant',
+              },
+            },
+            create: {
               user_id,
               project_id: project.id,
               role: 'consultant',
               is_active: true,
             },
+            update: { is_active: true },
           });
           totalRoles++;
 
           // Seed decisions
           const decisions = createDecisions(project.id, i);
           for (const decision of decisions) {
-            await tx.pMDecision.create({ data: decision });
+            await tx.pMDecision.upsert({
+              where: { urn: decision.urn },
+              create: decision,
+              update: {},
+            });
           }
           totalDecisions += decisions.length;
 
