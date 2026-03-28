@@ -516,3 +516,4 @@ infrastructure/scripts/
 
 # IFC demo assets — stored in DO Spaces, not git
 demo-assets/
+demo-library/maple-ridge/manifests/
