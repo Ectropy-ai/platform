@@ -3,8 +3,8 @@
  * DigitalOcean Spaces API for bundle storage operations.
  *
  * DO Spaces is S3-compatible. Endpoint: {region}.digitaloceanspaces.com
- * Bucket: ectropy-config (from DO_SPACES_BUCKET env var)
- * Region: nyc3 (from DO_SPACES_REGION env var)
+ * Bucket: ectropy-staging-configs (from DO_SPACES_BUCKET env var)
+ * Region: sfo3 (from DO_SPACES_REGION env var)
  *
  * Used by:
  *   - SpacesBundleLoader: reads bundle descriptors and ref files
@@ -66,8 +66,8 @@ export function spacesConfigFromEnv(): SpacesClientConfig {
   return {
     accessKeyId,
     secretAccessKey,
-    bucket: process.env.DO_SPACES_BUCKET ?? 'ectropy-config',
-    region: process.env.DO_SPACES_REGION ?? 'nyc3',
+    bucket: process.env.DO_SPACES_BUCKET ?? 'ectropy-staging-configs',
+    region: process.env.DO_SPACES_REGION ?? 'sfo3',
   };
 }
 
