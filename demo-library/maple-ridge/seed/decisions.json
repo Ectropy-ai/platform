@@ -1,0 +1,100 @@
+{
+  "bundle_version": "1.0.0",
+  "ifc_ground_truth_source": "Ifc4_Revit_MEP.ifc — 253 ducts at Level 1 confirmed",
+  "decisions": [
+    {
+      "decision_ref": "HVAC-B3-CLASH-001",
+      "title": "HVAC Supply Duct Routing Conflict — Grid B3, Level 1",
+      "description": "Main HVAC supply duct (450mm diameter) conflicts with W310x97 structural beam at Grid B3 on Level 1. Available clearance is 230mm — insufficient for duct plus insulation (450mm required). 837 duct segments in MEP model confirmed. This clash blocks Level 1 South MEP rough-in completion.",
+      "type": "PROPOSAL",
+      "status": "PENDING",
+      "authority_required": 3,
+      "question": "Approve reroute of HVAC supply duct from Grid B3 corridor to Grid C3 corridor to resolve 220mm clearance deficit with W310x97 beam.",
+      "clash_location": {
+        "centroid_x": 2.500,
+        "centroid_y": 0.000,
+        "centroid_z": 1.750,
+        "x_min": 1.500,
+        "x_max": 3.500,
+        "y_min": -1.500,
+        "y_max": 1.500,
+        "z_min": 1.400,
+        "z_max": 2.100
+      },
+      "budget_estimated": 45000,
+      "delay_days": 7,
+      "critical_path": true,
+      "look_ahead_week": 4,
+      "ai_analysis": {
+        "computed_at": "2026-03-27T00:00:00Z",
+        "model": "claude-sonnet-4-20250514",
+        "version": "1.0",
+        "situation": "HVAC supply duct routing conflict at Grid B3, Level 1. W310x97 structural beam creates 220mm clearance deficit. 837 duct segments in MEP model — this is the primary supply route for Level 1 South zone.",
+        "exposure": {
+          "cost_cad": 45000,
+          "delay_days": 7,
+          "critical_path": true,
+          "risk_if_unresolved_today": "7-day slip to Level 1 South zone closure. Cascades to Level 2 framing start. $45K CAD exposure if reroute required after MEP rough-in is otherwise complete."
+        },
+        "authority": {
+          "level_required": 3,
+          "role": "GC Superintendent",
+          "name": "James Okafor",
+          "contact": "james.okafor@gcpartner.ca"
+        },
+        "pre_approval": {
+          "available": true,
+          "condition": "Reroute stays within Zone C corridor (Grid C3 path). MEP coordination confirmed with electrical trade. No structural impact.",
+          "contract_clause": "MEP Coordination Protocol §4.2 — Pre-approval eligible for reroutes under $75K CAD staying within same takt zone."
+        },
+        "recommended_action": "Contact James Okafor (L3 — GC Superintendent) today for pre-approval of Grid C3 reroute. Structural clearance at C3 confirmed 610mm — sufficient for 450mm duct plus insulation. Electrical trade coordination required but non-blocking. Resolve before end of takt week 4 to protect Level 2 start date."
+      }
+    },
+    {
+      "decision_ref": "STRUCT-L1-TOLERANCE-001",
+      "title": "Column Base Plate Tolerance Deviation — Grid A2, Level 1",
+      "description": "Steel column base plate at Grid A2 is 12mm off design centerline. Within tolerance for structural performance but requires documented approval for architectural finish alignment.",
+      "type": "PROPOSAL",
+      "status": "PENDING",
+      "authority_required": 2,
+      "question": "Approve 12mm tolerance deviation for column base plate at Grid A2. Structural performance unaffected. Architectural finish requires minor adjustment.",
+      "clash_location": {
+        "centroid_x": -3.200,
+        "centroid_y": 2.100,
+        "centroid_z": 0.200,
+        "x_min": -4.000,
+        "x_max": -2.400,
+        "y_min": 1.300,
+        "y_max": 2.900,
+        "z_min": 0.050,
+        "z_max": 0.500
+      },
+      "budget_estimated": 3500,
+      "delay_days": 0,
+      "critical_path": false,
+      "look_ahead_week": 4,
+      "ai_analysis": {
+        "computed_at": "2026-03-27T00:00:00Z",
+        "model": "claude-sonnet-4-20250514",
+        "version": "1.0",
+        "situation": "Column base plate tolerance deviation at Grid A2. 12mm off centerline — within structural tolerance limits but requires L2 approval for record.",
+        "exposure": {
+          "cost_cad": 3500,
+          "delay_days": 0,
+          "critical_path": false
+        },
+        "authority": {
+          "level_required": 2,
+          "role": "Site Foreman",
+          "name": "Marcus Webb"
+        },
+        "pre_approval": {
+          "available": true,
+          "condition": "Deviation within ±15mm structural tolerance. No safety impact. Architectural finish adjustment documented.",
+          "contract_clause": "Tolerance Schedule §2.1 — Structural deviations under 15mm pre-approved at L2."
+        },
+        "recommended_action": "Marcus Webb (L2) can approve directly. Document deviation in as-built record. Notify architectural trade for finish adjustment at Grid A2."
+      }
+    }
+  ]
+}
