@@ -424,32 +424,44 @@ jobs:
           echo "========================================="
           echo ""
 
-          SPACES_BUCKET="ectropy-staging-configs"
-          SPACES_REGION="sfo3"
-          SPACES_ENDPOINT="https://${SPACES_REGION}.digitaloceanspaces.com"
-          S3_KEY="staging/compose/docker-compose.staging.yml"
-
-          # Configure AWS CLI for DO Spaces (S3-compatible API)
-          export AWS_ACCESS_KEY_ID="${SPACES_ACCESS_KEY_ID}"
-          export AWS_SECRET_ACCESS_KEY="${SPACES_SECRET_ACCESS_KEY}"
-          export AWS_DEFAULT_REGION="us-east-1"
-
-          # Calculate content hash for change detection
           CONTENT_HASH=$(sha256sum docker-compose.staging.yml | cut -d' ' -f1)
           echo "File hash: ${CONTENT_HASH}"
 
-          # Upload with metadata for config-sync service
-          echo "Uploading docker-compose.staging.yml to s3://${SPACES_BUCKET}/${S3_KEY}..."
-          aws s3 cp docker-compose.staging.yml "s3://${SPACES_BUCKET}/${S3_KEY}" \
-            --endpoint-url "${SPACES_ENDPOINT}" \
-            --metadata "sha256=${CONTENT_HASH},deployed-by=github-actions,commit=${GITHUB_SHA}" \
-            --content-type "application/x-yaml"
+          # boto3 upload — replaces aws s3 cp which fails with --endpoint-url on CLI v1
+          echo "Uploading docker-compose.staging.yml to Spaces via boto3..."
+          CONTENT_HASH="${CONTENT_HASH}" python3 - <<'PYEOF'
+          import boto3, os, hashlib
 
-          # Verify upload
-          echo ""
-          echo "Verifying upload..."
-          aws s3 ls "s3://${SPACES_BUCKET}/${S3_KEY}" \
-            --endpoint-url "${SPACES_ENDPOINT}"
+          client = boto3.client(
+              's3',
+              region_name='sfo3',
+              endpoint_url='https://sfo3.digitaloceanspaces.com',
+              aws_access_key_id=os.environ['SPACES_ACCESS_KEY_ID'],
+              aws_secret_access_key=os.environ['SPACES_SECRET_ACCESS_KEY'],
+          )
+
+          bucket = 'ectropy-staging-configs'
+          key = 'staging/compose/docker-compose.staging.yml'
+
+          with open('docker-compose.staging.yml', 'rb') as f:
+              body = f.read()
+
+          client.put_object(
+              Bucket=bucket,
+              Key=key,
+              Body=body,
+              ContentType='application/x-yaml',
+              Metadata={
+                  'sha256': os.environ.get('CONTENT_HASH', ''),
+                  'deployed-by': 'github-actions',
+                  'commit': os.environ.get('GITHUB_SHA', ''),
+              },
+          )
+
+          # Verify upload by reading back the object metadata
+          head = client.head_object(Bucket=bucket, Key=key)
+          print(f"Uploaded {key} ({head['ContentLength']} bytes)")
+          PYEOF
 
           echo ""
           echo "✅ docker-compose.staging.yml deployed to Spaces"
