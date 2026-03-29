@@ -127,7 +127,7 @@ const ProjectDetailPage: React.FC = () => {
               <Button
                 variant='contained'
                 startIcon={<ViewInAr />}
-                onClick={() => navigate(`/viewer?project=${id}`)}
+                onClick={() => navigate(`/projects/${id}`)}
                 size='large'
               >
                 Open in BIM Viewer
