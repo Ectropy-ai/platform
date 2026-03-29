@@ -2,7 +2,8 @@
  * @fileoverview IntakePipeline — orchestrates the 7-stage Project
  * Intake Pipeline from bundle load through SEPPA context injection.
  *
- * Stage 4 (IFC_INGESTION) is omitted — awaits Python Half B service.
+ * All 7 stages execute in sequence: TENANT → PROJECT → TEAM →
+ * IFC_INGESTION → CONTRACT_TAKT → DECISIONS → SEPPA_CONTEXT.
  *
  * @see INTAKE-ARCHITECTURE-2026-03-27.md — Part I
  */
@@ -13,6 +14,7 @@ import { ConsoleIntakeLogger } from './intake-logger';
 import { Stage1TenantService } from './stages/stage-1-tenant';
 import { Stage2ProjectService } from './stages/stage-2-project';
 import { Stage3TeamService } from './stages/stage-3-team';
+import { Stage4IFCService } from './stages/stage-4-ifc';
 import { Stage5ContractTaktService } from './stages/stage-5-contract-takt';
 import { Stage6DecisionService } from './stages/stage-6-decisions';
 import { Stage7SeppaContextService } from './stages/stage-7-seppa-context';
@@ -99,11 +101,11 @@ export class IntakePipeline {
       logger.info('TENANT', `Pipeline starting — bundle=${bundleId}@${bundleVersion} type=${bundle.bundle_type}`);
     }
 
-    // Stage 4 (IFC_INGESTION) omitted — awaits Python Half B
     const stageInstances: IIntakeStage[] = [
       new Stage1TenantService(),
       new Stage2ProjectService(),
       new Stage3TeamService(),
+      new Stage4IFCService(),
       new Stage5ContractTaktService(),
       new Stage6DecisionService(),
       new Stage7SeppaContextService(),
