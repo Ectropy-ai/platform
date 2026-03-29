@@ -235,7 +235,7 @@ export class Stage4IFCService implements IIntakeStage {
           v.level ?? 'Unknown',
           ifcArr,
         );
-        return `(gen_random_uuid(),$${b},$${b+1},$${b+2}::uuid,$${b+3}::uuid,$${b+4}::uuid,$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},'PLANNED','HEALTHY',$${b+15},$${b+16},$${b+17})`;
+        return `(gen_random_uuid(),$${b},$${b+1},$${b+2}::uuid,$${b+3}::uuid,$${b+4}::uuid,$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},'PLANNED','HEALTHY',$${b+15},$${b+16},$${b+17}::text[])`;
       });
       await prisma.$executeRawUnsafe(
         `INSERT INTO voxels
