@@ -144,7 +144,19 @@ export class VoxelDecisionSurfaceExtension extends Extension {
    * Server runs VoxelDecompositionService, writes voxel_grids + pm_voxels.
    * BOX = BIM + BOM + VOX. DEC-009 BOX Pipeline Phase 1.
    */
-  async generateAndPersistBoxes(projectId: string): Promise<void> {
+  /**
+   * @param projectId - Ectropy project UUID
+   * @param streamId  - Speckle stream ID from project's speckle_streams row
+   * @param objectId  - Root Speckle object ID (ARC) from speckle_streams.latest_object_id
+   *
+   * Never pass hardcoded stream or object IDs — always resolve from the
+   * project context via GET /api/speckle/projects/:id/streams.
+   */
+  async generateAndPersistBoxes(
+    projectId: string,
+    streamId: string,
+    objectId: string,
+  ): Promise<void> {
     if (!projectId?.match(/^[0-9a-f-]{36}$/)) {
       console.warn('[BOX] Invalid projectId:', projectId);
       return;
@@ -192,8 +204,8 @@ export class VoxelDecisionSurfaceExtension extends Extension {
         body: JSON.stringify({
           elements: mmElements,
           resolution: 100, // COARSE = 100mm
-          streamId: '302d48b34c',
-          objectId: '0fa195cea220c7192c7579678af64b5f',
+          streamId,
+          objectId,
         }),
       },
     );
