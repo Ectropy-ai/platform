@@ -37,6 +37,12 @@ import {
 } from '../../../../libs/shared/security/src/security.middleware.js';
 import { logger } from '../../../../libs/shared/utils/src/logger.js';
 import { getVoxelStreamHandler } from '../websocket/voxel-stream.js';
+import {
+  type BoxElement,
+  type BoxCell,
+  classifySystem,
+  rasterizeElements,
+} from '../intake/services/voxel-rasterizer.service.js';
 
 // ============================================================================
 // REDIS CACHE CONFIGURATION
@@ -108,134 +114,6 @@ interface VoxelStatusHistoryEntry {
   changedByName: string | null;
   source: string | null;
   timestamp: string;
-}
-
-// ============================================================================
-// BOX RASTERIZER (inlined) — DEC-009 SEPPA Stage S
-// Source: apps/mcp-server/src/services/voxel-decomposition.service.ts:395-560
-// Inlined: cross-app import fails in Docker production container —
-// api-gateway dist/ does not include mcp-server/.
-// ============================================================================
-
-interface BoxBBox {
-  min: { x: number; y: number; z: number };
-  max: { x: number; y: number; z: number };
-}
-interface BoxElement {
-  globalId: string;
-  type: string;
-  containedInStorey: string;
-  boundingBox: BoxBBox;
-}
-interface BoxCell {
-  center: { x: number; y: number; z: number };
-  bounds: BoxBBox;
-  system: string;
-  level: string;
-  ifcElements: string[];
-}
-
-function classifySystem(entityType: string): string {
-  const t = entityType.toLowerCase();
-  if (t.includes('pipe') || t.includes('plumb') || t.includes('sanitary')) return 'PLUMB';
-  if (t.includes('elec') || t.includes('light') || t.includes('cable')) return 'ELEC';
-  if (t.includes('hvac') || t.includes('duct') || t.includes('air') || t.includes('ventil')) return 'HVAC';
-  if (t.includes('sprinkler') || t.includes('fire') || t.includes('alarm')) return 'FIRE';
-  if (t.includes('column') || t.includes('beam') || t.includes('slab') || t.includes('foundation')) return 'STRUCT';
-  if (t.includes('wall') || t.includes('door') || t.includes('window') || t.includes('stair')) return 'ARCH';
-  return 'UNK';
-}
-
-/**
- * Conservative AABB voxelization. Input coordinates in millimeters.
- * Output center/bounds also in millimeters (caller applies MM_TO_M).
- */
-function rasterizeElements(
-  elements: BoxElement[],
-  resolution: number,
-): { voxels: BoxCell[] } {
-  let gMinX = Infinity, gMinY = Infinity, gMinZ = Infinity;
-  let gMaxX = -Infinity, gMaxY = -Infinity, gMaxZ = -Infinity;
-
-  for (const el of elements) {
-    if (!el.boundingBox) continue;
-    const { min, max } = el.boundingBox;
-    gMinX = Math.min(gMinX, min.x); gMinY = Math.min(gMinY, min.y); gMinZ = Math.min(gMinZ, min.z);
-    gMaxX = Math.max(gMaxX, max.x); gMaxY = Math.max(gMaxY, max.y); gMaxZ = Math.max(gMaxZ, max.z);
-  }
-
-  // Padding
-  const pad = resolution * 2;
-  gMinX -= pad; gMinY -= pad; gMinZ -= pad;
-  gMaxX += pad; gMaxY += pad; gMaxZ += pad;
-
-  // Safety: cap total grid cells to prevent stack overflow.
-  // At 100mm (COARSE), a 90m building = 900 cells per axis.
-  // Phase 1 cap: 500K total cells max. If exceeded, increase resolution.
-  const MAX_CELLS = 500_000;
-  let effectiveRes = resolution;
-  const xSteps = Math.ceil((gMaxX - gMinX) / effectiveRes);
-  const ySteps = Math.ceil((gMaxY - gMinY) / effectiveRes);
-  const zSteps = Math.ceil((gMaxZ - gMinZ) / effectiveRes);
-  const estimatedCells = xSteps * ySteps * zSteps;
-  if (estimatedCells > MAX_CELLS) {
-    // Auto-coarsen: find the minimum resolution that fits under cap
-    const volume = (gMaxX - gMinX) * (gMaxY - gMinY) * (gMaxZ - gMinZ);
-    effectiveRes = Math.cbrt(volume / MAX_CELLS);
-    console.log(`[BOX:rasterizer] Auto-coarsened: ${resolution}mm → ${Math.round(effectiveRes)}mm (estimated ${estimatedCells} cells > ${MAX_CELLS} cap)`);
-  }
-  // Use effectiveRes from here
-  const res = effectiveRes;
-
-  // Track occupied cells and their contributing element IDs
-  const cellMap = new Map<string, Set<string>>();
-
-  for (const el of elements) {
-    if (!el.boundingBox) continue;
-    const { min, max } = el.boundingBox;
-    const i0 = Math.floor((min.x - gMinX) / res);
-    const i1 = Math.ceil((max.x - gMinX) / res);
-    const j0 = Math.floor((min.y - gMinY) / res);
-    const j1 = Math.ceil((max.y - gMinY) / res);
-    const k0 = Math.floor((min.z - gMinZ) / res);
-    const k1 = Math.ceil((max.z - gMinZ) / res);
-
-    for (let i = i0; i <= i1; i++) {
-      for (let j = j0; j <= j1; j++) {
-        for (let k = k0; k <= k1; k++) {
-          const key = `${i},${j},${k}`;
-          if (!cellMap.has(key)) cellMap.set(key, new Set());
-          cellMap.get(key)!.add(el.globalId);
-        }
-      }
-    }
-  }
-
-  // Convert occupied cells to BoxCell array
-  const voxels: BoxCell[] = [];
-  for (const [key, ids] of cellMap.entries()) {
-    const [i, j, k] = key.split(',').map(Number);
-    const primaryId = ids.values().next().value!;
-    const primaryEl = elements.find(e => e.globalId === primaryId);
-    if (!primaryEl) continue;
-
-    voxels.push({
-      center: {
-        x: gMinX + (i + 0.5) * res,
-        y: gMinY + (j + 0.5) * res,
-        z: gMinZ + (k + 0.5) * res,
-      },
-      bounds: {
-        min: { x: gMinX + i * res, y: gMinY + j * res, z: gMinZ + k * res },
-        max: { x: gMinX + (i + 1) * res, y: gMinY + (j + 1) * res, z: gMinZ + (k + 1) * res },
-      },
-      system: classifySystem(primaryEl.type),
-      level: primaryEl.containedInStorey || 'Unknown',
-      ifcElements: [...ids],
-    });
-  }
-
-  return { voxels };
 }
 
 // ============================================================================
