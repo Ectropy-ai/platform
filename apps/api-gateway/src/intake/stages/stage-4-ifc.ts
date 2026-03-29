@@ -252,19 +252,17 @@ export class Stage4IFCService implements IIntakeStage {
     log.info(this.stageId, `Inserted ${voxelCount} voxels`);
 
     // ── 7. Upsert speckle_streams row ───────────────────────────────────
+    // stream_id has @unique — may already be claimed by another project.
+    // Use raw SQL upsert on stream_id to handle both cases.
     if (streamId) {
-      await prisma.speckleStream.upsert({
-        where: { construction_project_id: projectId },
-        create: {
-          construction_project_id: projectId,
-          stream_id: streamId,
-          stream_name: `${bundle.project.name} — Full IFC Model`,
-        },
-        update: {
-          stream_id: streamId,
-          stream_name: `${bundle.project.name} — Full IFC Model`,
-        },
-      });
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO speckle_streams (id, construction_project_id, stream_id, stream_name, created_at, updated_at)
+        VALUES (gen_random_uuid(), $1::uuid, $2, $3, NOW(), NOW())
+        ON CONFLICT (stream_id) DO UPDATE SET
+          construction_project_id = EXCLUDED.construction_project_id,
+          stream_name = EXCLUDED.stream_name,
+          updated_at = NOW()
+      `, projectId, streamId, `${bundle.project.name} — Full IFC Model`);
       log.info(this.stageId, `speckle_streams upserted: stream_id=${streamId}`);
     }
 
