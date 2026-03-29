@@ -1,9 +1,10 @@
 {
   "bundle_id": "maple-ridge-commerce-centre",
-  "bundle_version": "1.0.0",
+  "bundle_version": "1.1.0",
   "bundle_type": "DEMO",
   "schema_version": "1.0.0",
   "created_at": "2026-03-27T00:00:00Z",
+  "updated_at": "2026-03-29T00:00:00Z",
   "created_by": "erik@luh.tech",
   "tenant": {
     "slug": "maple-ridge-demo",
@@ -15,8 +16,15 @@
   "project": {
     "name": "Maple Ridge Commerce Centre",
     "type": "COMMERCIAL",
-    "currency": "CAD",
+    "address": {
+      "street": "1200 Brunette Ave",
+      "city": "Coquitlam",
+      "province": "BC",
+      "country": "CA",
+      "postal_code": "V3K 1G1"
+    },
     "contract_type": "IPD",
+    "currency": "CAD",
     "budget": 8400000,
     "start_date": "2026-01-15",
     "target_completion": "2026-09-30"
@@ -24,57 +32,83 @@
   "ifc": {
     "source_type": "SPACES",
     "base_path": "demo-library/maple-ridge/ifc/",
+    "speckle_stream_id": "8887bf8651",
+    "speckle_already_uploaded": true,
+    "speckle_objects": {
+      "ARC": "a8e00aebe494b63dc9891e8953e19664",
+      "MEP": "20635b275e3994f9b7a4e30ee5670582",
+      "STR": "0f7e72984287186d3454eccea2f5f225"
+    },
     "files": [
       {
         "discipline": "ARC",
         "filename": "Ifc4_Revit_ARC.ifc",
-        "size_bytes": 13631488,
-        "sha256": "PENDING"
+        "size_bytes": 13646137,
+        "sha256": "c4dd3612f126a0ca5a57f0e75d28f3e5da62751def85a452d849883c2892b518",
+        "storeys": 6,
+        "element_count": 489
       },
       {
         "discipline": "MEP",
         "filename": "Ifc4_Revit_MEP.ifc",
-        "size_bytes": 29360128,
-        "sha256": "PENDING"
+        "size_bytes": 29165277,
+        "sha256": "829c08715d56256e04d04fa7be40ec68928e0397631c3b846efd72d003f96495",
+        "storeys": 4,
+        "element_count": 6955
       },
       {
         "discipline": "STR",
         "filename": "Ifc4_Revit_STR.ifc",
-        "size_bytes": 11534336,
-        "sha256": "PENDING"
+        "size_bytes": 11285247,
+        "sha256": "8c16c7ecf76786568c5374e624575cbd3586ec646468dad6f9ea3c9a4e97239f",
+        "storeys": 6,
+        "element_count": 4150
       }
     ],
-    "speckle_stream_id": "9a5215cc88",
-    "speckle_already_uploaded": true,
+    "manifest_cache_path": "ifc-extraction-cache/maple-ridge/",
     "voxelization": {
       "resolution_tier": "COARSE",
       "resolution_m": 0.1,
       "strategy": "PER_ELEMENT_RASTERIZATION",
-      "expected_cell_count": 92700
+      "expected_cell_count_min": 200000,
+      "expected_cell_count_max": 500000,
+      "coordinate_space": "metres"
     }
   },
-  "staff_ref": "demo-library/maple-ridge/seed/staff.json",
-  "contract_ref": null,
-  "takt_ref": "demo-library/maple-ridge/contract/takt-schedule.json",
-  "decisions_ref": "demo-library/maple-ridge/seed/decisions.json",
   "pipeline_flags": {
-    "voxelize": false,
+    "voxelize": true,
     "apply_takt": true,
     "seed_decisions": true,
     "inject_seppa_context": true,
     "precompute_ai_analysis": true,
     "assign_demo_user": true
   },
+  "staff_ref": "demo-library/maple-ridge/seed/staff.json",
+  "contract_ref": "demo-library/maple-ridge/contract/contract.json",
+  "takt_ref": "demo-library/maple-ridge/contract/takt-schedule.json",
+  "decisions_ref": "demo-library/maple-ridge/seed/decisions.json",
+  "manifest_cache": {
+    "ARC": "ifc-extraction-cache/maple-ridge/ARC-manifest.json",
+    "MEP": "ifc-extraction-cache/maple-ridge/MEP-manifest.json",
+    "STR": "ifc-extraction-cache/maple-ridge/STR-manifest.json"
+  },
   "metadata": {
-    "ifc_source": "youshengCode/IfcSampleFiles (public domain, CC0)",
+    "ifc_source": "youshengCode/IfcSampleFiles (public domain)",
+    "ifc_license": "CC0",
     "ifc_units": "millimetres in source — converted to metres by extraction service",
     "ifc_storeys_arc": ["Foundation", "Level 1 Living Rm", "Level 1", "Ceiling", "Level 2", "Roof Line"],
     "ifc_storeys_mep": ["Level 1", "Level 2", "Level 3", "Roof Level"],
     "mep_duct_count": 837,
-    "coordinate_space": "Speckle-transformed metres — x:-7.5→7.6, y:-6.0→6.1, z:-0.04→3.13",
-    "narrative": "5-storey commercial building under IPD contract. Takt week 4. Foundation complete, Level 1 active with HVAC clash at Grid B3 (837 real duct segments), Level 2 planned.",
+    "building_envelope": {
+      "x_min": -7.536, "x_max": 7.628,
+      "y_min": -6.036, "y_max": 6.074,
+      "z_min": -0.036, "z_max": 3.127,
+      "units": "metres",
+      "source": "ARC IQR-filtered, confirmed from Speckle WorldTree"
+    },
+    "narrative": "5-storey commercial building under IPD contract. Takt week 4. Level 0 complete, Level 1 active with HVAC clash at Grid B3 (837 real duct segments). Level 2 planned.",
     "demo_story": "HVAC duct routing conflict blocks Level 1 South. $45K CAD exposure. L3 authority (James Okafor) required. Pre-approval available for Grid C3 reroute.",
-    "ground_truth_validated": "2026-03-27",
-    "tags": ["commercial", "IPD", "MEP-clash", "takt-demo", "837-ducts-confirmed"]
+    "ground_truth_validated": "2026-03-29",
+    "tags": ["commercial", "IPD", "MEP-clash", "takt-demo", "8887bf8651-confirmed"]
   }
 }
