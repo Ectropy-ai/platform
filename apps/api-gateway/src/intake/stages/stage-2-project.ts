@@ -57,18 +57,18 @@ export class Stage2ProjectService implements IIntakeStage {
         select: { id: true },
       });
 
-      // Find existing project by name + tenant
-      let project = await db_.project.findFirst({
-        where: {
-          name: p.name,
-          tenant_id: context.tenantId,
-        },
-        select: { id: true },
-      });
+      // If the bundle specifies a canonical project ID, upsert against that
+      // stable UUID. This ensures the demo project dc1eaa5b is always the
+      // target and the speckle_streams row is never orphaned to a new record.
+      // Falls back to findFirst-by-name for non-canonical bundles.
+      const canonicalProjectId = (p as any).canonical_id as string | undefined;
 
-      if (!project) {
-        project = await db_.project.create({
-          data: {
+      let project: { id: string };
+      if (canonicalProjectId) {
+        project = await db_.project.upsert({
+          where: { id: canonicalProjectId },
+          create: {
+            id: canonicalProjectId,
             name: p.name,
             tenant_id: context.tenantId,
             owner_id: owner.id,
@@ -78,11 +78,40 @@ export class Stage2ProjectService implements IIntakeStage {
             start_date: p.start_date ? new Date(p.start_date) : null,
             expected_completion: p.target_completion ? new Date(p.target_completion) : null,
           },
+          update: {
+            name: p.name,
+            tenant_id: context.tenantId,
+          },
           select: { id: true },
         });
-        log.info(this.stageId, `Project created id=${project.id}`);
+        log.info(this.stageId, `Project upserted (canonical) id=${project.id}`);
       } else {
-        log.info(this.stageId, `Project exists id=${project.id}`);
+        project = await db_.project.findFirst({
+          where: {
+            name: p.name,
+            tenant_id: context.tenantId,
+          },
+          select: { id: true },
+        });
+
+        if (!project) {
+          project = await db_.project.create({
+            data: {
+              name: p.name,
+              tenant_id: context.tenantId,
+              owner_id: owner.id,
+              status: 'planning',
+              currency: p.currency ?? 'CAD',
+              total_budget: p.budget ?? null,
+              start_date: p.start_date ? new Date(p.start_date) : null,
+              expected_completion: p.target_completion ? new Date(p.target_completion) : null,
+            },
+            select: { id: true },
+          });
+          log.info(this.stageId, `Project created id=${project.id}`);
+        } else {
+          log.info(this.stageId, `Project exists id=${project.id}`);
+        }
       }
 
       context.projectId = project.id as string;

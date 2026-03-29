@@ -11,7 +11,8 @@
     "name": "Maple Ridge Commerce Centre Demo",
     "region": "nyc3",
     "tier": "DEMO",
-    "pipeda_compliant": false
+    "pipeda_compliant": false,
+    "canonical_id": "00000000-0000-0000-0000-000000000001"
   },
   "project": {
     "name": "Maple Ridge Commerce Centre",
@@ -27,11 +28,12 @@
     "currency": "CAD",
     "budget": 8400000,
     "start_date": "2026-01-15",
-    "target_completion": "2026-09-30"
+    "target_completion": "2026-09-30",
+    "canonical_id": "dc1eaa5b-7553-46ec-92a5-e20762a60c71"
   },
   "ifc": {
     "source_type": "SPACES",
-    "base_path": "demo-library/maple-ridge/ifc/",
+    "base_path": "demo-library/maple-ridge-commerce-centre/ifc/",
     "speckle_stream_id": "8887bf8651",
     "speckle_already_uploaded": true,
     "speckle_objects": {
@@ -65,7 +67,7 @@
         "element_count": 4150
       }
     ],
-    "manifest_cache_path": "ifc-extraction-cache/maple-ridge/",
+    "manifest_cache_path": "ifc-extraction-cache/maple-ridge-commerce-centre/",
     "voxelization": {
       "resolution_tier": "COARSE",
       "resolution_m": 0.1,
@@ -83,32 +85,53 @@
     "precompute_ai_analysis": true,
     "assign_demo_user": true
   },
-  "staff_ref": "demo-library/maple-ridge/seed/staff.json",
-  "contract_ref": "demo-library/maple-ridge/contract/contract.json",
-  "takt_ref": "demo-library/maple-ridge/contract/takt-schedule.json",
-  "decisions_ref": "demo-library/maple-ridge/seed/decisions.json",
+  "staff_ref": "demo-library/maple-ridge-commerce-centre/seed/staff.json",
+  "contract_ref": "demo-library/maple-ridge-commerce-centre/contract/contract.json",
+  "takt_ref": "demo-library/maple-ridge-commerce-centre/contract/takt-schedule.json",
+  "decisions_ref": "demo-library/maple-ridge-commerce-centre/seed/decisions.json",
   "manifest_cache": {
-    "ARC": "ifc-extraction-cache/maple-ridge/ARC-manifest.json",
-    "MEP": "ifc-extraction-cache/maple-ridge/MEP-manifest.json",
-    "STR": "ifc-extraction-cache/maple-ridge/STR-manifest.json"
+    "ARC": "ifc-extraction-cache/maple-ridge-commerce-centre/ARC-manifest.json",
+    "MEP": "ifc-extraction-cache/maple-ridge-commerce-centre/MEP-manifest.json",
+    "STR": "ifc-extraction-cache/maple-ridge-commerce-centre/STR-manifest.json"
   },
   "metadata": {
     "ifc_source": "youshengCode/IfcSampleFiles (public domain)",
     "ifc_license": "CC0",
-    "ifc_units": "millimetres in source — converted to metres by extraction service",
-    "ifc_storeys_arc": ["Foundation", "Level 1 Living Rm", "Level 1", "Ceiling", "Level 2", "Roof Line"],
-    "ifc_storeys_mep": ["Level 1", "Level 2", "Level 3", "Roof Level"],
+    "ifc_units": "millimetres in source \u2014 converted to metres by extraction service",
+    "ifc_storeys_arc": [
+      "Foundation",
+      "Level 1 Living Rm",
+      "Level 1",
+      "Ceiling",
+      "Level 2",
+      "Roof Line"
+    ],
+    "ifc_storeys_mep": [
+      "Level 1",
+      "Level 2",
+      "Level 3",
+      "Roof Level"
+    ],
     "mep_duct_count": 837,
     "building_envelope": {
-      "x_min": -7.536, "x_max": 7.628,
-      "y_min": -6.036, "y_max": 6.074,
-      "z_min": -0.036, "z_max": 3.127,
+      "x_min": -7.536,
+      "x_max": 7.628,
+      "y_min": -6.036,
+      "y_max": 6.074,
+      "z_min": -0.036,
+      "z_max": 3.127,
       "units": "metres",
       "source": "ARC IQR-filtered, confirmed from Speckle WorldTree"
     },
     "narrative": "5-storey commercial building under IPD contract. Takt week 4. Level 0 complete, Level 1 active with HVAC clash at Grid B3 (837 real duct segments). Level 2 planned.",
     "demo_story": "HVAC duct routing conflict blocks Level 1 South. $45K CAD exposure. L3 authority (James Okafor) required. Pre-approval available for Grid C3 reroute.",
     "ground_truth_validated": "2026-03-29",
-    "tags": ["commercial", "IPD", "MEP-clash", "takt-demo", "8887bf8651-confirmed"]
+    "tags": [
+      "commercial",
+      "IPD",
+      "MEP-clash",
+      "takt-demo",
+      "8887bf8651-confirmed"
+    ]
   }
 }

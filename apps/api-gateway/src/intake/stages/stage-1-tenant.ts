@@ -50,23 +50,51 @@ export class Stage1TenantService implements IIntakeStage {
 
       const complianceFlags = t.pipeda_compliant ? ['PIPEDA'] : [];
 
-      const record = await db_.tenant.upsert({
-        where: { slug: t.slug },
-        create: {
-          slug: t.slug,
-          name: t.name,
-          status: 'ACTIVE',
-          subscription_tier: mapTier(t.tier),
-          data_region: t.region,
-          compliance_flags: complianceFlags,
-        },
-        update: {
-          name: t.name,
-          data_region: t.region,
-          compliance_flags: complianceFlags,
-        },
-        select: { id: true, slug: true },
-      });
+      // If the bundle specifies a canonical tenant ID, upsert against that
+      // stable UUID rather than creating by slug. This is the idempotency
+      // contract for all canonical demo bundles — the same tenant record
+      // is always the target regardless of how many times the pipeline runs.
+      const canonicalTenantId = (t as any).canonical_id as string | undefined;
+
+      let record: { id: string; slug: string };
+      if (canonicalTenantId) {
+        record = await db_.tenant.upsert({
+          where: { id: canonicalTenantId },
+          create: {
+            id: canonicalTenantId,
+            slug: t.slug,
+            name: t.name,
+            status: 'ACTIVE',
+            subscription_tier: mapTier(t.tier),
+            data_region: t.region,
+            compliance_flags: complianceFlags,
+          },
+          update: {
+            name: t.name,
+            data_region: t.region,
+            compliance_flags: complianceFlags,
+          },
+          select: { id: true, slug: true },
+        });
+      } else {
+        record = await db_.tenant.upsert({
+          where: { slug: t.slug },
+          create: {
+            slug: t.slug,
+            name: t.name,
+            status: 'ACTIVE',
+            subscription_tier: mapTier(t.tier),
+            data_region: t.region,
+            compliance_flags: complianceFlags,
+          },
+          update: {
+            name: t.name,
+            data_region: t.region,
+            compliance_flags: complianceFlags,
+          },
+          select: { id: true, slug: true },
+        });
+      }
 
       context.tenantId = record.id as string;
 
