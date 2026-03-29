@@ -6,6 +6,13 @@
 import { Pool } from 'pg';
 import { logger } from '../../../../libs/shared/utils/src/logger.js';
 
+export const BLOCKED_PROJECT_NAMES = [
+  'My First Project',
+  'E2E Test Project',
+  'Test Project',
+  'Untitled Project',
+] as const;
+
 export interface Project {
   id: string;
   name: string;
@@ -144,6 +151,13 @@ export class ProjectService {
       if (!projectData.tenant_id) {
         throw new Error(
           'Tenant ID is required to create a project (multi-tenant isolation)'
+        );
+      }
+
+      if (BLOCKED_PROJECT_NAMES.includes(projectData.name as any)) {
+        throw new Error(
+          `Project name '${projectData.name}' is reserved and cannot be used. ` +
+          `Choose a descriptive project name.`
         );
       }
 

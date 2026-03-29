@@ -5253,6 +5253,28 @@
       "supersededBy": null,
       "reviewDate": "2026-04-25",
       "appendix": {}
+    },
+    {
+      "id": "DEC-011",
+      "title": "Demo Library Governance Framework",
+      "date": "2026-03-28",
+      "status": "APPROVED",
+      "author": "erik@luh.tech",
+      "dependsOn": "DEC-010",
+      "supersedes": "none",
+      "summary": "Six governance rules enforcing separation between canonical demo records, test fixtures, and seed state. Includes BLOCKED_PROJECT_NAMES API guard, bundle immutability contract, CI cleanup obligation, and production promotion gate.",
+      "canonicalRegistry": {
+        "projects": [
+          { "name": "Demo Office Building", "id": "dc1eaa5b-7553-46ec-92a5-e20762a60c71", "bundle": "maple-ridge-commerce-centre" },
+          { "name": "Sample Residential Complex", "id": "47fd3a1b-10ac-40b2-aeef-e58fdfe7c523", "bundle": "ci-baseline" }
+        ],
+        "tenants": [
+          { "name": "Ectropy Demo Organization", "id": "00000000-0000-0000-0000-000000000001", "slug": "ectropy-demo" }
+        ],
+        "users": [
+          { "email": "ectropytest@gmail.com", "id": "d574b84f-dba8-446d-af17-647ec53a8a74", "role": "CONSULTANT" }
+        ]
+      }
     }
   ]
 }

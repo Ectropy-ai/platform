@@ -229,6 +229,14 @@ export function createSeedDemoDataRoutes(): Router {
     '/seed-demo-data',
     apiKeyMiddleware.dualAuth(['seed_demo_data', '*']),
     asyncHandler(async (req: Request, res: Response): Promise<void> => {
+      if (process.env.DEMO_SEEDING_ENABLED !== 'true') {
+        res.status(403).json({
+          error: 'Demo seeding is disabled in this environment.',
+          code: 'DEMO_SEEDING_DISABLED',
+        });
+        return;
+      }
+
       const { user_id, tenant_id, projectId, assignRolesTo } = req.body;
 
       // ================================================================
