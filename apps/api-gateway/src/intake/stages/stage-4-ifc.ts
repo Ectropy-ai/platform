@@ -190,7 +190,7 @@ export class Stage4IFCService implements IIntakeStage {
 
     // Delete existing grid records for this project (idempotent)
     await prisma.$executeRawUnsafe(
-      `DELETE FROM voxel_grids WHERE project_id = $1`,
+      `DELETE FROM voxel_grids WHERE project_id = $1::uuid`,
       projectId,
     );
 
@@ -200,7 +200,7 @@ export class Stage4IFCService implements IIntakeStage {
          source_type, status, voxel_count,
          bbox_min_x, bbox_max_x, bbox_min_y, bbox_max_y, bbox_min_z, bbox_max_z,
          generated_at, created_at, updated_at)
-      VALUES (gen_random_uuid(), $1, $2, $3, $4, 'COARSE', 'BIM', 'COMPLETE', $5,
+      VALUES (gen_random_uuid(), $1::uuid, $2, $3, $4, 'COARSE', 'BIM', 'COMPLETE', $5,
               $6, $7, $8, $9, $10, $11, NOW(), NOW(), NOW())
       RETURNING id
     `,
@@ -235,7 +235,7 @@ export class Stage4IFCService implements IIntakeStage {
           v.level ?? 'Unknown',
           ifcArr,
         );
-        return `(gen_random_uuid(),$${b},$${b+1},$${b+2},$${b+3},$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},'PLANNED','HEALTHY',$${b+15},$${b+16},$${b+17})`;
+        return `(gen_random_uuid(),$${b},$${b+1},$${b+2}::uuid,$${b+3}::uuid,$${b+4}::uuid,$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},'PLANNED','HEALTHY',$${b+15},$${b+16},$${b+17})`;
       });
       await prisma.$executeRawUnsafe(
         `INSERT INTO voxels
