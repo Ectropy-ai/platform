@@ -98,8 +98,8 @@ export class Stage5ContractTaktService implements IIntakeStage {
         totalRowsAffected += rowsAffected;
         taktZoneMap[zone.zone_id] = {
           status: zone.status,
-          z_min: zone.z_range.min,
-          z_max: zone.z_range.max,
+          z_min: zone.z_range?.min,
+          z_max: zone.z_range?.max,
           x_min: zone.x_range?.min,
           x_max: zone.x_range?.max,
           y_min: zone.y_range?.min,
@@ -170,11 +170,33 @@ export class Stage5ContractTaktService implements IIntakeStage {
       );
     }
 
-    const whereClauses: string[] = [
-      `project_id = '${projectId}'`,
-      `coord_z >= ${zone.z_range.min}`,
-      `coord_z <= ${zone.z_range.max}`,
-    ];
+    const whereClauses: string[] = [`project_id = '${projectId}'`];
+
+    // Primary spatial filter: level_names takes precedence over z_range.
+    // When level_names is set, use level IN (...) as the main discriminator.
+    // z_range then acts as an optional sub-range refinement within that level.
+    if (zone.level_names && zone.level_names.length > 0) {
+      const escaped = zone.level_names
+        .map(n => `'${n.replace(/'/g, "''")}'`)
+        .join(', ');
+      whereClauses.push(`level IN (${escaped})`);
+      // Optional z_range refinement within the level (e.g. BLOCKED clash cluster)
+      if (zone.z_range !== null) {
+        whereClauses.push(`coord_z >= ${zone.z_range.min}`);
+        whereClauses.push(`coord_z <= ${zone.z_range.max}`);
+      }
+    } else if (zone.z_range !== null) {
+      // Coordinate-range-only fallback (legacy zones without level_names)
+      whereClauses.push(`coord_z >= ${zone.z_range.min}`);
+      whereClauses.push(`coord_z <= ${zone.z_range.max}`);
+    } else {
+      // No spatial filter — would match all cells in project, refuse
+      log.warn(
+        'CONTRACT_TAKT' as IntakeStageId,
+        `Zone '${zone.zone_id}' has neither level_names nor z_range — skipping to avoid full-table update`,
+      );
+      return 0;
+    }
     if (zone.x_range !== null) {
       whereClauses.push(`coord_x >= ${zone.x_range.min}`);
       whereClauses.push(`coord_x <= ${zone.x_range.max}`);

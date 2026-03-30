@@ -19,7 +19,7 @@ import type { ElementManifest } from './ifc-extraction.interface';
 export interface TaktZoneMap {
   [zoneId: string]: {
     status: string;
-    z_min: number; z_max: number;
+    z_min?: number; z_max?: number;
     x_min?: number; x_max?: number;
     y_min?: number; y_max?: number;
   };
