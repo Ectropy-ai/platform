@@ -422,7 +422,7 @@ export function ViewerPage() {
               <Typography variant='body2'>
                 Platform admin view — no personal projects. Use the admin console to manage tenants and provision demo users.
               </Typography>
-              <Button variant='contained' size='small' href='/admin/dashboard' sx={{ mt: 1 }}>
+              <Button variant='contained' size='small' href='https://console.ectropy.ai/' target='_blank' rel='noopener noreferrer' sx={{ mt: 1 }}>
                 Admin Console
               </Button>
             </Alert>
