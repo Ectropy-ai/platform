@@ -618,6 +618,17 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       );
       console.log('🟢 [BIM Viewer] viewer.loadObject completed');
 
+      // Re-apply light background after loadObject (Speckle renderer resets on load)
+      try {
+        const speckleRenderer = (viewer as any).getRenderer?.();
+        if (speckleRenderer?.renderer) {
+          speckleRenderer.renderer.setClearColor(new THREE.Color(0xf0f2f5), 1);
+          viewer.requestRender();
+        }
+      } catch (_bgErr) {
+        // background setting is non-blocking
+      }
+
       logger.info('[BIM Viewer] Successfully loaded Speckle object with official loader', {
         objectUrl,
       });
