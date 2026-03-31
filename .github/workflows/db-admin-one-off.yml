@@ -10,27 +10,43 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Setup SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/prod_key
-          chmod 600 ~/.ssh/prod_key
-          ssh-keyscan -H ${{ secrets.DO_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      - name: Upsert ectropytest project_roles via SSH
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add runner IP to firewall (temporary)
+        id: firewall
         run: |
-          ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=no root@${{ secrets.DO_HOST }} '
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          echo "Adding $RUNNER_IP/32 to firewall $FIREWALL_ID"
+          doctl compute firewall add-rules $FIREWALL_ID \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+          echo "Waiting 5s for propagation..."
+          sleep 5
+
+      - name: Add SSH known hosts
+        run: ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+
+      - name: Upsert ectropytest project_roles
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ vars.PROD_BLUE_IP }} '
             CONTAINER=$(docker ps --filter name=api-gateway --format "{{.ID}}" | head -1)
             if [ -z "$CONTAINER" ]; then
               echo "ERROR: api-gateway container not found"
               exit 1
             fi
-            echo "Using container: $CONTAINER"
-
+            echo "Container: $CONTAINER"
             docker exec $CONTAINER node -e "
               const { PrismaClient } = require(\"@prisma/client\");
               const p = new PrismaClient();
-
               async function main() {
                 const existing = await p.projectRole.findFirst({
                   where: {
@@ -39,12 +55,10 @@ jobs:
                     role: \"contractor\"
                   }
                 });
-
                 if (existing) {
                   console.log(\"ALREADY_EXISTS:\", JSON.stringify(existing));
                   return;
                 }
-
                 const result = await p.projectRole.create({
                   data: {
                     user_id: \"d574b84f-dba8-446d-af17-647ec53a8a74\",
@@ -55,16 +69,21 @@ jobs:
                     voting_power: 0
                   }
                 });
-
                 console.log(\"UPSERT_RESULT:\", JSON.stringify(result));
               }
-
               main()
                 .catch(e => { console.error(\"ERROR:\", e.message); process.exit(1); })
                 .finally(() => p.\$disconnect());
             "
           '
 
-      - name: Cleanup SSH key
+      - name: Remove runner IP from firewall
         if: always()
-        run: rm -f ~/.ssh/prod_key
+        run: |
+          RUNNER_IP="${{ steps.firewall.outputs.runner_ip }}"
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          if [ -n "$RUNNER_IP" ] && [ -n "$FIREWALL_ID" ]; then
+            doctl compute firewall remove-rules $FIREWALL_ID \
+              --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32" || true
+            echo "Firewall rule removed"
+          fi
