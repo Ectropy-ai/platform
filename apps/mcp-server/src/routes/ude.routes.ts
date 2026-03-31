@@ -44,7 +44,7 @@ udeRouter.get('/', rateLimiter, async (_req: Request, res: Response) => {
 
     const categorizedTools = {
       dataAccess: toolDefinitions.filter((t) =>
-        ['read_current_truth', 'read_roadmap', 'read_decision_log'].includes(
+        ['read_current_truth', 'read_roadmap'].includes(
           t.name
         )
       ),
