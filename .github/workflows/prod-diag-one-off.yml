@@ -1,0 +1,95 @@
+name: "Prod Diagnostic — One-Off (DELETE AFTER USE)"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 5
+
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add runner IP to firewall (temporary)
+        id: firewall
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          doctl compute firewall add-rules $FIREWALL_ID \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+          sleep 5
+
+      - name: Add SSH known hosts
+        run: ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+
+      - name: Diagnose Redis + Session + OAuth on blue node
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ vars.PROD_BLUE_IP }} '
+            echo "=== REDIS CONTAINER STATUS ==="
+            docker ps --filter name=redis --format "{{.Names}} {{.Status}}"
+
+            echo ""
+            echo "=== REDIS PING ==="
+            REDIS_CONTAINER=$(docker ps --filter name=redis --format "{{.Names}}" | head -1)
+            if [ -n "$REDIS_CONTAINER" ]; then
+              REDIS_PW=$(docker exec $(docker ps --filter name=api-gateway --format "{{.Names}}" | head -1) env 2>/dev/null | grep "^REDIS_PASSWORD=" | cut -d= -f2-)
+              if [ -n "$REDIS_PW" ]; then
+                docker exec $REDIS_CONTAINER redis-cli -a "$REDIS_PW" ping 2>/dev/null | grep -v Warning || echo "REDIS_PING_FAILED"
+              else
+                docker exec $REDIS_CONTAINER redis-cli ping 2>/dev/null || echo "REDIS_PING_NO_AUTH"
+              fi
+            else
+              echo "REDIS_CONTAINER_NOT_FOUND"
+            fi
+
+            echo ""
+            echo "=== REDIS KEY COUNT ==="
+            if [ -n "$REDIS_CONTAINER" ] && [ -n "$REDIS_PW" ]; then
+              docker exec $REDIS_CONTAINER redis-cli -a "$REDIS_PW" dbsize 2>/dev/null | grep -v Warning || echo "DBSIZE_FAILED"
+            fi
+
+            echo ""
+            echo "=== REDIS SESSION KEYS ==="
+            if [ -n "$REDIS_CONTAINER" ] && [ -n "$REDIS_PW" ]; then
+              docker exec $REDIS_CONTAINER redis-cli -a "$REDIS_PW" keys "sess:*" 2>/dev/null | grep -v Warning | head -5 || echo "NO_SESSION_KEYS"
+            fi
+
+            echo ""
+            echo "=== API GATEWAY ENV: SESSION/REDIS VARS ==="
+            docker exec $(docker ps --filter name=api-gateway --format "{{.Names}}" | head -1) \
+              env 2>/dev/null | grep -iE "REDIS|SESSION|COOKIE" | sed "s/=.*/=REDACTED/" || echo "ENV_READ_FAILED"
+
+            echo ""
+            echo "=== API GATEWAY LOGS: session/oauth errors (last 100) ==="
+            docker logs $(docker ps --filter name=api-gateway --format "{{.Names}}" | head -1) \
+              --tail 100 2>&1 | grep -iE "session|oauth|state|passport|Unable to verify" | tail -20 || echo "NO_MATCHING_LOGS"
+
+            echo ""
+            echo "=== DOCKER COMPOSE REDIS CONFIG ==="
+            grep -A 15 "redis:" /opt/ectropy/docker-compose.yml 2>/dev/null | head -20 || echo "NO_COMPOSE_REDIS"
+
+            echo ""
+            echo "=== ALL RUNNING CONTAINERS ==="
+            docker ps --format "table {{.Names}}\t{{.Status}}" 2>/dev/null
+          '
+
+      - name: Remove runner IP from firewall
+        if: always()
+        run: |
+          RUNNER_IP="${{ steps.firewall.outputs.runner_ip }}"
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          if [ -n "$RUNNER_IP" ] && [ -n "$FIREWALL_ID" ]; then
+            doctl compute firewall remove-rules $FIREWALL_ID \
+              --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32" || true
+          fi
