@@ -922,7 +922,7 @@ async function bootstrap(): Promise<void> {
             used: Math.round(process.memoryUsage().rss / 1024 / 1024),
             total: 512, // fixed threshold for health scoring
             external: Math.round(process.memoryUsage().external / 1024 / 1024),
-            percent: Math.round(memPercent * 100),
+            percent: memPercent,
           },
           services: healthStatus,
         };
@@ -1068,7 +1068,7 @@ async function bootstrap(): Promise<void> {
             used: Math.round(process.memoryUsage().rss / 1024 / 1024),
             total: 512, // fixed threshold for health scoring
             external: Math.round(process.memoryUsage().external / 1024 / 1024),
-            percent: Math.round(memPercent * 100),
+            percent: memPercent,
           },
           services: healthStatus,
         };
