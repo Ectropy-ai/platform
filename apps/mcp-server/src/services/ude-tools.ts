@@ -573,7 +573,11 @@ const getHealthAssessmentTool: MCPToolDefinition = {
 export const udeTools: MCPToolDefinition[] = [
   readCurrentTruthTool,
   readRoadmapTool,
-  readDecisionLogTool,
+  // readDecisionLogTool removed — reads .roadmap/decision-log.json (platform
+  // architecture decisions), NOT construction PM decisions. SEPPA must use
+  // query_decision_history (PostgreSQL pm_decisions table) for all project
+  // decision queries. Per DEC-007: platform governance tools belong in
+  // MCP-ECTROPY-BUSINESS, not MCP-CONSTRUCTION (SEPPA).
   getFeatureStatusTool,
   getNextWorkTool,
   getHealthAssessmentTool,

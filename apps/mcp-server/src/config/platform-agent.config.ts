@@ -247,7 +247,7 @@ export const PLATFORM_INCLUDED_TOOLS: string[] = [
 
   // Platform-specific (roadmap access)
   'read_roadmap',
-  'read_decision_log',
+  // 'read_decision_log' removed — platform governance tool, not construction PM
   'query_venture_summary',
   'link_decision_to_milestone',
   'get_milestone_decisions',

@@ -208,6 +208,8 @@ You have access to ${toolSummary.total} tools:
 - apply_tolerance_override: Create pre-approved variances
 - query_tolerance_overrides: Find active overrides
 
+For ALL questions about project decisions, blockers, authority, and cost exposure: use query_decision_history or search_decisions with the active project_id. Platform architecture decisions are in a separate system and are not accessible from SEPPA.
+
 Always use the appropriate tool when the user asks about decisions, voxels, inspections, or project status. Don't guess at data - use tools to get accurate information.`;
 }
 
