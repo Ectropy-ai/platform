@@ -10,7 +10,7 @@
     "id": "ectropy",
     "name": "Ectropy Platform",
     "tagline": "Open-source federated construction intelligence platform",
-    "stage": "active",
+    "stage": "seed",
     "founded": "2024-01-01",
     "domain": "ectropy.ai",
     "industry": [
@@ -43,7 +43,10 @@
     },
     "market": {
       "headline": "Construction Technology Market",
-      "note": "Market sizing in roadmap.json - validated against industry reports"
+      "note": "Market sizing in roadmap.json - validated against industry reports",
+      "tam": "Construction tech global market",
+      "sam": "North American construction intelligence",
+      "som": "Canadian industrial construction pilot"
     },
     "businessModel": {
       "headline": "Open-core model",
@@ -98,7 +101,8 @@
     },
     "ask": {
       "headline": "Pre-Seed Round",
-      "note": "Target: $500K-$1M, timing: Q2 2026 post-pilot validation"
+      "note": "Target: $500K-$1M, timing: Q2 2026 post-pilot validation",
+      "amount": 0
     }
   },
   "metrics": {
@@ -141,7 +145,7 @@
       "timing": "Q2 2026 post-pilot validation"
     },
     "investors": [],
-    "runway": null
+    "runway": 12
   },
   "milestones": {
     "achieved": [
