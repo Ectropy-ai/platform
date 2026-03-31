@@ -4,38 +4,32 @@
  * This replaces the session middleware from AuthenticationMiddleware
  * to ensure proper compatibility with Passport.js OAuth flows.
  *
- * Phase: OAuth Architecture Fix
- * Issue: Session state not persisting during OAuth callback
+ * Phase: Shared Session Store (Blue/Green)
+ * Fix: Per-node Redis replaced with shared managed PostgreSQL.
+ * Root cause: Blue and Green nodes ran isolated Redis containers.
+ * Sessions created on one node were invisible to the other.
  */
 
 import session from 'express-session';
 import type { RequestHandler } from 'express';
-import RedisStore from 'connect-redis';
-import { createRedisClient } from './redis.config.js';
+import connectPgSimple from 'connect-pg-simple';
 import { config, isProduction, isStaging } from './index.js';
 import { logger } from '../../../../libs/shared/utils/src/logger.js';
 
 export function getSessionMiddleware(): RequestHandler {
-  // Build Redis URL from environment variables
-  const REDIS_URL =
-    process.env.REDIS_URL ||
-    `redis://:${encodeURIComponent(process.env.REDIS_PASSWORD || '')}@${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || '6379'}`;
+  // Shared PostgreSQL session store — survives blue/green LB routing
+  // Uses the same managed PostgreSQL cluster as the application DB
+  const PgStore = connectPgSimple(session);
 
-  logger.info('Initializing session middleware for Passport.js', {
-    redisHost: process.env.REDIS_HOST || 'localhost',
-    redisPort: process.env.REDIS_PORT || '6379',
+  logger.info('Initializing session middleware (PostgreSQL store)', {
+    hasDbUrl: !!process.env.DATABASE_URL,
   });
 
-  // Create dedicated Redis client for sessions (no keyPrefix to avoid conflicts with Passport)
-  const redisClient = createRedisClient(REDIS_URL, {
-    db: 1, // Use DB 1 for sessions to isolate from main app (DB 0)
-  });
-
-  // Create Redis store with connect-redis v7 (built-in types)
-  const store = new RedisStore({
-    client: redisClient,
-    prefix: 'ectropy:session:',
-    ttl: 86400, // 24 hours in seconds
+  const store = new PgStore({
+    conString: process.env.DATABASE_URL,
+    tableName: 'sessions',
+    createTableIfMissing: true,
+    ttl: 86400, // 24 hours — matches cookie maxAge
   });
 
   // Environment detection
