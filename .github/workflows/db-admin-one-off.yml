@@ -23,7 +23,7 @@ jobs:
 
       - name: Upsert ectropytest project_roles
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: postgresql://${{ vars.DATABASE_USER }}:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}?sslmode=require
         run: |
           node -e "
             const { PrismaClient } = require('@prisma/client');
