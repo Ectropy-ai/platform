@@ -42,16 +42,18 @@ export function getSessionMiddleware(): RequestHandler {
   const isSecureEnvironment = isProduction || isStaging;
 
   // Cookie sameSite setting:
-  // - Development: 'lax' (sameSite:'none' requires secure:true/HTTPS)
-  // - Staging/Production: 'none' (allows OAuth redirects across subdomains with HTTPS)
-  const sameSiteSetting = isSecureEnvironment ? 'none' : 'lax';
+  // - All environments: 'lax' — allows cookies on top-level GET navigations
+  //   (OAuth callback from Google is a top-level GET, so 'lax' works correctly)
+  // - 'none' was causing failures because browsers increasingly block SameSite=None
+  //   cookies as third-party cookies, even on OAuth redirects
+  // - 'lax' is the browser default and the correct choice for OAuth flows
+  const sameSiteSetting: 'lax' | 'none' | 'strict' = 'lax';
 
   logger.info('Session configuration', {
     isProduction,
     isStaging,
     isSecureEnvironment,
     secure: isSecureEnvironment,
-    domain: isSecureEnvironment ? '.ectropy.ai' : undefined,
     sameSite: sameSiteSetting,
     cookieName: 'oauth_session',
   });
@@ -66,9 +68,11 @@ export function getSessionMiddleware(): RequestHandler {
     cookie: {
       secure: isSecureEnvironment, // HTTPS only in staging/production
       httpOnly: true,
-      sameSite: sameSiteSetting, // 'lax' in development, 'none' in staging/production
+      sameSite: sameSiteSetting, // 'lax' always — correct for OAuth top-level GET callbacks
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      domain: isSecureEnvironment ? '.ectropy.ai' : undefined, // Subdomain sharing in staging/prod
+      // domain omitted — browser defaults to exact origin (ectropy.ai)
+      // Explicit '.ectropy.ai' domain was unnecessary (no subdomain sharing needed)
+      // and could cause cookie matching issues with some proxy configurations
       path: '/',
     },
   });
