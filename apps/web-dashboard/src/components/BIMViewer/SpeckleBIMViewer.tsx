@@ -26,6 +26,9 @@ import {
   Viewer,
   CameraController,
   SelectionExtension,
+  MeasurementsExtension,
+  SectionTool,
+  FilteringExtension,
   ViewerEvent,
   ViewModes,
   type SelectionEvent,
@@ -355,9 +358,23 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       console.log('[BIM] Viewer import type:', typeof Viewer, Viewer);
       console.log('[BIM] instanceof Viewer:', viewerRaw instanceof Viewer);
 
+      // Set light background for demo readability (default is black)
+      try {
+        const speckleRenderer = (viewer as any).getRenderer?.();
+        if (speckleRenderer?.renderer) {
+          speckleRenderer.renderer.setClearColor(new THREE.Color(0xf0f2f5), 1);
+          viewer.requestRender();
+        }
+      } catch (_bgErr) {
+        // background setting is non-blocking
+      }
+
       // Add essential extensions
       viewer.createExtension(CameraController);
       viewer.createExtension(SelectionExtension);
+      viewer.createExtension(MeasurementsExtension);
+      viewer.createExtension(SectionTool);
+      viewer.createExtension(FilteringExtension);
       viewer.createExtension(ViewModes);
       viewer.createExtension(VoxelDecisionSurfaceExtension);
 
