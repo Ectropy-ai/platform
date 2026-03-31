@@ -46,6 +46,8 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          LUHTECH_PKG_READ: ${{ secrets.LUHTECH_PKG_READ }}
 
       - name: Install Playwright Browsers
         run: pnpm exec playwright install chromium --with-deps

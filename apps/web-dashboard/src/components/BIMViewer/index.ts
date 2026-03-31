@@ -15,22 +15,26 @@
 export { default as SpeckleBIMViewer } from './SpeckleBIMViewer';
 export type { default as SpeckleBIMViewerProps } from './SpeckleBIMViewer';
 
-// Voxel Overlay
+// Voxel Types (canonical source of truth — DEC-008)
 export {
-  VoxelOverlay,
-  VoxelLegend,
-  VoxelControls,
-  useVoxelOverlay,
   VoxelColorScheme,
   VoxelVisualizationMode,
-} from './VoxelOverlay';
+  SYSTEM_COLORS,
+  STATUS_COLORS,
+  HEALTH_COLORS,
+} from './VoxelTypes';
 export type {
   VoxelData,
   VoxelOverlayConfig,
-  VoxelOverlayProps,
   VoxelLegendProps,
   VoxelControlsProps,
-} from './VoxelOverlay';
+} from './VoxelTypes';
+
+// Voxel Legend (extracted from VoxelOverlay — DEC-008)
+export { VoxelLegend } from './VoxelLegend';
+
+// Voxel Decision Surface Extension (replaces VoxelOverlay — DEC-008)
+export { VoxelDecisionSurfaceExtension } from './VoxelDecisionSurfaceExtension';
 
 // ROS MRO Coordination View
 export { ROSMROView } from './ROSMROView';

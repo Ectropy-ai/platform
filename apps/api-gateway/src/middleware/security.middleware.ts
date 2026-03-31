@@ -52,6 +52,7 @@ const csrfProtection = (req: Request, res: Response, next: NextFunction) => {
     req.path.startsWith('/api/speckle/') || // Speckle BIM (session auth + CORS + project authz)
     req.path.startsWith('/api/v2/projects/') || // Speckle v2 API proxy (session auth + CORS + service token injection)
     req.path.startsWith('/api/admin/') || // Admin operations (session auth + RBAC + audit logging)
+    req.path.startsWith('/api/v1/projects/') || // Voxel/BOX API (session auth + CORS + project authz) DEC-009
     req.path === '/health' || // Health check
     req.path === '/api/health' || // API health check
     req.path === '/ready' || // Ready check

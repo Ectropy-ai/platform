@@ -6,6 +6,30 @@
 import { Pool } from 'pg';
 import { logger } from '../../../../libs/shared/utils/src/logger.js';
 
+/**
+ * Project names blocked at the API layer per DEC-011 Demo Library Governance.
+ *
+ * Two categories:
+ *   1. Generic placeholder names that indicate a test or uninitialised project
+ *   2. Canonical demo library names that must never be recreated by users,
+ *      test fixtures, or rogue pipeline runs — stability contract per DEC-011.
+ *
+ * To add a new canonical demo project, update this constant AND the
+ * CANONICAL DEMO RECORD REGISTRY in ECTROPY-DEMO-LIBRARY-GOVERNANCE-2026-03-28.md.
+ */
+export const BLOCKED_PROJECT_NAMES = [
+  // Generic placeholders — never valid project names
+  'My First Project',
+  'E2E Test Project',
+  'Test Project',
+  'Untitled Project',
+  // Canonical demo library names — DEC-011 stability contract
+  // These IDs are immutable: dc1eaa5b (Maple Ridge) | 47fd3a1b (Sample Residential)
+  'Maple Ridge Commerce Centre',
+  'Sample Residential Complex',
+  'Demo Office Building',
+] as const;
+
 export interface Project {
   id: string;
   name: string;
@@ -144,6 +168,13 @@ export class ProjectService {
       if (!projectData.tenant_id) {
         throw new Error(
           'Tenant ID is required to create a project (multi-tenant isolation)'
+        );
+      }
+
+      if (BLOCKED_PROJECT_NAMES.includes(projectData.name as any)) {
+        throw new Error(
+          `Project name '${projectData.name}' is reserved and cannot be used. ` +
+          `Choose a descriptive project name.`
         );
       }
 

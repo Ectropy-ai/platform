@@ -26,6 +26,9 @@ import {
   Viewer,
   CameraController,
   SelectionExtension,
+  MeasurementsExtension,
+  SectionTool,
+  FilteringExtension,
   ViewerEvent,
   ViewModes,
   type SelectionEvent,
@@ -33,6 +36,8 @@ import {
 // ENTERPRISE FIX (2026-01-14): SpeckleLoader and WorldTree are exported at runtime but not in TypeScript defs
 // Import namespace for runtime access with proper type safety via our interfaces below
 import * as SpeckleViewerModule from '@speckle/viewer';
+import type { IViewer } from '@speckle/viewer';
+import { VoxelDecisionSurfaceExtension } from './VoxelDecisionSurfaceExtension';
 import ObjectLoader from '@speckle/objectloader';
 import * as THREE from 'three';
 import { logger } from '../../services/logger';
@@ -124,7 +129,8 @@ interface SpeckleBIMViewerProps {
    * SPRINT 5 ROS MRO: Callback when Three.js scene is ready for overlay integration.
    * Provides access to the internal Three.js scene and camera for VoxelOverlay.
    */
-  onSceneReady?: (scene: THREE.Scene, camera: THREE.Camera, container: HTMLDivElement) => void;
+  onSceneReady?: (scene: THREE.Scene, camera: THREE.Camera, container: HTMLDivElement, requestRender?: () => void) => void;
+  onViewerReady?: (viewer: IViewer) => void;
   height?: string;
   serverUrl?: string;
 }
@@ -142,6 +148,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
   stakeholderRole,
   onElementSelect,
   onSceneReady,
+  onViewerReady,
   height = '600px',
   serverUrl,
 }) => {
@@ -351,10 +358,25 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       console.log('[BIM] Viewer import type:', typeof Viewer, Viewer);
       console.log('[BIM] instanceof Viewer:', viewerRaw instanceof Viewer);
 
+      // Set light background for demo readability (default is black)
+      try {
+        const speckleRenderer = (viewer as any).getRenderer?.();
+        if (speckleRenderer?.renderer) {
+          speckleRenderer.renderer.setClearColor(new THREE.Color(0xf0f2f5), 1);
+          viewer.requestRender();
+        }
+      } catch (_bgErr) {
+        // background setting is non-blocking
+      }
+
       // Add essential extensions
       viewer.createExtension(CameraController);
       viewer.createExtension(SelectionExtension);
+      viewer.createExtension(MeasurementsExtension);
+      viewer.createExtension(SectionTool);
+      viewer.createExtension(FilteringExtension);
       viewer.createExtension(ViewModes);
+      viewer.createExtension(VoxelDecisionSurfaceExtension);
 
       // Set up selection handling
       viewer.on(ViewerEvent.ObjectClicked, (selectionEvent: SelectionEvent | null) => {
@@ -379,9 +401,13 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         await loadSpeckleObject(viewer, effectiveStreamId, effectiveObjectId);
         loadedObjectRef.current = objectKey;
         console.log('🟢 [BIM Viewer] loadObject resolved, starting render pass');
+        // Notify parent AFTER scene is fully loaded — extensions that call
+        // scene.add() need the post-loadObject scene, not the pre-load one.
+        onViewerReady?.(viewer);
       } else {
         await loadDemoContent(viewer);
         loadedObjectRef.current = null;
+        onViewerReady?.(viewer);
       }
 
       // Apply stakeholder-specific view settings
@@ -394,16 +420,21 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       // This enables VoxelOverlay integration for the coordination view
       if (onSceneReady && containerRef.current) {
         try {
-          // Access Three.js scene and camera from Speckle viewer internals
-          // The viewer exposes these via World and cameraHandler properties
+          // Access Three.js scene and camera from Speckle Viewer v2.28.0 internals
+          // FIX (2026-03-25): viewer.World.scene and viewer.cameraHandler do not exist.
+          // Correct API: getRenderer().scene + CameraController.renderingCamera
+          // CameraController extension name is minified in bundle — find by property.
           const viewerAny = viewer as any;
-          const scene = viewerAny.World?.scene || viewerAny.getRenderer?.()?.scene;
-          const camera =
-            viewerAny.cameraHandler?.camera || viewerAny.cameraHandler?.activeCam?.camera;
+          const speckleRenderer = viewerAny.getRenderer();
+          const scene = speckleRenderer?.scene;
+          const cameraExt = Object.values(viewerAny.extensions || {})
+            .find((ext: any) => ext?.renderingCamera !== undefined);
+          const camera = (cameraExt as any)?.renderingCamera;
 
           if (scene && camera) {
             logger.info('[BIM Viewer] Calling onSceneReady with Three.js internals');
-            onSceneReady(scene as THREE.Scene, camera as THREE.Camera, containerRef.current);
+            const requestRender = () => viewer.requestRender();
+            onSceneReady(scene as THREE.Scene, camera as THREE.Camera, containerRef.current, requestRender);
           } else {
             logger.warn('[BIM Viewer] Could not access Three.js scene/camera from viewer');
           }

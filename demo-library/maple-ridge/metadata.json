@@ -1,0 +1,59 @@
+{
+  "projectId": "dc1eaa5b-7553-46ec-92a5-e20762a60c71",
+  "projectName": "Maple Ridge Commerce Centre",
+  "projectSlug": "maple-ridge-commerce-centre",
+  "location": {
+    "city": "Edmonton",
+    "province": "Alberta",
+    "country": "Canada",
+    "timezone": "America/Edmonton"
+  },
+  "budget": 12500000,
+  "currency": "CAD",
+  "startDate": "2026-03-01",
+  "completionDate": "2026-09-30",
+  "contractType": "IPD",
+  "contractStandard": "AIA-C191-2009-adapted-CA",
+  "parties": {
+    "owner": {
+      "name": "Maple Ridge Development Corp.",
+      "contact": "Sandra Kowalski",
+      "role": "Owner",
+      "authorityLevel": "L1"
+    },
+    "generalContractor": {
+      "name": "Northland Construction Ltd.",
+      "contact": "James Okafor",
+      "role": "GC / Construction Manager",
+      "authorityLevel": "L2"
+    },
+    "architect": {
+      "name": "Benner + Hollis Architects",
+      "contact": "Priya Sharma",
+      "role": "Architect of Record",
+      "authorityLevel": "L2"
+    },
+    "structural": {
+      "name": "Summit Structural Engineers",
+      "contact": "David Marchetti",
+      "role": "Structural Engineer",
+      "authorityLevel": "L3"
+    },
+    "mep": {
+      "name": "Prairie Systems Engineering",
+      "contact": "Wei Chen",
+      "role": "MEP Engineer",
+      "authorityLevel": "L3"
+    }
+  },
+  "ifc": {
+    "architectural": "ifc/Ifc4_Revit_ARC.ifc",
+    "mechanical": "ifc/Ifc4_Revit_MEP.ifc",
+    "structural": "ifc/Ifc4_Revit_STR.ifc",
+    "schema": "IFC4",
+    "source": "youshengCode/IfcSampleFiles (public domain)"
+  },
+  "demoLibraryVersion": "1.0.0",
+  "createdAt": "2026-03-27",
+  "createdBy": "LuhTech Holdings — Ectropy Platform"
+}

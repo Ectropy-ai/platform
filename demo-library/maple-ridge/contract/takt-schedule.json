@@ -1,0 +1,76 @@
+{
+  "project_id_ref": "dc1eaa5b-7553-46ec-92a5-e20762a60c71",
+  "bundle_version": "1.0.0",
+  "ifc_ground_truth_source": "Ifc4_Revit_ARC.ifc + MEP.ifc — 2026-03-27",
+  "coordinate_system": "metres (Speckle-transformed from mm IFC source)",
+  "takt_cycle_weeks": 2,
+  "zones": [
+    {
+      "zone_id": "Zone-A-Foundation",
+      "name": "Foundation and Ground Slab",
+      "takt_week": 1,
+      "status": "COMPLETE",
+      "percent_complete": 100,
+      "z_range": { "min": -0.036, "max": 0.050 },
+      "x_range": null,
+      "y_range": null,
+      "actual_start": "2026-01-15",
+      "actual_end": "2026-02-14",
+      "trades": ["STRUCT"],
+      "predecessor_zones": []
+    },
+    {
+      "zone_id": "Zone-B-L1-North",
+      "name": "Level 1 North — MEP Rough-In",
+      "takt_week": 3,
+      "status": "IN_PROGRESS",
+      "percent_complete": 65,
+      "z_range": { "min": 0.050, "max": 2.700 },
+      "x_range": { "min": -7.536, "max": 0.000 },
+      "y_range": null,
+      "planned_start": "2026-02-15",
+      "actual_start": "2026-02-15",
+      "trades": ["HVAC", "PLUMB", "ELEC"],
+      "predecessor_zones": ["Zone-A-Foundation"]
+    },
+    {
+      "zone_id": "Zone-C-L1-South",
+      "name": "Level 1 South — MEP Coordination",
+      "takt_week": 4,
+      "status": "IN_PROGRESS",
+      "percent_complete": 45,
+      "z_range": { "min": 0.050, "max": 2.700 },
+      "x_range": { "min": 0.000, "max": 7.628 },
+      "y_range": null,
+      "planned_start": "2026-03-01",
+      "actual_start": "2026-03-01",
+      "trades": ["HVAC", "PLUMB", "ELEC", "STRUCT"],
+      "predecessor_zones": ["Zone-A-Foundation"]
+    },
+    {
+      "zone_id": "Zone-C-L1-Clash-B3",
+      "name": "Level 1 South — HVAC Clash Cluster Grid B3",
+      "takt_week": 4,
+      "status": "BLOCKED",
+      "percent_complete": 0,
+      "z_range": { "min": 1.400, "max": 2.100 },
+      "x_range": { "min": 1.500, "max": 3.500 },
+      "y_range": { "min": -1.500, "max": 1.500 },
+      "blocking_decision_ref": "HVAC-B3-CLASH-001",
+      "predecessor_zones": ["Zone-C-L1-South"]
+    },
+    {
+      "zone_id": "Zone-D-L2",
+      "name": "Level 2 — Framing and Envelope",
+      "takt_week": 5,
+      "status": "PLANNED",
+      "percent_complete": 0,
+      "z_range": { "min": 2.700, "max": 3.127 },
+      "x_range": null,
+      "y_range": null,
+      "planned_start": "2026-04-01",
+      "trades": ["STRUCT", "ARCH"],
+      "predecessor_zones": ["Zone-B-L1-North", "Zone-C-L1-South"]
+    }
+  ]
+}

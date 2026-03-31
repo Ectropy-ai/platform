@@ -249,6 +249,7 @@ import { ConsoleRoutes } from './routes/console/index.js';
 import { ExternalIntegrationsRoutes } from './routes/external-integrations.routes.js';
 import { createDemoProvisioningRoutes } from './routes/admin/provision-demo-user.route.js';
 import { createSeedDemoDataRoutes } from './routes/admin/seed-demo-data.route.js';
+import { createIntakeRoutes } from './routes/admin/intake.routes.js';
 import mcpProxyRoutes from './routes/mcp-proxy.routes.js';
 import { TaskRoutes } from './routes/tasks.routes.js';
 import { AlertRoutes } from './routes/alerts.routes.js';
@@ -1352,6 +1353,7 @@ async function bootstrap(): Promise<void> {
     try {
       app.use('/api/admin', createDemoProvisioningRoutes());
       app.use('/api/admin', createSeedDemoDataRoutes());
+      app.use('/api/admin', createIntakeRoutes());
       logger.info(
         '✅ Demo Provisioning routes mounted successfully at /api/admin'
       );
@@ -2073,6 +2075,70 @@ async function bootstrap(): Promise<void> {
           return res.status(500).json({
             success: false,
             error: 'Internal server error',
+          });
+        }
+      }
+    );
+
+    // GET /api/v1/projects/:projectId/decisions
+    // ROOT CAUSE FIX (2026-03-24): Frontend calls /api/v1/projects/:id/decisions
+    // but no decisions route existed. Data lives in pm_decisions table.
+    // Query params (status, type) accepted but not filtered — enum mismatch
+    // with frontend constants; frontend only consumes count + array length.
+    app.get(
+      '/api/v1/projects/:projectId/decisions',
+      ensureAuthenticated,
+      async (req: Request, res: Response) => {
+        try {
+          if (!req.user || !req.user.id) {
+            return res.status(401).json({
+              success: false,
+              error: 'Authentication required',
+            });
+          }
+
+          const { projectId } = req.params;
+          const userId = req.user.id;
+
+          // Verify project access
+          const access = await pool.query(
+            `SELECT 1 FROM project_roles
+             WHERE user_id = $1 AND project_id = $2 AND is_active = true`,
+            [userId, projectId]
+          );
+
+          if (access.rows.length === 0) {
+            return res.status(403).json({
+              success: false,
+              error: 'Access denied to this project',
+            });
+          }
+
+          const result = await pool.query(
+            `SELECT id, urn, project_id, decision_id, title, description,
+                    type, status, authority_required, authority_current,
+                    budget_estimated, budget_currency, primary_voxel_urn,
+                    created_at, updated_at
+             FROM pm_decisions
+             WHERE project_id = $1
+             ORDER BY created_at DESC`,
+            [projectId]
+          );
+
+          return res.json({
+            decisions: result.rows,
+            count: result.rows.length,
+          });
+        } catch (error) {
+          const err = error as Error;
+          logger.error('Failed to fetch decisions', {
+            projectId: req.params.projectId,
+            userId: req.user?.id,
+            error: err.message,
+          });
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to fetch decisions',
           });
         }
       }

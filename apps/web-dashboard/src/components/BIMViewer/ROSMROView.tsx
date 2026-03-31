@@ -80,13 +80,13 @@ import * as THREE from 'three';
 
 import SpeckleBIMViewer from './SpeckleBIMViewer';
 import {
-  VoxelOverlay,
-  VoxelLegend,
   VoxelColorScheme,
   VoxelVisualizationMode,
-  VoxelOverlayConfig,
-  VoxelData,
-} from './VoxelOverlay';
+  type VoxelData,
+} from './VoxelTypes';
+import { VoxelLegend } from './VoxelLegend';
+import { VoxelDecisionSurfaceExtension } from './VoxelDecisionSurfaceExtension';
+import type { IViewer } from '@speckle/viewer';
 // SPRINT 5: Import React Query hooks for real data (2026-01-24)
 import {
   useROSMROData,
@@ -118,6 +118,8 @@ export interface ROSMROViewProps {
   userName?: string;
   /** User authority level (0-6) for SEPPA decision routing */
   userAuthority?: AuthorityLevel;
+  /** Whether this tab is currently visible — defers BIM mount until active */
+  isActive?: boolean;
 }
 
 interface VoxelAggregation {
@@ -509,6 +511,7 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
   userId = 'anonymous',
   userName,
   userAuthority = 3, // Default to PM level
+  isActive = true,
 }) => {
   // SPRINT 5: Use React Query hooks for real data (2026-01-24)
   // Replaces local state + useEffect with centralized data fetching
@@ -577,42 +580,48 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
   const [selectedVoxel, setSelectedVoxel] = useState<VoxelData | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [showControlPanel, setShowControlPanel] = useState(true);
-  const [sceneReady, setSceneReady] = useState(false);
+  const [hasBeenActive, setHasBeenActive] = useState(isActive);
+  const [voxelExt, setVoxelExt] = useState<VoxelDecisionSurfaceExtension | null>(null);
+
+  // Defer SpeckleBIMViewer mount until tab is visible (non-zero canvas dimensions)
+  useEffect(() => {
+    if (isActive) setHasBeenActive(true);
+  }, [isActive]);
 
   // M6: SEPPA AI Assistant state
   const [seppaOpen, setSeppaOpen] = useState(false);
 
-  // Three.js refs for VoxelOverlay integration
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.Camera | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  // DEC-009: Ref for projectId to avoid stale closure in handleViewerReady
+  const projectIdRef = React.useRef(projectId);
+  projectIdRef.current = projectId;
 
-  // SPRINT 5: onSceneReady callback to capture Three.js internals from SpeckleBIMViewer
-  const handleSceneReady = useCallback(
-    (scene: THREE.Scene, camera: THREE.Camera, container: HTMLDivElement) => {
-      sceneRef.current = scene;
-      cameraRef.current = camera;
-      containerRef.current = container;
-      setSceneReady(true);
-      console.log('[ROSMROView] Scene ready for VoxelOverlay integration');
-    },
-    [],
-  );
+  // DEC-008: Get extension ref when viewer is ready
+  // DEC-009: Trigger BOX generation after model load
+  const handleViewerReady = useCallback((viewer: IViewer) => {
+    console.log('[DEC-008 wiring] handleViewerReady called, ext:', viewer.getExtension(VoxelDecisionSurfaceExtension));
+    const ext = viewer.getExtension(VoxelDecisionSurfaceExtension) as VoxelDecisionSurfaceExtension;
+    setVoxelExt(ext);
+    // DEC-009: Generate BOX cells from WorldTree after model load completes
+    const pid = projectIdRef.current;
+    if (ext && pid && streamId) {
+      ext.generateAndPersistBoxes(pid, streamId, objectId ?? '').catch((err: unknown) => {
+        console.error('[BOX] generateAndPersistBoxes failed:', err);
+      });
+    }
+  }, []);
 
-  // Voxel overlay config
-  const voxelConfig = useMemo<VoxelOverlayConfig>(
-    () => ({
-      mode: viewState.visualizationMode,
-      colorScheme: viewState.colorScheme,
-      opacity: 0.7,
-      showWireframe: viewState.visualizationMode === VoxelVisualizationMode.WIREFRAME,
-      showLabels: false,
-      filterSystems: viewState.filterSystems.length > 0 ? viewState.filterSystems : undefined,
-      filterStatuses: viewState.filterStatuses.length > 0 ? viewState.filterStatuses : undefined,
-      highlightedVoxels: viewState.selectedVoxelId ? [viewState.selectedVoxelId] : undefined,
-    }),
-    [viewState],
-  );
+  // DEC-008: Sync voxel data to extension when data loads/changes
+  useEffect(() => {
+    console.log('[DEC-008 wiring] updateVoxels effect firing, voxelExt:', !!voxelExt, 'voxels:', voxels?.length);
+    if (!voxelExt || !voxels?.length) return;
+    voxelExt.updateVoxels(voxels);
+  }, [voxelExt, voxels]);
+
+  // DEC-008: Sync visibility toggle
+  useEffect(() => {
+    voxelExt?.setVisible(viewState.showVoxels ?? true);
+  }, [voxelExt, viewState.showVoxels]);
+
 
   // Handle voxel click
   const handleVoxelClick = useCallback(
@@ -761,32 +770,19 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
       </Paper>
 
       {/* Main Content */}
-      <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 600 }}>
         {/* 3D Viewer */}
         <Box sx={{ flex: 1, position: 'relative' }}>
           {/* BIM Mesh Viewer with VoxelOverlay integration */}
-          {viewState.showMesh && (
+          {viewState.showMesh && hasBeenActive && (
             <SpeckleBIMViewer
               streamId={streamId}
               objectId={objectId}
               stakeholderRole={stakeholderRole}
               serverUrl={serverUrl}
               onElementSelect={handleBIMElementSelect}
-              onSceneReady={handleSceneReady}
+              onViewerReady={handleViewerReady}
               height='100%'
-            />
-          )}
-
-          {/* Voxel Overlay - renders when Three.js scene is ready */}
-          {viewState.showVoxels && sceneReady && sceneRef.current && cameraRef.current && (
-            <VoxelOverlay
-              voxels={voxels}
-              config={voxelConfig}
-              scene={sceneRef.current}
-              camera={cameraRef.current}
-              visible={viewState.showVoxels}
-              onVoxelClick={handleVoxelClick}
-              onVoxelHover={handleVoxelHover}
             />
           )}
 

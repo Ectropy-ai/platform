@@ -77,6 +77,8 @@ jobs:
           echo "🔄 Updating patch and minor versions..."
           pnpm update --latest --interactive false || true
           pnpm install
+        env:
+          LUHTECH_PKG_READ: ${{ secrets.LUHTECH_PKG_READ }}
 
       - name: Run security audit
         id: audit

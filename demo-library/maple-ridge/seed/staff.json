@@ -1,0 +1,93 @@
+{
+  "bundle_version": "1.0.0",
+  "authority_levels": [
+    {
+      "level": 0,
+      "name": "FIELD",
+      "title": "AI Auto-Resolve",
+      "budget_limit": 0,
+      "auto_approve": true,
+      "schedule_authority": "0"
+    },
+    {
+      "level": 1,
+      "name": "FOREMAN",
+      "title": "Field Worker",
+      "budget_limit": 5000,
+      "auto_approve": false,
+      "schedule_authority": "1 hour"
+    },
+    {
+      "level": 2,
+      "name": "SUPERINTENDENT",
+      "title": "Site Foreman",
+      "budget_limit": 25000,
+      "auto_approve": false,
+      "schedule_authority": "4 hours"
+    },
+    {
+      "level": 3,
+      "name": "PM",
+      "title": "GC Superintendent",
+      "budget_limit": 100000,
+      "auto_approve": false,
+      "schedule_authority": "2 hours"
+    },
+    {
+      "level": 4,
+      "name": "ARCHITECT",
+      "title": "Project Manager",
+      "budget_limit": 500000,
+      "auto_approve": false,
+      "schedule_authority": "1 day"
+    },
+    {
+      "level": 5,
+      "name": "OWNER",
+      "title": "Owner Representative",
+      "budget_limit": 2000000,
+      "auto_approve": false,
+      "schedule_authority": "1 week"
+    },
+    {
+      "level": 6,
+      "name": "REGULATORY",
+      "title": "Owner / Regulatory",
+      "budget_limit": null,
+      "auto_approve": false,
+      "schedule_authority": "unlimited"
+    }
+  ],
+  "staff": [
+    {
+      "email": "marcus.webb@gcpartner.ca",
+      "name": "Marcus Webb",
+      "authority_level": 2,
+      "role": "SUPERINTENDENT"
+    },
+    {
+      "email": "james.okafor@gcpartner.ca",
+      "name": "James Okafor",
+      "authority_level": 3,
+      "role": "PM"
+    },
+    {
+      "email": "sarah.chen@gcpartner.ca",
+      "name": "Sarah Chen",
+      "authority_level": 4,
+      "role": "ARCHITECT"
+    },
+    {
+      "email": "derek.huang@mapleridge-dev.ca",
+      "name": "Derek Huang",
+      "authority_level": 5,
+      "role": "OWNER"
+    },
+    {
+      "email": "ectropytest@gmail.com",
+      "name": "Demo User",
+      "authority_level": 1,
+      "role": "FOREMAN"
+    }
+  ]
+}

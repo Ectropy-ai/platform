@@ -15,11 +15,22 @@ import {
   StakeholderRole,
 } from '@prisma/client';
 import { logger } from '@ectropy/shared/utils';
-import {
-  TwentyGraphQLClient,
-  PersonService,
-  CompanyService,
-} from '@luh-tech/crm';
+// CRM integration stubs — @luh-tech/crm removed (ghost dependency, v0.2.x throwaway per
+// Ectropy-Business/apps/crm/README.md). Real CRM targets Twenty CRM v1.18.0 GraphQL
+// (Phase 3, Ectropy-Business). Stubs satisfy TypeScript compiler. All CRM paths are
+// gated behind CRM_ENABLED=true (currently false — no runtime impact).
+interface _CRMClientConfig { apiUrl: string; apiKey: string; }
+interface _UpsertByDomainArgs { name: string; domainName?: string; }
+interface _UpsertByEmailArgs { email: string; firstName: string; lastName: string; }
+class TwentyGraphQLClient { constructor(_config: _CRMClientConfig) {} }
+class PersonService {
+  constructor(_client: TwentyGraphQLClient) {}
+  upsertByEmail(_args: _UpsertByEmailArgs): Promise<void> { return Promise.resolve(); }
+}
+class CompanyService {
+  constructor(_client: TwentyGraphQLClient) {}
+  upsertByDomain(_args: _UpsertByDomainArgs): Promise<void> { return Promise.resolve(); }
+}
 import {
   UserManagementError,
   UserManagementErrorCode,
