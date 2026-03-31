@@ -581,9 +581,6 @@ importers:
       '@ectropy/database':
         specifier: workspace:*
         version: link:../../packages/database
-      '@luh-tech/crm':
-        specifier: 0.2.0
-        version: 0.2.0
       '@prisma/client':
         specifier: 6.16.3
         version: 6.16.3(prisma@6.16.3(magicast@0.3.5)(typescript@5.9.3))(typescript@5.9.3)
@@ -3435,9 +3432,6 @@ packages:
 
   '@lhci/utils@0.15.1':
     resolution: {integrity: sha512-WclJnUQJeOMY271JSuaOjCv/aA0pgvuHZS29NFNdIeI14id8eiFsjith85EGKYhljgoQhJ2SiW4PsVfFiakNNw==}
-
-  '@luh-tech/crm@0.2.0':
-    resolution: {integrity: sha512-7AMz7Icb2MWu+eqojYUq3DPPchILCfycmzKA0v+zQaZaAA0x5Yk/+T5t/QXIOJWF3x+U6QuafVrFkFYln24eHQ==, tarball: https://npm.pkg.github.com/download/@luh-tech/crm/0.2.0/11022f1497d4f8bfa2005d91cf7a29943a61b60d}
 
   '@mapbox/node-pre-gyp@1.0.11':
     resolution: {integrity: sha512-Yhlar6v9WQgUp/He7BdgzOz8lqMQ8sU+jkCq7Wx8Myc5YFJLbEe7lgui/V7G1qB1DJykHSGwreceSaD60Y0PUQ==}
@@ -17525,8 +17519,6 @@ snapshots:
       - react-native-b4a
       - supports-color
       - utf-8-validate
-
-  '@luh-tech/crm@0.2.0': {}
 
   '@mapbox/node-pre-gyp@1.0.11(encoding@0.1.13)':
     dependencies:

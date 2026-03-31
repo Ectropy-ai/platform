@@ -17,7 +17,18 @@ import { randomBytes } from 'crypto';
 import { logger } from '@ectropy/shared/utils';
 import { emailService } from '../email.service.js';
 import { EmailTemplateService } from './email-template.service.js';
-import { TwentyGraphQLClient, PersonService } from '@luh-tech/crm';
+// CRM integration stubs — @luh-tech/crm removed (ghost dependency, v0.2.x throwaway per
+// Ectropy-Business/apps/crm/README.md). Real CRM targets Twenty CRM v1.18.0 GraphQL
+// (Phase 3, Ectropy-Business). Stubs satisfy TypeScript compiler. All CRM paths are
+// gated behind CRM_ENABLED=true (currently false — no runtime impact).
+interface _CRMClientConfig { apiUrl: string; apiKey: string; }
+interface _UpsertByEmailArgs { email: string; firstName: string; lastName: string; }
+class TwentyGraphQLClient { constructor(_config: _CRMClientConfig) {} }
+class PersonService {
+  constructor(_client: TwentyGraphQLClient) {}
+  upsertByEmail(_args: _UpsertByEmailArgs): Promise<{ id: string }> { return Promise.resolve({ id: '' }); }
+  updateLifecycleStage(_id: string, _stage: string): Promise<void> { return Promise.resolve(); }
+}
 import {
   UserManagementError,
   UserManagementErrorCode,
