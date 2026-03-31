@@ -132,12 +132,14 @@ jobs:
         env:
           DOCKER_BUILDKIT: 1
           COMPOSE_DOCKER_CLI_BUILD: 1
+          LUHTECH_PKG_READ: ${{ secrets.LUHTECH_PKG_READ }}
         run: |
           echo "⏱️  BUILD START: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
           # Build images with BuildKit cache
           docker compose -f docker-compose.test.yml build \
             --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --build-arg LUHTECH_PKG_READ="${LUHTECH_PKG_READ}" \
             web-dashboard api-gateway mcp-server
 
           echo "⏱️  BUILD END: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
