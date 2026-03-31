@@ -10,56 +10,61 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install Prisma
+      - name: Setup SSH key
         run: |
-          npm install prisma @prisma/client
-          npx prisma generate
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/prod_key
+          chmod 600 ~/.ssh/prod_key
+          ssh-keyscan -H ${{ secrets.DO_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Upsert ectropytest project_roles
-        env:
-          DATABASE_URL: postgresql://${{ vars.DATABASE_USER }}:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}?sslmode=require
+      - name: Upsert ectropytest project_roles via SSH
         run: |
-          node -e "
-            const { PrismaClient } = require('@prisma/client');
-            const p = new PrismaClient();
+          ssh -i ~/.ssh/prod_key -o StrictHostKeyChecking=no root@${{ secrets.DO_HOST }} '
+            CONTAINER=$(docker ps --filter name=api-gateway --format "{{.ID}}" | head -1)
+            if [ -z "$CONTAINER" ]; then
+              echo "ERROR: api-gateway container not found"
+              exit 1
+            fi
+            echo "Using container: $CONTAINER"
 
-            async function main() {
-              // First check if row already exists
-              const existing = await p.projectRole.findFirst({
-                where: {
-                  user_id: 'd574b84f-dba8-446d-af17-647ec53a8a74',
-                  project_id: 'dc1eaa5b-7553-46ec-92a5-e20762a60c71',
-                  role: 'contractor'
+            docker exec $CONTAINER node -e "
+              const { PrismaClient } = require(\"@prisma/client\");
+              const p = new PrismaClient();
+
+              async function main() {
+                const existing = await p.projectRole.findFirst({
+                  where: {
+                    user_id: \"d574b84f-dba8-446d-af17-647ec53a8a74\",
+                    project_id: \"dc1eaa5b-7553-46ec-92a5-e20762a60c71\",
+                    role: \"contractor\"
+                  }
+                });
+
+                if (existing) {
+                  console.log(\"ALREADY_EXISTS:\", JSON.stringify(existing));
+                  return;
                 }
-              });
 
-              if (existing) {
-                console.log('ALREADY_EXISTS:', JSON.stringify(existing));
-                return;
+                const result = await p.projectRole.create({
+                  data: {
+                    user_id: \"d574b84f-dba8-446d-af17-647ec53a8a74\",
+                    project_id: \"dc1eaa5b-7553-46ec-92a5-e20762a60c71\",
+                    role: \"contractor\",
+                    permissions: [],
+                    is_active: true,
+                    voting_power: 0
+                  }
+                });
+
+                console.log(\"UPSERT_RESULT:\", JSON.stringify(result));
               }
 
-              // Create the row
-              const result = await p.projectRole.create({
-                data: {
-                  user_id: 'd574b84f-dba8-446d-af17-647ec53a8a74',
-                  project_id: 'dc1eaa5b-7553-46ec-92a5-e20762a60c71',
-                  role: 'contractor',
-                  permissions: [],
-                  is_active: true,
-                  voting_power: 0
-                }
-              });
+              main()
+                .catch(e => { console.error(\"ERROR:\", e.message); process.exit(1); })
+                .finally(() => p.\$disconnect());
+            "
+          '
 
-              console.log('UPSERT_RESULT:', JSON.stringify(result));
-            }
-
-            main()
-              .catch(e => { console.error('ERROR:', e.message); process.exit(1); })
-              .finally(() => p.\$disconnect());
-          "
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/prod_key
