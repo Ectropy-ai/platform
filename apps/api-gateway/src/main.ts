@@ -857,12 +857,15 @@ async function bootstrap(): Promise<void> {
           score -= 10;
         }
 
-        // Memory check
+        // Memory check — use RSS against fixed threshold (not heapUsed/heapTotal)
+        // V8 keeps heapTotal close to heapUsed at low traffic (95%+ is normal idle).
+        // RSS measures actual process memory including native allocations and buffers.
         const memUsage = process.memoryUsage();
-        const memPercent = memUsage.heapUsed / memUsage.heapTotal;
-        if (memPercent > 0.9) {
+        const rssMB = memUsage.rss / 1024 / 1024;
+        const memPercent = Math.round((rssMB / 512) * 100); // 512MB threshold
+        if (rssMB > 460) {
           score -= 20;
-        } else if (memPercent > 0.8) {
+        } else if (rssMB > 384) {
           score -= 10;
         }
 
@@ -916,10 +919,10 @@ async function bootstrap(): Promise<void> {
                 : { total: 0, idle: 0, waiting: 0 },
           },
           memory: {
-            used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-            total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+            used: Math.round(process.memoryUsage().rss / 1024 / 1024),
+            total: 512, // fixed threshold for health scoring
             external: Math.round(process.memoryUsage().external / 1024 / 1024),
-            percent: Math.round(memPercent * 100),
+            percent: memPercent,
           },
           services: healthStatus,
         };
@@ -1000,12 +1003,15 @@ async function bootstrap(): Promise<void> {
           score -= 10;
         }
 
-        // Memory check
+        // Memory check — use RSS against fixed threshold (not heapUsed/heapTotal)
+        // V8 keeps heapTotal close to heapUsed at low traffic (95%+ is normal idle).
+        // RSS measures actual process memory including native allocations and buffers.
         const memUsage = process.memoryUsage();
-        const memPercent = memUsage.heapUsed / memUsage.heapTotal;
-        if (memPercent > 0.9) {
+        const rssMB = memUsage.rss / 1024 / 1024;
+        const memPercent = Math.round((rssMB / 512) * 100); // 512MB threshold
+        if (rssMB > 460) {
           score -= 20;
-        } else if (memPercent > 0.8) {
+        } else if (rssMB > 384) {
           score -= 10;
         }
 
@@ -1059,10 +1065,10 @@ async function bootstrap(): Promise<void> {
                 : { total: 0, idle: 0, waiting: 0 },
           },
           memory: {
-            used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-            total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+            used: Math.round(process.memoryUsage().rss / 1024 / 1024),
+            total: 512, // fixed threshold for health scoring
             external: Math.round(process.memoryUsage().external / 1024 / 1024),
-            percent: Math.round(memPercent * 100),
+            percent: memPercent,
           },
           services: healthStatus,
         };
