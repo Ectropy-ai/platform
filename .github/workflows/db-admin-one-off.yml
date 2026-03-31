@@ -1,0 +1,65 @@
+name: "DB Admin — One-Off (DELETE AFTER USE)"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  upsert-project-role:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Prisma
+        run: |
+          npm install prisma @prisma/client
+          npx prisma generate
+
+      - name: Upsert ectropytest project_roles
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          node -e "
+            const { PrismaClient } = require('@prisma/client');
+            const p = new PrismaClient();
+
+            async function main() {
+              // First check if row already exists
+              const existing = await p.projectRole.findFirst({
+                where: {
+                  user_id: 'd574b84f-dba8-446d-af17-647ec53a8a74',
+                  project_id: 'dc1eaa5b-7553-46ec-92a5-e20762a60c71',
+                  role: 'contractor'
+                }
+              });
+
+              if (existing) {
+                console.log('ALREADY_EXISTS:', JSON.stringify(existing));
+                return;
+              }
+
+              // Create the row
+              const result = await p.projectRole.create({
+                data: {
+                  user_id: 'd574b84f-dba8-446d-af17-647ec53a8a74',
+                  project_id: 'dc1eaa5b-7553-46ec-92a5-e20762a60c71',
+                  role: 'contractor',
+                  permissions: [],
+                  is_active: true,
+                  voting_power: 0
+                }
+              });
+
+              console.log('UPSERT_RESULT:', JSON.stringify(result));
+            }
+
+            main()
+              .catch(e => { console.error('ERROR:', e.message); process.exit(1); })
+              .finally(() => p.\$disconnect());
+          "
