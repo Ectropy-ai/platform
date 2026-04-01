@@ -2,46 +2,78 @@ name: "ONE-OFF: Create sessions table in production DB"
 on:
   workflow_dispatch:
 
+env:
+  PROD_BLUE_IP: ${{ vars.PROD_BLUE_IP }}
+
 jobs:
   create-sessions-table:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Create sessions table
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add runner IP to firewall (temporary)
+        id: add-firewall-rule
         run: |
-          npm install pg
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "Runner IP: $RUNNER_IP"
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          doctl compute firewall add-rules $FIREWALL_ID \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+          echo "Firewall rule added"
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-          # Strip sslmode from DATABASE_URL (same pattern as session.config.ts)
-          CLEAN_URL=$(echo "$DATABASE_URL" | sed 's/sslmode=[^&]*&\?//g')
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-          node -e "
-            const { Pool } = require('pg');
-            const pool = new Pool({
-              connectionString: '$CLEAN_URL'.replace(/sslmode=[^&]*(&|\$)/g, ''),
-              ssl: { rejectUnauthorized: false }
-            });
-            pool.query(\`
-              CREATE TABLE IF NOT EXISTS \"sessions\" (
-                \"sid\" varchar NOT NULL COLLATE \"default\",
-                \"sess\" json NOT NULL,
-                \"expire\" timestamp(6) NOT NULL,
-                CONSTRAINT \"session_pkey\" PRIMARY KEY (\"sid\")
-                  NOT DEFERRABLE INITIALLY IMMEDIATE
-              ) WITH (OIDS=FALSE)
-            \`).then(() => pool.query(\`
-              CREATE INDEX IF NOT EXISTS \"IDX_session_expire\"
-              ON \"sessions\" (\"expire\")
-            \`)).then(() => {
-              return pool.query(
-                'SELECT COUNT(*) as cnt FROM sessions'
-              );
-            }).then(r => {
-              console.log('SUCCESS: sessions table exists, rows:', r.rows[0].cnt);
-              pool.end();
-            }).catch(e => {
-              console.error('FAILED:', e.message);
-              process.exit(1);
-            });
-          "
+      - name: Wait for firewall propagation and SSH keyscan
+        run: |
+          echo "Waiting 20s for DO firewall propagation..."
+          sleep 20
+          for i in 1 2 3 4 5; do
+            echo "Attempt $i/5..."
+            if ssh-keyscan -T 10 -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts 2>&1; then
+              echo "ssh-keyscan succeeded on attempt $i"
+              break
+            fi
+            if [ $i -eq 5 ]; then
+              echo "ssh-keyscan failed after 5 attempts"
+              exit 1
+            fi
+            echo "Retrying in 10s..."
+            sleep 10
+          done
+
+      - name: Create sessions table via SSH to production container
+        run: |
+          ssh -o StrictHostKeyChecking=no root@${{ vars.PROD_BLUE_IP }} '
+            docker exec ectropy-api-gateway sh -c "node -e \"
+              const { Pool } = require(\\\"pg\\\");
+              const url = process.env.DATABASE_URL.replace(/[?&]sslmode=[^&]*/g, \\\"\\\");
+              const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
+              pool.query(\\\"CREATE TABLE IF NOT EXISTS sessions (sid varchar NOT NULL COLLATE default, sess json NOT NULL, expire timestamp(6) NOT NULL, CONSTRAINT session_pkey PRIMARY KEY (sid) NOT DEFERRABLE INITIALLY IMMEDIATE) WITH (OIDS=FALSE)\\\")
+                .then(() => pool.query(\\\"CREATE INDEX IF NOT EXISTS IDX_session_expire ON sessions (expire)\\\"))
+                .then(() => pool.query(\\\"SELECT COUNT(*) as cnt FROM sessions\\\"))
+                .then(r => { console.log(\\\"SUCCESS: sessions table exists, rows:\\\", r.rows[0].cnt); pool.end(); })
+                .catch(e => { console.error(\\\"FAILED:\\\", e.message); process.exit(1); });
+            \""
+          '
+
+      - name: Remove runner IP from firewall (cleanup)
+        if: always()
+        run: |
+          RUNNER_IP="${{ steps.add-firewall-rule.outputs.runner_ip }}"
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          echo "Removing temporary firewall rule for $RUNNER_IP"
+          doctl compute firewall remove-rules $FIREWALL_ID \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32" || true
+          echo "Cleanup complete"
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
