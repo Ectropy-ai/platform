@@ -11,6 +11,8 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
+          npm install pg
+
           # Strip sslmode from DATABASE_URL (same pattern as session.config.ts)
           CLEAN_URL=$(echo "$DATABASE_URL" | sed 's/sslmode=[^&]*&\?//g')
 
