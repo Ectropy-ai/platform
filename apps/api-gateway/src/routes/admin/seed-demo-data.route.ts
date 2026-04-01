@@ -152,55 +152,9 @@ function createDecisions(projectId: string, projectIndex: number) {
   ];
 }
 
-/** Generate 25 representative demo voxels across 5 systems, 5 levels */
-function createDemoVoxels(projectId: string) {
-  const systems = ['STRUCT', 'MECH', 'ELEC', 'PLUMB', 'HVAC'];
-  const statuses = ['PLANNED', 'IN_PROGRESS', 'COMPLETE', 'BLOCKED', 'ON_HOLD'] as const;
-  const healthStatuses = ['HEALTHY', 'HEALTHY', 'HEALTHY', 'AT_RISK', 'CRITICAL'] as const;
-  const voxels: any[] = [];
-  const spacing = 200;
-
-  for (let level = 0; level < 5; level++) {
-    for (let s = 0; s < 5; s++) {
-      const idx = level * 5 + s;
-      const system = systems[s];
-      const x = s * spacing + spacing / 2;
-      const y = level * spacing + spacing / 2;
-      const z = level * 1000 + 500;
-      const halfSize = spacing * 0.45;
-
-      voxels.push({
-        id: crypto.randomUUID(),
-        urn: `urn:luhtech:demo:voxel:${projectId.slice(0, 8)}-${String(idx).padStart(3, '0')}`,
-        project_id: projectId,
-        voxel_id: `VOX-L${level}-${system}-${String(idx).padStart(3, '0')}`,
-        status: statuses[idx % statuses.length],
-        health_status: healthStatuses[idx % healthStatuses.length],
-        coord_x: x,
-        coord_y: y,
-        coord_z: z,
-        resolution: spacing * 0.9,
-        min_x: x - halfSize,
-        max_x: x + halfSize,
-        min_y: y - halfSize,
-        max_y: y + halfSize,
-        min_z: z - halfSize,
-        max_z: z + halfSize,
-        building: 'Main Building',
-        level: `Level ${level}`,
-        system,
-        percent_complete:
-          statuses[idx % statuses.length] === 'COMPLETE' ? 100 :
-          statuses[idx % statuses.length] === 'IN_PROGRESS' ? Math.floor(Math.random() * 60) + 20 :
-          statuses[idx % statuses.length] === 'PLANNED' ? 0 : undefined,
-        decision_count: Math.floor(Math.random() * 4),
-        is_critical_path: idx % 5 === 0,
-      });
-    }
-  }
-
-  return voxels;
-}
+// Toy voxel generation removed — voxels populated exclusively by
+// POST /api/admin/provision-project (IntakePipeline Stage 4: IFC_INGESTION).
+// See: apps/api-gateway/src/intake/stages/stage-4-ifc.ts
 
 /**
  * Create the demo data seeding router.
@@ -308,17 +262,9 @@ export function createSeedDemoDataRoutes(): Router {
             roleResults.push({ email: normalizedEmail, status: 'assigned' });
           }
 
-          // Seed voxels if project has none
-          const voxelCount = await tx.voxel.count({ where: { project_id: projectId } });
-          if (voxelCount === 0) {
-            const demoVoxels = createDemoVoxels(projectId);
-            for (const voxel of demoVoxels) {
-              await tx.voxel.create({ data: voxel });
-            }
-            voxelsSeeded = demoVoxels.length;
-          }
+          // Voxels populated by POST /api/admin/provision-project — not seeded here
 
-          return { rolesAssigned, voxelsSeeded, existingVoxels: voxelCount, roleResults };
+          return { rolesAssigned, voxelsSeeded: 0, existingVoxels: 0, roleResults };
         });
 
         logger.info('[Demo Seed] Existing project seeded', {
