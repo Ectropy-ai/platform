@@ -13,6 +13,8 @@
 import session from 'express-session';
 import type { RequestHandler } from 'express';
 import connectPgSimple from 'connect-pg-simple';
+import pg from 'pg';
+const { Pool } = pg;
 import { config, isProduction, isStaging } from './index.js';
 import { logger } from '../../../../libs/shared/utils/src/logger.js';
 
@@ -21,12 +23,13 @@ export function getSessionMiddleware(): RequestHandler {
   // Uses the same managed PostgreSQL cluster as the application DB
   const PgStore = connectPgSimple(session);
 
-  // DigitalOcean managed PostgreSQL uses internal CA certificates.
-  // Node.js rejects these by default ("self-signed certificate in certificate chain").
-  // Must pass a pg Pool with ssl.rejectUnauthorized=false.
-  const { Pool } = require('pg');
+  // DigitalOcean managed PostgreSQL uses sslmode=require in DATABASE_URL.
+  // This overrides ssl.rejectUnauthorized=false — pg treats sslmode=require
+  // as ssl: true (rejectUnauthorized: true). Fix: strip sslmode from URL,
+  // pass ssl config directly to Pool constructor.
+  const dbUrl = (process.env.DATABASE_URL || '').replace(/[?&]sslmode=[^&]*/g, '');
   const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: dbUrl,
     ssl: { rejectUnauthorized: false },
   });
 
