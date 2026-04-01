@@ -42,6 +42,29 @@ import ObjectLoader from '@speckle/objectloader';
 import * as THREE from 'three';
 import { logger } from '../../services/logger';
 
+/**
+ * Apply light background (0xf0f2f5) via Speckle pipeline GPass.
+ * WebGLRenderer.setClearColor is overwritten every frame by the pipeline —
+ * must set clearColor on each GPass in the rendering pipeline instead.
+ */
+function applyLightBackground(viewer: any): void {
+  try {
+    const speckleRenderer = viewer.getRenderer?.();
+    if (!speckleRenderer) return;
+    const pipeline = speckleRenderer.pipeline;
+    if (pipeline?.passes) {
+      for (const pass of pipeline.passes) {
+        if (typeof pass.setClearColor === 'function') {
+          pass.setClearColor(0xf0f2f5, 1);
+        }
+      }
+    }
+    speckleRenderer.needsRender = true;
+  } catch (_bgErr) {
+    // background setting is non-blocking
+  }
+}
+
 // ENTERPRISE: Type definitions for @speckle/viewer v2.25.7 compatibility
 // The package types are incomplete - use type assertion at runtime
 interface ViewerParams {
@@ -359,15 +382,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       console.log('[BIM] instanceof Viewer:', viewerRaw instanceof Viewer);
 
       // Set light background for demo readability (default is black)
-      try {
-        const speckleRenderer = (viewer as any).getRenderer?.();
-        if (speckleRenderer?.renderer) {
-          speckleRenderer.renderer.setClearColor(new THREE.Color(0xf0f2f5), 1);
-          viewer.requestRender();
-        }
-      } catch (_bgErr) {
-        // background setting is non-blocking
-      }
+      applyLightBackground(viewer);
 
       // Add essential extensions
       viewer.createExtension(CameraController);
@@ -619,15 +634,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       console.log('🟢 [BIM Viewer] viewer.loadObject completed');
 
       // Re-apply light background after loadObject (Speckle renderer resets on load)
-      try {
-        const speckleRenderer = (viewer as any).getRenderer?.();
-        if (speckleRenderer?.renderer) {
-          speckleRenderer.renderer.setClearColor(new THREE.Color(0xf0f2f5), 1);
-          viewer.requestRender();
-        }
-      } catch (_bgErr) {
-        // background setting is non-blocking
-      }
+      applyLightBackground(viewer);
 
       logger.info('[BIM Viewer] Successfully loaded Speckle object with official loader', {
         objectUrl,
