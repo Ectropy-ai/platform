@@ -21,12 +21,21 @@ export function getSessionMiddleware(): RequestHandler {
   // Uses the same managed PostgreSQL cluster as the application DB
   const PgStore = connectPgSimple(session);
 
+  // DigitalOcean managed PostgreSQL uses internal CA certificates.
+  // Node.js rejects these by default ("self-signed certificate in certificate chain").
+  // Must pass a pg Pool with ssl.rejectUnauthorized=false.
+  const { Pool } = require('pg');
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+  });
+
   logger.info('Initializing session middleware (PostgreSQL store)', {
     hasDbUrl: !!process.env.DATABASE_URL,
   });
 
   const store = new PgStore({
-    conString: process.env.DATABASE_URL,
+    pool,
     tableName: 'sessions',
     createTableIfMissing: true,
     ttl: 86400, // 24 hours — matches cookie maxAge
