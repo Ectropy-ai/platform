@@ -203,19 +203,24 @@ jobs:
 
           echo "✅ Temporary firewall rule added for CI/CD"
 
-      - name: Add SSH known hosts
+      - name: Add SSH known hosts (with firewall propagation retry)
         run: |
-          # ENTERPRISE FIX (2026-01-23): ROOT CAUSE #113 - Firewall Rule Propagation Delay
-          # Problem: ssh-keyscan runs 70ms after firewall rule addition, but rule needs time to propagate
-          # Pattern: DigitalOcean firewall API accepts rule immediately but actual enforcement takes 2-3s
-          # Solution: 5-second delay ensures rule is active before connection attempt
-          # Impact: Prevents "Connection refused" and "Connection timed out" errors in ssh-keyscan
-          echo "⏳ Waiting 5 seconds for firewall rule propagation..."
-          sleep 5
-          echo "✅ Firewall rule should be active, attempting SSH key scan..."
-
-          # ENTERPRISE FIX (2025-12-10): Use variable instead of hardcoded IP
-          ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+          echo "Waiting 20s for DO firewall rule propagation..."
+          sleep 20
+          echo "Attempting ssh-keyscan with retry..."
+          for i in 1 2 3 4 5; do
+            echo "Attempt $i/5..."
+            if ssh-keyscan -T 10 -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts 2>&1; then
+              echo "ssh-keyscan succeeded on attempt $i"
+              break
+            fi
+            if [ $i -eq 5 ]; then
+              echo "ssh-keyscan failed after 5 attempts"
+              exit 1
+            fi
+            echo "Retrying in 10s..."
+            sleep 10
+          done
 
       - name: Remove blue from load balancer
         run: |
@@ -468,12 +473,26 @@ jobs:
 
           echo "✅ Temporary firewall rule added for CI/CD"
 
-      - name: Add SSH known hosts
+      - name: Add SSH known hosts (with firewall propagation retry)
         run: |
-          echo "⏳ Waiting 5 seconds for firewall rule propagation..."
-          sleep 5
-          ssh-keyscan -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
-          ssh-keyscan -H ${{ vars.PROD_GREEN_IP }} >> ~/.ssh/known_hosts
+          echo "Waiting 20s for DO firewall rule propagation..."
+          sleep 20
+          echo "Attempting ssh-keyscan with retry..."
+          for host in ${{ vars.PROD_BLUE_IP }} ${{ vars.PROD_GREEN_IP }}; do
+            for i in 1 2 3 4 5; do
+              echo "Attempt $i/5 for $host..."
+              if ssh-keyscan -T 10 -H "$host" >> ~/.ssh/known_hosts 2>&1; then
+                echo "ssh-keyscan succeeded for $host on attempt $i"
+                break
+              fi
+              if [ $i -eq 5 ]; then
+                echo "ssh-keyscan failed for $host after 5 attempts"
+                exit 1
+              fi
+              echo "Retrying in 10s..."
+              sleep 10
+            done
+          done
 
       - name: Monitor error rates
         # ENTERPRISE FIX (ROOT CAUSE #36 - 2025-12-22): Enhanced Monitoring with Fallbacks
@@ -543,11 +562,24 @@ jobs:
 
           echo "✅ Temporary firewall rule added for CI/CD"
 
-      - name: Add SSH known hosts
+      - name: Add SSH known hosts (with firewall propagation retry)
         run: |
-          echo "⏳ Waiting 5 seconds for firewall rule propagation..."
-          sleep 5
-          ssh-keyscan -H ${{ vars.PROD_GREEN_IP }} >> ~/.ssh/known_hosts
+          echo "Waiting 20s for DO firewall rule propagation..."
+          sleep 20
+          echo "Attempting ssh-keyscan with retry..."
+          for i in 1 2 3 4 5; do
+            echo "Attempt $i/5..."
+            if ssh-keyscan -T 10 -H ${{ vars.PROD_GREEN_IP }} >> ~/.ssh/known_hosts 2>&1; then
+              echo "ssh-keyscan succeeded on attempt $i"
+              break
+            fi
+            if [ $i -eq 5 ]; then
+              echo "ssh-keyscan failed after 5 attempts"
+              exit 1
+            fi
+            echo "Retrying in 10s..."
+            sleep 10
+          done
 
       # ENTERPRISE FIX (2025-12-16): P0 CRITICAL - Static File Deployment Pattern (Green Server)
       # Extract pre-built static files from Docker image and deploy to green server
