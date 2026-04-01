@@ -51,18 +51,16 @@ jobs:
 
       - name: Create sessions table via SSH to production container
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ vars.PROD_BLUE_IP }} '
-            docker exec ectropy-api-gateway sh -c "node -e \"
-              const { Pool } = require(\\\"pg\\\");
-              const url = process.env.DATABASE_URL.replace(/[?&]sslmode=[^&]*/g, \\\"\\\");
-              const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
-              pool.query(\\\"CREATE TABLE IF NOT EXISTS sessions (sid varchar NOT NULL COLLATE default, sess json NOT NULL, expire timestamp(6) NOT NULL, CONSTRAINT session_pkey PRIMARY KEY (sid) NOT DEFERRABLE INITIALLY IMMEDIATE) WITH (OIDS=FALSE)\\\")
-                .then(() => pool.query(\\\"CREATE INDEX IF NOT EXISTS IDX_session_expire ON sessions (expire)\\\"))
-                .then(() => pool.query(\\\"SELECT COUNT(*) as cnt FROM sessions\\\"))
-                .then(r => { console.log(\\\"SUCCESS: sessions table exists, rows:\\\", r.rows[0].cnt); pool.end(); })
-                .catch(e => { console.error(\\\"FAILED:\\\", e.message); process.exit(1); });
-            \""
-          '
+          ssh -o StrictHostKeyChecking=no root@${{ vars.PROD_BLUE_IP }} 'docker exec ectropy-api-gateway node -e "
+            const{Pool}=require(\"pg\");
+            const url=process.env.DATABASE_URL.replace(/[?&]sslmode=[^&]*/g,\"\");
+            const pool=new Pool({connectionString:url,ssl:{rejectUnauthorized:false}});
+            pool.query(\"CREATE TABLE IF NOT EXISTS sessions (sid varchar NOT NULL, sess json NOT NULL, expire timestamp(6) NOT NULL, CONSTRAINT session_pkey PRIMARY KEY (sid) NOT DEFERRABLE INITIALLY IMMEDIATE)\")
+              .then(()=>pool.query(\"CREATE INDEX IF NOT EXISTS IDX_session_expire ON sessions (expire)\"))
+              .then(()=>pool.query(\"SELECT COUNT(*) as cnt FROM sessions\"))
+              .then(r=>{console.log(\"SUCCESS: sessions table exists, rows:\",r.rows[0].cnt);pool.end()})
+              .catch(e=>{console.error(\"FAILED:\",e.message);process.exit(1)});
+          "'
 
       - name: Remove runner IP from firewall (cleanup)
         if: always()
