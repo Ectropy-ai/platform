@@ -55,7 +55,7 @@ jobs:
             const{Pool}=require(\"pg\");
             const url=process.env.DATABASE_URL.replace(/[?&]sslmode=[^&]*/g,\"\");
             const pool=new Pool({connectionString:url,ssl:{rejectUnauthorized:false}});
-            pool.query(\"CREATE TABLE IF NOT EXISTS sessions (sid varchar NOT NULL, sess json NOT NULL, expire timestamp(6) NOT NULL, CONSTRAINT session_pkey PRIMARY KEY (sid) NOT DEFERRABLE INITIALLY IMMEDIATE)\")
+            pool.query(\"SELECT current_user, current_database(), current_schema()\").then(r=>{console.log(\"DB user:\",r.rows[0].current_user,\"db:\",r.rows[0].current_database,\"schema:\",r.rows[0].current_schema)}).then(()=>pool.query(\"CREATE TABLE IF NOT EXISTS sessions (sid varchar NOT NULL, sess json NOT NULL, expire timestamp(6) NOT NULL, CONSTRAINT session_pkey PRIMARY KEY (sid) NOT DEFERRABLE INITIALLY IMMEDIATE)\"))
               .then(()=>pool.query(\"CREATE INDEX IF NOT EXISTS IDX_session_expire ON sessions (expire)\"))
               .then(()=>pool.query(\"SELECT COUNT(*) as cnt FROM sessions\"))
               .then(r=>{console.log(\"SUCCESS: sessions table exists, rows:\",r.rows[0].cnt);pool.end()})
