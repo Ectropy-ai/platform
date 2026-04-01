@@ -179,7 +179,7 @@ export async function createAuthRateLimiter(): Promise<
 
   const config: RateLimitConfig = {
     windowMs: 5 * 60 * 1000, // TIGHTENED: 5 minutes (was 15 minutes)
-    max: 3, // TIGHTENED: 3 attempts (was 5)
+    max: 20, // RELAXED: 20 attempts/5min for pilot demo (was 3)
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req: Request) => {
@@ -353,7 +353,7 @@ export async function initializeRateLimiters(): Promise<{
   const standardMax = parseInt(process.env.RATE_LIMIT_STANDARD_MAX || '100');
   logger.info('✅ Rate limiters initialized successfully');
   logger.info(`   - Standard API: ${standardMax} req/15min`);
-  logger.info('   - Authentication: 3 req/5min');
+  logger.info('   - Authentication: 20 req/5min');
   logger.info('   - File Upload: 10 req/hour');
   logger.info('   - Read-Only: 300 req/15min');
 

@@ -18,6 +18,30 @@ const { Pool } = pg;
 import { config, isProduction, isStaging } from './index.js';
 import { logger } from '../../../../libs/shared/utils/src/logger.js';
 
+/**
+ * Create the sessions table if it does not exist.
+ *
+ * connect-pg-simple's createTableIfMissing reads table.sql from the package
+ * directory at runtime. In Docker the bundler (esbuild) does NOT copy .sql
+ * assets into /app/dist/, so the file is always ENOENT and the table is
+ * never created. This function replaces that mechanism with inline SQL
+ * executed directly against the pool — no file dependency.
+ *
+ * Idempotent: safe to call on every cold start.
+ */
+function ensureSessionsTable(pool: InstanceType<typeof Pool>): void {
+  pool.query(`
+    CREATE TABLE IF NOT EXISTS "sessions" (
+      "sid" varchar NOT NULL COLLATE "default",
+      "sess" json NOT NULL,
+      "expire" timestamp(6) NOT NULL,
+      CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE
+    ) WITH (OIDS=FALSE)
+  `).then(() => pool.query(`CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "sessions" ("expire")`))
+    .then(() => logger.info('[session] sessions table ensured'))
+    .catch((err) => logger.error('[session] Failed to create sessions table', { error: err.message }));
+}
+
 export function getSessionMiddleware(): RequestHandler {
   // Shared PostgreSQL session store — survives blue/green LB routing
   // Uses the same managed PostgreSQL cluster as the application DB
@@ -33,6 +57,8 @@ export function getSessionMiddleware(): RequestHandler {
     ssl: { rejectUnauthorized: false },
   });
 
+  ensureSessionsTable(pool);
+
   logger.info('Initializing session middleware (PostgreSQL store)', {
     hasDbUrl: !!process.env.DATABASE_URL,
   });
@@ -40,7 +66,8 @@ export function getSessionMiddleware(): RequestHandler {
   const store = new PgStore({
     pool,
     tableName: 'sessions',
-    createTableIfMissing: true,
+    // Disabled: reads table.sql from disk — file missing in Docker bundle (ENOENT).
+    createTableIfMissing: false,
     ttl: 86400, // 24 hours — matches cookie maxAge
   });
 
