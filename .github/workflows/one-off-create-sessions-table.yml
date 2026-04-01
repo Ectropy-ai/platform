@@ -1,0 +1,45 @@
+name: "ONE-OFF: Create sessions table in production DB"
+on:
+  workflow_dispatch:
+
+jobs:
+  create-sessions-table:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Create sessions table
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          # Strip sslmode from DATABASE_URL (same pattern as session.config.ts)
+          CLEAN_URL=$(echo "$DATABASE_URL" | sed 's/sslmode=[^&]*&\?//g')
+
+          node -e "
+            const { Pool } = require('pg');
+            const pool = new Pool({
+              connectionString: '$CLEAN_URL'.replace(/sslmode=[^&]*(&|\$)/g, ''),
+              ssl: { rejectUnauthorized: false }
+            });
+            pool.query(\`
+              CREATE TABLE IF NOT EXISTS \"sessions\" (
+                \"sid\" varchar NOT NULL COLLATE \"default\",
+                \"sess\" json NOT NULL,
+                \"expire\" timestamp(6) NOT NULL,
+                CONSTRAINT \"session_pkey\" PRIMARY KEY (\"sid\")
+                  NOT DEFERRABLE INITIALLY IMMEDIATE
+              ) WITH (OIDS=FALSE)
+            \`).then(() => pool.query(\`
+              CREATE INDEX IF NOT EXISTS \"IDX_session_expire\"
+              ON \"sessions\" (\"expire\")
+            \`)).then(() => {
+              return pool.query(
+                'SELECT COUNT(*) as cnt FROM sessions'
+              );
+            }).then(r => {
+              console.log('SUCCESS: sessions table exists, rows:', r.rows[0].cnt);
+              pool.end();
+            }).catch(e => {
+              console.error('FAILED:', e.message);
+              process.exit(1);
+            });
+          "
