@@ -9,7 +9,7 @@
  * Tools:
  *  1. read_current_truth    - Platform state nodes from current-truth.json
  *  2. read_roadmap          - Work units and containers from roadmap.json
- *  3. read_decision_log     - Decisions from decision-log.json
+ *  3. (deleted) read_decision_log — removed per DEC-007
  *  4. get_feature_status    - Single work unit or state node by ID
  *  5. get_next_work         - Prioritized work recommendations
  *  6. get_health_assessment - 12-metric eigenmode health assessment
@@ -237,99 +237,12 @@ const readRoadmapTool: MCPToolDefinition = {
 };
 
 // ============================================================================
-// Tool 3: read_decision_log
+// Tool 3: read_decision_log — DELETED
+// Reads .roadmap/decision-log.json (platform architecture decisions).
+// Removed per DEC-007: platform governance tools belong in
+// MCP-ECTROPY-BUSINESS, not MCP-CONSTRUCTION (SEPPA).
+// Construction PM decisions served by query_decision_history (pm-data-service.ts).
 // ============================================================================
-
-const readDecisionLogTool: MCPToolDefinition = {
-  name: 'read_decision_log',
-  description:
-    'Read the decision log. Returns architectural, governance, and technical decisions. Filter by status, category, impact level, or tags.',
-  inputSchema: {
-    type: 'object',
-    required: [],
-    properties: {
-      status: {
-        type: 'array',
-        description:
-          'Filter by status: planned, active, completed, blocked, on-hold, cancelled',
-        items: { type: 'string' },
-      },
-      category: {
-        type: 'string',
-        description:
-          'Filter by category (e.g., "governance", "technical", "architecture")',
-      },
-      impact: {
-        type: 'array',
-        description: 'Filter by impact level: low, medium, high, critical',
-        items: { type: 'string' },
-      },
-      tags: {
-        type: 'array',
-        description: 'Filter by tags',
-        items: { type: 'string' },
-      },
-      decisionId: {
-        type: 'string',
-        description:
-          'Get a specific decision by ID. If provided, other filters are ignored.',
-      },
-    },
-  },
-  handler: async (args): Promise<PMToolResult<unknown>> => {
-    const startTime = Date.now();
-    try {
-      const adapter = getAdapter(args.domainId as string);
-
-      // Single decision lookup
-      if (args.decisionId) {
-        const decision = await adapter.getDecision(args.decisionId as string);
-        if (!decision) {
-          return {
-            success: false,
-            error: {
-              code: 'DECISION_NOT_FOUND',
-              message: `Decision "${args.decisionId}" not found`,
-            },
-            metadata: meta(startTime),
-          };
-        }
-        return {
-          success: true,
-          data: decision,
-          metadata: meta(startTime),
-        };
-      }
-
-      // Filtered list
-      const decisions = await adapter.getDecisions({
-        status: args.status as any,
-        category: args.category as string | undefined,
-        impact: args.impact as any,
-        tags: args.tags as string[] | undefined,
-      });
-
-      return {
-        success: true,
-        data: {
-          decisions,
-          count: decisions.length,
-          domain: adapter.getDomainContext(),
-        },
-        metadata: meta(startTime),
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: {
-          code: 'READ_DECISION_LOG_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        },
-        metadata: meta(startTime),
-      };
-    }
-  },
-};
 
 // ============================================================================
 // Tool 4: get_feature_status
