@@ -509,12 +509,16 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       // credentials: 'include' sends session cookie for authentication
       logger.debug('[BIM Viewer] Testing BFF proxy access', { proxyObjectUrl });
 
+      const testHeaders: Record<string, string> = {
+        'X-Requested-With': 'XMLHttpRequest',
+      };
+      if (viewerToken) {
+        testHeaders['Authorization'] = `Bearer ${viewerToken}`;
+      }
       const testResponse = await fetch(proxyObjectUrl, {
         method: 'GET',
-        credentials: 'include', // Include session cookies for BFF authentication
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest',
-        },
+        credentials: 'include',
+        headers: testHeaders,
       });
 
       logger.debug('[BIM Viewer] BFF proxy test result', {
@@ -544,7 +548,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         serverUrl: `${proxyBaseUrl}/api/speckle`, // BFF proxy base URL
         streamId,
         objectId,
-        // SPRINT 7: NO token passed - token injected server-side by BFF proxy
+        token: viewerToken ?? undefined, // DEC-015: VST for geometry auth
       });
 
       logger.debug('[BIM Viewer] ObjectLoader created', {
