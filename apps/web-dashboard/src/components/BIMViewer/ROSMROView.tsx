@@ -110,6 +110,7 @@ export interface ROSMROViewProps {
   objectId?: string;
   stakeholderRole: 'architect' | 'engineer' | 'contractor' | 'owner';
   serverUrl?: string;
+  viewerToken?: string; // DEC-015: VST for geometry proxy auth
   onDecisionSelect?: (decisionId: string, voxelId: string) => void;
   onVoxelSelect?: (voxelId: string, voxelData: VoxelData | null) => void;
   /** User ID for SEPPA conversation tracking */
@@ -506,6 +507,7 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
   objectId,
   stakeholderRole,
   serverUrl,
+  viewerToken,
   onDecisionSelect,
   onVoxelSelect,
   userId = 'anonymous',
@@ -780,6 +782,7 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
               objectId={objectId}
               stakeholderRole={stakeholderRole}
               serverUrl={serverUrl}
+              viewerToken={viewerToken}
               onElementSelect={handleBIMElementSelect}
               onViewerReady={handleViewerReady}
               height='100%'

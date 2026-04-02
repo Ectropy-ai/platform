@@ -544,6 +544,7 @@ export function ViewerPage() {
                   streamId={selectedStream?.stream_id}
                   objectId={selectedStream?.latest_object_id || undefined}
                   serverUrl={config.speckleApiUrl}
+                  viewerToken={selectedStream?.viewer_token}
                   isActive={currentTab === 1}
                   stakeholderRole={
                     (['architect', 'engineer', 'contractor', 'owner'].includes(projectRole || '')
