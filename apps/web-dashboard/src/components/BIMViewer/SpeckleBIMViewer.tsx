@@ -43,17 +43,26 @@ import * as THREE from 'three';
 import { logger } from '../../services/logger';
 
 /**
- * Apply light background (0xf0f2f5) via Speckle pipeline GPass.
- * WebGLRenderer.setClearColor is overwritten every frame by the pipeline —
- * must set clearColor on each GPass in the rendering pipeline instead.
+ * Apply light background (0xf0f2f5) — dual-layer approach (H-04).
+ * Primary: THREE.js WebGLRenderer.setClearColor — works regardless of pipeline state.
+ * Secondary: GPass pipeline passes — covers Speckle's per-frame render loop.
+ * Both layers needed: renderer for immediate effect, GPass to survive render frames.
  */
 function applyLightBackground(viewer: any): void {
   try {
     const speckleRenderer = viewer.getRenderer?.();
     if (!speckleRenderer) return;
-    const pipeline = speckleRenderer.pipeline;
-    if (pipeline?.passes) {
-      for (const pass of pipeline.passes) {
+    // Primary: THREE.js WebGLRenderer
+    if (speckleRenderer.renderer?.setClearColor) {
+      speckleRenderer.renderer.setClearColor(0xf0f2f5, 1);
+    }
+    // Secondary: GPass pipeline passes
+    const passes = speckleRenderer.pipeline?.passes;
+    if (passes) {
+      for (const pass of passes) {
+        if (pass.clearColor !== undefined) {
+          pass.clearColor.set(0xf0f2f5);
+        }
         if (typeof pass.setClearColor === 'function') {
           pass.setClearColor(0xf0f2f5, 1);
         }
@@ -842,6 +851,8 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       } catch (error) {
         logger.debug('[BIM Viewer] ViewModes extension method not available', { error });
       }
+      // H-04: Re-apply background after pipeline switch (mode change rebuilds passes)
+      setTimeout(() => applyLightBackground(viewerRef.current!), 50);
     }
   };
 
