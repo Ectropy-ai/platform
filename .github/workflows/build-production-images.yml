@@ -172,13 +172,10 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Install doctl
-        uses: digitalocean/action-doctl@v2
+      - name: Authenticate to DOCR
+        uses: ./.github/actions/docr-login
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-
-      - name: Log in to DigitalOcean Container Registry
-        run: doctl registry login --expiry-seconds 3600
 
       - name: Build Docker Image
         run: |
@@ -200,30 +197,19 @@ jobs:
           echo "✅ Docker image built successfully"
           docker images | grep "${{ matrix.service }}"
 
-      # ENTERPRISE FIX (2026-03-31): Isolated DOCKER_CONFIG for DOCR push
-      # ROOT CAUSE: doctl registry login credentials expire or are intercepted
-      # by Docker credential helper before docker push executes. Ubuntu 24 GitHub
-      # Actions runners may have a credential helper that silently fails to store
-      # credentials. Fix: write DOCR credentials to isolated config dir immediately
-      # before push. Same pattern as deploy-staging.yml ENTERPRISE FIX 2026-03-12.
       - name: Tag and Push Docker Images to DOCR
         run: |
           echo "📤 Pushing ${{ matrix.service }} images to DOCR..."
-
-          # Write DOCR credentials directly — bypasses Docker credential helper
-          mkdir -p /tmp/docker-creds
-          doctl registry docker-config --read-write --expiry-seconds 3600 > /tmp/docker-creds/config.json
-          echo "✅ DOCR credentials refreshed (isolated config)"
 
           # Tag with multiple versions for production flexibility
           docker tag ${{ matrix.service }}:latest ${{ env.REGISTRY }}/${{ matrix.service }}:latest
           docker tag ${{ matrix.service }}:latest ${{ env.REGISTRY }}/${{ matrix.service }}:${{ steps.tag.outputs.tag }}
           docker tag ${{ matrix.service }}:latest ${{ env.REGISTRY }}/${{ matrix.service }}:${{ steps.tag.outputs.short_sha }}
 
-          # Push all tags with isolated config — no credential helper in path
-          DOCKER_CONFIG=/tmp/docker-creds docker push ${{ env.REGISTRY }}/${{ matrix.service }}:latest
-          DOCKER_CONFIG=/tmp/docker-creds docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ steps.tag.outputs.tag }}
-          DOCKER_CONFIG=/tmp/docker-creds docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ steps.tag.outputs.short_sha }}
+          # Push — DOCKER_CONFIG set by docr-login action (isolated credentials)
+          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:latest
+          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ steps.tag.outputs.tag }}
+          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ steps.tag.outputs.short_sha }}
 
           echo "✅ Images pushed to DOCR"
           echo "  - ${{ env.REGISTRY }}/${{ matrix.service }}:latest"

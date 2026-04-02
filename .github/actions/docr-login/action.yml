@@ -1,0 +1,28 @@
+name: 'Authenticate to DOCR'
+description: 'Isolated DOCR credential setup — bypasses Ubuntu 24 Docker credential helper'
+author: 'Ectropy Engineering'
+
+inputs:
+  token:
+    description: 'DigitalOcean API token with registry read/write access'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install doctl
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ inputs.token }}
+
+    - name: Write DOCR credentials to isolated config
+      shell: bash
+      run: |
+        # ENTERPRISE FIX (2026-04-02): Isolated DOCKER_CONFIG for DOCR push
+        # ROOT CAUSE: Ubuntu 24 Docker credential helper intercepts credentials
+        # written by doctl registry login to ~/.docker/config.json before
+        # docker push reads them. Fix: write to isolated dir, export DOCKER_CONFIG.
+        mkdir -p /tmp/docker-creds
+        doctl registry docker-config --read-write --expiry-seconds 3600 > /tmp/docker-creds/config.json
+        echo "DOCKER_CONFIG=/tmp/docker-creds" >> "$GITHUB_ENV"
+        echo "::notice::DOCR credentials written to isolated config (/tmp/docker-creds)"

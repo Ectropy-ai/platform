@@ -187,8 +187,8 @@ jobs:
       # credentials from doctl registry login. build-production-images.yml avoids this
       # by using standard docker build + docker push (direct CLI reads ~/.docker/config.json).
       # FIX: Align staging with production — standard docker build + docker push.
-      - name: Install doctl
-        uses: digitalocean/action-doctl@v2
+      - name: Authenticate to DOCR
+        uses: ./.github/actions/docr-login
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
@@ -210,28 +210,17 @@ jobs:
           echo "✅ Docker image built successfully"
           docker images | grep "${{ matrix.service }}"
 
-      # ENTERPRISE FIX (2026-04-02): Isolated DOCKER_CONFIG for DOCR push
-      # ROOT CAUSE: doctl registry login credentials expire or are intercepted
-      # by Docker credential helper before docker push executes. Ubuntu 24 GitHub
-      # Actions runners have a credential helper that silently fails to store
-      # credentials. Fix: write DOCR credentials to isolated config dir immediately
-      # before push. Matches build-production-images.yml pattern (2026-03-31).
       - name: Tag and Push Docker image to DOCR
         run: |
           echo "📤 Pushing ${{ matrix.service }} images to DOCR..."
-
-          # Write DOCR credentials directly — bypasses Docker credential helper
-          mkdir -p /tmp/docker-creds
-          doctl registry docker-config --read-write --expiry-seconds 3600 > /tmp/docker-creds/config.json
-          echo "✅ DOCR credentials refreshed (isolated config)"
 
           # Tag for DOCR
           docker tag ${{ matrix.service }}:staging ${{ env.REGISTRY }}/${{ matrix.service }}:staging
           docker tag ${{ matrix.service }}:staging ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
 
-          # Push all tags with isolated config — no credential helper in path
-          DOCKER_CONFIG=/tmp/docker-creds docker push ${{ env.REGISTRY }}/${{ matrix.service }}:staging
-          DOCKER_CONFIG=/tmp/docker-creds docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
+          # Push — DOCKER_CONFIG set by docr-login action (isolated credentials)
+          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:staging
+          docker push ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
 
           echo "✅ Images pushed to DOCR"
           echo "  - ${{ env.REGISTRY }}/${{ matrix.service }}:staging"
