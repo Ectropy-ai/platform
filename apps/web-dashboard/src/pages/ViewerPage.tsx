@@ -528,6 +528,7 @@ export function ViewerPage() {
                     onElementSelect={handleElementSelect}
                     height='600px'
                     serverUrl={config.speckleApiUrl}
+                    viewerToken={selectedStream?.viewer_token}
                   />
                 </BIMViewerErrorBoundary>
               </Box>

@@ -48,6 +48,8 @@ import {
   requireStreamAccess,
   PermissionLevel,
 } from '../middleware/authorization.middleware';
+import { requireViewerToken } from '../middleware/requireViewerToken';
+import { generateViewerToken } from '../auth/viewer-token';
 
 // ENTERPRISE: Import centralized User type - no local interface declarations
 import type { User } from '@ectropy/shared/types';
@@ -417,12 +419,23 @@ router.get(
     try {
       const service = await getSpeckleServiceAsync();
       const streams = await service.getProjectStreams(projectId);
+      const user = req.user!;
+
+      // DEC-015: Attach a stream-scoped Viewer Session Token per stream
+      const streamsWithTokens = streams.map((stream: any) => ({
+        ...stream,
+        viewer_token: generateViewerToken(
+          user.id,
+          stream.stream_id,
+          projectId,
+        ),
+      }));
 
       res.json({
         success: true,
         projectId,
-        streams,
-        count: streams.length,
+        streams: streamsWithTokens,
+        count: streamsWithTokens.length,
       });
     } catch (error) {
       logger.error('Failed to fetch streams:', error);
@@ -814,7 +827,7 @@ router.post('/graphql', requireAuth, async (req: Request, res: Response) => {
  */
 router.get(
   '/objects/:streamId/:objectId',
-  requireAuth,
+  requireViewerToken,
   async (req: Request, res: Response) => {
     try {
       const serverUrl = process.env.SPECKLE_SERVER_URL || '';
@@ -899,7 +912,7 @@ router.get(
  */
 router.get(
   '/objects/:streamId/:objectId/single',
-  requireAuth,
+  requireViewerToken,
   async (req: Request, res: Response) => {
     try {
       const serverUrl = process.env.SPECKLE_SERVER_URL || '';
@@ -988,7 +1001,7 @@ router.get(
  */
 router.post(
   '/api/getobjects/:streamId',
-  requireAuth,
+  requireViewerToken,
   async (req: Request, res: Response) => {
     try {
       const serverUrl = process.env.SPECKLE_SERVER_URL || '';
@@ -1116,7 +1129,7 @@ export const speckleRootProxy: ExpressRouter = Router();
 // Proxy: GET /streams/:streamId/objects/:objectId → Speckle server
 speckleRootProxy.get(
   '/streams/:streamId/objects/:objectId',
-  requireAuth,
+  requireViewerToken,
   async (req: Request, res: Response) => {
     try {
       const { streamId, objectId } = req.params;
@@ -1154,7 +1167,7 @@ speckleRootProxy.get(
 // ObjectLoader2 fetches the root object at this endpoint before streaming geometry
 speckleRootProxy.get(
   '/objects/:streamId/:objectId/single',
-  requireAuth,
+  requireViewerToken,
   async (req: Request, res: Response) => {
     try {
       const { streamId, objectId } = req.params;
@@ -1222,7 +1235,7 @@ speckleRootProxy.post(
 // ObjectLoader2 uses this v2 endpoint for batch geometry streaming
 speckleRootProxy.post(
   '/api/v2/projects/:streamId/object-stream/',
-  requireAuth,
+  requireViewerToken,
   async (req: Request, res: Response) => {
     try {
       const { streamId } = req.params;

@@ -156,6 +156,7 @@ interface SpeckleBIMViewerProps {
   onViewerReady?: (viewer: IViewer) => void;
   height?: string;
   serverUrl?: string;
+  viewerToken?: string; // DEC-015: Stream-scoped VST for geometry proxy auth
 }
 
 interface ViewConfiguration {
@@ -174,6 +175,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
   onViewerReady,
   height = '600px',
   serverUrl,
+  viewerToken,
 }) => {
   // SPRINT 7: BFF Pattern - Get secure Speckle configuration from backend
   // Token is NEVER exposed to client - all API calls proxied through backend
@@ -621,7 +623,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       const speckleLoader = new SpeckleLoaderClass(
         viewerTree,
         proxyResourceUrl,
-        '', // No token — root proxy injects service token server-side
+        viewerToken || '', // DEC-015: VST from server — proxy validates, injects service token
         true, // Enable caching
       );
 

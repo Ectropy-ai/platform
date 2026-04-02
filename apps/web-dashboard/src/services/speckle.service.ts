@@ -14,6 +14,7 @@ export interface SpeckleStream {
   last_commit_date: string | null;
   latest_object_id: string | null; // Object ID from latest commit for viewer rendering
   created_at: string;
+  viewer_token?: string; // DEC-015: Stream-scoped VST for geometry proxy auth
 }
 
 export interface SpeckleImportResult {
