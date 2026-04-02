@@ -43,26 +43,19 @@ import * as THREE from 'three';
 import { logger } from '../../services/logger';
 
 /**
- * Apply light background (0xf0f2f5) — dual-layer approach (H-04).
- * Primary: THREE.js WebGLRenderer.setClearColor — works regardless of pipeline state.
- * Secondary: GPass pipeline passes — covers Speckle's per-frame render loop.
- * Both layers needed: renderer for immediate effect, GPass to survive render frames.
+ * Apply light background (0xf0f2f5) via GPass pipeline (H-04).
+ * GPass._clearColor is the source of truth — persists across all render frames.
+ * Set via pass.setClearColor(color, alpha), not by writing to pass.clearColor
+ * (getter only, no setter) or pass.clearColor.set() (clearColor is number, not Color).
+ * WebGLRenderer.setClearColor is overwritten by Pipeline.render() every frame — wrong layer.
  */
 function applyLightBackground(viewer: any): void {
   try {
     const speckleRenderer = viewer.getRenderer?.();
     if (!speckleRenderer) return;
-    // Primary: THREE.js WebGLRenderer
-    if (speckleRenderer.renderer?.setClearColor) {
-      speckleRenderer.renderer.setClearColor(0xf0f2f5, 1);
-    }
-    // Secondary: GPass pipeline passes
     const passes = speckleRenderer.pipeline?.passes;
     if (passes) {
       for (const pass of passes) {
-        if (pass.clearColor !== undefined) {
-          pass.clearColor.set(0xf0f2f5);
-        }
         if (typeof pass.setClearColor === 'function') {
           pass.setClearColor(0xf0f2f5, 1);
         }
