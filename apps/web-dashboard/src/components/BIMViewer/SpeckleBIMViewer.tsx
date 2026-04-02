@@ -43,28 +43,13 @@ import * as THREE from 'three';
 import { logger } from '../../services/logger';
 
 /**
- * Apply light background (0xf0f2f5) via GPass pipeline (H-04).
- * GPass._clearColor is the source of truth — persists across all render frames.
- * Set via pass.setClearColor(color, alpha), not by writing to pass.clearColor
- * (getter only, no setter) or pass.clearColor.set() (clearColor is number, not Color).
- * WebGLRenderer.setClearColor is overwritten by Pipeline.render() every frame — wrong layer.
+ * Apply light background via CSS on viewer container (H-04).
+ * Speckle v2 canvas is transparent by design — CSS background shows through.
+ * Source: speckle.community/t/viewer-api-changing-background-colour/7991
  */
 function applyLightBackground(viewer: any): void {
-  try {
-    const speckleRenderer = viewer.getRenderer?.();
-    if (!speckleRenderer) return;
-    const passes = speckleRenderer.pipeline?.passes;
-    if (passes) {
-      for (const pass of passes) {
-        if (typeof pass.setClearColor === 'function') {
-          pass.setClearColor(0xf0f2f5, 1);
-        }
-      }
-    }
-    speckleRenderer.needsRender = true;
-  } catch (_bgErr) {
-    // background setting is non-blocking
-  }
+  const container = viewer.getContainer?.();
+  if (container) container.style.backgroundColor = '#f0f2f5';
 }
 
 // ENTERPRISE: Type definitions for @speckle/viewer v2.25.7 compatibility
@@ -1156,7 +1141,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
             width: '100%',
             height: '100%',
             overflow: 'hidden',
-            backgroundColor: '#1a1a2e',
+            backgroundColor: '#f0f2f5',
             '& canvas': {
               display: 'block',
               width: '100% !important',
