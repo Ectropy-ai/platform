@@ -426,7 +426,7 @@ router.get(
         ...stream,
         viewer_token: generateViewerToken(
           user.id,
-          stream.stream_id,
+          stream.id,
           projectId,
         ),
       }));
