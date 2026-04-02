@@ -148,6 +148,7 @@ export class SpeckleService {
         last_commit_date: latestCommit?.createdAt || null,
         latest_object_id: objectId, // CRITICAL: Extract objectId for viewer
         created_at: stream.createdAt || new Date().toISOString(),
+        viewer_token: stream.viewer_token, // DEC-015: Pass through VST from server
       };
     });
   }
