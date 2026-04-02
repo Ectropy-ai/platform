@@ -931,6 +931,12 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       return;
     }
 
+    // DEC-015: Wait for viewerToken before initializing — prevents 401 race condition
+    if (!viewerToken) {
+      console.log('⏸️ [BIM Viewer] Skipping init - waiting for viewer token');
+      return;
+    }
+
     // ENTERPRISE FIX (2025-11-23): Initialize/reload when we have new model data
     if (hasModelData) {
       // FIX (2026-03-16): Guard against post-load reinit loop
@@ -965,6 +971,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
     containerMounted,
     configLoading,
     speckleAvailable,
+    viewerToken,
   ]);
 
   // ENTERPRISE FIX (2026-01-13): Handle role changes WITHOUT re-initializing viewer
