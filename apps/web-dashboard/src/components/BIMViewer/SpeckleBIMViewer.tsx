@@ -1,6 +1,6 @@
 /// <reference types="node" />
 
-import { CameraAlt, Fullscreen, FullscreenExit, Settings, ZoomIn } from '@mui/icons-material';
+import { CameraAlt, ContentCut, Fullscreen, FullscreenExit, OpenWith, Settings, Straighten, ZoomIn } from '@mui/icons-material';
 import {
   Alert,
   Box,
@@ -28,7 +28,9 @@ import {
   SelectionExtension,
   MeasurementsExtension,
   SectionTool,
+  SectionOutlines,
   FilteringExtension,
+  ExplodeExtension,
   ViewerEvent,
   ViewModes,
   type SelectionEvent,
@@ -226,6 +228,9 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
   const [error, setError] = useState<string | null>(getInitialError());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewMode, setViewMode] = useState<'shaded' | 'wireframe' | 'ghosted'>('shaded');
+  const [measureActive, setMeasureActive] = useState(false);
+  const [sectionActive, setSectionActive] = useState(false);
+  const [explodeValue, setExplodeValue] = useState(0);
   // const [selectedElement, setSelectedElement] = useState<any>(null);
 
   // Stakeholder-specific view configurations
@@ -383,7 +388,9 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
       viewer.createExtension(SelectionExtension);
       viewer.createExtension(MeasurementsExtension);
       viewer.createExtension(SectionTool);
+      viewer.createExtension(SectionOutlines);
       viewer.createExtension(FilteringExtension);
+      viewer.createExtension(ExplodeExtension);
       viewer.createExtension(ViewModes);
       viewer.createExtension(VoxelDecisionSurfaceExtension);
 
@@ -849,6 +856,31 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
     }
   };
 
+  const toggleMeasure = () => {
+    const ext = viewerRef.current?.getExtension(MeasurementsExtension) as any;
+    if (ext) {
+      ext.enabled = !measureActive;
+      setMeasureActive(!measureActive);
+    }
+  };
+
+  const toggleSection = () => {
+    const ext = viewerRef.current?.getExtension(SectionTool) as any;
+    if (ext) {
+      ext.toggle();
+      setSectionActive(!sectionActive);
+    }
+  };
+
+  const toggleExplode = () => {
+    const ext = viewerRef.current?.getExtension(ExplodeExtension) as any;
+    if (ext) {
+      const next = explodeValue > 0 ? 0 : 0.5;
+      ext.explode(next);
+      setExplodeValue(next);
+    }
+  };
+
   // DIAGNOSTIC: Track mount/unmount lifecycle
   useEffect(() => {
     console.log('🟢 [BIM Viewer] COMPONENT MOUNTED');
@@ -1058,6 +1090,24 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         </FormControl>
 
         <Box sx={{ flexGrow: 1 }} />
+
+        <Tooltip title={measureActive ? 'Disable Measure' : 'Measure'}>
+          <IconButton onClick={toggleMeasure} size='small' color={measureActive ? 'primary' : 'default'}>
+            <Straighten />
+          </IconButton>
+        </Tooltip>
+
+        <Tooltip title={sectionActive ? 'Disable Section' : 'Section'}>
+          <IconButton onClick={toggleSection} size='small' color={sectionActive ? 'primary' : 'default'}>
+            <ContentCut />
+          </IconButton>
+        </Tooltip>
+
+        <Tooltip title={explodeValue > 0 ? 'Collapse' : 'Explode'}>
+          <IconButton onClick={toggleExplode} size='small' color={explodeValue > 0 ? 'primary' : 'default'}>
+            <OpenWith />
+          </IconButton>
+        </Tooltip>
 
         <Tooltip title='Zoom to Fit'>
           <IconButton onClick={zoomToFit} size='small'>
