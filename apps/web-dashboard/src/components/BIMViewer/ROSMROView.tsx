@@ -626,6 +626,15 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
     voxelExt?.setVisible(viewState.showVoxels ?? true);
   }, [voxelExt, viewState.showVoxels]);
 
+  // DEC-017 Amendment C: wire filter state to voxel overlay
+  // Note: levels not yet wired — pending GAP-FILTER-001 (VoxelData.level field)
+  useEffect(() => {
+    if (!voxelExt) return;
+    voxelExt.applyFilters({
+      systems: viewState.filterSystems,
+      statuses: viewState.filterStatuses,
+    });
+  }, [voxelExt, viewState.filterSystems, viewState.filterStatuses]);
 
   // Handle voxel click
   const handleVoxelClick = useCallback(

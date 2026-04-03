@@ -54,6 +54,7 @@ interface VoxelIFCElement {
 export class VoxelDecisionSurfaceExtension extends Extension {
   private _mesh: THREE.InstancedMesh | null = null;
   private _voxelData: VoxelData[] = [];
+  private _filteredData: VoxelData[] | null = null;
 
   constructor(viewer: IViewer) {
     super(viewer);
@@ -76,6 +77,33 @@ export class VoxelDecisionSurfaceExtension extends Extension {
     this.enabled = visible;
     if (this._mesh) this._mesh.visible = visible;
     this.viewer.requestRender();
+  }
+
+  /**
+   * Filter visible voxels by system, status, and/or level.
+   * Empty array = no filter on that dimension (show all).
+   * Rebuilds the InstancedMesh with only matching voxels.
+   * NOTE: level filtering pending VoxelData.level field addition (GAP-FILTER-001).
+   */
+  applyFilters(filters: {
+    systems?: string[];
+    statuses?: string[];
+    levels?: string[]; // placeholder — level not yet in VoxelData
+  }): void {
+    const { systems, statuses } = filters; // levels intentionally unused — GAP-FILTER-001
+    const noSystemFilter = !systems || systems.length === 0;
+    const noStatusFilter = !statuses || statuses.length === 0;
+
+    if (noSystemFilter && noStatusFilter) {
+      this._filteredData = null;
+    } else {
+      this._filteredData = this._voxelData.filter(v => {
+        const systemMatch = noSystemFilter || systems!.includes(v.system);
+        const statusMatch = noStatusFilter || statuses!.includes(v.status);
+        return systemMatch && statusMatch;
+      });
+    }
+    this._rebuildMesh();
   }
 
   /**
@@ -231,9 +259,10 @@ export class VoxelDecisionSurfaceExtension extends Extension {
 
   private _rebuildMesh(): void {
     this._clearMesh();
-    console.log('[DEC-008 ext] _rebuildMesh, renderer:', !!(this.viewer as any).getRenderer?.(), 'scene:', !!(this.viewer as any).getRenderer?.()?.scene, 'voxelData:', this._voxelData.length);
+    const data = this._filteredData ?? this._voxelData;
+    console.log('[DEC-008 ext] _rebuildMesh, renderer:', !!(this.viewer as any).getRenderer?.(), 'scene:', !!(this.viewer as any).getRenderer?.()?.scene, 'voxelData:', data.length);
 
-    if (!this._voxelData.length) return;
+    if (!data.length) return;
 
     const geometry = new THREE.BoxGeometry(1, 1, 1);
 
@@ -247,7 +276,7 @@ export class VoxelDecisionSurfaceExtension extends Extension {
     this._mesh = new THREE.InstancedMesh(
       geometry,
       material,
-      this._voxelData.length,
+      data.length,
     );
 
     // OVERLAY layer (4) — rendered by overlayPass in Speckle's DefaultPipeline.
@@ -262,7 +291,7 @@ export class VoxelDecisionSurfaceExtension extends Extension {
     const scale = new THREE.Vector3();
     const color = new THREE.Color();
 
-    this._voxelData.forEach((voxel, i) => {
+    data.forEach((voxel, i) => {
       position.set(voxel.center.x, voxel.center.y, voxel.center.z);
       scale.setScalar(voxel.resolution);
       matrix.compose(position, rotation, scale);
