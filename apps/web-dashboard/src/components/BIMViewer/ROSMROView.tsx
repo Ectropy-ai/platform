@@ -108,6 +108,7 @@ export interface ROSMROViewProps {
   modelId?: string;
   streamId?: string;
   objectId?: string;
+  objectIds?: string[]; // Multi-discipline: all commit object IDs
   stakeholderRole: 'architect' | 'engineer' | 'contractor' | 'owner';
   serverUrl?: string;
   viewerToken?: string; // DEC-015: VST for geometry proxy auth
@@ -505,6 +506,7 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
   modelId,
   streamId,
   objectId,
+  objectIds,
   stakeholderRole,
   serverUrl,
   viewerToken,
@@ -780,6 +782,7 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
             <SpeckleBIMViewer
               streamId={streamId}
               objectId={objectId}
+              objectIds={objectIds}
               stakeholderRole={stakeholderRole}
               serverUrl={serverUrl}
               viewerToken={viewerToken}

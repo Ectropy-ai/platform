@@ -13,6 +13,7 @@ export interface SpeckleStream {
   construction_project_id: string;
   last_commit_date: string | null;
   latest_object_id: string | null; // Object ID from latest commit for viewer rendering
+  commit_object_ids?: string[]; // All discipline commit object IDs for multi-object loading
   created_at: string;
   viewer_token?: string; // DEC-015: Stream-scoped VST for geometry proxy auth
 }
@@ -147,6 +148,10 @@ export class SpeckleService {
         construction_project_id: projectId,
         last_commit_date: latestCommit?.createdAt || null,
         latest_object_id: objectId, // CRITICAL: Extract objectId for viewer
+        commit_object_ids: (stream.commits?.items || [])
+          .map((c: any) => c.referencedObject || c.objectId)
+          .filter(Boolean)
+          .slice(0, 10),
         created_at: stream.createdAt || new Date().toISOString(),
         viewer_token: stream.viewer_token, // DEC-015: Pass through VST from server
       };

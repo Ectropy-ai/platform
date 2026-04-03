@@ -135,6 +135,7 @@ type SpeckleViewer = Viewer & Partial<ViewerExtendedMethods>;
 interface SpeckleBIMViewerProps {
   streamId?: string;
   objectId?: string;
+  objectIds?: string[]; // Multi-discipline: all commit object IDs
   stakeholderRole: 'architect' | 'engineer' | 'contractor' | 'owner';
   onElementSelect?: (elementId: string, properties: ElementProperties | null) => void;
   /**
@@ -158,6 +159,7 @@ interface ViewConfiguration {
 export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
   streamId,
   objectId,
+  objectIds,
   stakeholderRole,
   onElementSelect,
   onSceneReady,
@@ -411,14 +413,20 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
 
       viewerRef.current = viewer;
 
-      // Load content — loadSpeckleObject rethrows on failure so loadedObjectRef
-      // is only set when the object actually loaded successfully.
-      if (effectiveStreamId && effectiveObjectId) {
-        await loadSpeckleObject(viewer, effectiveStreamId, effectiveObjectId);
+      // Load content — multi-discipline: load all commit objects if available
+      const idsToLoad = (objectIds?.length
+        ? objectIds
+        : effectiveObjectId ? [effectiveObjectId] : []
+      ).filter(Boolean);
+
+      if (effectiveStreamId && idsToLoad.length > 0) {
+        console.log(`[BIM Viewer] Loading ${idsToLoad.length} discipline object(s)`);
+        for (let i = 0; i < idsToLoad.length; i++) {
+          console.log(`[BIM Viewer] Loading object ${i + 1}/${idsToLoad.length}: ${idsToLoad[i].substring(0, 12)}...`);
+          await loadSpeckleObject(viewer, effectiveStreamId, idsToLoad[i]);
+        }
         loadedObjectRef.current = objectKey;
-        console.log('🟢 [BIM Viewer] loadObject resolved, starting render pass');
-        // Notify parent AFTER scene is fully loaded — extensions that call
-        // scene.add() need the post-loadObject scene, not the pre-load one.
+        console.log('🟢 [BIM Viewer] All discipline objects loaded');
         onViewerReadyRef.current?.(viewer);
       } else {
         await loadDemoContent(viewer);

@@ -524,6 +524,7 @@ export function ViewerPage() {
                   <SpeckleBIMViewer
                     streamId={selectedStream?.stream_id || undefined}
                     objectId={selectedStream?.latest_object_id || undefined}
+                    objectIds={selectedStream?.commit_object_ids}
                     stakeholderRole={(projectRole || 'contractor') as any}
                     onElementSelect={handleElementSelect}
                     height='600px'
@@ -543,6 +544,7 @@ export function ViewerPage() {
                   projectId={projectId}
                   streamId={selectedStream?.stream_id}
                   objectId={selectedStream?.latest_object_id || undefined}
+                  objectIds={selectedStream?.commit_object_ids}
                   serverUrl={config.speckleApiUrl}
                   viewerToken={selectedStream?.viewer_token}
                   isActive={currentTab === 1}
