@@ -149,9 +149,9 @@ export class SpeckleService {
         last_commit_date: latestCommit?.createdAt || null,
         latest_object_id: objectId, // CRITICAL: Extract objectId for viewer
         commit_object_ids: (stream.commits?.items || [])
+          .slice(0, 3) // Take 3 newest commits (multi-discipline: ARC+MEP+STR)
           .map((c: any) => c.referencedObject || c.objectId)
-          .filter(Boolean)
-          .slice(0, 10),
+          .filter(Boolean),
         created_at: stream.createdAt || new Date().toISOString(),
         viewer_token: stream.viewer_token, // DEC-015: Pass through VST from server
       };
