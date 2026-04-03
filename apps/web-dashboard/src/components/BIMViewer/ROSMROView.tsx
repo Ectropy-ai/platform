@@ -777,19 +777,25 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
       <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 600 }}>
         {/* 3D Viewer */}
         <Box sx={{ flex: 1, position: 'relative' }}>
-          {/* BIM Mesh Viewer with VoxelOverlay integration */}
-          {viewState.showMesh && hasBeenActive && (
-            <SpeckleBIMViewer
-              streamId={streamId}
-              objectId={objectId}
-              objectIds={objectIds}
-              stakeholderRole={stakeholderRole}
-              serverUrl={serverUrl}
-              viewerToken={viewerToken}
-              onElementSelect={handleBIMElementSelect}
-              onViewerReady={handleViewerReady}
-              height='100%'
-            />
+          {/* BIM Mesh Viewer — always mounted to preserve voxelExt state (DEC-017) */}
+          {hasBeenActive && (
+            <div style={{
+              visibility: viewState.showMesh ? 'visible' : 'hidden',
+              height: viewState.showMesh ? '100%' : '0',
+              overflow: 'hidden',
+            }}>
+              <SpeckleBIMViewer
+                streamId={streamId}
+                objectId={objectId}
+                objectIds={objectIds}
+                stakeholderRole={stakeholderRole}
+                serverUrl={serverUrl}
+                viewerToken={viewerToken}
+                onElementSelect={handleBIMElementSelect}
+                onViewerReady={handleViewerReady}
+                height='100%'
+              />
+            </div>
           )}
 
           {/* Floating Legend */}
