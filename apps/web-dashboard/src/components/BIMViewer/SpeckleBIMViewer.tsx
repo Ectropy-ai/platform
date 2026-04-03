@@ -190,13 +190,18 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
   const loadedObjectRef = useRef<string | null>(null);
   // ENTERPRISE FIX (2026-01-13): Use ref for onElementSelect to prevent re-initializations
   const onElementSelectRef = useRef(onElementSelect);
+  // Use ref for onViewerReady — same pattern. Avoids stale closure in useCallback.
+  const onViewerReadyRef = useRef(onViewerReady);
   // ENTERPRISE FIX (2026-01-13): Prevent concurrent initialization attempts
   const isInitializing = useRef(false);
 
-  // Keep ref up to date without triggering effects
+  // Keep refs up to date without triggering effects
   useEffect(() => {
     onElementSelectRef.current = onElementSelect;
   }, [onElementSelect]);
+  useEffect(() => {
+    onViewerReadyRef.current = onViewerReady;
+  }, [onViewerReady]);
 
   // ENTERPRISE FIX (2025-11-23): hasModelData must be REACTIVE, not initial state
   // This allows the component to respond to new props after upload
@@ -407,11 +412,11 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         console.log('🟢 [BIM Viewer] loadObject resolved, starting render pass');
         // Notify parent AFTER scene is fully loaded — extensions that call
         // scene.add() need the post-loadObject scene, not the pre-load one.
-        onViewerReady?.(viewer);
+        onViewerReadyRef.current?.(viewer);
       } else {
         await loadDemoContent(viewer);
         loadedObjectRef.current = null;
-        onViewerReady?.(viewer);
+        onViewerReadyRef.current?.(viewer);
       }
 
       // Apply stakeholder-specific view settings
