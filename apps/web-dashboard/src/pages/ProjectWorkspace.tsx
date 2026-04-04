@@ -340,7 +340,7 @@ const ProjectWorkspace: React.FC<ProjectWorkspaceProps> = ({
               </Box>
               <Box sx={{ height: '600px', bgcolor: '#f5f5f5', borderRadius: 1 }}>
                 <SpeckleBIMViewer
-                  streamId={project.id}
+                  streamId={undefined}
                   objectId={undefined}
                   stakeholderRole={(project.userRole as any) || 'contractor'}
                   onElementSelect={handleElementSelect}
