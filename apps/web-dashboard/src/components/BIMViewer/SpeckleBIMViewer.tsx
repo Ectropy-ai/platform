@@ -197,6 +197,7 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
   // Use ref for onViewerReady — same pattern. Avoids stale closure in useCallback.
   const onViewerReadyRef = useRef(onViewerReady);
   onViewerReadyRef.current = onViewerReady;
+  console.log('[BIM Viewer] onViewerReady prop at mount:', typeof onViewerReady, onViewerReady === undefined ? 'UNDEFINED' : 'FUNCTION');
   // ENTERPRISE FIX (2026-01-13): Prevent concurrent initialization attempts
   const isInitializing = useRef(false);
 
