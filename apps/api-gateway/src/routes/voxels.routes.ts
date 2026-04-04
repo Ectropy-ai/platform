@@ -628,12 +628,12 @@ export class VoxelRoutes {
           [
             projectId, streamId, objectId ?? null,
             resolution * MM, vs.length,
-            Math.min(...vs.map((v: any) => v.bounds.min.x)) * MM,
-            Math.max(...vs.map((v: any) => v.bounds.max.x)) * MM,
-            Math.min(...vs.map((v: any) => v.bounds.min.y)) * MM,
-            Math.max(...vs.map((v: any) => v.bounds.max.y)) * MM,
-            Math.min(...vs.map((v: any) => v.bounds.min.z)) * MM,
-            Math.max(...vs.map((v: any) => v.bounds.max.z)) * MM,
+            vs.reduce((a: number, v: any) => Math.min(a, v.bounds.min.x), Infinity) * MM,
+            vs.reduce((a: number, v: any) => Math.max(a, v.bounds.max.x), -Infinity) * MM,
+            vs.reduce((a: number, v: any) => Math.min(a, v.bounds.min.y), Infinity) * MM,
+            vs.reduce((a: number, v: any) => Math.max(a, v.bounds.max.y), -Infinity) * MM,
+            vs.reduce((a: number, v: any) => Math.min(a, v.bounds.min.z), Infinity) * MM,
+            vs.reduce((a: number, v: any) => Math.max(a, v.bounds.max.z), -Infinity) * MM,
           ]
         );
         const gridId = gridResult.rows[0].id;
