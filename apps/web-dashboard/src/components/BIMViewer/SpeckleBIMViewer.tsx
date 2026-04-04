@@ -427,11 +427,21 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
         }
         loadedObjectRef.current = objectKey;
         console.log('🟢 [BIM Viewer] All discipline objects loaded');
-        onViewerReadyRef.current?.(viewer);
+        if (onViewerReadyRef.current) {
+          console.log('[BIM Viewer] onViewerReady firing — ref is populated');
+          onViewerReadyRef.current(viewer);
+        } else {
+          console.warn('[BIM Viewer] onViewerReady NOT fired — ref is null at call time');
+        }
       } else {
         await loadDemoContent(viewer);
         loadedObjectRef.current = null;
-        onViewerReadyRef.current?.(viewer);
+        if (onViewerReadyRef.current) {
+          console.log('[BIM Viewer] onViewerReady firing — ref is populated');
+          onViewerReadyRef.current(viewer);
+        } else {
+          console.warn('[BIM Viewer] onViewerReady NOT fired — ref is null at call time');
+        }
       }
 
       // Apply stakeholder-specific view settings
