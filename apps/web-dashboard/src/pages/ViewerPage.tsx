@@ -9,7 +9,7 @@
  * - Role-based viewer controls
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Box,
@@ -43,6 +43,8 @@ import type {
   SpeckleImportResult,
   SpeckleInitializeResult,
 } from '../services/speckle.service';
+import type { IViewer } from '@speckle/viewer';
+import { VoxelDecisionSurfaceExtension } from '../components/BIMViewer/VoxelDecisionSurfaceExtension';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -87,6 +89,13 @@ export function ViewerPage() {
   const [projectPermissions, setProjectPermissions] = useState<string[]>([]);
   const [projectRoleLoading, setProjectRoleLoading] = useState(false);
   const [projectRoleError, setProjectRoleError] = useState<string | null>(null);
+
+  // P0 FIX (2026-04-04): Refs for BOX generation callback — avoid stale closures
+  const boxGenTriggeredRef = useRef(false);
+  const selectedStreamRef = useRef(selectedStream);
+  const projectIdRef = useRef(selectedProjectId);
+  useEffect(() => { selectedStreamRef.current = selectedStream; }, [selectedStream]);
+  useEffect(() => { projectIdRef.current = selectedProjectId; }, [selectedProjectId]);
 
   // Read URL parameters — stream (BIM viewer) and project (demo project creation)
   const streamIdFromUrl = searchParams.get('stream');
@@ -352,6 +361,37 @@ export function ViewerPage() {
     // In production, this would update a properties panel or trigger other actions
   }, []);
 
+  /**
+   * Handle viewer ready — trigger BOX generation from Viewer tab instance.
+   * DEC-016/017: Instance 1 (Viewer tab) loads successfully. Instance 2
+   * (Coordination tab, ROSMROView) suffers Three.js singleton conflict. Fix: wire
+   * callback to Instance 1. Guard ref prevents double-trigger.
+   */
+  const handleViewerReady = useCallback((viewer: IViewer) => {
+    if (boxGenTriggeredRef.current) return;
+    boxGenTriggeredRef.current = true;
+    const ext = viewer.getExtension(
+      VoxelDecisionSurfaceExtension
+    ) as VoxelDecisionSurfaceExtension;
+    const pid = projectIdRef.current;
+    const streamId = selectedStreamRef.current?.stream_id;
+    const objectId = selectedStreamRef.current?.latest_object_id;
+    if (ext && pid && streamId) {
+      console.log('[BOX] ViewerPage: triggering generateAndPersistBoxes', {
+        pid, streamId, objectId,
+      });
+      ext
+        .generateAndPersistBoxes(pid, streamId, objectId ?? '')
+        .catch((err: Error) =>
+          console.error('[BOX] generateAndPersistBoxes failed:', err)
+        );
+    } else {
+      console.warn('[BOX] ViewerPage: handleViewerReady missing ext/pid/streamId', {
+        hasExt: !!ext, pid, streamId,
+      });
+    }
+  }, []);
+
   return (
     <Container maxWidth='xl' sx={{ py: 3 }}>
       <Paper elevation={2}>
@@ -536,6 +576,7 @@ export function ViewerPage() {
                     objectIds={selectedStream?.commit_object_ids}
                     stakeholderRole={(projectRole || 'contractor') as any}
                     onElementSelect={handleElementSelect}
+                    onViewerReady={handleViewerReady}
                     height='600px'
                     serverUrl={config.speckleApiUrl}
                     viewerToken={selectedStream?.viewer_token}
