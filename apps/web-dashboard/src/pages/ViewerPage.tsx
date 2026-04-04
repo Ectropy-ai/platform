@@ -290,12 +290,21 @@ export function ViewerPage() {
 
       // ENTERPRISE FIX (2026-01-12): Prevent stream=undefined in URL
       // ROOT CAUSE: stream.stream_id could be undefined/null, resulting in literal "undefined" string
-      // SOLUTION: Only set URL param if stream_id is valid, otherwise clear all params
+      // SOLUTION: Only set URL param if stream_id is valid, otherwise clear stream param
+      // FIX (2026-04-03): Preserve ?project= param — dropping it causes refresh to lose context
       if (stream?.stream_id) {
-        setSearchParams({ stream: stream.stream_id });
+        setSearchParams(prev => {
+          const next = new URLSearchParams(prev);
+          next.set('stream', stream.stream_id);
+          return next;
+        });
       } else {
-        console.log('🔄 [ViewerPage] Clearing URL params (no stream_id)');
-        setSearchParams({});
+        console.log('🔄 [ViewerPage] Clearing stream URL param (no stream_id)');
+        setSearchParams(prev => {
+          const next = new URLSearchParams(prev);
+          next.delete('stream');
+          return next;
+        });
       }
     },
     [setSearchParams],
