@@ -606,81 +606,93 @@ export class VoxelRoutes {
 
         logger.info(`[BOX:generate] ${elements.length} elements, res=${resolution}mm, project=${projectId}`);
 
-        // Rasterize using inlined conservative AABB algorithm
-        const result = rasterizeElements(elements, resolution);
+        // Return 202 immediately — Cloudflare kills synchronous requests at 100s.
+        // Generation runs async via setImmediate; VoxelStream WebSocket pushes
+        // live progress to the client.
+        res.status(202).json({
+          message: 'Generation accepted — processing in background',
+          projectId,
+          elementCount: elements.length,
+        });
 
-        if (!result?.voxels?.length) {
-          throw new AppError('Engine produced 0 voxels', 422);
-        }
+        // Capture db ref for use inside setImmediate closure
+        const db = this.db;
 
-        const vs = result.voxels;
-        const MM = 0.001; // engine mm → DB meters
+        setImmediate(async () => {
+          try {
+            // Rasterize using inlined conservative AABB algorithm
+            const result = rasterizeElements(elements, resolution);
 
-        // Create voxel_grids record (not in Prisma — raw SQL)
-        const gridResult = await this.db.query(
-          `INSERT INTO voxel_grids
-             (project_id, stream_id, object_id, resolution, resolution_tier,
-              source_type, status, voxel_count,
-              bbox_min_x, bbox_max_x, bbox_min_y, bbox_max_y, bbox_min_z, bbox_max_z,
-              generated_at)
-           VALUES ($1,$2,$3,$4,'COARSE','BIM','COMPLETE',$5,$6,$7,$8,$9,$10,$11,NOW())
-           RETURNING id`,
-          [
-            projectId, streamId, objectId ?? null,
-            resolution * MM, vs.length,
-            vs.reduce((a: number, v: any) => Math.min(a, v.bounds.min.x), Infinity) * MM,
-            vs.reduce((a: number, v: any) => Math.max(a, v.bounds.max.x), -Infinity) * MM,
-            vs.reduce((a: number, v: any) => Math.min(a, v.bounds.min.y), Infinity) * MM,
-            vs.reduce((a: number, v: any) => Math.max(a, v.bounds.max.y), -Infinity) * MM,
-            vs.reduce((a: number, v: any) => Math.min(a, v.bounds.min.z), Infinity) * MM,
-            vs.reduce((a: number, v: any) => Math.max(a, v.bounds.max.z), -Infinity) * MM,
-          ]
-        );
-        const gridId = gridResult.rows[0].id;
+            if (!result?.voxels?.length) {
+              logger.error('[BOX:generate] Engine produced 0 voxels', { projectId });
+              return;
+            }
 
-        // Batch insert pm_voxels — chunks of 200 to stay within param limits
-        const CHUNK = 100;
-        for (let i = 0; i < vs.length; i += CHUNK) {
-          const chunk = vs.slice(i, i + CHUNK);
-          const vals: any[] = [];
-          const placeholders = chunk.map((v: any, j: number) => {
-            const b = j * 18 + 1;
-            const ifcArr = `{${(v.ifcElements ?? []).join(',')}}`;
-            const voxelId = v.voxelId ?? `VOX-BOX-${String(i + j).padStart(4, '0')}`;
-            const urn = v.urn ?? `urn:ectropy:${projectId}:voxel:${voxelId}`;
-            vals.push(
-              urn, voxelId,
-              projectId, gridId, null,  // parent_voxel_id = null for COARSE
-              v.center.x * MM, v.center.y * MM, v.center.z * MM,
-              v.bounds.min.x * MM, v.bounds.max.x * MM,
-              v.bounds.min.y * MM, v.bounds.max.y * MM,
-              v.bounds.min.z * MM, v.bounds.max.z * MM,
-              resolution * MM,
-              v.system ?? 'UNKNOWN',
-              v.level ?? 'Unknown',
-              ifcArr,
+            const vs = result.voxels;
+            const MM = 0.001; // engine mm → DB meters
+
+            // Create voxel_grids record (not in Prisma — raw SQL)
+            const gridResult = await db.query(
+              `INSERT INTO voxel_grids
+                 (project_id, stream_id, object_id, resolution, resolution_tier,
+                  source_type, status, voxel_count,
+                  bbox_min_x, bbox_max_x, bbox_min_y, bbox_max_y, bbox_min_z, bbox_max_z,
+                  generated_at)
+               VALUES ($1,$2,$3,$4,'COARSE','BIM','COMPLETE',$5,$6,$7,$8,$9,$10,$11,NOW())
+               RETURNING id`,
+              [
+                projectId, streamId, objectId ?? null,
+                resolution * MM, vs.length,
+                vs.reduce((a: number, v: any) => Math.min(a, v.bounds.min.x), Infinity) * MM,
+                vs.reduce((a: number, v: any) => Math.max(a, v.bounds.max.x), -Infinity) * MM,
+                vs.reduce((a: number, v: any) => Math.min(a, v.bounds.min.y), Infinity) * MM,
+                vs.reduce((a: number, v: any) => Math.max(a, v.bounds.max.y), -Infinity) * MM,
+                vs.reduce((a: number, v: any) => Math.min(a, v.bounds.min.z), Infinity) * MM,
+                vs.reduce((a: number, v: any) => Math.max(a, v.bounds.max.z), -Infinity) * MM,
+              ]
             );
-            return `(gen_random_uuid(),$${b},$${b+1},$${b+2},$${b+3},$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},'PLANNED','HEALTHY',$${b+15},$${b+16},$${b+17})`;
-          });
-          await this.db.query(
-            `INSERT INTO voxels
-               (id, urn, voxel_id,
-                project_id, voxel_grid_id, parent_voxel_id,
-                coord_x, coord_y, coord_z,
-                min_x, max_x, min_y, max_y, min_z, max_z,
-                resolution, status, health_status, system, level, ifc_elements)
-             VALUES ${placeholders.join(',')}`,
-            vals
-          );
-        }
+            const gridId = gridResult.rows[0].id;
 
-        logger.info(`[BOX:generate] Complete — gridId=${gridId}, voxels=${vs.length}`);
+            // Batch insert pm_voxels — chunks of 200 to stay within param limits
+            const CHUNK = 100;
+            for (let i = 0; i < vs.length; i += CHUNK) {
+              const chunk = vs.slice(i, i + CHUNK);
+              const vals: any[] = [];
+              const placeholders = chunk.map((v: any, j: number) => {
+                const b = j * 18 + 1;
+                const ifcArr = `{${(v.ifcElements ?? []).join(',')}}`;
+                const voxelId = v.voxelId ?? `VOX-BOX-${String(i + j).padStart(4, '0')}`;
+                const urn = v.urn ?? `urn:ectropy:${projectId}:voxel:${voxelId}`;
+                vals.push(
+                  urn, voxelId,
+                  projectId, gridId, null,  // parent_voxel_id = null for COARSE
+                  v.center.x * MM, v.center.y * MM, v.center.z * MM,
+                  v.bounds.min.x * MM, v.bounds.max.x * MM,
+                  v.bounds.min.y * MM, v.bounds.max.y * MM,
+                  v.bounds.min.z * MM, v.bounds.max.z * MM,
+                  resolution * MM,
+                  v.system ?? 'UNKNOWN',
+                  v.level ?? 'Unknown',
+                  ifcArr,
+                );
+                return `(gen_random_uuid(),$${b},$${b+1},$${b+2},$${b+3},$${b+4},$${b+5},$${b+6},$${b+7},$${b+8},$${b+9},$${b+10},$${b+11},$${b+12},$${b+13},$${b+14},'PLANNED','HEALTHY',$${b+15},$${b+16},$${b+17})`;
+              });
+              await db.query(
+                `INSERT INTO voxels
+                   (id, urn, voxel_id,
+                    project_id, voxel_grid_id, parent_voxel_id,
+                    coord_x, coord_y, coord_z,
+                    min_x, max_x, min_y, max_y, min_z, max_z,
+                    resolution, status, health_status, system, level, ifc_elements)
+                 VALUES ${placeholders.join(',')}`,
+                vals
+              );
+            }
 
-        res.status(201).json({
-          gridId,
-          voxelCount: vs.length,
-          resolutionTier: 'COARSE',
-          resolution: resolution * MM,
+            logger.info(`[BOX:generate] Complete — gridId=${gridId}, voxels=${vs.length}`);
+          } catch (err) {
+            logger.error('[BOX:generate] Background generation failed', { projectId, error: err });
+          }
         });
       })
     );
