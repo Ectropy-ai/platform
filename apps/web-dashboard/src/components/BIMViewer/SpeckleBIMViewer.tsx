@@ -196,7 +196,9 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
   const onElementSelectRef = useRef(onElementSelect);
   // Use ref for onViewerReady — same pattern. Avoids stale closure in useCallback.
   const onViewerReadyRef = useRef(onViewerReady);
-  onViewerReadyRef.current = onViewerReady;
+  if (onViewerReady !== undefined) {
+    onViewerReadyRef.current = onViewerReady;
+  }
   console.log('[BIM Viewer] onViewerReady prop at mount:', typeof onViewerReady, onViewerReady === undefined ? 'UNDEFINED' : 'FUNCTION');
   // ENTERPRISE FIX (2026-01-13): Prevent concurrent initialization attempts
   const isInitializing = useRef(false);
@@ -206,7 +208,9 @@ export const SpeckleBIMViewer: React.FC<SpeckleBIMViewerProps> = ({
     onElementSelectRef.current = onElementSelect;
   }, [onElementSelect]);
   useEffect(() => {
-    onViewerReadyRef.current = onViewerReady;
+    if (onViewerReady !== undefined) {
+      onViewerReadyRef.current = onViewerReady;
+    }
   }, [onViewerReady]);
 
   // ENTERPRISE FIX (2025-11-23): hasModelData must be REACTIVE, not initial state
