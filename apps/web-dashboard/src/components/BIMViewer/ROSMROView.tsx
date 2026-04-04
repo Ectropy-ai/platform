@@ -598,6 +598,10 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
   // DEC-009: Ref for projectId to avoid stale closure in handleViewerReady
   const projectIdRef = React.useRef(projectId);
   projectIdRef.current = projectId;
+  const streamIdRef = React.useRef<string | null>(null);
+  const objectIdRef = React.useRef<string | null>(null);
+  streamIdRef.current = streamId ?? null;
+  objectIdRef.current = objectId ?? null;
 
   // DEC-008: Get extension ref when viewer is ready
   // DEC-009: Trigger BOX generation after model load
@@ -607,10 +611,15 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
     setVoxelExt(ext);
     // DEC-009: Generate BOX cells from WorldTree after model load completes
     const pid = projectIdRef.current;
-    if (ext && pid && streamId) {
-      ext.generateAndPersistBoxes(pid, streamId, objectId ?? '').catch((err: unknown) => {
-        console.error('[BOX] generateAndPersistBoxes failed:', err);
-      });
+    const currentStreamId = streamIdRef.current;
+    const currentObjectId = objectIdRef.current;
+    if (ext && pid && currentStreamId) {
+      ext.generateAndPersistBoxes(pid, currentStreamId, currentObjectId ?? '')
+        .catch((err: Error) =>
+          console.error('[BOX] generateAndPersistBoxes failed:', err));
+    } else {
+      console.warn('[DEC-008] handleViewerReady: missing ext/pid/streamId',
+        { ext: !!ext, pid, currentStreamId, currentObjectId });
     }
   }, []);
 
