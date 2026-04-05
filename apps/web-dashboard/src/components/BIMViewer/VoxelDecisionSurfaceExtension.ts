@@ -137,14 +137,15 @@ export class VoxelDecisionSurfaceExtension extends Extension {
     const typeMap = new Map<string, string>();
     try {
       const tree = (this.viewer as any).getWorldTree?.();
-      if (tree?.root) {
-        const stack = [tree.root];
+      const treeRoot = tree?.root ?? tree?.tree?.root;
+      if (treeRoot) {
+        const stack = [treeRoot];
         while (stack.length) {
           const node = stack.pop();
           if (node?.model?.raw?.speckle_type && node.model.id) {
             typeMap.set(node.model.id, node.model.raw.speckle_type);
           }
-          const children = node?.model?.children ?? node?.children ?? [];
+          const children = node?._children ?? node?.children ?? [];
           for (const child of children) stack.push(child);
         }
       }
