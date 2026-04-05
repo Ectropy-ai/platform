@@ -156,6 +156,8 @@ services:
       # token takes precedence (it's the only one with correct bcrypt hashing).
       SPECKLE_SERVER_URL: ${SPECKLE_SERVER_URL:-http://ectropy-speckle-server:3000}
       SPECKLE_SERVER_TOKEN: ${SPECKLE_SERVER_TOKEN}
+      # DEC-018: Direct Speckle DB connection for token self-healing
+      SPECKLE_DB_URL: postgresql://postgres:${DATABASE_PASSWORD}@ectropy-postgres:5432/speckle
       SPECKLE_ADMIN_EMAIL: ${SPECKLE_ADMIN_EMAIL:-speckle-admin@ectropy.ai}
       SPECKLE_ADMIN_PASSWORD: ${SPECKLE_ADMIN_PASSWORD}
 

@@ -209,6 +209,8 @@ import {
   AuditEventType,
   AuditResourceType,
 } from './services/audit.service.js';
+// DEC-018: Speckle service token self-healing startup check
+import { ensureSpeckleToken } from './services/speckle-token.service.js';
 import {
   createAuditMiddleware,
   authAuditMiddleware,
@@ -2639,6 +2641,11 @@ async function bootstrap(): Promise<void> {
         path: req.originalUrl,
       });
     });
+
+    // DEC-018: Ensure Speckle service token is valid before server starts
+    // Self-heals orphaned tokens caused by Speckle PostgreSQL container recreation.
+    // Server will not start if token cannot be ensured — fail-fast by design.
+    await ensureSpeckleToken();
 
     logger.info('Step 7/8: Starting HTTP server...');
     logger.info(`Attempting to listen on port ${PORT}...`);
