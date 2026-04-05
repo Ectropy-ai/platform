@@ -41,3 +41,4 @@ Dockerfile* text eol=lf
 
 # Default behavior: auto-detect text files and normalize to LF
 * text=auto eol=lf
+*.ifc binary
