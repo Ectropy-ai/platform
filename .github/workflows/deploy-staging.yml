@@ -181,6 +181,12 @@ jobs:
           echo "🏗️ Building ${{ matrix.service }}..."
           pnpm nx build ${{ matrix.service }} --configuration=production
 
+      # SECRET ARCHITECTURE (2026-04-04 — do not add env-level duplicates):
+      # DIGITALOCEAN_ACCESS_TOKEN lives at REPO LEVEL ONLY.
+      # Staging and production share one DOCR — one token, one location.
+      # Environment-level copies silently drift after token rotations.
+      # To rotate: update repo-level secret only (Bitwarden: DIGITALOCEAN_ACCESS_TOKEN).
+      #
       # ENTERPRISE FIX (2026-03-07): Five Why — DOCR 401 buildx credential isolation
       # ROOT CAUSE: docker/build-push-action@v5 uses BuildKit docker-container driver
       # which runs in an isolated container that does NOT reliably inherit host Docker
