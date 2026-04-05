@@ -76,7 +76,8 @@ export async function ensureSpeckleToken(): Promise<SpeckleTokenResult> {
 
   const pool = new Pool({
     connectionString: speckleDbUrl,
-    ssl: { rejectUnauthorized: false },
+    // No SSL — Speckle postgres is a local Docker container (ectropy-postgres)
+    ssl: false,
     max: 2,
     connectionTimeoutMillis: 10000,
   });
