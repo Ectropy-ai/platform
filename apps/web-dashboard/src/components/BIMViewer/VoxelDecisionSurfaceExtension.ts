@@ -132,6 +132,27 @@ export class VoxelDecisionSurfaceExtension extends Extension {
       return [];
     }
 
+    // Build speckle_type lookup from WorldTree (node.model.raw.speckle_type
+    // contains real IFC type strings like "Objects.BuiltElements.Wall:...")
+    const typeMap = new Map<string, string>();
+    try {
+      const tree = (this.viewer as any).getWorldTree?.();
+      if (tree?.root) {
+        const stack = [tree.root];
+        while (stack.length) {
+          const node = stack.pop();
+          if (node?.model?.raw?.speckle_type && node.model.id) {
+            typeMap.set(node.model.id, node.model.raw.speckle_type);
+          }
+          const children = node?.model?.children ?? node?.children ?? [];
+          for (const child of children) stack.push(child);
+        }
+      }
+      console.log(`[BOX] WorldTree type lookup: ${typeMap.size} entries`);
+    } catch (e) {
+      console.warn('[BOX] WorldTree walk failed, types will be Unknown', e);
+    }
+
     const batchObjects: any[] = renderer.getObjects?.() ?? [];
     console.log(`[BOX] Batch objects from renderer: ${batchObjects.length}`);
 
@@ -150,11 +171,24 @@ export class VoxelDecisionSurfaceExtension extends Extension {
 
       // Extract identity from renderView.renderData (confirmed in Speckle source)
       const rd = bObj?.renderView?.renderData ?? {};
+      const objId = rd?.id ?? `gen-${elements.length}`;
+
+      // Resolve real IFC type from WorldTree lookup
+      const rawType = typeMap.get(objId) ?? 'Objects.BuiltElements.Unknown';
+
+      // Z-banding for level (meters, world-space). Ranges from staging coord_z:
+      // -2.15 → 14.57m. Bands calibrated to Maple Ridge IFC storey heights.
+      const centerZ = (b.min.z + b.max.z) / 2;
+      let level: string;
+      if (centerZ < 1.0) level = 'Level 0';
+      else if (centerZ < 4.5) level = 'First Floor';
+      else if (centerZ < 8.5) level = 'Second Floor';
+      else level = 'Roof - Main';
 
       elements.push({
-        globalId: rd?.id ?? `gen-${elements.length}`,
-        type: 'Objects.BuiltElements.Unknown', // speckleType is enum, not string — Phase 2
-        containedInStorey: 'Unknown', // Not on renderData — Phase 2 via WorldTree
+        globalId: objId,
+        type: rawType,
+        containedInStorey: level,
         materials: [],
         boundingBox: {
           min: { x: b.min.x, y: b.min.y, z: b.min.z },
