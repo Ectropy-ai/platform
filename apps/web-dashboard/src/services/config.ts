@@ -230,7 +230,7 @@ class ConfigurationService {
       // Cloudflare SSL certificate auto-provisioned for speckle.staging.ectropy.ai
       // Mixed content security: HTTPS page requires HTTPS resources
       const stagingProtocol = process.env['REACT_APP_STAGING_SPECKLE_PROTOCOL'] || 'https';
-      return `${stagingProtocol}://speckle.${stagingDomain}`;
+      return `${stagingProtocol}://${stagingDomain}/speckle`;
     } else {
       // Production deployment - path-based proxy (DO LB does not route subdomains)
       const productionProtocol = process.env['REACT_APP_PRODUCTION_PROTOCOL'] || currentProtocol;
