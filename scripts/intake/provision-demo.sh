@@ -286,7 +286,7 @@ except: print('')
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer $SPECKLE_TOKEN" \
         -d "{
-          \"query\": \"{ stream(id: \\\"${STREAM_ID}\\\") { branch(name: \\\"${DISC}\\\") { commits(limit: 1) { items { id referencedObject } } } } }\"
+          \"query\": \"{ stream(id: \\\"${STREAM_ID}\\\") { branch(name: \\\"main\\\") { commits(limit: 1) { items { id referencedObject } } } } }\"
         }" 2>/dev/null || echo '{}')
 
       REF_OBJ=$(echo "$POLL_RESP" | python3 -c "
