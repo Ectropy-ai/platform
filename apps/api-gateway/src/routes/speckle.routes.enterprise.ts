@@ -611,9 +611,27 @@ router.get('/streams', requireAuth, async (req: Request, res: Response) => {
  *
  * @see apps/mcp-server/data/documentation/apps/web-dashboard-speckle-token-architecture.json
  */
+router.get('/viewer-token', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const token = await getSpeckleToken();
+    const publicServerUrl = process.env.SPECKLE_PUBLIC_URL || process.env.SPECKLE_SERVER_URL || '';
+    if (!token) {
+      return res.status(503).json({ status: 'error', message: 'Speckle token not configured' });
+    }
+    return res.json({
+      status: 'success',
+      data: { token, serverUrl: publicServerUrl },
+    });
+  } catch (error) {
+    logger.error('[SpeckleViewerToken] Failed to get viewer token', { error });
+    return res.status(500).json({ status: 'error', message: 'Failed to get viewer token' });
+  }
+});
+
 router.get('/config', requireAuth, async (req: Request, res: Response) => {
   try {
     const serverUrl = process.env.SPECKLE_SERVER_URL || '';
+    const publicServerUrl = process.env.SPECKLE_PUBLIC_URL || serverUrl;
     const token = await getSpeckleToken();
     const demoStreamId = process.env.DEMO_SPECKLE_STREAM_ID;
     const demoObjectId = process.env.DEMO_SPECKLE_OBJECT_ID;
@@ -712,8 +730,8 @@ router.get('/config', requireAuth, async (req: Request, res: Response) => {
     res.json({
       status: 'success',
       data: {
-        serverUrl,
-        frontendUrl,
+        serverUrl: publicServerUrl,
+        frontendUrl: publicServerUrl,
         demoStreamId,
         demoObjectId,
         tokenStatus,
