@@ -1,0 +1,99 @@
+name: Provision Demo Project (DEC-020)
+
+# DEC-020: Server-side IFC → Speckle provisioning workflow.
+# Three modes: setup (full IFC upload), load (fast restore), export (snapshot).
+# BOX generation fires via onViewerReady — not part of this workflow.
+# Server-side BOX generation: DEC-021 (post-demo — @speckle/objectloader).
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Provision mode'
+        required: true
+        type: choice
+        default: 'load'
+        options:
+          - setup
+          - load
+          - export
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        default: 'staging'
+        options:
+          - staging
+          - production
+      project_id:
+        description: 'Ectropy project UUID'
+        required: true
+        default: 'dc1eaa5b-7553-46ec-92a5-e20762a60c71'
+
+jobs:
+  provision:
+    name: Provision Demo (${{ github.event.inputs.mode }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install boto3
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Configure environment
+        id: config
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "production" ]; then
+            echo "STAGING_URL=https://ectropy.ai" >> $GITHUB_ENV
+            echo "SPECKLE_SERVER_URL=https://ectropy.ai/speckle" >> $GITHUB_ENV
+          else
+            echo "STAGING_URL=https://staging.ectropy.ai" >> $GITHUB_ENV
+            echo "SPECKLE_SERVER_URL=https://staging.ectropy.ai/speckle" >> $GITHUB_ENV
+          fi
+          echo "PROJECT_ID=${{ github.event.inputs.project_id }}" >> $GITHUB_ENV
+
+      - name: Run provision script
+        env:
+          SPECKLE_TOKEN: ${{ secrets.SPECKLE_SERVER_TOKEN }}
+          SPACES_ACCESS_KEY: ${{ secrets.DO_SPACES_ACCESS_KEY }}
+          SPACES_SECRET_KEY: ${{ secrets.DO_SPACES_SECRET_KEY }}
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: |
+          chmod +x scripts/intake/provision-demo.sh
+          ./scripts/intake/provision-demo.sh ${{ github.event.inputs.mode }}
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Provision Demo Project" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode:** ${{ github.event.inputs.mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project ID:** ${{ github.event.inputs.project_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event.inputs.mode }}" = "setup" ]; then
+            echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "1. Open the viewer to trigger BOX generation" >> $GITHUB_STEP_SUMMARY
+            echo "2. Wait for voxels to populate (~2-5 min)" >> $GITHUB_STEP_SUMMARY
+            echo "3. Run this workflow again with mode=**export**" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ github.event.inputs.mode }}" = "load" ]; then
+            echo "### Result" >> $GITHUB_STEP_SUMMARY
+            echo "BOX cells restored from Spaces snapshot. Viewer ready." >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ github.event.inputs.mode }}" = "export" ]; then
+            echo "### Result" >> $GITHUB_STEP_SUMMARY
+            echo "BOX snapshot exported to DO Spaces for fast restore." >> $GITHUB_STEP_SUMMARY
+          fi
