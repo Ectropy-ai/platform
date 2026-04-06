@@ -1,141 +1,19 @@
 {
   "$schema": "urn:luhtech:schema:roadmap:v3.1",
-  "schemaVersion": "3.1.0",
+  "schemaVersion": "3.1.1",
   "meta": {
     "ventureId": "ectropy",
     "ventureName": "Ectropy Platform",
-    "lastUpdated": "2026-03-27T00:00:00Z",
+    "lastUpdated": "2026-04-05T00:00:00Z",
     "author": "erik",
     "status": "active",
     "sourceDoc": ".roadmap/roadmap.json",
-    "strategicDocuments": [],
     "syncStatus": {
-      "v1Path": "apps/mcp-server/data/roadmap-platform.json",
-      "lastSync": "2026-01-28T22:45:00Z",
-      "syncDirection": "v3-is-source-of-truth"
-    },
-    "schemaChangelog": [
-      {
-        "version": "3.1.3",
-        "date": "2026-03-27",
-        "changes": [
-          "TRUE-UP: meta.lastUpdated and metricsReporting.lastUpdated advanced to 2026-03-27",
-          "TRUE-UP: cicdHealth.foundationHealth marked unknown-pending-verification (was 'failing' 2026-03-07, not re-read)",
-          "TRUE-UP: Past-due keyMilestones (repo-split, prisma-n8n, graphql-api, mobile-voxel, pilot-ready, pilot-launch) annotated — status requires git/CI verification",
-          "TRUE-UP: repo-split milestone — split evidence confirmed (commits 81dab61, fe00494; ../Ectropy-Business exists)",
-          "ADD: features.box-architecture — DEC-009, BOX-ARCHITECTURE-2026-03-26.docx canonical",
-          "ADD: features.ifc-extraction-service — DEC-010, Stage 4 of Project Intake Pipeline",
-          "ADD: features.project-intake-pipeline — DEC-010, INTAKE-ARCHITECTURE-2026-03-27.md",
-          "UPDATE: p5b-d1 Multi-Format Ingestion status planned -> in-progress",
-          "Source: INTAKE-ARCHITECTURE-2026-03-27.md, BOX-ARCHITECTURE-2026-03-26.docx"
-        ]
-      },
-      {
-        "version": "3.0.0",
-        "date": "2026-02-14",
-        "changes": [
-          "UPGRADE: Schema v2.4.0 → v3.0.0",
-          "Removed business fields from roadmap.json: financials, team, competitive",
-          "Business data now lives exclusively in roadmap-business.json",
-          "Source: GAP 1 resolution — schema-v3-upstream-sync"
-        ]
-      },
-      {
-        "version": "2.4.0",
-        "date": "2026-02-12",
-        "changes": [
-          "DAG FIX: Removed urn:luhtech:viiva:milestone:fork-ready from repo-split successors",
-          "Viiva launches standalone (Phase 1), Ectropy integration is Phase 6",
-          "Source: DAG validation error resolution Feb 12 2026"
-        ]
-      },
-      {
-        "version": "2.0.0",
-        "date": "2026-01-06",
-        "changes": [
-          "Initial roadmap schema v2"
-        ]
-      },
-      {
-        "version": "2.3.0",
-        "date": "2026-01-28",
-        "changes": [
-          "Added URN identifiers to keyMilestones",
-          "Added graphMetadata for portfolio dependency tracking",
-          "Added milestone classification (LEAD/DERIVED/EXTERNAL/FLEXIBLE)",
-          "Added authorityLevel for change control",
-          "Added bufferDays for schedule float"
-        ]
-      },
-      {
-        "version": "2.3.0",
-        "date": "2026-02-04",
-        "changes": [
-          "Added team.members[] array for slide generation pipeline compatibility"
-        ]
-      },
-      {
-        "version": "2.3.0",
-        "date": "2026-02-03",
-        "changes": [
-          "RESTORE: Recovered full file from parent commit (quarters section was missing)",
-          "Aligned repo split date to 2026-02-28 per strategic planning",
-          "Added Tier 4 ventures (Siltana, Viitata, Pelto.ai) to cross-venture dependencies",
-          "Added integration-first competitive positioning (Ectropy in Your Stack)",
-          "Documented EC3 API integration strategy (consume API, add voxel layer)",
-          "Documented carbon boundary (Ectropy = calcs, Raizal = marketplace)",
-          "Updated MCP tool counts (39/24/79)"
-        ]
-      },
-      {
-        "version": "2.3.0",
-        "date": "2026-02-11",
-        "changes": [
-          "DATA: Added pitch.traction from metricsReporting (96/100 readiness, 164 E2E tests)",
-          "DATA: Added pitch.ask from financials ($500K-$1M pre-seed Q2 2026)",
-          "DATA: Added pitch.technology from infrastructure services and feature specs",
-          "Source: Roadmap data gap analysis Feb 11 2026"
-        ]
-      },
-      {
-        "version": "2.4.0",
-        "date": "2026-02-12",
-        "changes": [
-          "UPGRADE: Schema v2.3.0 → v2.4.0 with feature reference fields",
-          "Added features[] array with featureRef links to .roadmap/features/ FEATURE.json specs",
-          "Added featureUrn, specVersion, dependsOnFeatures for graph traversal",
-          "20 feature specifications linked (17 flat + 3 EIL sub-features)"
-        ]
-      },
-      {
-        "version": "3.1.0",
-        "date": "2026-02-26",
-        "changes": [
-          "MIGRATE: mission, vision, currentStage, overallProgress added to venture.* from roadmap-business.json",
-          "Source: Transform Fabric Architecture v2.0.0 — business identity fields are team-visible, not financial",
-          "Schema upgraded from urn:luhtech:schema:roadmap:v3.0 → urn:luhtech:schema:roadmap:v3.1"
-        ]
-      },
-      {
-        "version": "3.1.2",
-        "date": "2026-02-27",
-        "changes": [
-          "CLEANUP: Removed dangling strategicDocuments ref to deleted ectropy-pm-core-vision.json",
-          "UPDATE: cicdHealth.lastWorkflowRun and workflowRunId updated to run 22509762893 (2026-02-27)"
-        ]
-      },
-      {
-        "version": "3.1.1",
-        "date": "2026-02-27",
-        "changes": [
-          "TRUE-UP: Phase 5a→5b, platformProgress 65%→93%, overallProgress 65→93",
-          "TRUE-UP: productionReadiness.score 96→92 (validated 2026-02-25T20:00:00Z)",
-          "TRUE-UP: e2eTestStatus 164/164→35/62 (staging CI as of 2026-02-25, fixture improvements in-progress)",
-          "TRUE-UP: pitch.traction updated to reflect current PRS and E2E state",
-          "Source: current-truth.json (2026-02-25T22:00:00Z), node-staging-first-seeded-deploy-2026-02-25, node-e2e-test-fixture-pattern-2026-02-25"
-        ]
-      }
-    ]
+      "canonicalSource": "luh-tech/Ectropy-Business/.roadmap/roadmap.json",
+      "syncMode": "manual",
+      "lastSync": "2026-04-05",
+      "note": "Manually maintained thin copy of Ectropy-Business T1. Business narrative fields sourced from EB on sync date. Operational fields (metricsReporting, features, milestones) maintained here. Future: CI workflow will automate sync."
+    }
   },
   "venture": {
     "type": "Platform",
@@ -144,21 +22,59 @@
     "codeReuse": 0,
     "platformProgress": "93%",
     "currentPhase": "5b",
-    "mission": "Deliver open-source construction intelligence that eliminates project delays and rework through proactive, spatially-aware decision navigation.",
-    "vision": "A world where every construction project completes on time and on budget through AI-powered federated data intelligence across the full project lifecycle.",
+    "mission": "Ectropy exists to transform construction into a transparent, efficient, and sustainable industry — providing the world's first federated construction platform where every stakeholder can collaborate seamlessly while maintaining their preferred tools and workflows.",
+    "vision": "Democratize construction technology through open-source infrastructure, enabling community-driven innovation and creating sustainable value for every contributor to the built environment.",
     "currentStage": "pre-seed",
-    "overallProgress": 93
+    "overallProgress": 93,
+    "domain": "ectropy.ai"
   },
   "pitch": {
-    "oneLiner": "Open-source construction intelligence delivering proactive decision navigation with spatial awareness",
-    "problem": "Construction loses 30%+ to delays and rework from siloed BIM, schedules, and field data. Decision escalations take 28+ hours at $13,210 per incident. 67% of projects exceed budgets, $1.6T annual waste.",
+    "oneLiner": "delivering validated ground truth to every construction decision",
+    "problem": {
+      "headline": "Construction Is Losing the War on Waste",
+      "subheadline": "Siloed data, vanishing knowledge, no unified record layer",
+      "problemColumns": [
+        {
+          "header": "The Challenge",
+          "bullets": [
+            "BIM, schedules, and field data remain siloed across every project",
+            "Knowledge walks out the door when crews rotate",
+            "No unified record of why decisions were made"
+          ]
+        },
+        {
+          "header": "The Impact",
+          "bullets": [
+            "28+ hours average decision latency at $13,210 per incident",
+            "67% of projects exceed budgets with 83-day payment cycles",
+            "$1.6T in annual industry waste — the most avoidable number in construction"
+          ]
+        },
+        {
+          "header": "The Gap",
+          "bullets": [
+            "Less than 1% of construction R&D spend reaches field tools",
+            "No open platform owns the decision record layer",
+            "Construction remains the least digitized major industry on earth"
+          ]
+        }
+      ]
+    },
     "solution": "Federated data platform with AI-powered decision lifecycle, voxel decision surfaces for proactive field navigation, and zero-friction capture via phone agents",
     "market": "Construction Tech - $22 trillion industry, $15B software market, 12% CAGR",
     "differentiator": "Proactive decision attachment to physical space (voxels), 7-tier authority cascade, AI graph traversal, offline-first edge architecture",
     "businessModel": "Open-core: Apache 2.0 platform + commercial extensions + professional services",
     "traction": "92/100 production readiness score, 35/62 E2E tests passing in staging CI (fixture improvements in progress), 11 services operational on staging, decision lifecycle schemas validated (4 new schemas), Canadian pilot March 2026 ($50K verbal commitment), partner demo completed Dec 2025",
     "ask": "Pre-seed $500K-$1M targeting Q2 2026. Pilot validation → 15-20 investor meetings → close. Use: 60% team, 15% infrastructure, 15% operations, 10% buffer.",
-    "technology": "Cloud-native platform: Next.js + TypeScript, PostgreSQL + PostGIS, Redis, Speckle Server (BIM federation), Docker Compose orchestration, 5-layer immutable architecture, 11 operational services, 24/39 MCP decision tools operational, Qdrant vector DB for RAG"
+    "technology": "Cloud-native platform: Next.js + TypeScript, PostgreSQL + PostGIS, Redis, Speckle Server (BIM federation), Docker Compose orchestration, 5-layer immutable architecture, 11 operational services, 24/39 MCP decision tools operational, Qdrant vector DB for RAG",
+    "missionLine": "One truth. One goal. One team.",
+    "mantra": "Changing the vector of global construction.",
+    "coverStat": {
+      "value": "$1.6T",
+      "label": "annual waste in construction",
+      "source": "McKinsey Global Institute, 2017"
+    },
+    "solutionScreenshotDriveId": "1mSnU5kIaxlPn0dO-lRO-YSZVlC88ysTP"
   },
   "features": [
     {
@@ -1224,91 +1140,6 @@
       "erikHours": 8
     }
   },
-  "featureSpecifications": {
-    "voxelEstimation": {
-      "id": "p5b-d16",
-      "name": "In-Browser Voxel Estimation Service",
-      "estimatedHours": 720,
-      "priority": "high",
-      "targetQuarter": "Q2 2026",
-      "description": "WebAssembly IFC parser, GPU-accelerated voxelizer, XGBoost cost prediction with SHAP explainability, Three.js visualization with cost heatmap",
-      "businessImpact": "$2M ARR Year 1, 9:1 ROI, 95% time savings",
-      "technicalArchitecture": {
-        "service": "voxel-service on port 4002",
-        "database": "2 PostgreSQL tables (voxel_grids, voxels) with PostGIS",
-        "api": "5 REST endpoints (/api/v1/voxel/*)",
-        "processing": "WebWorker background, GPU acceleration via WebGL"
-      },
-      "phases": [
-        {
-          "phase": "MVP",
-          "duration": "3 months",
-          "accuracy": "+/-30%"
-        },
-        {
-          "phase": "Production",
-          "duration": "3 months",
-          "accuracy": "90%+"
-        },
-        {
-          "phase": "Advanced AI",
-          "duration": "3 months",
-          "features": "PCAM, design optimization, WebXR"
-        }
-      ]
-    },
-    "phoneAgent": {
-      "id": "p5b-d10",
-      "name": "AI Phone Agent System",
-      "estimatedHours": 240,
-      "priority": "high",
-      "targetQuarter": "Q1 2026",
-      "description": "Zero-friction field data capture via SMS/voice using Twilio + Claude integration",
-      "differentiator": "Eliminates adoption friction - meets field workers where they are",
-      "features": [
-        "SMS parsing with AI tagging",
-        "Voice capture via Twilio",
-        "Email integration",
-        "Teams integration (future)"
-      ]
-    },
-    "decisionSurface": {
-      "name": "Decision Surface & Lifecycle",
-      "targetQuarter": "Q3 2026",
-      "description": "Pre-approved decision navigation, authority cascade visualization, voxel-attached decisions",
-      "features": [
-        "Decision request escalation",
-        "Authority cascade UI",
-        "Zone-based navigation",
-        "Pre-approval patterns"
-      ]
-    },
-    "insuranceService": {
-      "name": "Insurance Service (RiskThinking.AI)",
-      "status": "specification complete, partnership track",
-      "description": "Three-layer data model (Site, Building, Climate) for insurance marketplace",
-      "marketOpportunity": "$280B coverage gap"
-    },
-    "vibeCode": {
-      "name": "Vibe Code Platform",
-      "targetQuarter": "Q3 2026",
-      "description": "n8n + MCP + v0.dev + Permit.io for BIM admin dashboard creation via natural language",
-      "estimatedCost": "$750-1,200/month production",
-      "implementationTime": "8-12 weeks"
-    }
-  },
-  "erikAllocation": {
-    "currentHoursPerWeek": 25,
-    "targetHoursPerWeek": 8,
-    "transitionQuarter": "q4_2026",
-    "quarterlyBreakdown": {
-      "q4_2025": 25,
-      "q1_2026": 20,
-      "q2_2026": 15,
-      "q3_2026": 10,
-      "q4_2026": 8
-    }
-  },
   "keyMilestones": [
     {
       "id": "demo",
@@ -1346,13 +1177,13 @@
     {
       "id": "repo-split",
       "urn": "urn:luhtech:ectropy:milestone:repo-split",
-      "date": "2026-02-28",
+      "date": "2026-03-11",
       "event": "Repository Split Complete",
       "classification": "LEAD",
       "quarter": "q1_2026",
       "gate": true,
       "critical": true,
-      "status": "planned",
+      "status": "complete",
       "authorityLevel": 4,
       "bufferDays": 2,
       "graphMetadata": {
@@ -1362,8 +1193,7 @@
           "urn:luhtech:qullqa:milestone:fork-ready"
         ]
       },
-      "note": "LEAD milestone - changes cascade to 2 downstream ventures (JobsiteControl, Qullqa). Requires L4 (Architect) authority to modify. Viiva removed: launches standalone Phase 1, Ectropy integration is Phase 6. | PAST DUE as of 2026-03-27. Status requires CI/git verification before marking complete.",
-      "splitEvidence": "CONFIRMED — git commits 81dab61 (remove console — moved to Ectropy-Business, DEC-002) and fe00494 (resolve DEC-002). Directory ../Ectropy-Business exists locally (last modified 2026-03-17). Repos ectropy-ai/platform and luh-tech/Ectropy-Business both exist."
+      "note": "Completed. Archive notice commit 2026-03-11. Public platform: ectropy-ai/platform. Source: Ectropy-Business T1 ground truth."
     },
     {
       "id": "prisma-n8n",
@@ -1585,61 +1415,6 @@
         ],
         "successors": []
       }
-    }
-  ],
-  "crossVentureDependencies": [
-    {
-      "from": "ectropy",
-      "to": "jobsitecontrol",
-      "type": "fork",
-      "milestone": "Repository Split",
-      "date": "2026-02-28",
-      "critical": true,
-      "note": "Legacy format - see keyMilestones[repo-split].graphMetadata for v2.3 format"
-    },
-    {
-      "from": "ectropy",
-      "to": "qullqa",
-      "type": "fork",
-      "milestone": "Repository Split",
-      "date": "2026-02-28",
-      "critical": false,
-      "note": "Legacy format - see keyMilestones[repo-split].graphMetadata for v2.3 format"
-    },
-    {
-      "from": "jobsitecontrol",
-      "to": "hilja",
-      "type": "edge-platform",
-      "milestone": "Edge Server Prototype",
-      "date": "2026-02-28",
-      "codeReuse": "80%"
-    },
-    {
-      "from": "ectropy",
-      "to": "siltana",
-      "type": "template",
-      "milestone": "Venture Template System",
-      "date": "post-split",
-      "codeReuse": "70%",
-      "note": "Tier 4 venture - building operations (50+ year lifecycle). Activation: post repo split + venture templating"
-    },
-    {
-      "from": "ectropy",
-      "to": "viitata",
-      "type": "template",
-      "milestone": "Venture Template System",
-      "date": "post-split",
-      "codeReuse": "60%",
-      "note": "Tier 4 venture - open sensor infrastructure (Arduino/SparkFun model). Activation: post repo split + venture templating"
-    },
-    {
-      "from": "raizal",
-      "to": "pelto-ai",
-      "type": "fork",
-      "milestone": "Raizal Traction",
-      "date": "post-raizal",
-      "codeReuse": "75%",
-      "note": "Tier 4 venture - farm management, Raizal customer onramp. Nonprofit focus. JtC patterns for farms."
     }
   ]
 }
