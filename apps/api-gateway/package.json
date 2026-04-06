@@ -104,5 +104,10 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
     "vitest": "^2.1.9"
+  },
+  "pnpm": {
+    "overrides": {
+      "jsdom": "^26.1.0"
+    }
   }
 }
