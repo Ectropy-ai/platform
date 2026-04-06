@@ -930,7 +930,7 @@ router.get(
  */
 router.get(
   '/objects/:streamId/:objectId/single',
-  requireViewerToken,
+  requireAuth,
   async (req: Request, res: Response) => {
     try {
       const serverUrl = process.env.SPECKLE_SERVER_URL || '';

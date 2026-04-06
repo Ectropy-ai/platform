@@ -239,7 +239,7 @@ except Exception as e:
   for DISC in "${DISCIPLINES[@]}"; do
     FILENAME="${IFC_FILES[$DISC]}"
     LOCAL_PATH="${IFC_DIR}/${FILENAME}"
-    MODEL_NAME="${DISC}"
+    MODEL_NAME="main"
     UPLOAD_URL="${SPECKLE_SERVER_URL}/api/file/autodetect/${STREAM_ID}/${MODEL_NAME}"
 
     echo "  Uploading ${DISC}: ${FILENAME}..."
@@ -286,7 +286,7 @@ except: print('')
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer $SPECKLE_TOKEN" \
         -d "{
-          \"query\": \"{ stream(id: \\\"${STREAM_ID}\\\") { branch(name: \\\"${DISC}\\\") { commits(limit: 1) { items { id referencedObject } } } } }\"
+          \"query\": \"{ stream(id: \\\"${STREAM_ID}\\\") { branch(name: \\\"main\\\") { commits(limit: 1) { items { id referencedObject } } } } }\"
         }" 2>/dev/null || echo '{}')
 
       REF_OBJ=$(echo "$POLL_RESP" | python3 -c "
