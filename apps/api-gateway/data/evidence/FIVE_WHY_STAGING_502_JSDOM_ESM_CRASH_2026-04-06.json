@@ -1,0 +1,51 @@
+{
+  "title": "Staging API Gateway 502 — jsdom@27 ESM crash on Node 20",
+  "date": "2026-04-06",
+  "severity": "blocking",
+  "context": "Deploy Staging workflow (run 24036780682) passed all build steps but API Gateway returned 502 for the full 420s health-check timeout. MCP, web-dashboard, and nginx were all healthy. The container crash-loops because Node 20 cannot require() an ESM-only module introduced by jsdom@27's dependency chain.",
+  "incident_url": "https://github.com/Ectropy-ai/platform/actions/runs/24036780682/job/70099180799",
+  "commit_sha": "c7c9ec8",
+  "chains": [
+    {
+      "id": "chain-1",
+      "symptom": "API Gateway returns 502 on staging for 420 seconds, then health check fails the deploy",
+      "severity": "blocking",
+      "whys": [
+        "Why 1: The API Gateway container crash-loops on startup with ERR_REQUIRE_ASYNC_MODULE",
+        "Why 2: cssstyle@5.x depends on @asamuzakjp/css-color which uses ESM top-level await — Node 20 cannot require() it",
+        "Why 3: jsdom@27 depends on cssstyle@5.x (breaking change from cssstyle@4.x which was CJS-compatible)",
+        "Why 4: isomorphic-dompurify@2.36.0 (resolved fresh in runner stage) requires jsdom@^27.0.0 as a direct dependency",
+        "Why 5 (ROOT): The Dockerfile runner stage runs pnpm install --no-frozen-lockfile against a generated package.json, bypassing the workspace lockfile. pnpm.overrides placed in apps/api-gateway/package.json was silently ignored because pnpm only reads overrides from the workspace root."
+      ],
+      "root_cause": "pnpm.overrides in a workspace sub-package is silently ignored. The runner stage Docker install resolves dependencies fresh (no lockfile), so isomorphic-dompurify floated to 2.36.0 pulling jsdom@27 → cssstyle@5 → ESM-only code incompatible with Node 20.",
+      "fix": "Move jsdom override to root package.json pnpm.overrides: \"jsdom\": \"^26.1.0\". Verified via pnpm why jsdom — all resolutions now 26.1.0, cssstyle resolves to 4.6.0 (CJS).",
+      "fix_commits": ["4dc9bda", "c7c9ec8"],
+      "file": "package.json",
+      "line": "339",
+      "verified": true,
+      "verification": "pnpm why jsdom shows 26.1.0 across entire workspace. cssstyle@4.6.0 confirmed. Lockfile updated. Deploy triggered (run 24038043896)."
+    },
+    {
+      "id": "chain-2",
+      "symptom": "First fix attempt (commit 4dc9bda) did not resolve the 502",
+      "severity": "warning",
+      "whys": [
+        "Why 1: The override was placed in apps/api-gateway/package.json",
+        "Why 2: pnpm workspace architecture only reads overrides from the root package.json",
+        "Why 3: pnpm emits a WARN but does not error — easy to miss in CI logs",
+        "Why 4: The builder stage resolved jsdom@26.1.0 from the lockfile (masking the problem), but the runner stage resolved fresh without lockfile",
+        "Why 5 (ROOT): Two-stage Docker install creates a divergence: builder uses --frozen-lockfile (safe), runner uses --no-frozen-lockfile against a generated package.json (unsafe, floats versions)"
+      ],
+      "root_cause": "The runner stage Dockerfile pattern (--no-frozen-lockfile with generated package.json) is inherently fragile — it can float transitive dependencies to breaking versions even when the builder stage is pinned via lockfile.",
+      "fix": "Immediate: root-level pnpm override pins jsdom. Future: investigate making the runner stage use a pruned lockfile instead of --no-frozen-lockfile to prevent similar drift.",
+      "file": "apps/api-gateway/Dockerfile",
+      "line": "183",
+      "verified": true
+    }
+  ],
+  "prevention": {
+    "immediate": "Root-level pnpm override pins jsdom to ^26.1.0 across the entire workspace",
+    "short_term": "Add CI check that warns when runner stage resolves a different major version than builder stage",
+    "long_term": "Refactor Dockerfile runner stage to use a pruned lockfile (pnpm deploy or pnpm install --lockfile-only) instead of --no-frozen-lockfile, eliminating version drift entirely"
+  }
+}
