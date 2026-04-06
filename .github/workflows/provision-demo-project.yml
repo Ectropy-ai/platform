@@ -61,7 +61,9 @@ jobs:
             echo "SPECKLE_SERVER_URL=https://ectropy.ai/speckle" >> $GITHUB_ENV
           else
             echo "STAGING_URL=https://staging.ectropy.ai" >> $GITHUB_ENV
-            echo "SPECKLE_SERVER_URL=https://staging.ectropy.ai/speckle" >> $GITHUB_ENV
+            # Speckle server URL from secret — not hardcoded to droplet IP.
+            # Update SPECKLE_SERVER_URL_STAGING secret when droplet changes.
+            echo "SPECKLE_SERVER_URL=${{ secrets.SPECKLE_SERVER_URL_STAGING }}" >> $GITHUB_ENV
           fi
           echo "PROJECT_ID=${{ github.event.inputs.project_id }}" >> $GITHUB_ENV
 
