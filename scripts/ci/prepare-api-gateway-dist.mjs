@@ -65,6 +65,11 @@ const distPkg = {
     '@prisma/client': rootPkg.devDependencies['@prisma/client'],
     'prisma': rootPkg.devDependencies['prisma'],
   },
+  // CRITICAL: Propagate pnpm overrides from workspace root
+  // Runner stage uses --no-frozen-lockfile against this generated package.json,
+  // so without overrides, transitive deps float to breaking versions.
+  // Root cause of staging 502: jsdom@27 → cssstyle@5 → ESM crash on Node 20.
+  ...(rootPkg.pnpm?.overrides ? { pnpm: { overrides: rootPkg.pnpm.overrides } } : {}),
 };
 
 console.log(`   📦 Generated package.json:`);
