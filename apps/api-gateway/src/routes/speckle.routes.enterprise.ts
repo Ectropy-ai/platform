@@ -1185,7 +1185,7 @@ speckleRootProxy.get(
 // ObjectLoader2 fetches the root object at this endpoint before streaming geometry
 speckleRootProxy.get(
   '/objects/:streamId/:objectId/single',
-  requireViewerToken,
+  requireAuth,
   async (req: Request, res: Response) => {
     try {
       const { streamId, objectId } = req.params;
