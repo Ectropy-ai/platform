@@ -239,7 +239,7 @@ except Exception as e:
   for DISC in "${DISCIPLINES[@]}"; do
     FILENAME="${IFC_FILES[$DISC]}"
     LOCAL_PATH="${IFC_DIR}/${FILENAME}"
-    MODEL_NAME="${DISC}"
+    MODEL_NAME="main"
     UPLOAD_URL="${SPECKLE_SERVER_URL}/api/file/autodetect/${STREAM_ID}/${MODEL_NAME}"
 
     echo "  Uploading ${DISC}: ${FILENAME}..."
