@@ -100,8 +100,7 @@ jobs:
           environment: staging
           digitalocean-token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           ssh-private-key: ${{ secrets.TERRAFORM_DEPLOY_PRIVATE_KEY }}
-          ssl-cert-private-key: ${{ secrets.CF_ORIGIN_KEY }}
-          ssl-cert-leaf: ${{ secrets.CF_ORIGIN_CERT }}
+          ssl-certificate-name: ectropy-production-cert
           app-version: ${{ vars.STAGING_APP_VERSION }}
           api-url: ${{ vars.STAGING_API_URL }}
           frontend-url: ${{ vars.STAGING_FRONTEND_URL }}
@@ -263,8 +262,7 @@ jobs:
           environment: staging
           digitalocean-token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           ssh-private-key: ${{ secrets.TERRAFORM_DEPLOY_PRIVATE_KEY }}
-          ssl-cert-private-key: ${{ secrets.CF_ORIGIN_KEY }}
-          ssl-cert-leaf: ${{ secrets.CF_ORIGIN_CERT }}
+          ssl-certificate-name: ectropy-production-cert
           app-version: ${{ vars.STAGING_APP_VERSION }}
           api-url: ${{ vars.STAGING_API_URL }}
           frontend-url: ${{ vars.STAGING_FRONTEND_URL }}
