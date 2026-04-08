@@ -44,7 +44,7 @@ describe('UDE Tools', () => {
       const names = getUdeToolNames();
       expect(names).toContain('read_current_truth');
       expect(names).toContain('read_roadmap');
-      expect(names).toContain('read_decision_log');
+      // read_decision_log removed per DEC-007
       expect(names).toContain('get_feature_status');
       expect(names).toContain('get_next_work');
       expect(names).toContain('get_health_assessment');
@@ -200,47 +200,7 @@ describe('UDE Tools', () => {
       );
     });
 
-    // Tool 3: read_decision_log
-    describe('read_decision_log', () => {
-      it.skipIf(!hasDataFiles)(
-        'returns decisions with no filters',
-        async () => {
-          const tool = getUdeToolByName('read_decision_log')!;
-          const result = await tool.handler({});
-
-          expect(result.success).toBe(true);
-          const data = result.data as any;
-          expect(data.decisions).toBeInstanceOf(Array);
-          expect(data.count).toBeGreaterThan(0);
-        }
-      );
-
-      it.skipIf(!hasDataFiles)('filters by category', async () => {
-        const tool = getUdeToolByName('read_decision_log')!;
-        const result = await tool.handler({ category: 'governance' });
-
-        expect(result.success).toBe(true);
-        const data = result.data as any;
-        if (data.count > 0) {
-          for (const d of data.decisions) {
-            expect(d.category).toBe('governance');
-          }
-        }
-      });
-
-      it.skipIf(!hasDataFiles)(
-        'returns error for missing decision ID',
-        async () => {
-          const tool = getUdeToolByName('read_decision_log')!;
-          const result = await tool.handler({
-            decisionId: 'nonexistent-decision-xyz',
-          });
-
-          expect(result.success).toBe(false);
-          expect(result.error?.code).toBe('DECISION_NOT_FOUND');
-        }
-      );
-    });
+    // Tool 3: read_decision_log — removed per DEC-007
 
     // Tool 4: get_feature_status
     describe('get_feature_status', () => {

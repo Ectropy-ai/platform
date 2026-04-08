@@ -245,12 +245,10 @@ export const PLATFORM_INCLUDED_TOOLS: string[] = [
   'propagate_date_change',
   'resolve_dependencies',
 
-  // Platform-specific (roadmap access)
-  'read_roadmap',
-  // 'read_decision_log' removed — platform governance tool, not construction PM
-  'query_venture_summary',
-  'link_decision_to_milestone',
-  'get_milestone_decisions',
+  // DEC-007: Platform governance tools removed — SEPPA is construction-only.
+  // Removed: read_roadmap, read_decision_log, query_venture_summary,
+  // link_decision_to_milestone, get_milestone_decisions.
+  // These belong in MCP-ECTROPY-BUSINESS (luh-tech/Ectropy-Business).
 ];
 
 /**
