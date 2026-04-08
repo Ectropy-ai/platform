@@ -165,9 +165,8 @@ async function fetchVoxels(
     const response = await apiService.get<{ voxels: VoxelData[]; total: number }>(url);
     return (response as any) || { voxels: [], total: 0 };
   } catch (error) {
-    logger.warn('[Voxels] Fetch error, returning mock data', { error });
-    // Return mock data as fallback
-    return generateMockVoxels(projectId);
+    logger.error('[Voxels] Fetch error', { error });
+    throw error;
   }
 }
 
@@ -182,9 +181,8 @@ async function fetchVoxelAggregations(
     );
     return (response as any) || { aggregations: [] };
   } catch (error) {
-    logger.warn('[Voxels] Aggregations fetch error, returning mock data', { error });
-    // Return mock aggregations
-    return { aggregations: generateMockAggregations() };
+    logger.error('[Voxels] Aggregations fetch error', { error });
+    throw error;
   }
 }
 
@@ -199,8 +197,8 @@ async function fetchVoxelActivity(
     );
     return (response as any) || { activities: [], count: 0 };
   } catch (error) {
-    logger.warn('[Voxels] Activity fetch error, returning mock data', { error });
-    return { activities: generateMockActivity(), count: 5 };
+    logger.error('[Voxels] Activity fetch error', { error });
+    throw error;
   }
 }
 
