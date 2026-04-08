@@ -307,10 +307,11 @@ export class DemoPersistenceService {
       try {
         await client.query(`
           INSERT INTO project_roles (
-            user_id, project_id, role, is_active, created_at, updated_at
-          ) VALUES ($1, $2, $3, true, NOW(), NOW())
+            user_id, project_id, role, permissions, is_active, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, true, NOW(), NOW())
           ON CONFLICT (user_id, project_id) DO UPDATE SET
             role = EXCLUDED.role,
+            permissions = EXCLUDED.permissions,
             is_active = true,
             updated_at = NOW()
         `, [
@@ -319,6 +320,7 @@ export class DemoPersistenceService {
           this.mapUserRole(p.name?.includes('Architect') ? 'architect' :
                            p.name?.includes('Engineer') ? 'engineer' :
                            p.name?.includes('Contractor') ? 'contractor' : 'owner'),
+          ['admin', 'read', 'write', 'delete', 'manage_members'],
         ]);
         count++;
       } catch (err) {
