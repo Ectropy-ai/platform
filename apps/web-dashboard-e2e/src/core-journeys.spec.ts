@@ -115,12 +115,11 @@ journeys.forEach(({ name, path, description }) => {
     // Journey-specific validations
     switch (name) {
       case 'user-login':
-        // Verify dashboard elements (changed from login form)
-        const hasDashboard =
-          (await page
-            .locator('[data-testid*="dashboard"], .dashboard, main')
-            .count()) > 0;
-        expect(hasDashboard).toBeTruthy();
+        // Wait for Suspense to resolve and dashboard to render
+        // Auth setup confirms dashboard-main exists — test needs explicit wait
+        await page.waitForSelector('[data-testid="dashboard-main"]', {
+          timeout: 15000,
+        });
         console.log('✅ Dashboard accessible (authenticated)');
         break;
 
