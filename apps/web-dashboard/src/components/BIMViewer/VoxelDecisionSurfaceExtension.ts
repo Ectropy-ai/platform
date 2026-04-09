@@ -231,9 +231,9 @@ export class VoxelDecisionSurfaceExtension extends Extension {
       const check = await fetch(`/api/v1/projects/${projectId}/voxels?limit=1`);
       if (check.ok) {
         const data = await check.json();
-        const total = data.total ?? data.voxels?.length ?? 0;
-        if (total > 0) {
-          console.log(`[BOX] ${total} cells exist — skipping generation`);
+        const hasVoxels = (data.voxels?.length ?? 0) > 0;
+        if (hasVoxels) {
+          console.log('[BOX] Voxels already exist — skipping generation');
           return;
         }
       }
