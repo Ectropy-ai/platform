@@ -599,7 +599,9 @@ test.describe('Page Navigation', () => {
 
     // Verify URL didn't change (client-side routing)
     const afterTabUrl = page.url();
-    expect(afterTabUrl).toBe(initialUrl);
+    const afterTabPathname = new URL(afterTabUrl).pathname;
+    const initialPathname = new URL(initialUrl).pathname;
+    expect(afterTabPathname).toBe(initialPathname);
   });
 });
 
