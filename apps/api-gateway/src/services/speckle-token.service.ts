@@ -68,10 +68,12 @@ export async function ensureSpeckleToken(): Promise<SpeckleTokenResult> {
   // Step 4 — Validate SPECKLE_DB_URL
   const speckleDbUrl = process.env['SPECKLE_DB_URL'];
   if (!speckleDbUrl) {
-    throw new Error(
-      '[SpeckleToken] SPECKLE_DB_URL not configured' +
-      ' — cannot connect to Speckle database'
+    logger.warn(
+      '[SpeckleToken] SPECKLE_DB_URL not configured — skipping Speckle DB bootstrap. ' +
+      'Falling back to SPECKLE_SERVER_TOKEN env var or shared token volume. ' +
+      'Set SPECKLE_DB_URL to enable full bootstrap (required after DEC-019 migration).'
     );
+    return { status: 'valid', prefix };
   }
 
   const pool = new Pool({
