@@ -25,7 +25,7 @@ const KEEP_PROJECTS = ['Demo Office Building', 'Sample Residential Complex'];
 const PERMISSIONS: Record<string, string[]> = {
   owner: ['read', 'write', 'admin', 'delete', 'manage_members'],
   admin: ['read', 'write', 'admin'],
-  consultant: ['read'],
+  consultant: ['read', 'write'],
 };
 
 interface Assignment {

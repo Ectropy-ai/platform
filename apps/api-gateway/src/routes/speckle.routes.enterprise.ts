@@ -956,32 +956,15 @@ router.get(
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
         },
       });
 
-      // Stream the response back (objects can be large)
-      const contentType =
-        proxyResponse.headers.get('content-type') || 'application/json';
-      res.setHeader('Content-Type', contentType);
       res.status(proxyResponse.status);
-
-      // For large objects, stream the response
-      if (proxyResponse.body) {
-        const reader = proxyResponse.body.getReader();
-        const pump = async (): Promise<void> => {
-          const { done, value } = await reader.read();
-          if (done) {
-            res.end();
-            return;
-          }
-          res.write(Buffer.from(value));
-          return pump();
-        };
-        await pump();
-      } else {
-        const data = await proxyResponse.text();
-        res.send(data);
-      }
+      const contentType = proxyResponse.headers.get('content-type');
+      if (contentType) res.setHeader('Content-Type', contentType);
+      const body = await proxyResponse.arrayBuffer();
+      res.send(Buffer.from(body));
 
       logger.debug('[SpeckleProxy] Single object fetched', {
         userId: req.user?.id,

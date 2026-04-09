@@ -378,9 +378,9 @@ export function requireStreamAccess() {
       const streamQuery = await authPool.query(
         `SELECT
           ss.stream_id as id,
-          ss.name,
-          ss.description,
-          ss.is_public as "isPublic",
+          ss.stream_name as name,
+          NULL as description,
+          false as "isPublic",
           ss.created_at as "createdAt",
           ss.updated_at as "updatedAt",
           ss.construction_project_id,
