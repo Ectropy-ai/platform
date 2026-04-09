@@ -904,8 +904,8 @@ export class VoxelRoutes {
         userName: row.userName,
       }));
     } catch (error) {
-      logger.error('[VoxelRoutes] Activity query failed', { error });
-      throw error;
+      logger.error('[VoxelRoutes] Activity query failed, returning empty', { error });
+      return [];
     }
   }
 
