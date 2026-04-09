@@ -2,7 +2,7 @@
   "$schema": "https://luhtech.dev/schemas/decision-log-v2.json",
   "version": "2.0.4",
   "ventureId": "ectropy",
-  "lastUpdated": "2026-04-08T18:30:00Z",
+  "lastUpdated": "2026-04-09T06:00:00Z",
   "decisions": [
     {
       "decisionId": "DEC-002",
@@ -5437,6 +5437,38 @@
         "875f10e"
       ],
       "alternatives": []
+    },
+    {
+      "id": "DEC-028",
+      "title": "Stream ACL enforcement on /objects/single \u2014 SEC-001",
+      "date": "2026-04-09",
+      "status": "IMPLEMENTED",
+      "author": "erik@luh.tech",
+      "dependsOn": "DEC-015",
+      "supersedes": "3c223c5",
+      "summary": "/objects/:streamId/:objectId/single was using requireAuth only \u2014 no stream-scoping. Any authenticated platform user could fetch objects from any stream regardless of project_roles. Fix: chain requireAuth + requireStreamAccess (authorization.middleware.ts:350-445). Auth chain: session cookie \u2192 stream ACL via speckle_streams + project_roles \u2192 handler fetches service token for upstream Speckle call. /graphql stays requireAuth (ObjectLoader2 GraphQL queries use session cookies, not VST). Contract tests added for 401/403/200 on /objects/single.",
+      "routes": {
+        "fixed": [
+          "router.get('/objects/:streamId/:objectId/single') \u2014 line 933",
+          "speckleRootProxy.get('/objects/:streamId/:objectId/single') \u2014 line 1188"
+        ],
+        "unchanged": [
+          "router.get('/objects/:streamId/:objectId') \u2014 requireViewerToken (correct)",
+          "speckleRootProxy.post('/graphql') \u2014 requireAuth (intentional)"
+        ]
+      },
+      "alternatives": [
+        {
+          "option": "New requireAuthWithStreamAcl middleware",
+          "rejected": true,
+          "reason": "requireStreamAccess already exists and is tested. Chaining is cleaner than duplicating."
+        },
+        {
+          "option": "requireViewerToken on /objects/single",
+          "rejected": true,
+          "reason": "SpeckleLoader v2.28.0 ObjectLoader2 does not send VST in headers for /single requests. Would break BIM viewer."
+        }
+      ]
     }
   ]
 }

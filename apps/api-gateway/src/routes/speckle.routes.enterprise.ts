@@ -931,6 +931,7 @@ router.get(
 router.get(
   '/objects/:streamId/:objectId/single',
   requireAuth,
+  requireStreamAccess(),
   async (req: Request, res: Response) => {
     try {
       const serverUrl = process.env.SPECKLE_SERVER_URL || '';
@@ -1186,6 +1187,7 @@ speckleRootProxy.get(
 speckleRootProxy.get(
   '/objects/:streamId/:objectId/single',
   requireAuth,
+  requireStreamAccess(),
   async (req: Request, res: Response) => {
     try {
       const { streamId, objectId } = req.params;
