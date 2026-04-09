@@ -112,6 +112,7 @@ module.exports = (config, { configuration: _configuration }) => {
       // stub with an empty Viewer) instead of the real package.
       '@speckle/viewer': path.resolve(__dirname, '../../node_modules/@speckle/viewer'),
       '@speckle/objectloader': path.resolve(__dirname, '../../node_modules/@speckle/objectloader'),
+      'three': path.resolve(__dirname, '../../node_modules/three'),
       // Enterprise browser-safe utilities (exclude server-only winston/async_hooks)
       '@ectropy/shared/utils/browser': path.resolve(__dirname, '../../libs/shared/utils/src/browser.ts'),
     },
