@@ -627,9 +627,6 @@ importers:
       date-fns:
         specifier: ^3.6.0
         version: 3.6.0
-      dompurify:
-        specifier: '>=3.3.2'
-        version: 3.3.3
       dotenv:
         specifier: ^16.3.0
         version: 16.6.1

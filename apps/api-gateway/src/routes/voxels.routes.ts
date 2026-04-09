@@ -853,8 +853,8 @@ export class VoxelRoutes {
 
       return aggregations;
     } catch (error) {
-      logger.warn('[VoxelRoutes] Aggregation query failed, returning mock data', { error });
-      return this.generateMockAggregations();
+      logger.error('[VoxelRoutes] Aggregation query failed', { error });
+      throw error;
     }
   }
 
@@ -904,8 +904,8 @@ export class VoxelRoutes {
         userName: row.userName,
       }));
     } catch (error) {
-      logger.warn('[VoxelRoutes] Activity query failed, returning mock data', { error });
-      return this.generateMockActivity();
+      logger.error('[VoxelRoutes] Activity query failed', { error });
+      throw error;
     }
   }
 

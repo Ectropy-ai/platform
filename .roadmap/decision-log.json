@@ -2,7 +2,7 @@
   "$schema": "https://luhtech.dev/schemas/decision-log-v2.json",
   "version": "2.0.4",
   "ventureId": "ectropy",
-  "lastUpdated": "2026-03-25T00:00:00Z",
+  "lastUpdated": "2026-04-09T06:00:00Z",
   "decisions": [
     {
       "decisionId": "DEC-002",
@@ -5351,6 +5351,122 @@
           "option": "Store service token in localStorage",
           "rejected": true,
           "reason": "Violates BFF principle. Service token exposed to browser bypasses Ectropy access control."
+        }
+      ]
+    },
+    {
+      "id": "DEC-022",
+      "title": "nginx proxy buffering strategy",
+      "date": "2026-04-07",
+      "status": "IMPLEMENTED",
+      "author": "erik@luh.tech",
+      "dependsOn": "none",
+      "supersedes": "none",
+      "summary": "Added proxy_buffering off to /api/v1/ and /api/ nginx location blocks on staging to prevent ObjectLoader streaming responses from being buffered to disk. Added dedicated /streams/ block with Speckle service token injection for SpeckleLoader SDK compatibility.",
+      "commits": [
+        "db554a4"
+      ],
+      "consequences": {
+        "positive": "Streaming geometry responses delivered without disk buffering. SpeckleLoader can traverse object graph.",
+        "costs": "Token hardcoded in /streams/ block (staging-only acceptable). Production requires env var injection (see DEC-024)."
+      },
+      "alternatives": []
+    },
+    {
+      "id": "DEC-023",
+      "title": "setVoxelExt functional update guard",
+      "date": "2026-04-07",
+      "status": "IMPLEMENTED",
+      "author": "erik@luh.tech",
+      "dependsOn": "DEC-008",
+      "supersedes": "none",
+      "summary": "Replaced direct state setter with functional update pattern (setVoxelExt(prev => prev ?? ext)) to prevent SEPPA re-render loop. Multiple renders were firing on each voxel extension load because the setter was not idempotent. Functional update with null-coalescing guard prevents re-render if value already set.",
+      "commits": [
+        "80687b8"
+      ],
+      "alternatives": []
+    },
+    {
+      "id": "DEC-024",
+      "title": "Speckle /streams/ nginx token hygiene plan",
+      "date": "2026-04-07",
+      "status": "STAGING-ONLY",
+      "author": "erik@luh.tech",
+      "dependsOn": "DEC-022",
+      "supersedes": "none",
+      "summary": "/streams/ nginx location block injects Speckle service token as Authorization header for SpeckleLoader SDK compatibility. Token currently hardcoded in nginx config on staging (acceptable for demo). Production deployment requires env var injection via docker-compose envsubst or nginx variables before /streams/ block can be promoted.",
+      "productionGate": "env var injection required before production deploy",
+      "alternatives": []
+    },
+    {
+      "id": "DEC-025",
+      "title": "Five-tier environment architecture",
+      "date": "2026-04-07",
+      "status": "IMPLEMENTED",
+      "author": "erik@luh.tech",
+      "dependsOn": "none",
+      "supersedes": "none",
+      "summary": "Formalized five-tier environment model: (1) Local Mac/OrbStack \u2014 individual dev, (2) Mac Mini \u2014 full container pipeline validation, (3) ectropy-development 64.23.157.16 \u2014 agent pipeline + console, (4) ectropy-staging 143.198.108.161 \u2014 integration with Watchtower auto-deploy, (5) production blue+green \u2014 live traffic with workflow_dispatch only. Branch contract: feature/* \u2192 Mac Mini \u2192 develop \u2192 staging \u2192 main \u2192 production.",
+      "alternatives": []
+    },
+    {
+      "id": "DEC-026",
+      "title": "/objects/single auth strategy \u2014 requireAuth over requireViewerToken",
+      "date": "2026-04-08",
+      "status": "IMPLEMENTED",
+      "author": "erik@luh.tech",
+      "dependsOn": "DEC-015",
+      "supersedes": "none",
+      "summary": "SpeckleLoader v2.28.0 ObjectLoader2 does not propagate authToken into fetch transport headers. requireViewerToken on /objects/single would always reject browser requests since no Authorization header is sent. Fixed by replacing requireViewerToken with requireAuth (session cookie) on /objects/single route in both /api/speckle router (line 933) and speckleRootProxy (line 1188). Service token injection via getSpeckleToken() preserved on all routes. DEC-015 VST architecture remains correct \u2014 viewer_token generated and returned per stream, available for future SDK upgrade.",
+      "commits": [
+        "3c223c5",
+        "9bc5713"
+      ],
+      "alternatives": []
+    },
+    {
+      "id": "DEC-027",
+      "title": "Remove silent mock fallback in voxel fetch hooks",
+      "date": "2026-04-08",
+      "status": "IMPLEMENTED",
+      "author": "erik@luh.tech",
+      "dependsOn": "none",
+      "supersedes": "none",
+      "summary": "Silent catch blocks in fetchVoxelAggregations, fetchVoxelActivity, and fetchVoxels (useVoxels.ts) were swallowing API errors and returning mock data (75 voxels across 3 levels) as if real. React Query cached the mock as valid data for up to 2 minutes. Status panel showed 75 Voxels instead of 81,983. Fix: propagate errors so React Query handles retry/error state correctly. Mock generator functions retained for test use only.",
+      "commits": [
+        "875f10e"
+      ],
+      "alternatives": []
+    },
+    {
+      "id": "DEC-028",
+      "title": "Stream ACL enforcement on /objects/single \u2014 SEC-001",
+      "date": "2026-04-09",
+      "status": "IMPLEMENTED",
+      "author": "erik@luh.tech",
+      "dependsOn": "DEC-015",
+      "supersedes": "3c223c5",
+      "summary": "/objects/:streamId/:objectId/single was using requireAuth only \u2014 no stream-scoping. Any authenticated platform user could fetch objects from any stream regardless of project_roles. Fix: chain requireAuth + requireStreamAccess (authorization.middleware.ts:350-445). Auth chain: session cookie \u2192 stream ACL via speckle_streams + project_roles \u2192 handler fetches service token for upstream Speckle call. /graphql stays requireAuth (ObjectLoader2 GraphQL queries use session cookies, not VST). Contract tests added for 401/403/200 on /objects/single.",
+      "routes": {
+        "fixed": [
+          "router.get('/objects/:streamId/:objectId/single') \u2014 line 933",
+          "speckleRootProxy.get('/objects/:streamId/:objectId/single') \u2014 line 1188"
+        ],
+        "unchanged": [
+          "router.get('/objects/:streamId/:objectId') \u2014 requireViewerToken (correct)",
+          "speckleRootProxy.post('/graphql') \u2014 requireAuth (intentional)"
+        ]
+      },
+      "alternatives": [
+        {
+          "option": "New requireAuthWithStreamAcl middleware",
+          "rejected": true,
+          "reason": "requireStreamAccess already exists and is tested. Chaining is cleaner than duplicating."
+        },
+        {
+          "option": "requireViewerToken on /objects/single",
+          "rejected": true,
+          "reason": "SpeckleLoader v2.28.0 ObjectLoader2 does not send VST in headers for /single requests. Would break BIM viewer."
         }
       ]
     }

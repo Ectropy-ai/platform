@@ -273,6 +273,7 @@ package-lock.json
 !.github/actions/setup-terraform-vars/README.md
 !apps/mcp-server/data/evidence/2026-02/PRODUCTION_READINESS_ROADMAP_2026-02-13.md
 !apps/mcp-server/data/evidence/milestone-2026-01-29/SESSION_SUMMARY_2026-01-29.md
+!docs/architecture/ECTROPY-ENVIRONMENT-ARCHITECTURE-2026-04-08.md
 
 # Script archives (keep scripts in scripts/ directory)
 test-*.sh

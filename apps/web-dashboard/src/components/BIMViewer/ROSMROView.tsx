@@ -577,7 +577,11 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
     [hookActivities],
   );
 
-  const error = queryError ? String(queryError) : null;
+  const error = queryError
+    ? (queryError instanceof Error
+        ? queryError.message
+        : String(queryError))
+    : null;
 
   // Local UI state
   const [viewState, setViewState] = useState<ViewState>(DEFAULT_VIEW_STATE);
