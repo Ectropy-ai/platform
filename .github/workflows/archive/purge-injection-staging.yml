@@ -1,9 +1,14 @@
-name: Assign Demo Users to Projects (One-Off)
+# ARCHIVED: 2026-04-10
+# One-off / low-frequency workflow — archived per Gap G-05
+# See: .github/workflows/archive/README.md
+# DO NOT remove — preserved for institutional knowledge
+
+name: Purge Injection (One-Off)
 on:
   workflow_dispatch:
 
 jobs:
-  assign:
+  purge:
     runs-on: ubuntu-latest
     environment: staging
     steps:
@@ -23,10 +28,10 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm prisma:generate
       - name: Dry Run
-        run: npx tsx scripts/database/assign-demo-users-to-projects.ts --dry-run
+        run: npx tsx scripts/database/purge-injection.ts --dry-run
         env:
           DATABASE_URL: postgresql://${{ vars.DATABASE_USER }}:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}?sslmode=require
-      - name: Execute Assignment
-        run: npx tsx scripts/database/assign-demo-users-to-projects.ts --execute
+      - name: Execute Purge
+        run: npx tsx scripts/database/purge-injection.ts --execute
         env:
           DATABASE_URL: postgresql://${{ vars.DATABASE_USER }}:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}?sslmode=require

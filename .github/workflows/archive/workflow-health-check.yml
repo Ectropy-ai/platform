@@ -1,3 +1,8 @@
+# ARCHIVED: 2026-04-10
+# One-off / low-frequency workflow — archived per Gap G-05
+# See: .github/workflows/archive/README.md
+# DO NOT remove — preserved for institutional knowledge
+
 name: Weekly Workflow Health Check
 
 on:
