@@ -11,12 +11,7 @@ on:
     branches:
       - develop
     paths:
-      - 'infrastructure/terraform/**' # Terraform staging definitions
-      - 'infrastructure/nginx/**' # Nginx configuration files (ROOT CAUSE #159)
-      - 'docker-compose.staging.yml' # Docker Compose staging configuration
-      - 'terraform/modules/infrastructure-deployment/**' # Infrastructure GitOps module
-      - 'terraform/modules/compose-deployment/**' # Compose GitOps module
-      - 'terraform/modules/env-deployment/**' # Environment GitOps module
+      - 'infrastructure/terraform/**'
       - '.github/workflows/terraform-staging-gitops.yml'
 
 env:
