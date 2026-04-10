@@ -253,11 +253,8 @@ resource "digitalocean_loadbalancer" "production" {
     healthy_threshold        = 2
   }
 
-  # PHASE 4.5 CUTOVER: Now routing to VPC-isolated droplets
-  droplet_ids = [
-    digitalocean_droplet.production_blue_isolated.id,
-    digitalocean_droplet.production_green_isolated.id
-  ]
+  # PHASE 4.5 CUTOVER: Tag-based targeting — LB auto-discovers droplets
+  droplet_tag = "environment:production"
 
   # Match staging: 300s idle timeout for long-running API operations
   http_idle_timeout_seconds = 300

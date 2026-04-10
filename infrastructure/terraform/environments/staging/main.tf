@@ -199,7 +199,7 @@ resource "digitalocean_loadbalancer" "staging" {
     healthy_threshold        = 2
   }
 
-  droplet_ids = [digitalocean_droplet.staging.id]
+  droplet_tag = "environment:staging"
 
   # ENTERPRISE FIX (2026-03-07): Increase idle timeout for Speckle file uploads
   # ROOT CAUSE: Default 60s idle timeout kills Speckle file upload connections
