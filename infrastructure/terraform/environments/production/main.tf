@@ -63,13 +63,14 @@ resource "digitalocean_droplet" "production_blue_isolated" {
   vpc_uuid = module.production_vpc.id
 
   tags = [
-    "production",
-    "ectropy",
+    "managed-by:terraform",
+    "environment:production",
+    "product:ectropy",
+    "role:app",
     "blue-green",
     "blue",
     "vpc-isolated",
-    "dedicated-cpu",
-    "managed-by:terraform"
+    "dedicated-cpu"
   ]
 
   # ============================================================================
@@ -117,13 +118,14 @@ resource "digitalocean_droplet" "production_green_isolated" {
   vpc_uuid = module.production_vpc.id
 
   tags = [
-    "production",
-    "ectropy",
+    "managed-by:terraform",
+    "environment:production",
+    "product:ectropy",
+    "role:app",
     "blue-green",
     "green",
     "vpc-isolated",
-    "dedicated-cpu",
-    "managed-by:terraform"
+    "dedicated-cpu"
   ]
 
   # Same templatefile() pattern as blue droplet

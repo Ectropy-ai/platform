@@ -50,10 +50,11 @@ resource "digitalocean_droplet" "staging" {
   vpc_uuid = module.staging_vpc.id
 
   tags = [
+    "managed-by:terraform",
     "environment:staging",
-    "ectropy",
-    "vpc-isolated",
-    "terraform-managed"
+    "product:ectropy",
+    "role:app",
+    "vpc-isolated"
   ]
 
   # ============================================================================

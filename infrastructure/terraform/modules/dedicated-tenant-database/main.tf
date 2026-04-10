@@ -200,8 +200,9 @@ resource "digitalocean_database_cluster" "tenant_database" {
 
   tags = concat(
     [
-      "terraform-managed",
-      "enterprise",
+      "managed-by:terraform",
+      "product:ectropy",
+      "role:database",
       "tenant:${var.tenant_slug}",
       "database-per-tenant"
     ],
