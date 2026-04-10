@@ -357,6 +357,38 @@ variable "shared_database_url" {
 }
 
 # ============================================================================
+# AI Services
+# ============================================================================
+
+variable "anthropic_api_key" {
+  description = "Anthropic API key for SEPPA/MCP initialization"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# ============================================================================
+# Authentication (DEC-015 VST Pattern)
+# ============================================================================
+
+variable "viewer_token_secret" {
+  description = "Viewer token secret for DEC-015 VST pattern"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# ============================================================================
+# Server Configuration
+# ============================================================================
+
+variable "port" {
+  description = "API gateway listen port"
+  type        = string
+  default     = "4000"
+}
+
+# ============================================================================
 # VARIABLE SUMMARY
 # ============================================================================
 # Infrastructure Variables: 4

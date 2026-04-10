@@ -99,6 +99,7 @@ jobs:
           app-version: ${{ vars.STAGING_APP_VERSION }}
           api-url: ${{ vars.STAGING_API_URL }}
           frontend-url: ${{ vars.STAGING_FRONTEND_URL }}
+          database-host: ${{ vars.DATABASE_HOST }}
           database-password: ${{ secrets.DB_PASSWORD }}
           jwt-secret: ${{ secrets.JWT_SECRET }}
           jwt-refresh-secret: ${{ secrets.JWT_REFRESH_SECRET }}
@@ -123,6 +124,8 @@ jobs:
           cloudflare-zone-id: ${{ vars.CLOUDFLARE_ZONE_ID }}
           platform-database-url: ${{ secrets.PLATFORM_DATABASE_URL }}
           shared-database-url: ${{ secrets.SHARED_DATABASE_URL }}
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          viewer-token-secret: ${{ secrets.VIEWER_TOKEN_SECRET }}
 
       - name: Terraform Plan
         id: plan
@@ -261,6 +264,7 @@ jobs:
           app-version: ${{ vars.STAGING_APP_VERSION }}
           api-url: ${{ vars.STAGING_API_URL }}
           frontend-url: ${{ vars.STAGING_FRONTEND_URL }}
+          database-host: ${{ vars.DATABASE_HOST }}
           database-password: ${{ secrets.DB_PASSWORD }}
           jwt-secret: ${{ secrets.JWT_SECRET }}
           jwt-refresh-secret: ${{ secrets.JWT_REFRESH_SECRET }}
@@ -285,6 +289,8 @@ jobs:
           cloudflare-zone-id: ${{ vars.CLOUDFLARE_ZONE_ID }}
           platform-database-url: ${{ secrets.PLATFORM_DATABASE_URL }}
           shared-database-url: ${{ secrets.SHARED_DATABASE_URL }}
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          viewer-token-secret: ${{ secrets.VIEWER_TOKEN_SECRET }}
 
       - name: Terraform Apply
         working-directory: ${{ env.TF_WORKING_DIR }}
