@@ -1,0 +1,108 @@
+# ============================================================================
+# One-Shot Diagnostic: Capture staging api-gateway logs via SSH
+# ============================================================================
+# PURPOSE: Emergency diagnostic — staging api-gateway returning 502,
+#          no containers visible in stale Spaces diagnostic.
+# SAFETY:  Opens port 22 only for the duration of the SSH command.
+#          Close step runs unconditionally (if: always).
+# USAGE:   Manual dispatch only (workflow_dispatch).
+# CLEANUP: Delete this workflow after root cause is identified.
+# ============================================================================
+
+name: "Diagnostic: Staging API Gateway Logs"
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  capture-logs:
+    name: SSH diagnostic — api-gateway logs
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      DROPLET_IP: "147.182.207.12"
+      FIREWALL_NAME: "ectropy-staging-http-lb-only"
+    steps:
+      # ── 0. Pre-flight: verify SSH key exists ────────────────
+      - name: Verify STAGING_SSH_KEY is set
+        run: |
+          if [ -z "${{ secrets.STAGING_SSH_KEY }}" ]; then
+            echo "::error::STAGING_SSH_KEY is empty — aborting before opening firewall"
+            exit 1
+          fi
+          echo "::notice::STAGING_SSH_KEY is present"
+
+      # ── 1. Install doctl ──────────────────────────────────────
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      # ── 2. Open port 22 on the firewall ──────────────────────
+      - name: Open SSH on firewall (temporary)
+        id: open-fw
+        run: |
+          echo "::notice::Opening port 22 on $FIREWALL_NAME"
+          FIREWALL_ID=$(doctl compute firewall list --format ID,Name --no-header \
+            | grep "$FIREWALL_NAME" | awk '{print $1}')
+          echo "firewall_id=$FIREWALL_ID" >> "$GITHUB_OUTPUT"
+
+          doctl compute firewall add-rules "$FIREWALL_ID" \
+            --inbound-rules "protocol:tcp,ports:22,sources:addresses:0.0.0.0/0,::/0"
+
+          echo "::notice::Port 22 opened — will close in cleanup step"
+
+      # ── 3. SSH in and capture logs ────────────────────────────
+      - name: Capture docker logs via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ env.DROPLET_IP }}
+          username: root
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          timeout: 30s
+          command_timeout: 60s
+          script: |
+            set -euo pipefail
+            echo "=== DIAGNOSTIC START: $(date -u) ==="
+            echo ""
+            echo "=== docker ps -a ==="
+            docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+            echo ""
+            echo "=== docker logs ectropy-api-gateway --tail 100 ==="
+            docker logs ectropy-api-gateway --tail 100 2>&1 || echo "CONTAINER_NOT_FOUND"
+            echo ""
+            echo "=== docker logs ectropy-vector --tail 20 ==="
+            docker logs ectropy-vector --tail 20 2>&1 || echo "VECTOR_NOT_FOUND"
+            echo ""
+            echo "=== config-sync journal (last 30 lines) ==="
+            journalctl -u config-sync --no-pager -n 30 2>&1 || echo "JOURNAL_NOT_AVAILABLE"
+            echo ""
+            echo "=== disk usage ==="
+            df -h / /var/lib/docker 2>&1 || df -h /
+            echo ""
+            echo "=== DIAGNOSTIC END: $(date -u) ==="
+
+      # ── 4. Close port 22 IMMEDIATELY (always runs) ───────────
+      - name: Close SSH on firewall
+        if: always()
+        run: |
+          FIREWALL_ID="${{ steps.open-fw.outputs.firewall_id }}"
+          if [ -z "$FIREWALL_ID" ]; then
+            echo "::warning::No firewall ID — open-fw step may not have run"
+            exit 0
+          fi
+
+          echo "::notice::Closing port 22 on firewall $FIREWALL_ID"
+
+          doctl compute firewall remove-rules "$FIREWALL_ID" \
+            --inbound-rules "protocol:tcp,ports:22,sources:addresses:0.0.0.0/0,::/0"
+
+          echo "::notice::Port 22 closed"
+
+          # Verify
+          echo "::group::Firewall rules after cleanup"
+          doctl compute firewall get "$FIREWALL_ID" --format InboundRules
+          echo "::endgroup::"
