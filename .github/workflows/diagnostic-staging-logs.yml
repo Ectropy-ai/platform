@@ -51,7 +51,7 @@ jobs:
           echo "firewall_id=$FIREWALL_ID" >> "$GITHUB_OUTPUT"
 
           doctl compute firewall add-rules "$FIREWALL_ID" \
-            --inbound-rules "protocol:tcp,ports:22,sources:addresses:0.0.0.0/0,::/0"
+            --inbound-rules "protocol:tcp,ports:22,sources:addresses:0.0.0.0/0"
 
           echo "::notice::Port 22 opened — will close in cleanup step"
 
@@ -127,7 +127,7 @@ jobs:
           echo "::notice::Closing port 22 on firewall $FIREWALL_ID"
 
           doctl compute firewall remove-rules "$FIREWALL_ID" \
-            --inbound-rules "protocol:tcp,ports:22,sources:addresses:0.0.0.0/0,::/0"
+            --inbound-rules "protocol:tcp,ports:22,sources:addresses:0.0.0.0/0"
 
           echo "::notice::Port 22 closed"
 
