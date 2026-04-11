@@ -152,4 +152,63 @@ systemctl is-enabled config-sync.timer \
   || { echo 'FATAL: config-sync.timer not enabled'; exit 1; }
 echo 'BOOTSTRAP VALIDATION: PASSED'
 
+# DIAGNOSTIC: One-shot timer to capture api-gateway logs 4 minutes after boot
+# TEMPORARY — remove after debugging api-gateway 502 issue
+cat > /opt/ectropy/scripts/capture-api-gw-logs.sh <<'DIAGSCRIPT'
+#!/bin/bash
+source /etc/default/config-sync
+sleep 10
+docker logs ectropy-api-gateway --tail 200 > /tmp/api-gw-diag.txt 2>&1
+docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' >> /tmp/api-gw-diag.txt 2>&1
+echo "--- config-sync log ---" >> /tmp/api-gw-diag.txt
+tail -50 /var/log/config-sync.log >> /tmp/api-gw-diag.txt 2>&1
+python3 - <<'PYEOF'
+import boto3, os, datetime
+try:
+    with open('/tmp/api-gw-diag.txt') as f:
+        output = f.read()
+    ts = datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
+    key = f'diagnostics/api-gateway-logs-{ts}.txt'
+    s3 = boto3.client('s3',
+        region_name='sfo3',
+        endpoint_url='https://sfo3.digitaloceanspaces.com',
+        aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID',''),
+        aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY',''))
+    s3.put_object(Bucket='ectropy-staging-configs',
+        Key=key, Body=output.encode())
+    print(f'Diagnostic uploaded: {key}')
+except Exception as e:
+    print(f'Diagnostic failed: {e}')
+PYEOF
+DIAGSCRIPT
+chmod +x /opt/ectropy/scripts/capture-api-gw-logs.sh
+
+cat > /etc/systemd/system/capture-api-gw-logs.service <<'DIAGSVC'
+[Unit]
+Description=Capture api-gateway logs to Spaces (one-shot diagnostic)
+After=config-sync.timer
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/default/config-sync
+ExecStart=/opt/ectropy/scripts/capture-api-gw-logs.sh
+DIAGSVC
+
+cat > /etc/systemd/system/capture-api-gw-logs.timer <<'DIAGTIMER'
+[Unit]
+Description=Fire diagnostic log capture 4 minutes after boot
+
+[Timer]
+OnBootSec=240
+Unit=capture-api-gw-logs.service
+
+[Install]
+WantedBy=timers.target
+DIAGTIMER
+
+systemctl daemon-reload
+systemctl enable capture-api-gw-logs.timer
+systemctl start capture-api-gw-logs.timer
+echo "DIAGNOSTIC: capture-api-gw-logs.timer enabled (fires 240s after boot)"
+
 echo "=== Staging server provisioned successfully: $(date) ===" | tee /opt/ectropy/provisioned.txt
