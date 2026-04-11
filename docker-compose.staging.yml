@@ -1043,6 +1043,94 @@ services:
       # Watchtower should not update itself automatically
       com.centurylinklabs.watchtower.enable: 'false'
 
+  # ===========================================================================
+  # Vector — Zero-SSH Log Egress (DEC-028)
+  # ===========================================================================
+  # Collects logs from ALL Docker containers via socket.
+  # Ships to DO Spaces: ectropy-staging-configs/logs/staging/<container>/<date>/
+  # Config embedded inline — no external dependencies.
+  # ===========================================================================
+  vector:
+    image: timberio/vector:0.40.0-alpine
+    container_name: ectropy-vector
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        cat > /tmp/vector.toml << 'VECTORCFG'
+        [api]
+        enabled = true
+        address = "0.0.0.0:8686"
+        [sources.docker_all]
+        type = "docker_logs"
+        [transforms.enrich]
+        type = "remap"
+        inputs = ["docker_all"]
+        source = """
+          .environment = "staging"
+          .platform = "ectropy"
+        """
+        [transforms.parse_json]
+        type = "remap"
+        inputs = ["enrich"]
+        drop_on_error = false
+        source = """
+          if is_string(.message) {
+            parsed, err = parse_json(.message)
+            if err == null {
+              . = merge(., parsed)
+            }
+          }
+        """
+        [sinks.spaces]
+        type = "aws_s3"
+        inputs = ["parse_json"]
+        bucket = "ectropy-staging-configs"
+        key_prefix = "logs/staging/{{ container_name }}/%Y/%m/%d/"
+        filename_time_format = "%H-%M-%S"
+        filename_append_uuid = true
+        endpoint = "https://sfo3.digitaloceanspaces.com"
+        region = "sfo3"
+        encoding.codec = "json"
+        encoding.timestamp_format = "rfc3339"
+        compression = "none"
+        [sinks.spaces.auth]
+        access_key_id = "${AWS_ACCESS_KEY_ID}"
+        secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
+        [sinks.spaces.batch]
+        timeout_secs = 30
+        max_bytes = 10485760
+        max_events = 10000
+        [sinks.spaces.request]
+        retry_attempts = 5
+        retry_initial_backoff_secs = 1
+        retry_max_duration_secs = 30
+        VECTORCFG
+        exec /usr/bin/vector --config /tmp/vector.toml
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    env_file:
+      - /etc/default/config-sync
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - ectropy-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider",
+             "http://localhost:8686/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    labels:
+      com.centurylinklabs.watchtower.enable: 'false'
+
 volumes:
   # ROOT CAUSE #208: postgres-data volume for Speckle services ONLY
   # Ectropy application uses managed PostgreSQL (no volume needed)
