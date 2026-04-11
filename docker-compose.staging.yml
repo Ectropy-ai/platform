@@ -1106,6 +1106,7 @@ services:
         retry_initial_backoff_secs = 1
         retry_max_duration_secs = 30
         VECTORCFG
+        sed -i 's/^        //' /tmp/vector.toml
         exec /usr/bin/vector --config /tmp/vector.toml
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
