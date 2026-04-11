@@ -55,6 +55,35 @@ jobs:
 
           echo "::notice::Port 22 opened — will close in cleanup step"
 
+          # Verify the rule was added
+          echo "::group::Firewall rules after opening"
+          doctl compute firewall get "$FIREWALL_ID" --format InboundRules
+          echo "::endgroup::"
+
+          # Wait for DO firewall propagation
+          echo "Waiting 15s for firewall propagation..."
+          sleep 15
+
+      # ── 2b. Test TCP connectivity before SSH ──────────────────
+      - name: Test TCP connectivity to port 22
+        run: |
+          echo "Testing raw TCP connection to $DROPLET_IP:22..."
+          for i in 1 2 3; do
+            echo "Attempt $i:"
+            if nc -vz -w 10 "$DROPLET_IP" 22 2>&1; then
+              echo "::notice::TCP connection to port 22 succeeded on attempt $i"
+              exit 0
+            fi
+            echo "Failed, waiting 10s..."
+            sleep 10
+          done
+          echo "::error::All TCP connection attempts failed — port 22 unreachable"
+          echo "Possible causes: DO firewall not propagated, host ufw, sshd not running"
+          echo ""
+          echo "Checking if port 80 is reachable (nginx should be up):"
+          nc -vz -w 5 "$DROPLET_IP" 80 2>&1 || echo "Port 80 also unreachable"
+          exit 1
+
       # ── 3. SSH in and capture logs ────────────────────────────
       - name: Capture docker logs via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -62,7 +91,7 @@ jobs:
           host: ${{ env.DROPLET_IP }}
           username: root
           key: ${{ secrets.STAGING_SSH_KEY }}
-          timeout: 30s
+          timeout: 60s
           command_timeout: 60s
           script: |
             set -euo pipefail
