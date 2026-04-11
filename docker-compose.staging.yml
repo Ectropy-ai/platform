@@ -1057,6 +1057,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
+        . /etc/default/config-sync
         cat > /tmp/vector.toml << 'VECTORCFG'
         [api]
         enabled = true
@@ -1110,8 +1111,6 @@ services:
         exec /usr/bin/vector --config /tmp/vector.toml
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    env_file:
-      - /etc/default/config-sync
     deploy:
       resources:
         limits:
