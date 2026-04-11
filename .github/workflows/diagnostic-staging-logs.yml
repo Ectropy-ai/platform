@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     env:
-      DROPLET_IP: "147.182.207.12"
+      DROPLET_IP: "209.38.149.53"
       FIREWALL_NAME: "ectropy-staging-http-lb-only"
     steps:
       # ── 0. Pre-flight: verify SSH key exists ────────────────
