@@ -1,3 +1,8 @@
+# ARCHIVED: 2026-04-10
+# Consolidated into terraform-staging-gitops.yml per Gap G-05
+# See: .github/workflows/archive/README.md
+# DO NOT remove — preserved for institutional knowledge
+
 name: Create Terraform Cloud Workspace
 
 # Manual workflow to create HCP Terraform Cloud workspaces

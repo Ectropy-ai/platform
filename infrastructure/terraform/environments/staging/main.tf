@@ -50,10 +50,11 @@ resource "digitalocean_droplet" "staging" {
   vpc_uuid = module.staging_vpc.id
 
   tags = [
+    "managed-by:terraform",
     "environment:staging",
-    "ectropy",
-    "vpc-isolated",
-    "terraform-managed"
+    "product:ectropy",
+    "role:app",
+    "vpc-isolated"
   ]
 
   # ============================================================================
@@ -198,7 +199,7 @@ resource "digitalocean_loadbalancer" "staging" {
     healthy_threshold        = 2
   }
 
-  droplet_ids = [digitalocean_droplet.staging.id]
+  droplet_tag = "environment:staging"
 
   # ENTERPRISE FIX (2026-03-07): Increase idle timeout for Speckle file uploads
   # ROOT CAUSE: Default 60s idle timeout kills Speckle file upload connections
@@ -445,6 +446,15 @@ DOCR_CONFIG_JSON=${var.docr_config_json}
 # @ectropy/database package requires these for DatabaseManager
 PLATFORM_DATABASE_URL=${var.platform_database_url}
 SHARED_DATABASE_URL=${var.shared_database_url}
+
+# AI Services
+ANTHROPIC_API_KEY=${var.anthropic_api_key}
+
+# Authentication (DEC-015 VST pattern)
+VIEWER_TOKEN_SECRET=${var.viewer_token_secret}
+
+# Server Configuration
+PORT=${var.port}
 ENV
 
   # Protect sensitive content

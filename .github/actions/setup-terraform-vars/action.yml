@@ -174,6 +174,18 @@ inputs:
     required: false
     default: ''
 
+  # AI Services
+  anthropic-api-key:
+    description: 'ANTHROPIC_API_KEY for SEPPA/MCP initialization'
+    required: false
+    default: ''
+
+  # Authentication (DEC-015 VST pattern)
+  viewer-token-secret:
+    description: 'VIEWER_TOKEN_SECRET for viewer token generation'
+    required: false
+    default: ''
+
 outputs:
   variables-set:
     description: 'Number of TF_VAR variables configured'
@@ -222,6 +234,8 @@ runs:
         INPUT_CLOUDFLARE_ZONE_ID: ${{ inputs.cloudflare-zone-id }}
         INPUT_PLATFORM_DATABASE_URL: ${{ inputs.platform-database-url }}
         INPUT_SHARED_DATABASE_URL: ${{ inputs.shared-database-url }}
+        INPUT_ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        INPUT_VIEWER_TOKEN_SECRET: ${{ inputs.viewer-token-secret }}
       run: |
         echo "Setting TF_VAR environment variables for $INPUT_ENVIRONMENT..."
 
@@ -346,6 +360,14 @@ runs:
         set_env_var "TF_VAR_platform_database_url" "$INPUT_PLATFORM_DATABASE_URL"
         : $((VAR_COUNT+=1))
         set_env_var "TF_VAR_shared_database_url" "$INPUT_SHARED_DATABASE_URL"
+        : $((VAR_COUNT+=1))
+
+        # AI Services
+        set_env_var "TF_VAR_anthropic_api_key" "$INPUT_ANTHROPIC_API_KEY"
+        : $((VAR_COUNT+=1))
+
+        # Authentication (DEC-015 VST pattern)
+        set_env_var "TF_VAR_viewer_token_secret" "$INPUT_VIEWER_TOKEN_SECRET"
         : $((VAR_COUNT+=1))
 
         echo "count=$VAR_COUNT" >> $GITHUB_OUTPUT

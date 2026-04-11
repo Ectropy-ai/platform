@@ -22,9 +22,10 @@ resource "digitalocean_droplet" "development" {
   ipv6       = true
 
   tags = [
-    "environment:development",
     "managed-by:terraform",
-    "ectropy"
+    "environment:development",
+    "product:ectropy",
+    "role:app"
   ]
 
   # Zero-SSH bootstrap: templatefile renders credentials before cloud-init execution

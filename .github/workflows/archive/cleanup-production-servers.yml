@@ -1,3 +1,8 @@
+# ARCHIVED: 2026-04-10
+# Consolidated into future operations.yml per Gap G-05
+# See: .github/workflows/archive/README.md
+# DO NOT remove — preserved for institutional knowledge
+
 name: Cleanup Production Servers
 
 on:
@@ -15,8 +20,6 @@ on:
 env:
   PROD_BLUE_IP: ${{ vars.PROD_BLUE_IP }}
   PROD_GREEN_IP: ${{ vars.PROD_GREEN_IP }}
-  PROD_BLUE_DROPLET_ID: ${{ vars.PROD_BLUE_DROPLET_ID }}
-  PROD_GREEN_DROPLET_ID: ${{ vars.PROD_GREEN_DROPLET_ID }}
 
 jobs:
   cleanup-blue:
@@ -25,36 +28,39 @@ jobs:
     if: ${{ inputs.target == 'blue' || inputs.target == 'both' }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      - name: Configure SSH
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add runner IP to firewall (temporary)
+        id: fw
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/ectropy_prod
-          chmod 600 ~/.ssh/ectropy_prod
-          ssh-keyscan -H ${{ env.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          doctl compute firewall add-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+          echo "Waiting for firewall propagation..."
+          sleep 5
+
+      - name: Add SSH known hosts
+        run: ssh-keyscan -H ${{ env.PROD_BLUE_IP }} >> ~/.ssh/known_hosts
 
       - name: Run cleanup on blue server
         run: |
-          echo "========================================="
-          echo "Cleaning up Blue Production Server"
-          echo "IP: ${{ env.PROD_BLUE_IP }}"
-          echo "========================================="
+          echo "=== Cleaning Blue Production Server ==="
+          ssh root@${{ env.PROD_BLUE_IP }} "docker system prune -af --volumes && df -h"
 
-          # Transfer cleanup script
-          scp -i ~/.ssh/ectropy_prod \
-            scripts/deployment/cleanup-production-server.sh \
-            root@${{ env.PROD_BLUE_IP }}:/tmp/cleanup.sh
-
-          # Execute cleanup script
-          ssh -i ~/.ssh/ectropy_prod root@${{ env.PROD_BLUE_IP }} \
-            "chmod +x /tmp/cleanup.sh && /tmp/cleanup.sh"
+      - name: Remove runner IP from firewall (cleanup)
+        if: always()
+        run: |
+          doctl compute firewall remove-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:${{ steps.fw.outputs.runner_ip }}/32"
 
   cleanup-green:
     name: Cleanup Green Production Server
@@ -62,66 +68,48 @@ jobs:
     if: ${{ inputs.target == 'green' || inputs.target == 'both' }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      - name: Configure SSH
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Add runner IP to firewall (temporary)
+        id: fw
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/ectropy_prod
-          chmod 600 ~/.ssh/ectropy_prod
-          ssh-keyscan -H ${{ env.PROD_GREEN_IP }} >> ~/.ssh/known_hosts
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+          doctl compute firewall add-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+          echo "Waiting for firewall propagation..."
+          sleep 5
+
+      - name: Add SSH known hosts
+        run: ssh-keyscan -H ${{ env.PROD_GREEN_IP }} >> ~/.ssh/known_hosts
 
       - name: Run cleanup on green server
         run: |
-          echo "========================================="
-          echo "Cleaning up Green Production Server"
-          echo "IP: ${{ env.PROD_GREEN_IP }}"
-          echo "========================================="
+          echo "=== Cleaning Green Production Server ==="
+          ssh root@${{ env.PROD_GREEN_IP }} "docker system prune -af --volumes && df -h"
 
-          # Transfer cleanup script
-          scp -i ~/.ssh/ectropy_prod \
-            scripts/deployment/cleanup-production-server.sh \
-            root@${{ env.PROD_GREEN_IP }}:/tmp/cleanup.sh
-
-          # Execute cleanup script
-          ssh -i ~/.ssh/ectropy_prod root@${{ env.PROD_GREEN_IP }} \
-            "chmod +x /tmp/cleanup.sh && /tmp/cleanup.sh"
+      - name: Remove runner IP from firewall (cleanup)
+        if: always()
+        run: |
+          doctl compute firewall remove-rules ${{ vars.PROD_FIREWALL_ID }} \
+            --inbound-rules "protocol:tcp,ports:22,address:${{ steps.fw.outputs.runner_ip }}/32"
 
   summary:
     name: Cleanup Summary
     runs-on: ubuntu-latest
     needs: [cleanup-blue, cleanup-green]
     if: always()
-
     steps:
       - name: Display summary
         run: |
-          echo "========================================="
-          echo "PRODUCTION SERVER CLEANUP COMPLETE"
-          echo "========================================="
-          echo ""
           echo "Target: ${{ inputs.target }}"
-          echo ""
-          if [ "${{ needs.cleanup-blue.result }}" == "success" ]; then
-            echo "✅ Blue server cleanup: SUCCESS"
-          elif [ "${{ needs.cleanup-blue.result }}" == "skipped" ]; then
-            echo "⏭️  Blue server cleanup: SKIPPED"
-          else
-            echo "❌ Blue server cleanup: FAILED"
-          fi
-
-          if [ "${{ needs.cleanup-green.result }}" == "success" ]; then
-            echo "✅ Green server cleanup: SUCCESS"
-          elif [ "${{ needs.cleanup-green.result }}" == "skipped" ]; then
-            echo "⏭️  Green server cleanup: SKIPPED"
-          else
-            echo "❌ Green server cleanup: FAILED"
-          fi
-          echo ""
-          echo "Next step: Retry production deployment"
+          echo "Blue: ${{ needs.cleanup-blue.result }}"
+          echo "Green: ${{ needs.cleanup-green.result }}"

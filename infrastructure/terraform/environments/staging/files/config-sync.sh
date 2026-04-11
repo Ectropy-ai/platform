@@ -67,9 +67,12 @@ log_success() {
 check_prerequisites() {
   log_info "Checking prerequisites..."
 
-  # Check AWS CLI installed
-  if ! command -v aws &> /dev/null; then
-    log_error "AWS CLI not installed. Install with: apt-get install awscli"
+  # Check python3 + boto3 installed (replaces broken AWS CLI v1 on DO droplets)
+  # INFRA-NOTE: AWS CLI v1 is broken on Ubuntu 22.04 staging droplet.
+  # boto3 is the only reliable DigitalOcean Spaces client in this environment.
+  # See: LUHTECH-CREDENTIAL-HANDLING-GROUND-TRUTH-2026-04-03.md Part III
+  if ! python3 -c "import boto3" &> /dev/null; then
+    log_error "python3 with boto3 not installed. Install with: pip3 install boto3"
     exit 1
   fi
 
@@ -105,10 +108,26 @@ download_from_s3() {
 
   log_info "Downloading s3://${SPACES_BUCKET}/${s3_key} to ${temp_path}..."
 
-  if aws s3 cp "s3://${SPACES_BUCKET}/${s3_key}" "${temp_path}" \
-      --endpoint-url "${SPACES_ENDPOINT}" \
-      --region "${SPACES_REGION}" \
-      --no-progress >> "${LOG_FILE}" 2>&1; then
+  # INFRA-NOTE: boto3 replaces AWS CLI v1 (broken on staging droplet).
+  # Variables expand in bash scope before heredoc passes to Python.
+  # Credentials sourced from AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+  # env vars set in /etc/default/config-sync (same as before).
+  if python3 - << PYEOF >> "${LOG_FILE}" 2>&1
+import os, boto3, sys
+s3 = boto3.client('s3',
+    region_name='${SPACES_REGION}',
+    endpoint_url='${SPACES_ENDPOINT}',
+    aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID',''),
+    aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY','')
+)
+try:
+    s3.download_file('${SPACES_BUCKET}', '${s3_key}', '${temp_path}')
+    print('[boto3] Downloaded ${s3_key}')
+except Exception as e:
+    print(f'[boto3] ERROR: {e}', file=sys.stderr)
+    sys.exit(1)
+PYEOF
+  then
     log_success "Downloaded ${s3_key}"
     echo "${temp_path}"
   else
@@ -448,15 +467,17 @@ main() {
   if deploy_config_file "${NGINX_MAIN_KEY}" "${NGINX_MAIN_FILE}" "nginx-main"; then
     nginx_changed=true
   elif [[ $? -eq 1 ]]; then
-    log_error "Failed to deploy nginx main.conf"
-    exit 1
+    # INFRA-NOTE: nginx sync failures are non-fatal (Fortune 500 resilience pattern).
+    # nginx configs change rarely. .env sync must never be blocked by nginx failures.
+    # Independent failure domains: nginx failure → warn only, .env always syncs.
+    log_warn "nginx main.conf sync failed — continuing (non-fatal, .env sync will proceed)"
   fi
 
   if deploy_config_file "${NGINX_SITE_KEY}" "${NGINX_SITE_FILE}" "nginx-site"; then
     nginx_changed=true
   elif [[ $? -eq 1 ]]; then
-    log_error "Failed to deploy nginx site config"
-    exit 1
+    # INFRA-NOTE: Same non-fatal pattern as nginx-main above.
+    log_warn "nginx site config sync failed — continuing (non-fatal, .env sync will proceed)"
   fi
 
   # Deploy docker-compose.yml
