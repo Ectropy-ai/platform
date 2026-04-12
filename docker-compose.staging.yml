@@ -157,7 +157,7 @@ services:
       SPECKLE_SERVER_URL: ${SPECKLE_SERVER_URL:-http://ectropy-speckle-server:3000}
       SPECKLE_SERVER_TOKEN: ${SPECKLE_SERVER_TOKEN}
       # DEC-018: Direct Speckle DB connection for token self-healing
-      SPECKLE_DB_URL: postgresql://postgres:${DATABASE_PASSWORD}@ectropy-postgres:5432/speckle
+      SPECKLE_DB_URL: ${SPECKLE_DB_URL}
       SPECKLE_ADMIN_EMAIL: ${SPECKLE_ADMIN_EMAIL:-speckle-admin@ectropy.ai}
       SPECKLE_ADMIN_PASSWORD: ${SPECKLE_ADMIN_PASSWORD}
 
@@ -427,38 +427,8 @@ services:
   # Official Speckle Server: https://github.com/specklesystems/speckle-server
   # =========================================================================
 
-  # Speckle Database Initialization (Init Container Pattern)
-  # Creates "speckle" database before Speckle server starts
-  speckle-db-init:
-    image: postgres:15-alpine
-    container_name: ectropy-speckle-db-init
-    environment:
-      PGPASSWORD: ${DATABASE_PASSWORD}
-    command: >
-      sh -c '
-        echo "=========================================" &&
-        echo "SPECKLE DATABASE INITIALIZATION" &&
-        echo "=========================================" &&
-        echo "Waiting for PostgreSQL..." &&
-        until psql -h ectropy-postgres -U postgres -c "\q" 2>/dev/null; do
-          sleep 2
-        done &&
-        echo "PostgreSQL ready. Creating Speckle database..." &&
-        psql -h ectropy-postgres -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '\''speckle'\''" | grep -q 1 ||
-        psql -h ectropy-postgres -U postgres -c "CREATE DATABASE speckle;" &&
-        echo "✅ Speckle database ready" &&
-        echo "========================================="
-      '
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: 'no' # Init container - runs once and exits
-    labels:
-      com.ectropy.service: 'speckle-database-init'
-      com.ectropy.type: 'init-container'
-      com.ectropy.purpose: 'Create Speckle database before server startup'
-    networks:
-      - ectropy-network
+  # DEC-019: speckle-db-init REMOVED — managed DO PostgreSQL handles DB creation
+  # Database: ectropy-staging-db (8fc39980), speckle DB created via doctl
 
   # Speckle Admin & Service Token Bootstrap
   # ============================================================================
@@ -671,10 +641,10 @@ services:
       # Evidence: "databaseHost":"undefined" despite POSTGRES_HOST being set in container
       # Speckle Server 2.x uses POSTGRES_URL for hostname (not a full connection string)
       # Pattern: Same as fileimport-service (line 568) and official Speckle documentation
-      POSTGRES_URL: ectropy-postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-      POSTGRES_DB: speckle
+      POSTGRES_URL: ${POSTGRES_URL}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
 
       # Redis configuration (reuse existing Redis, separate DB index)
       REDIS_URL: redis://:${REDIS_PASSWORD}@ectropy-redis:6379/1
@@ -714,7 +684,7 @@ services:
       FRONTEND_ORIGIN: https://staging.ectropy.ai
 
       # File import queue
-      FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://postgres:${DATABASE_PASSWORD}@ectropy-postgres/speckle
+      FILEIMPORT_QUEUE_POSTGRES_URL: ${FILEIMPORT_QUEUE_POSTGRES_URL}
       FF_NEXT_GEN_FILE_IMPORTER_ENABLED: 'true'
 
       # Trust proxy (nginx reverse proxy)
@@ -722,10 +692,6 @@ services:
     ports:
       - '${SPECKLE_SERVER_PORT:-3100}:3000' # Speckle API (host nginx proxy, container:3000)
     depends_on:
-      speckle-db-init:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       minio:
@@ -847,10 +813,9 @@ services:
     environment:
       LOG_LEVEL: warn
       LOG_PRETTY: 'false'
-      PG_CONNECTION_STRING: postgres://postgres:${DATABASE_PASSWORD}@ectropy-postgres/speckle
+      PG_CONNECTION_STRING: ${PG_CONNECTION_STRING}
     depends_on:
       - speckle-server
-      - postgres
     deploy:
       resources:
         limits:
@@ -883,15 +848,14 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@ectropy-redis:6379/1
 
       # PostgreSQL configuration (separate variables + connection string)
-      POSTGRES_URL: ectropy-postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-      POSTGRES_DB: speckle
-      PG_CONNECTION_STRING: postgresql://postgres:${DATABASE_PASSWORD}@ectropy-postgres/speckle
-      FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://postgres:${DATABASE_PASSWORD}@ectropy-postgres/speckle
+      POSTGRES_URL: ${POSTGRES_URL}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PG_CONNECTION_STRING: ${PG_CONNECTION_STRING}
+      FILEIMPORT_QUEUE_POSTGRES_URL: ${FILEIMPORT_QUEUE_POSTGRES_URL}
     depends_on:
       - speckle-server
-      - postgres
       - redis
     deploy:
       resources:
