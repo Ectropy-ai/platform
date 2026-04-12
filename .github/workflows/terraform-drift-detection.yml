@@ -7,7 +7,7 @@ on:
 
 env:
   TF_VERSION: '1.14.0' # Standardized across all Terraform workflows (aligned with local development)
-  TF_WORKING_DIR: './terraform'
+  TF_WORKING_DIR: './infrastructure/terraform/environments/production'
   # AWS_REGION is required by Terraform's S3 backend even for S3-compatible services like DigitalOcean Spaces
   # The actual region (sfo3) is configured in backend.tf endpoint URL
   AWS_REGION: 'us-east-1'
@@ -61,26 +61,6 @@ jobs:
 
           echo "✅ All required secrets are configured"
 
-      - name: Initialize DigitalOcean Spaces Backend
-        id: init-backend
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
-        run: |
-          echo "🔧 Initializing DigitalOcean Spaces backend..."
-          echo "This ensures the Terraform state bucket exists and is accessible"
-
-          if ! bash scripts/terraform/init-digitalocean-backend.sh; then
-            echo "❌ Backend initialization failed"
-            echo "This usually indicates:"
-            echo "  - DigitalOcean Spaces credentials are incorrect or expired"
-            echo "  - Network connectivity issues"
-            echo "  - Insufficient permissions to create/access Spaces bucket"
-            exit 1
-          fi
-
-          echo "✅ DigitalOcean Spaces backend initialized successfully"
-
       - name: Terraform Init
         id: init
         working-directory: ${{ env.TF_WORKING_DIR }}
@@ -110,7 +90,6 @@ jobs:
             echo ""
             echo "Common causes and solutions:"
             echo "  1. Bucket doesn't exist:"
-            echo "     - Backend initialization step should have created it"
             echo "     - Check DigitalOcean Spaces console"
             echo "  2. Credentials invalid:"
             echo "     - Verify AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY secrets"
@@ -133,17 +112,50 @@ jobs:
           echo ""
           echo "✅ Terraform initialized successfully with DigitalOcean Spaces backend"
 
+      - name: Setup Terraform Variables
+        uses: ./.github/actions/setup-terraform-vars
+        with:
+          environment: production
+          digitalocean-token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+          ssl-certificate-name: ectropy-production-cert
+          app-version: 'production'
+          api-url: ${{ vars.PRODUCTION_API_URL }}
+          frontend-url: ${{ vars.PRODUCTION_FRONTEND_URL }}
+          database-host: ${{ vars.DATABASE_HOST }}
+          database-password: ${{ secrets.DB_PASSWORD }}
+          jwt-secret: ${{ secrets.JWT_SECRET }}
+          jwt-refresh-secret: ${{ secrets.JWT_REFRESH_SECRET }}
+          session-secret: ${{ secrets.SESSION_SECRET }}
+          encryption-key: ${{ secrets.ENCRYPTION_KEY }}
+          google-client-id: ${{ secrets.GOOGLE_CLIENT_ID_PRODUCTION }}
+          google-client-secret: ${{ secrets.GOOGLE_CLIENT_SECRET_PRODUCTION }}
+          redis-password: ${{ secrets.REDIS_PASSWORD }}
+          mcp-api-key: ${{ secrets.MCP_API_KEY }}
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          speckle-server-token: ${{ secrets.SPECKLE_SERVER_TOKEN }}
+          speckle-admin-password: ${{ secrets.SPECKLE_ADMIN_PASSWORD }}
+          speckle-session-secret: ${{ secrets.SPECKLE_SESSION_SECRET }}
+          minio-access-key: ${{ secrets.MINIO_ACCESS_KEY }}
+          minio-secret-key: ${{ secrets.MINIO_SECRET_KEY }}
+          resend-api-key: ${{ secrets.RESEND_API_KEY }}
+          watchtower-http-api-token: ${{ secrets.WATCHTOWER_HTTP_API_TOKEN }}
+          spaces-access-key-id: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+          spaces-secret-access-key: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          docr-config-json: ${{ secrets.DOCR_CONFIG_JSON }}
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-zone-id: ${{ vars.CLOUDFLARE_ZONE_ID }}
+          platform-database-url: ${{ secrets.PLATFORM_DATABASE_URL }}
+          shared-database-url: ${{ secrets.SHARED_DATABASE_URL }}
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          viewer-token-secret: ${{ secrets.VIEWER_TOKEN_SECRET }}
+
       - name: Detect Drift
         id: drift
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
-          TF_VAR_do_token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-          TF_VAR_ssh_key_fingerprint: ${{ vars.TF_VAR_SSH_KEY_FINGERPRINT }}
-          TF_VAR_admin_ip: ${{ vars.TF_VAR_ADMIN_IP }}
-          TF_VAR_ssl_certificate_name: ${{ vars.TF_VAR_SSL_CERTIFICATE_NAME || 'ectropy-production-cert' }}
-          TF_VAR_alert_email: ${{ vars.TF_VAR_ALERT_EMAIL || 'alerts@ectropy.ai' }}
         run: |
           echo "🔍 Checking for configuration drift..."
 
@@ -152,10 +164,7 @@ jobs:
           # 1 = error
           # 2 = changes detected (drift)
           set +e
-          # ENTERPRISE FIX (2026-01-02): Load production environment configuration
-          # Uses production tfvars for environment/project_id and all production-specific config
-          # Prevents "No value for required variable" errors
-          terraform plan -var-file=environments/production/terraform.tfvars -detailed-exitcode -no-color -input=false -out=tfplan > drift_output.txt 2>&1
+          terraform plan -detailed-exitcode -no-color -input=false -out=tfplan > drift_output.txt 2>&1
           EXIT_CODE=$?
           set -e
 
