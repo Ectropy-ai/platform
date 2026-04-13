@@ -112,7 +112,20 @@ export function createRedisClient(
   };
   
   const client = new Redis(config);
-  
+
+  // Application-level heartbeat — prevents DO managed Redis LB from
+  // closing idle connections at ~60s. TCP keepAlive probes don't count
+  // as Redis activity from DO LB's perspective; only actual Redis
+  // commands do. PING every 30s keeps the connection hot.
+  const heartbeat = setInterval(() => {
+    client.ping().catch((err: Error) => {
+      logger.warn('Redis heartbeat ping failed', {
+        error: err.message, host, port, db: options.db || 0,
+      });
+    });
+  }, 30_000);
+  client.on('end', () => clearInterval(heartbeat));
+
   // Event handlers for observability and preventing unhandled errors
   client.on('connect', () => {
     logger.info('✅ Redis client connected', { host, port, db: options.db || 0 });
