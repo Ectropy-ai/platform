@@ -20,7 +20,7 @@ import { SpacesClient, spacesConfigFromEnv } from './intake/spaces-client';
  * @param summary - Error message + stack trace as a string
  */
 export async function uploadCrashDiagnostic(
-  kind: 'uncaughtException' | 'unhandledRejection',
+  kind: 'uncaughtException' | 'unhandledRejection' | 'signal',
   summary: string,
 ): Promise<void> {
   try {

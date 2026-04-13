@@ -2846,13 +2846,21 @@ async function bootstrap(): Promise<void> {
       redis,
       healthStatus
     );
-    process.on('SIGTERM', () => {
+    process.on('SIGTERM', async () => {
       logger.info('Received SIGTERM signal, initiating graceful shutdown...');
+      await uploadCrashDiagnostic(
+        'signal',
+        `[SIGTERM-RECEIVED] uptime=${process.uptime().toFixed(2)}s pid=${process.pid} ppid=${process.ppid}`,
+      ).catch(() => {});
       cleanupRateLimiters(); // Close Redis connection for rate limiters
       gracefulShutdown('SIGTERM');
     });
-    process.on('SIGINT', () => {
+    process.on('SIGINT', async () => {
       logger.info('Received SIGINT signal, initiating graceful shutdown...');
+      await uploadCrashDiagnostic(
+        'signal',
+        `[SIGINT-RECEIVED] uptime=${process.uptime().toFixed(2)}s pid=${process.pid} ppid=${process.ppid}`,
+      ).catch(() => {});
       cleanupRateLimiters(); // Close Redis connection for rate limiters
       gracefulShutdown('SIGINT');
     });
