@@ -2747,7 +2747,11 @@ async function bootstrap(): Promise<void> {
     });
 
     // M5.2 ENTERPRISE: Initialize Redis Pub/Sub adapter for horizontal WebSocket scaling
-    if (redis) {
+    if (process.env.DISABLE_PUBSUB === 'true') {
+      logger.warn(
+        '⚠️  DISABLE_PUBSUB=true — pub/sub adapter skipped for diagnosis. Cross-instance WebSocket broadcasts will be local-only.',
+      );
+    } else if (redis) {
       logger.info(
         'Initializing Redis Pub/Sub adapter for WebSocket scaling...'
       );
