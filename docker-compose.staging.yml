@@ -120,6 +120,7 @@ services:
       - .env
     environment:
       NODE_ENV: staging
+      NODE_OPTIONS: "--max-old-space-size=1400"
       PORT: 4000
       # ROOT CAUSE #208: DATABASE_* variables from .env (managed PostgreSQL)
       # No hardcoded overrides - uses managed database connection from .env file
