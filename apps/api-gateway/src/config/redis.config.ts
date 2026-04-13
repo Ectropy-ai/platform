@@ -87,6 +87,12 @@ export function createRedisClient(
     password,
     maxRetriesPerRequest: 3,
     connectTimeout: 10000, // 10 seconds
+    // Prevent DO managed Redis idle-timeout disconnect.
+    // Without this, DO LB culls idle TCP connections at
+    // ~60s → ioredis rejects pending commands as
+    // unhandledRejection → process.exit(1).
+    // Confirmed via diagnostics/runtime-unhandledRejection-*.txt.
+    keepAlive: 30000,
     retryStrategy: (times: number) => {
       if (times > 3) {
         logger.error('❌ Redis connection failed after 3 retries - giving up');
