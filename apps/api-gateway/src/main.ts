@@ -78,6 +78,31 @@ process.on('uncaughtException', async (error: Error) => {
 process.on(
   'unhandledRejection',
   async (reason: unknown, promise: Promise<unknown>) => {
+    // Tolerate known ioredis internal close-handler rejection.
+    // This is an ioredis 5.x bug where socket.once('close') creates
+    // an internal promise that escapes its own catch boundary — the
+    // rejection carries no command context (confirmed via enhanced
+    // crash diagnostic; reason object has only message+stack).
+    // We're already on ioredis@latest (5.10.1) with no upgrade path.
+    // TODO: remove when ioredis releases a fix or we switch libraries.
+    const isIoredisCloseRejection =
+      reason instanceof Error &&
+      reason.message === 'Connection is closed.' &&
+      reason.stack?.includes('ioredis') &&
+      reason.stack?.includes('event_handler.js');
+
+    if (isIoredisCloseRejection) {
+      await uploadCrashDiagnostic(
+        'unhandledRejection',
+        `[TOLERATED-IOREDIS-BUG] ${(reason as Error).stack}`,
+      ).catch(() => {});
+      logger.warn(
+        'Tolerated ioredis internal close-handler rejection',
+        { message: (reason as Error).message, uptime: process.uptime() },
+      );
+      return; // Do NOT process.exit(1)
+    }
+
     // Base stack/message
     const base =
       reason instanceof Error
