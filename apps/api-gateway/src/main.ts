@@ -35,8 +35,11 @@ logger.info('✅ Environment variables loaded');
 import '../../../src/config/event-emitter.config.js';
 logger.info('✅ EventEmitter configured');
 
+// Crash diagnostic uploader — writes to Spaces before process.exit(1)
+import { uploadCrashDiagnostic } from './crash-diagnostic.js';
+
 // CRITICAL: Global error handlers to prevent silent failures
-process.on('uncaughtException', (error: Error) => {
+process.on('uncaughtException', async (error: Error) => {
   // DIAGNOSTIC FIX (2026-03-06): Use console.error as backup — Winston drops
   // string metadata args in JSON format, making error details invisible.
   // Template literals ensure error details appear in the message field itself.
@@ -65,12 +68,16 @@ process.on('uncaughtException', (error: Error) => {
   logger.error(`Name: ${errName}`);
   logger.error(`Stack: ${errStack}`);
   logger.error('========================================');
+  await uploadCrashDiagnostic(
+    'uncaughtException',
+    `Error: ${errMsg}\nName: ${errName}\nStack: ${errStack}`,
+  ).catch(() => {});
   process.exit(1);
 });
 
 process.on(
   'unhandledRejection',
-  (reason: unknown, promise: Promise<unknown>) => {
+  async (reason: unknown, promise: Promise<unknown>) => {
     const reasonStr =
       reason instanceof Error
         ? `${reason.name}: ${reason.message}\n${reason.stack}`
@@ -83,6 +90,8 @@ process.on(
     logger.error('FATAL: Unhandled Promise Rejection');
     logger.error(`Reason: ${reasonStr}`);
     logger.error('========================================');
+    await uploadCrashDiagnostic('unhandledRejection', reasonStr)
+      .catch(() => {});
     process.exit(1);
   }
 );
