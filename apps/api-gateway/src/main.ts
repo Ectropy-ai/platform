@@ -106,6 +106,7 @@ import {
 import {
   getRedisClient,
   closeRedisConnections,
+  attachHeartbeat,
 } from './config/redis.config.js';
 // DEPRECATED (2026-01-01): Legacy envalid config - will be removed after migration validation
 // Use @ectropy/shared/config instead
@@ -2753,6 +2754,11 @@ async function bootstrap(): Promise<void> {
       try {
         // Create a duplicate Redis client for subscribing (required by Redis Pub/Sub)
         const subClient = redis.duplicate();
+
+        // subClient bypasses createRedisClient factory — attach heartbeat
+        // manually. Subscribers are idle-by-design; without heartbeat, DO
+        // Redis LB culls the connection at ~60s → unhandledRejection.
+        attachHeartbeat(subClient, 'pubsub-subscriber');
 
         const instanceId = `api-gateway-${process.pid}-${Date.now()}`;
         initializeRedisPubSub({

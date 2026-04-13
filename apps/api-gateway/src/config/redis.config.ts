@@ -68,6 +68,32 @@ export function parseRedisUrl(redisUrl: string): {
 }
 
 /**
+ * Attaches a 30-second PING heartbeat to a Redis client.
+ * Prevents DO managed Redis LB from culling idle TCP
+ * connections. Required for all clients — including
+ * redis.duplicate() instances which bypass the factory.
+ *
+ * PING is allowed in SUBSCRIBE mode per Redis protocol,
+ * so this is safe for pub/sub subscriber clients.
+ *
+ * @param client - Any ioredis Redis instance
+ * @param context - Optional label for log messages
+ */
+export function attachHeartbeat(
+  client: Redis,
+  context = 'redis',
+): void {
+  const heartbeat = setInterval(() => {
+    client.ping().catch((err: Error) => {
+      logger.warn(`Redis heartbeat ping failed [${context}]`, {
+        error: err.message,
+      });
+    });
+  }, 30_000);
+  client.on('end', () => clearInterval(heartbeat));
+}
+
+/**
  * Create Redis client with proper configuration
  * Use this for ALL Redis connections (main, session, cache, rate limiter, queues)
  * 
@@ -113,18 +139,8 @@ export function createRedisClient(
   
   const client = new Redis(config);
 
-  // Application-level heartbeat — prevents DO managed Redis LB from
-  // closing idle connections at ~60s. TCP keepAlive probes don't count
-  // as Redis activity from DO LB's perspective; only actual Redis
-  // commands do. PING every 30s keeps the connection hot.
-  const heartbeat = setInterval(() => {
-    client.ping().catch((err: Error) => {
-      logger.warn('Redis heartbeat ping failed', {
-        error: err.message, host, port, db: options.db || 0,
-      });
-    });
-  }, 30_000);
-  client.on('end', () => clearInterval(heartbeat));
+  // Keep connection alive through DO Redis LB's ~60s idle cull.
+  attachHeartbeat(client, `${host}:${port}/${options.db || 0}`);
 
   // Event handlers for observability and preventing unhandled errors
   client.on('connect', () => {
