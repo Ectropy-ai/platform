@@ -27,6 +27,11 @@ export async function uploadCrashDiagnostic(
     const client = new SpacesClient(spacesConfigFromEnv());
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
     const key = `diagnostics/runtime-${kind}-${ts}.txt`;
+    // Best-effort counts — these APIs are unstable but present in Node 20.
+    // Cast to `any` because TypeScript types omit them.
+    const handles = (process as any)._getActiveHandles?.().length ?? 'n/a';
+    const requests = (process as any)._getActiveRequests?.().length ?? 'n/a';
+    const rss_mb = Math.round(process.memoryUsage().rss / 1024 / 1024);
     const body = [
       `timestamp:  ${new Date().toISOString()}`,
       `kind:       ${kind}`,
@@ -35,6 +40,9 @@ export async function uploadCrashDiagnostic(
       `node:       ${process.version}`,
       `env:        ${process.env.NODE_ENV ?? 'unknown'}`,
       `memory_mb:  ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}`,
+      `rss_mb:     ${rss_mb}`,
+      `handles:    ${handles}`,
+      `requests:   ${requests}`,
       `---`,
       summary,
     ].join('\n');

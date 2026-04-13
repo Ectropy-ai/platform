@@ -78,10 +78,27 @@ process.on('uncaughtException', async (error: Error) => {
 process.on(
   'unhandledRejection',
   async (reason: unknown, promise: Promise<unknown>) => {
-    const reasonStr =
+    // Base stack/message
+    const base =
       reason instanceof Error
         ? `${reason.name}: ${reason.message}\n${reason.stack}`
         : String(reason);
+
+    // Capture ALL enumerable + non-enumerable own properties of the reason
+    // object. ioredis attaches `command`, `args`, `previousErrors` here —
+    // this is how we identify which Redis command is rejecting.
+    let ownProps = '(no reason object)';
+    if (reason && typeof reason === 'object') {
+      try {
+        const propNames = Object.getOwnPropertyNames(reason);
+        const snapshot: Record<string, unknown> = {};
+        for (const n of propNames) snapshot[n] = (reason as any)[n];
+        ownProps = JSON.stringify(snapshot, null, 2);
+      } catch (e) {
+        ownProps = `(serialization failed: ${(e as Error).message})`;
+      }
+    }
+    const reasonStr = `${base}\n\n--- reason own-properties ---\n${ownProps}`;
     console.error('========================================');
     console.error('FATAL: Unhandled Promise Rejection');
     console.error(`Reason: ${reasonStr}`);
