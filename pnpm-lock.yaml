@@ -685,7 +685,7 @@ importers:
         specifier: 3.0.1
         version: 3.0.1
       multer:
-        specifier: '>=2.1.1'
+        specifier: ^2.1.1
         version: 2.1.1
       object-assign:
         specifier: ^4.1.1
