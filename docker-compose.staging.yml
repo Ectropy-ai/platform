@@ -818,6 +818,7 @@ services:
       LOG_LEVEL: warn
       LOG_PRETTY: 'false'
       PG_CONNECTION_STRING: ${PG_CONNECTION_STRING}
+      NODE_TLS_REJECT_UNAUTHORIZED: '0'  # DO managed DB uses self-signed CA
     depends_on:
       - speckle-server
     deploy:
