@@ -453,6 +453,18 @@ SPECKLE_PUBLIC_URL=https://staging.ectropy.ai/speckle
 MINIO_ACCESS_KEY=${var.minio_access_key}
 MINIO_SECRET_KEY=${var.minio_secret_key}
 
+# Speckle PostgreSQL — Managed DO Database (DEC-019)
+# All Speckle services connect to managed cluster with SSL
+# Eliminates local Docker postgres — survives droplet replacement
+POSTGRES_URL=${var.database_host}:${var.database_port}
+POSTGRES_USER=doadmin
+POSTGRES_PASSWORD=${var.database_password}
+POSTGRES_DB=speckle
+POSTGRES_PORT=${var.database_port}
+PGSSLMODE=require
+PG_CONNECTION_STRING=postgres://doadmin:${urlencode(var.database_password)}@${var.database_host}:${var.database_port}/speckle?sslmode=require
+FILEIMPORT_QUEUE_POSTGRES_URL=postgres://doadmin:${urlencode(var.database_password)}@${var.database_host}:${var.database_port}/speckle?sslmode=require
+
 # Infrastructure Services
 RESEND_API_KEY=${var.resend_api_key}
 WATCHTOWER_HTTP_API_TOKEN=${var.watchtower_http_api_token}
