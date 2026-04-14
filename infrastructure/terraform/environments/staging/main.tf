@@ -216,43 +216,71 @@ resource "digitalocean_loadbalancer" "staging" {
 }
 
 # ============================================================================
-# Phase P4.1: Zero-SSH Validation Firewall (HTTP from Load Balancer Only)
+# Staging Firewall — Tag-Based (DEC-028)
 # ============================================================================
-# Purpose: Enable Zero-SSH validation via load balancer health checks
-# Pattern: Fortune 500 compliance - Absolute zero-SSH architecture
-# Strategy: HTTP/HTTPS access via load balancer ONLY (not direct droplet)
-# Reference: .roadmap/ENTERPRISE_ZERO_SSH_STRATEGIC_PLAN_2026-02-16.md
+# ARCHITECTURE FIX: Replaced droplet_ids with tags for self-healing
+# on droplet replacement. Adds SSH (admin break-glass), VPC internal,
+# and ICMP — aligning with production firewall pattern.
 #
-# Security Model:
-# - NO SSH access (removed temporary SSH firewall)
-# - NO direct HTTP/HTTPS access to droplet from internet
-# - HTTP traffic allowed ONLY from load balancer (health checks + traffic)
-# - Emergency access: DigitalOcean Console only (break-glass)
+# Root cause: Zero-SSH with DO Console as sole break-glass failed when
+# Console stuck on "connecting". Staging was unreachable for diagnostics.
 #
-# Validation Method:
-# - Health checks: Load balancer → /api/health endpoint
-# - User traffic: Load balancer → services (ports 80/443)
-# - Monitoring: DigitalOcean monitoring + load balancer metrics
+# Migration: droplet_ids → tags (environment:staging)
+# DO applies firewall to any droplet carrying the tag — automatic,
+# no Terraform dependency propagation needed on replacement.
 # ============================================================================
 
-resource "digitalocean_firewall" "staging_http" {
-  name = "ectropy-staging-http-lb-only"
+resource "digitalocean_firewall" "staging" {
+  name = "ectropy-staging-firewall"
 
-  # Apply to staging droplet only
-  droplet_ids = [digitalocean_droplet.staging.id]
+  # TAG-BASED: Self-healing on droplet replacement (DEC-028)
+  tags = ["environment:staging"]
 
-  # HTTP from load balancer only (health checks + traffic forwarding)
-  # CRITICAL: This is the ONLY HTTP inbound rule - no direct internet access
-  inbound_rule {
-    protocol                   = "tcp"
-    port_range                 = "80"
-    source_load_balancer_uids  = [digitalocean_loadbalancer.staging.id]
+  # SSH: Admin break-glass access from approved CIDRs
+  # Parameterized — empty default = no SSH unless explicitly set
+  dynamic "inbound_rule" {
+    for_each = length(var.admin_ssh_cidrs) > 0 ? [1] : []
+    content {
+      protocol         = "tcp"
+      port_range       = "22"
+      source_addresses = var.admin_ssh_cidrs
+    }
   }
 
-  # NO SSH access (Fortune 500 compliance - absolute zero-SSH)
-  # Break-glass emergency access: DigitalOcean Console only
+  # HTTP from load balancer (health checks + traffic forwarding)
+  inbound_rule {
+    protocol                  = "tcp"
+    port_range                = "80"
+    source_load_balancer_uids = [digitalocean_loadbalancer.staging.id]
+  }
 
-  # Allow all outbound (standard pattern for package updates, external APIs)
+  # Application port from load balancer (production parity)
+  inbound_rule {
+    protocol                  = "tcp"
+    port_range                = "3000"
+    source_load_balancer_uids = [digitalocean_loadbalancer.staging.id]
+  }
+
+  # VPC internal traffic (staging CIDR: 10.20.0.0/20)
+  inbound_rule {
+    protocol         = "tcp"
+    port_range       = "1-65535"
+    source_addresses = ["10.20.0.0/20"]
+  }
+
+  inbound_rule {
+    protocol         = "udp"
+    port_range       = "1-65535"
+    source_addresses = ["10.20.0.0/20"]
+  }
+
+  # ICMP for monitoring and diagnostics
+  inbound_rule {
+    protocol         = "icmp"
+    source_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  # Allow all outbound (package updates, external APIs, DOCR pulls)
   outbound_rule {
     protocol              = "tcp"
     port_range            = "1-65535"
@@ -268,11 +296,6 @@ resource "digitalocean_firewall" "staging_http" {
   outbound_rule {
     protocol              = "icmp"
     destination_addresses = ["0.0.0.0/0", "::/0"]
-  }
-
-  lifecycle {
-    # This firewall is permanent (Zero-SSH compliance requirement)
-    prevent_destroy = false # Can be destroyed for infrastructure migration
   }
 }
 
@@ -463,6 +486,11 @@ ENV
   # Lifecycle: Regenerate on variable changes only
   lifecycle {
     create_before_destroy = true
+
+    precondition {
+      condition     = var.jwt_secret != var.jwt_refresh_secret
+      error_message = "JWT_SECRET and JWT_REFRESH_SECRET must be different values. Using the same value for both is a security vulnerability."
+    }
   }
 }
 

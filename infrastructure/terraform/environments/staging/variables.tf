@@ -31,6 +31,7 @@ variable "ssh_keys" {
   # These keys must match the SSH keys attached to the existing droplet
   # Changing these values will trigger droplet recreation (not desired for import)
   default = [
+    "60:b6:d6:f2:ab:c5:f0:70:7c:e6:00:de:3a:af:9d:5e", # luhtech-enterprise (admin)
     "0a:b2:48:6d:1e:dc:95:e2:6e:96:ff:e8:fe:a8:35:42", # ectropy-production
     "72:7e:a1:f9:8d:74:b5:0d:25:4c:04:97:40:cd:39:8e", # terraform-deploy-key (GitOps automation)
   ]
@@ -39,6 +40,12 @@ variable "ssh_keys" {
     condition     = length(var.ssh_keys) >= 1
     error_message = "At least one SSH key must be provided"
   }
+}
+
+variable "admin_ssh_cidrs" {
+  description = "CIDR blocks allowed SSH access to staging (admin break-glass)"
+  type        = list(string)
+  default     = []  # Empty = no SSH by default; set via tfvars or CLI
 }
 
 variable "project_name" {
@@ -113,18 +120,33 @@ variable "jwt_secret" {
   description = "JWT signing secret (256-bit minimum)"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.jwt_secret) >= 64
+    error_message = "JWT_SECRET must be at least 64 characters (current: ${length(var.jwt_secret)}). Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
+  }
 }
 
 variable "jwt_refresh_secret" {
   description = "JWT refresh token secret (256-bit minimum)"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.jwt_refresh_secret) >= 64
+    error_message = "JWT_REFRESH_SECRET must be at least 64 characters (current: ${length(var.jwt_refresh_secret)}). Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
+  }
 }
 
 variable "session_secret" {
   description = "Session cookie signing secret"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.session_secret) >= 32
+    error_message = "SESSION_SECRET must be at least 32 characters (current: ${length(var.session_secret)}). Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
+  }
 }
 
 variable "google_client_id" {
@@ -204,6 +226,11 @@ variable "speckle_session_secret" {
   description = "Speckle session secret for cookie signing"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.speckle_session_secret) >= 32
+    error_message = "SPECKLE_SESSION_SECRET must be at least 32 characters (current: ${length(var.speckle_session_secret)}). Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
+  }
 }
 
 variable "minio_access_key" {
