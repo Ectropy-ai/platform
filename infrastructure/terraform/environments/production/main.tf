@@ -575,6 +575,11 @@ ENV
 
   lifecycle {
     create_before_destroy = true
+
+    precondition {
+      condition     = var.jwt_secret != var.jwt_refresh_secret
+      error_message = "JWT_SECRET and JWT_REFRESH_SECRET must be different values. Using the same value for both is a security vulnerability."
+    }
   }
 }
 

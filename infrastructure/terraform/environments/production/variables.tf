@@ -111,18 +111,33 @@ variable "jwt_secret" {
   description = "JWT signing secret (256-bit minimum)"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.jwt_secret) >= 64
+    error_message = "JWT_SECRET must be at least 64 characters (current: ${length(var.jwt_secret)}). Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
+  }
 }
 
 variable "jwt_refresh_secret" {
   description = "JWT refresh token secret (256-bit minimum)"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.jwt_refresh_secret) >= 64
+    error_message = "JWT_REFRESH_SECRET must be at least 64 characters (current: ${length(var.jwt_refresh_secret)}). Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
+  }
 }
 
 variable "session_secret" {
   description = "Session cookie signing secret"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.session_secret) >= 32
+    error_message = "SESSION_SECRET must be at least 32 characters (current: ${length(var.session_secret)}). Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
+  }
 }
 
 variable "google_client_id" {
@@ -202,6 +217,11 @@ variable "speckle_session_secret" {
   description = "Speckle session secret for cookie signing"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.speckle_session_secret) >= 32
+    error_message = "SPECKLE_SESSION_SECRET must be at least 32 characters (current: ${length(var.speckle_session_secret)}). Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
+  }
 }
 
 variable "minio_access_key" {
