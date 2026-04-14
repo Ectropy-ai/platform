@@ -321,22 +321,25 @@ except: print('')
   # --- Stage 6: Update project record ---
   echo "[Stage 6/7] Updating project record..."
 
-  UPDATE_RESP=$(curl -sf -X POST "${STAGING_URL}/api/v1/speckle/streams" \
-    -H "Content-Type: application/json" \
-    -d "{
-      \"projectId\": \"${PROJECT_ID}\",
-      \"streamId\": \"${STREAM_ID}\",
-      \"streamName\": \"Maple Ridge Commerce Centre\"
-    }" 2>/dev/null || echo '{"error":"update failed"}')
+  # Direct DB upsert — GH Actions runner has DATABASE_URL but no platform auth token.
+  # Uses psql (installed in workflow step "Install PostgreSQL client").
+  # sslmode=require is already in DATABASE_URL for managed DO PostgreSQL.
+  UPSERT_RESULT=$(psql -t -A "$DATABASE_URL" -c "
+    INSERT INTO speckle_streams (id, construction_project_id, stream_id, stream_name, created_at, updated_at)
+    VALUES (gen_random_uuid(), '${PROJECT_ID}', '${STREAM_ID}', 'Maple Ridge Commerce Centre', NOW(), NOW())
+    ON CONFLICT (construction_project_id) DO UPDATE SET
+      stream_id = EXCLUDED.stream_id,
+      stream_name = EXCLUDED.stream_name,
+      updated_at = NOW()
+    RETURNING stream_id;
+  " 2>&1)
 
-  echo "  Project→Stream link: $(echo "$UPDATE_RESP" | python3 -c "
-import sys,json
-try:
-    d=json.load(sys.stdin)
-    if 'error' in d: print('WARN: ' + str(d['error']))
-    else: print('OK')
-except: print('response not JSON')
-")"
+  if echo "$UPSERT_RESULT" | grep -q "$STREAM_ID"; then
+    echo "  Project→Stream link: OK (stream_id=${STREAM_ID:0:10}...)"
+  else
+    echo "  Project→Stream link: WARN — upsert may have failed"
+    echo "  Result: ${UPSERT_RESULT:0:200}"
+  fi
   echo ""
 
   # --- Stage 7: Report ---

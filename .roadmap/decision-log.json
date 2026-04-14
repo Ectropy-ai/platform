@@ -1,13 +1,13 @@
 {
   "$schema": "https://luhtech.dev/schemas/decision-log-v2.json",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "ventureId": "ectropy",
-  "lastUpdated": "2026-04-09T06:00:00Z",
+  "lastUpdated": "2026-04-14T21:00:00Z",
   "decisions": [
     {
       "decisionId": "DEC-002",
       "timestamp": "2026-03-11T00:00:00Z",
-      "title": "Console Migration \u2014 ectropy-console to Ectropy-Business",
+      "title": "Console Migration — ectropy-console to Ectropy-Business",
       "context": "ectropy-console contains is_platform_admin gating, demo provisioning, and internal admin tooling. This is business logic, not open-source platform code. Keeping it in the public repo violates the boundary contract.",
       "decision": "Move apps/ectropy-console from ectropy-ai/platform (public, Apache-2.0) to luh-tech/Ectropy-Business (private, PROPRIETARY). DOCR image name stays ectropy-console. Nginx config untouched. Only CI workflow changes.",
       "rationale": "Admin console with is_platform_admin gate, demo provisioning, and internal tooling belongs in the private business repo. Public repo should not contain enterprise admin surfaces.",
@@ -17,7 +17,7 @@
       "implementedDate": "2026-03-11",
       "evidence": [
         "ECTROPY-ARCH-CONSOLE-MIGRATION-2026-03-11.docx",
-        "boundaries.json v2.1.0 \u2014 console removed from publicRepo.includes"
+        "boundaries.json v2.1.0 — console removed from publicRepo.includes"
       ],
       "tags": [
         "repo-split",
@@ -29,7 +29,7 @@
     {
       "decisionId": "d-2026-02-25-e2e-test-fixture-pattern",
       "timestamp": "2026-02-25T16:00:00Z",
-      "title": "E2E Test Fixture Pattern \u2014 test.beforeAll Project Fixture",
+      "title": "E2E Test Fixture Pattern — test.beforeAll Project Fixture",
       "context": "E2E tests were creating projects per-test, causing slow execution and flaky state. Tests needed a shared project context without component-level auto-create overhead.",
       "decision": "Use test.beforeAll to create a shared project fixture at the test file level. Each test file gets one project, all tests within share it. Component-level auto-create removed.",
       "rationale": "Reduces test setup time by ~60%. Eliminates flaky state from parallel project creation. Matches Playwright best practices for fixture-based test architecture.",
@@ -51,7 +51,7 @@
     {
       "decisionId": "d-2026-02-25-crm-integration",
       "timestamp": "2026-02-25T14:00:00Z",
-      "title": "CRM Integration \u2014 Lead Capture on Landing Page",
+      "title": "CRM Integration — Lead Capture on Landing Page",
       "context": "Landing page needed lead capture functionality for pilot customer acquisition. Required CRM integration without vendor lock-in.",
       "decision": "Implement CRM lead capture directly on the landing page with form submission to api-gateway, which forwards to CRM provider.",
       "rationale": "Direct integration avoids third-party JavaScript overhead. Server-side forwarding allows CRM provider swap without frontend changes. Landing page is now operational with lead capture.",
@@ -73,7 +73,7 @@
     {
       "decisionId": "d-2026-02-24-console-mime-type-fix",
       "timestamp": "2026-02-24T20:00:00Z",
-      "title": "Console MIME Type Fix \u2014 Nginx Rewrite for Variable proxy_pass",
+      "title": "Console MIME Type Fix — Nginx Rewrite for Variable proxy_pass",
       "context": "ectropy-console was serving JavaScript files with incorrect MIME types (text/html instead of application/javascript) causing browser execution failures. Root cause: nginx proxy_pass with variable ($console_upstream) prevents URI rewriting.",
       "decision": "Add explicit rewrite rule: `rewrite ^/console/(.*) /$1 break;` before the proxy_pass directive to strip the /console/ prefix that variable proxy_pass cannot handle.",
       "rationale": "Variable proxy_pass in nginx is required for dynamic DNS resolution of Docker containers. But unlike static proxy_pass, it does not strip location prefixes from the URI. The rewrite rule compensates for this nginx behavior.",
@@ -95,7 +95,7 @@
     {
       "decisionId": "d-2026-02-24-speckle-auth-overhaul",
       "timestamp": "2026-02-24T18:00:00Z",
-      "title": "Speckle Auth Overhaul \u2014 Challenge Parameter for v2 Auth + Distroless Healthcheck",
+      "title": "Speckle Auth Overhaul — Challenge Parameter for v2 Auth + Distroless Healthcheck",
       "context": "Speckle v2 authentication requires a challenge parameter that v1 did not. Additionally, distroless container images lack /bin/sh, causing CMD-SHELL healthchecks to fail.",
       "decision": "Add challenge parameter to Speckle authentication flow. Switch healthcheck from CMD-SHELL to CMD format for distroless compatibility.",
       "rationale": "Speckle v2 breaking change in auth middleware requires challenge parameter. Distroless images are security best practice but require non-shell healthchecks.",
@@ -119,7 +119,7 @@
     {
       "decisionId": "d-2026-02-20-config-sync-hardening",
       "timestamp": "2026-02-20T16:00:00Z",
-      "title": "Config-Sync Hardening \u2014 SHA256 Hash Comparison + 60s Systemd Timer",
+      "title": "Config-Sync Hardening — SHA256 Hash Comparison + 60s Systemd Timer",
       "context": "Config-sync service needed reliable change detection to avoid unnecessary compose restarts and to provide rollback on invalid configurations.",
       "decision": "Implement SHA256 hash comparison for config files. Only trigger compose operations when hash changes. Use systemd timer with 60-second interval instead of cron. Add compose validation gate before applying changes with automatic rollback on failure.",
       "rationale": "SHA256 comparison eliminates false-positive restarts from S3 metadata changes. Systemd timers are more reliable than cron for server-level services. Validation gate prevents broken compose files from taking down the stack.",
@@ -143,7 +143,7 @@
     {
       "decisionId": "d-2026-02-20-compose-integrity-chain",
       "timestamp": "2026-02-20T14:00:00Z",
-      "title": "Compose Integrity Chain \u2014 Validation Gate + Rollback in Config-Sync",
+      "title": "Compose Integrity Chain — Validation Gate + Rollback in Config-Sync",
       "context": "Zero-SSH deployment requires compose files to be validated before application. A broken compose file pushed to S3 could take down all services with no SSH access to recover.",
       "decision": "Implement a three-stage integrity chain: (1) docker compose config validation before apply, (2) automatic rollback to previous known-good compose file on validation failure, (3) --remove-orphans flag (not --force-recreate) to clean up removed services without disrupting running ones.",
       "rationale": "Without SSH, a broken compose file is catastrophic. The integrity chain provides defense-in-depth: validation prevents applying bad configs, rollback recovers from edge cases, and --remove-orphans safely handles service topology changes.",
@@ -167,10 +167,10 @@
     {
       "decisionId": "d-2026-02-20-zero-ssh-p3-p4",
       "timestamp": "2026-02-20T12:00:00Z",
-      "title": "Zero-SSH P3/P4 \u2014 Watchtower + DOCR Polling Over SSH Deployment",
+      "title": "Zero-SSH P3/P4 — Watchtower + DOCR Polling Over SSH Deployment",
       "context": "Traditional deployment required SSH access to servers for docker compose up, config changes, and debugging. SSH is a security attack surface and operational bottleneck for a solo founder.",
       "decision": "Eliminate SSH entirely using: (1) Watchtower polling DOCR every 5 minutes for image updates, (2) config-sync polling S3 every 60 seconds for compose file changes, (3) cloud-init for initial server bootstrap. SSH port 22 closed on all servers.",
-      "rationale": "Zero-SSH eliminates the largest attack surface on servers. Watchtower + config-sync provide a fully automated deployment pipeline that requires no interactive access. GitHub Actions builds images, pushes to DOCR, and uploads configs to S3 \u2014 servers pull automatically.",
+      "rationale": "Zero-SSH eliminates the largest attack surface on servers. Watchtower + config-sync provide a fully automated deployment pipeline that requires no interactive access. GitHub Actions builds images, pushes to DOCR, and uploads configs to S3 — servers pull automatically.",
       "status": "implemented",
       "category": "infrastructure",
       "impact": "critical",
@@ -366,8 +366,8 @@
       "timestamp": "2026-01-01T13:30:00Z",
       "title": "P0 Critical: Upgrade Production PostgreSQL to 3-Node HA Cluster",
       "context": "Infrastructure analysis identified production PostgreSQL as single point of failure (SPOF). Current 1-node cluster creates critical risk: complete service outage if primary database fails, manual failover required (30-60min MTTR), potential data loss. Production readiness requires automatic failover capability for 99.95% availability SLA.",
-      "decision": "Upgrade production PostgreSQL to 3-node HA cluster with automatic failover. Updated terraform/environments/production/terraform.tfvars: database_node_count = 1 \u2192 3",
-      "rationale": "Enterprise production systems require automatic failover for business continuity. 3-node cluster with quorum voting is PostgreSQL industry standard, provides 98% MTTR reduction (30-60min \u2192 30-60sec), eliminates data loss risk, and enables zero-downtime maintenance. Cost increase ($60/month) is negligible compared to prevented outage cost ($10K-50K per incident). Aligns with infrastructure maturity target (9.5/10) and twelve-factor app backing services principle.",
+      "decision": "Upgrade production PostgreSQL to 3-node HA cluster with automatic failover. Updated terraform/environments/production/terraform.tfvars: database_node_count = 1 → 3",
+      "rationale": "Enterprise production systems require automatic failover for business continuity. 3-node cluster with quorum voting is PostgreSQL industry standard, provides 98% MTTR reduction (30-60min → 30-60sec), eliminates data loss risk, and enables zero-downtime maintenance. Cost increase ($60/month) is negligible compared to prevented outage cost ($10K-50K per incident). Aligns with infrastructure maturity target (9.5/10) and twelve-factor app backing services principle.",
       "status": "implemented",
       "category": "infrastructure",
       "impact": "critical",
@@ -467,7 +467,7 @@
         },
         "improvement": {
           "availability": "+0.95% (4.4 hours/year uptime gain)",
-          "mttr_reduction": "98% (60min \u2192 60sec)",
+          "mttr_reduction": "98% (60min → 60sec)",
           "roi": "Positive within first month (single prevented outage = $10K-50K)"
         }
       }
@@ -603,7 +603,7 @@
         },
         "improvement": {
           "risk_reduction": "100% (state corruption eliminated)",
-          "cost_savings": "$5/month (Spaces \u2192 Cloud free tier)",
+          "cost_savings": "$5/month (Spaces → Cloud free tier)",
           "operational_safety": "Concurrent operations blocked automatically"
         }
       }
@@ -726,7 +726,7 @@
       "decisionId": "d-2025-12-18-scalable-demo-architecture",
       "timestamp": "2025-12-18T16:57:00Z",
       "title": "Enterprise-Scalable Demo Architecture Supporting Multiple Building Types",
-      "context": "Need demo capability for BIM viewer that supports multiple building types (residential, commercial, multi-family, large projects) and enables walkthrough demos with potential for automated user action triggers. Investor demos require showing complete workflow: create project \u2192 upload model \u2192 view 3D.",
+      "context": "Need demo capability for BIM viewer that supports multiple building types (residential, commercial, multi-family, large projects) and enables walkthrough demos with potential for automated user action triggers. Investor demos require showing complete workflow: create project → upload model → view 3D.",
       "decision": "Build scalable demo script (scripts/core/speckle-demo-setup.sh) supporting 4 building types with GraphQL API integration, automated GitHub Actions workflow, and architecture supporting future demo overlay mode",
       "rationale": "Enterprise demos require flexibility to show different building types to different audiences (residential developers, commercial GCs, etc.). Scalable architecture with automated workflows enables scheduled demo refreshes and future demo overlay capability where production code runs with automated action triggers for investor presentations.",
       "status": "implemented",
@@ -804,7 +804,7 @@
             "Healthchecks work as written"
           ],
           "cons": [
-            "Image size increases 10x (30MB \u2192 300MB)",
+            "Image size increases 10x (30MB → 300MB)",
             "Longer pull times",
             "Upstream Speckle uses minimal images"
           ],
@@ -916,8 +916,8 @@
       "decisionId": "d-2025-12-11-schema-driven-qa-framework",
       "timestamp": "2025-12-11T16:00:00Z",
       "title": "Establish Schema-Driven QA Framework with Gradual Enforcement and Roadmap Integration",
-      "context": "Analysis of testing infrastructure revealed critical gaps preventing roadmap-driven development: (1) Zero test templates or generators - developers create tests ad-hoc without patterns, (2) No test coverage schemas - test-matrix.json and test-data-catalog.json did not exist, coverage tracking manual, (3) Pre-commit hooks do NOT enforce unit test creation - .husky/pre-commit validates patterns and runs affected tests but has no requirement for test existence, (4) No schema-driven automation - qa-framework.json did not exist, no single source of truth for QA configuration, (5) Roadmap deliverables P5a-d7 (E2E suite complete) and P5b-d15 (80% coverage) lack automated validation against test schemas. User explicitly requested: 'roadmap driven approach with schema targets and unit tests leading the way for deliverables. this integrated with qa testing and playwright to close the loop.' Evidence: 467 test files exist with sophisticated E2E configuration (21 Playwright tests, 235 test cases), excellent QA framework documentation (885-line architecture), auth.fixture migration 56% complete (10 of 18 tests), but infrastructure not operational. Root cause: Missing closed-loop automation connecting schemas \u2192 pre-commit enforcement \u2192 test generation \u2192 coverage tracking \u2192 roadmap validation.",
-      "decision": "Create comprehensive schema-driven QA framework with three foundational JSON schemas following luh-tech schema-first patterns: (1) apps/mcp-server/data/qa-framework.json - Framework configuration with gradual enforcement phases (warn Dec 18 \u2192 block-new Jan 1 \u2192 block-all Jan 15), coverage targets (90% unit, 80% component, 75% integration, 95% E2E), test template paths, generator script configurations, pre-commit rules with exemption patterns, roadmap integration for P5a-d7 and P5b-d15 deliverables. (2) apps/mcp-server/data/test-matrix.json - Automated coverage tracking matrix updated post-test-run tracking 4 projects (api-gateway, web-dashboard, mcp-server, shared-libs), milestone targets (Month 1: 30%, Month 2: 60%, Month 6: 85%), current state baseline (13.7% overall, 51% E2E with 10 of 18 tests passing), auto-update triggers (test-complete, post-commit, ci-pipeline). (3) apps/mcp-server/data/test-data-catalog.json - Centralized fixtures catalog with Speckle streams (low/medium/high complexity), mock users (5 roles for auth.fixture), API response fixtures, IFC test files, test database configurations. All schemas validated with JSON parsing. Next: Create test templates (unit/component/integration/e2e), build generator scripts, enhance pre-commit hooks reading from qa-framework.json for gradual enforcement, create roadmap validation scripts checking deliverable completion against test schemas.",
+      "context": "Analysis of testing infrastructure revealed critical gaps preventing roadmap-driven development: (1) Zero test templates or generators - developers create tests ad-hoc without patterns, (2) No test coverage schemas - test-matrix.json and test-data-catalog.json did not exist, coverage tracking manual, (3) Pre-commit hooks do NOT enforce unit test creation - .husky/pre-commit validates patterns and runs affected tests but has no requirement for test existence, (4) No schema-driven automation - qa-framework.json did not exist, no single source of truth for QA configuration, (5) Roadmap deliverables P5a-d7 (E2E suite complete) and P5b-d15 (80% coverage) lack automated validation against test schemas. User explicitly requested: 'roadmap driven approach with schema targets and unit tests leading the way for deliverables. this integrated with qa testing and playwright to close the loop.' Evidence: 467 test files exist with sophisticated E2E configuration (21 Playwright tests, 235 test cases), excellent QA framework documentation (885-line architecture), auth.fixture migration 56% complete (10 of 18 tests), but infrastructure not operational. Root cause: Missing closed-loop automation connecting schemas → pre-commit enforcement → test generation → coverage tracking → roadmap validation.",
+      "decision": "Create comprehensive schema-driven QA framework with three foundational JSON schemas following luh-tech schema-first patterns: (1) apps/mcp-server/data/qa-framework.json - Framework configuration with gradual enforcement phases (warn Dec 18 → block-new Jan 1 → block-all Jan 15), coverage targets (90% unit, 80% component, 75% integration, 95% E2E), test template paths, generator script configurations, pre-commit rules with exemption patterns, roadmap integration for P5a-d7 and P5b-d15 deliverables. (2) apps/mcp-server/data/test-matrix.json - Automated coverage tracking matrix updated post-test-run tracking 4 projects (api-gateway, web-dashboard, mcp-server, shared-libs), milestone targets (Month 1: 30%, Month 2: 60%, Month 6: 85%), current state baseline (13.7% overall, 51% E2E with 10 of 18 tests passing), auto-update triggers (test-complete, post-commit, ci-pipeline). (3) apps/mcp-server/data/test-data-catalog.json - Centralized fixtures catalog with Speckle streams (low/medium/high complexity), mock users (5 roles for auth.fixture), API response fixtures, IFC test files, test database configurations. All schemas validated with JSON parsing. Next: Create test templates (unit/component/integration/e2e), build generator scripts, enhance pre-commit hooks reading from qa-framework.json for gradual enforcement, create roadmap validation scripts checking deliverable completion against test schemas.",
       "rationale": "Aligns with luh-tech schema-first architecture patterns learned from luh-tech repository. JSON becomes single source of truth, markdown auto-generated for human reading only. Gradual enforcement phases (5-week rollout) prevent developer friction while systematically building compliance: Week 1 (Dec 18): WARN mode educates team about missing tests but does not block commits, Week 3 (Jan 1): BLOCK-NEW mode requires tests for new files only (existing code exempt), Week 5 (Jan 15): BLOCK-ALL mode enforces tests for all modified files (zero exemptions). Roadmap integration creates closed loop: Unit tests lead deliverable completion (user requirement), test validation gates P5a-d7 (18/18 Playwright passing) and P5b-d15 (80% coverage requirement), automated validation scripts check schemas vs. roadmap acceptance criteria. Template-based generation accelerates development: 4 test types (unit/component/integration/e2e), composable templates with variables ({{CLASS_NAME}}, {{FILE_NAME}}), generator CLI (pnpm test:generate unit <path>), AI-powered edge case detection in generators. Coverage tracking becomes automated: test-matrix.json updates post-test-run (no manual tracking), weekly snapshots show trend data and growth rate, milestones validate progress (Month 1: 30%, Month 2: 60%, Month 6: 85%). Evidence of need: Current E2E pass rate 51% (10 of 18 tests), overall coverage 13.7%, Phase 1.2 auth fixture migration demonstrates organic adoption slow (56% after significant effort). Enterprise validation: Pattern proven in luh-tech repository, follows schema-standard.json compliance, enables agent-driven CI/CD pipeline (user vision).",
       "status": "implemented",
       "impact": "high",
@@ -959,13 +959,13 @@
           "option": "Schema-Driven QA with Gradual Enforcement (SELECTED)",
           "pros": [
             "JSON as single source of truth (luh-tech schema-first pattern)",
-            "Gradual enforcement prevents developer friction (warn \u2192 block-new \u2192 block-all)",
+            "Gradual enforcement prevents developer friction (warn → block-new → block-all)",
             "Roadmap integration: Tests validate deliverable completion (P5a-d7, P5b-d15)",
             "Automated coverage tracking: test-matrix.json updates post-test-run",
             "Template-based generation: Consistent patterns, faster test creation",
             "Closed-loop system: Schemas drive hooks, automation updates schemas",
             "Industry-aligned: Follows Vitest 2025, Playwright 2025, Nx 2025 patterns",
-            "Scalable: 6-month ramp (30% \u2192 60% \u2192 90% coverage)",
+            "Scalable: 6-month ramp (30% → 60% → 90% coverage)",
             "Traceable: All config versioned in schema-standard.json format"
           ],
           "cons": [
@@ -1001,8 +1001,8 @@
       "decisionId": "d-2025-12-11-typescript-path-resolution-order",
       "timestamp": "2025-12-11T15:30:00Z",
       "title": "Fix TypeScript Path Resolution Order to Prevent Node.js Modules in Browser Builds",
-      "context": "Deploy Staging workflow Run 20118448325 failed with 11 webpack 5 module resolution errors: 'Module not found: Can't resolve os, path, crypto, fs, async_hooks, zlib'. Build logs showed import chain: OwnerDashboard.tsx \u2192 libs/shared/src/utils \u2192 libs/shared/utils/src/index.ts \u2192 logger.ts (winston with Node.js dependencies). Root cause analysis: TypeScript path mappings in apps/web-dashboard/tsconfig.app.json had wildcard pattern @ectropy/shared/* BEFORE specific pattern @ectropy/shared/utils/browser. When dashboard imports '@ectropy/shared/utils/browser', TypeScript matched wildcard @ectropy/shared/* (where * = utils/browser) resolving to libs/shared/src/utils/browser (non-existent), falling back to libs/shared/src/utils/index.ts which exports ALL utilities including server-only winston logger. Webpack 5 removed automatic Node.js polyfills causing build to fail when encountering Node.js core modules in browser bundle. Previous fix attempt (PR #2160, commit dbbd1db5) created browser.ts entry point but did NOT fix path resolution order - incomplete solution.",
-      "decision": "Reorder TypeScript path mappings to place SPECIFIC paths BEFORE wildcard patterns. Modified apps/web-dashboard/tsconfig.app.json paths property to enforce top-to-bottom resolution priority: (1) @ectropy/shared/utils/browser \u2192 libs/shared/utils/src/browser.ts (SPECIFIC, browser-safe), (2) @ectropy/shared/utils \u2192 libs/shared/utils/src/index.ts (SPECIFIC, Node.js-safe), (3) @ectropy/shared/types \u2192 libs/shared/types/src/index.ts (SPECIFIC), (4) @ectropy/shared \u2192 libs/shared/src/index.ts (LESS SPECIFIC), (5) @ectropy/shared/* \u2192 libs/shared/src/* (WILDCARD LAST). Added inline documentation explaining the critical ordering requirement and root cause. Validated fix with production build locally before committing: 'pnpm nx build web-dashboard --configuration=production' compiled successfully in 178s with zero module resolution errors.",
+      "context": "Deploy Staging workflow Run 20118448325 failed with 11 webpack 5 module resolution errors: 'Module not found: Can't resolve os, path, crypto, fs, async_hooks, zlib'. Build logs showed import chain: OwnerDashboard.tsx → libs/shared/src/utils → libs/shared/utils/src/index.ts → logger.ts (winston with Node.js dependencies). Root cause analysis: TypeScript path mappings in apps/web-dashboard/tsconfig.app.json had wildcard pattern @ectropy/shared/* BEFORE specific pattern @ectropy/shared/utils/browser. When dashboard imports '@ectropy/shared/utils/browser', TypeScript matched wildcard @ectropy/shared/* (where * = utils/browser) resolving to libs/shared/src/utils/browser (non-existent), falling back to libs/shared/src/utils/index.ts which exports ALL utilities including server-only winston logger. Webpack 5 removed automatic Node.js polyfills causing build to fail when encountering Node.js core modules in browser bundle. Previous fix attempt (PR #2160, commit dbbd1db5) created browser.ts entry point but did NOT fix path resolution order - incomplete solution.",
+      "decision": "Reorder TypeScript path mappings to place SPECIFIC paths BEFORE wildcard patterns. Modified apps/web-dashboard/tsconfig.app.json paths property to enforce top-to-bottom resolution priority: (1) @ectropy/shared/utils/browser → libs/shared/utils/src/browser.ts (SPECIFIC, browser-safe), (2) @ectropy/shared/utils → libs/shared/utils/src/index.ts (SPECIFIC, Node.js-safe), (3) @ectropy/shared/types → libs/shared/types/src/index.ts (SPECIFIC), (4) @ectropy/shared → libs/shared/src/index.ts (LESS SPECIFIC), (5) @ectropy/shared/* → libs/shared/src/* (WILDCARD LAST). Added inline documentation explaining the critical ordering requirement and root cause. Validated fix with production build locally before committing: 'pnpm nx build web-dashboard --configuration=production' compiled successfully in 178s with zero module resolution errors.",
       "rationale": "TypeScript path resolution evaluates patterns in declaration order. When wildcard @ectropy/shared/* appears BEFORE specific @ectropy/shared/utils/browser, TypeScript matches the wildcard first (greedy matching). The browser-safe entry point exists (libs/shared/utils/src/browser.ts) but was never reached due to path ordering. Previous fix (PR #2160) created the browser.ts file but missed the TypeScript configuration root cause. Evidence from webpack logs confirmed import chain traced through libs/shared/src/utils (wildcard resolution) not libs/shared/utils/src/browser.ts (intended specific resolution). TypeScript handbook section 'Module Resolution' explicitly documents this behavior: 'More specific path mappings should be listed before less specific ones.' Enterprise validation confirmed fix: production build succeeded with zero errors, 655 modules resolved correctly, 1.06MB bundle created. No alternative solutions necessary - reordering paths is the definitive TypeScript-idiomatic fix.",
       "status": "implemented",
       "impact": "critical",
@@ -1168,7 +1168,7 @@
       "decision": "Implement Enterprise Configuration Management Pattern using GitHub Variables as Single Source of Truth. Created 7 repository variables (PROD_BLUE_IP=161.35.226.36, PROD_GREEN_IP=143.198.231.147, PROD_BLUE_DROPLET_ID=534912631, PROD_GREEN_DROPLET_ID=534912633, PROD_LB_ID=f773103b-d40c-43c9-ad8a-fc2cd63f82f1, STAGING_IP=143.198.154.94, RUNNER_IP=165.232.132.224). Updated deploy-production.yml to inject variables as global env (lines 36-42) making them available to all jobs. Updated 8 deployment scripts (deploy-to-server.sh, validate-health.sh, monitor-errors.sh, rollback-server.sh, deploy-to-production-server.sh, rollback-production.sh, switch-production-traffic.sh, failover scripts) to use environment variables with production fallbacks (e.g., BLUE_IP=\"${PROD_BLUE_IP:-161.35.226.36}\"). Updated 2 workflows (deploy-nginx-staging.yml, runner-disk-health.yml) to use variables in documentation and SSH commands. Eliminated 100% of wrong hardcoded IPs (134.199.137.136, 134.199.140.63) - zero instances remain. Pattern enables future IP changes via GitHub UI (Settings > Variables) without code changes, enables disaster recovery server swaps, supports blue-green rotation, and aligns with infrastructure-as-code principles.",
       "alternatives": [
         {
-          "option": "Fix IPs in place (change 134.199.137.136 \u2192 161.35.226.36)",
+          "option": "Fix IPs in place (change 134.199.137.136 → 161.35.226.36)",
           "pros": [
             "Quick 5-minute fix",
             "Unblocks immediate deployment",
@@ -1743,7 +1743,7 @@
       "timestamp": "2025-12-08T17:00:00Z",
       "title": "Workflow Cleanup: Remove 10 Deprecated Workflows and Consolidate Production Deployment",
       "context": "GitHub Actions UI showed 46+ active workflows with additional confusion from 7 archived workflows (in .archive/ subdirectory still visible in UI), 4 manually disabled workflows (already deleted but showing in UI), and 3 duplicate production deployment workflows. Analysis revealed 21% of workflows were deprecated, causing management difficulty and UI clutter. Archive directory created 2025-10-17 with 30-day review period (until 2025-11-16) has passed with no issues reported.",
-      "decision": "Execute comprehensive workflow cleanup: Phase 1 - Delete .archive/ directory (7 workflows: deploy-staging, health-check, playwright-tests, production-gates, provision-staging, test-container-mcp-integration, test-mcp-container) and setup-shared-browser-cache.yml (legacy from self-hosted E2E era). Phase 2 - Consolidate production deployments by retaining deploy-production-enterprise.yml (blue/green deployment) as primary and deleting deploy-production.yml (standard) and deploy-production-phase3.yml (matrix). Total cleanup: 10 workflows deleted (21% reduction: 48 \u2192 38 workflows).",
+      "decision": "Execute comprehensive workflow cleanup: Phase 1 - Delete .archive/ directory (7 workflows: deploy-staging, health-check, playwright-tests, production-gates, provision-staging, test-container-mcp-integration, test-mcp-container) and setup-shared-browser-cache.yml (legacy from self-hosted E2E era). Phase 2 - Consolidate production deployments by retaining deploy-production-enterprise.yml (blue/green deployment) as primary and deleting deploy-production.yml (standard) and deploy-production-phase3.yml (matrix). Total cleanup: 10 workflows deleted (21% reduction: 48 → 38 workflows).",
       "status": "implemented",
       "category": "infrastructure",
       "impact": "high",
@@ -1874,7 +1874,7 @@
       "decisionId": "d-2025-12-08-phase3-transformation-complete",
       "timestamp": "2025-12-08T12:00:00Z",
       "title": "Phase 3 Complete: Enterprise CI/CD Hybrid Runner Transformation Achievement - 87.5% GitHub-Hosted",
-      "context": "Systematic enterprise transformation following decision d-2025-12-07-hybrid-runner-strategy. Migrated 9 workflows across 3 phases (Foundation, Critical Pipelines, Security & Validation) from self-hosted to GitHub-hosted runners. Achieved 68% build time reduction (41min \u2192 14min average), 79% code complexity reduction (625 lines removed), and 60% infrastructure cost reduction. Phase 4 assessment revealed 33 additional workflows already on GitHub-hosted runners, bringing total to 42 of 48 workflows (87.5%). Remaining 6 workflows (12.5%) MUST stay self-hosted due to architectural requirements: SSH access to DigitalOcean droplets (4 deployment workflows) or monitoring the runner itself (2 monitoring workflows). Enterprise patterns established: pnpm + Nx caching, simplified installation, Build Once Deploy Many, hybrid architecture validated.",
+      "context": "Systematic enterprise transformation following decision d-2025-12-07-hybrid-runner-strategy. Migrated 9 workflows across 3 phases (Foundation, Critical Pipelines, Security & Validation) from self-hosted to GitHub-hosted runners. Achieved 68% build time reduction (41min → 14min average), 79% code complexity reduction (625 lines removed), and 60% infrastructure cost reduction. Phase 4 assessment revealed 33 additional workflows already on GitHub-hosted runners, bringing total to 42 of 48 workflows (87.5%). Remaining 6 workflows (12.5%) MUST stay self-hosted due to architectural requirements: SSH access to DigitalOcean droplets (4 deployment workflows) or monitoring the runner itself (2 monitoring workflows). Enterprise patterns established: pnpm + Nx caching, simplified installation, Build Once Deploy Many, hybrid architecture validated.",
       "decision": "DECLARE TRANSFORMATION COMPLETE at 87.5% GitHub-hosted achievement. Remaining 6 self-hosted workflows have valid architectural reasons and should NOT be migrated: (1) runner-health.yml - monitors self-hosted runner health, (2) runner-disk-health.yml - monitors self-hosted runner disk, (3-6) deploy jobs in deploy-staging.yml, deploy-production.yml, deploy-production-enterprise.yml, deploy-production-phase3.yml - require SSH access to DigitalOcean droplets. Hybrid strategy validated as optimal architecture: GitHub-hosted for builds (infinite scaling), self-hosted for SSH deployments. Next phase: Create enterprise composite actions for standardization, then proceed to test infrastructure remediation (Phase 6).",
       "rationale": "Transformation objectives achieved: (1) Build performance target exceeded (< 15min target, 14min achieved), (2) Infrastructure cost target exceeded (50% target, 60% achieved), (3) All migratable workflows migrated (100% of possible migrations complete), (4) Code quality achieved (enterprise templates, 79% complexity reduction), (5) Strategic alignment maintained (100% adherence to MCP strategic data). Further migration would violate architectural constraints (cannot SSH from GitHub-hosted to DigitalOcean, cannot monitor runner from external VM). Status: COMPLETE FOR ALL FEASIBLE WORKFLOWS.",
       "status": "implemented",
@@ -1906,7 +1906,7 @@
       "title": "Hybrid GitHub-Hosted and Self-Hosted Runner Strategy for Enterprise CI/CD Scaling",
       "context": "Production deployment failures due to self-hosted runner resource contention: Run 20014652320 failed with 20-minute timeout and NO OUTPUT during Nx build, load average 4.57-5.87 (CPU saturation) on 8-core runner with 4 concurrent jobs competing for resources. Local build succeeded in 15 seconds proving code was correct but CI infrastructure was the bottleneck. Enterprise analysis revealed monorepo CI anti-pattern: all-self-hosted approach causing systematic performance degradation. Industry research (2025) consensus: 'Default to GitHub-hosted runners unless specific requirements (VPC access, specialized hardware, compliance) necessitate self-hosted.' Cost pressure: Recommended upgrade to 16-core self-hosted runner would cost +$96/month ($192/month total).",
       "decision": "Implement Hybrid Runner Strategy: GitHub-hosted (ubuntu-latest) for all build and validation jobs, self-hosted ([self-hosted, deploy]) for deployment jobs requiring SSH access. Transform deploy-production-phase3.yml (8 jobs) and foundation.yml (4 jobs) to use GitHub-hosted runners for builds, keeping only deploy-production job on self-hosted. Remove runner-specific configurations (cache paths like /opt/runner-cache, cleanup scripts, RUNNER_NAME env vars) and adopt GitHub Actions standard patterns (cache path: ~/.pnpm-store, ephemeral VMs). Reduce build timeouts from 30min to 15min leveraging GitHub-hosted performance. Phase 3: Downsize self-hosted runner from s-8vcpu-16gb-amd (8 vCPUs, $96/month) to s-4vcpu-8gb (4 vCPUs, $48/month) as it only handles deployments. Phase 4: Consolidate from 4 runners to 1 deploy-only runner.",
-      "rationale": "The hybrid strategy addresses the root cause (self-hosted resource contention) while maintaining deployment capability (SSH access to production servers). GitHub's 2025 industry consensus is 'Default to GitHub-hosted unless you need VPC access, specialized hardware, or compliance requirements.' Our build phase has ZERO such requirements - it's pure pnpm install + TypeScript compilation + Docker builds. Our deployment phase DOES require SSH access to DigitalOcean droplets. Perfect use case for hybrid approach. Validation: Foundation Health workflow run 20016102723 proved the strategy with 100% success - api-gateway built in 2m 1s, mcp-server in 1m 57s, web-dashboard in 2m 33s (vs previous 20+ minute timeout). Cost optimization: Downsizing self-hosted runner from 8-core to 4-core ($96\u2192$48/month) achieves 50% savings since it only handles sequential deployment (no concurrency needed).",
+      "rationale": "The hybrid strategy addresses the root cause (self-hosted resource contention) while maintaining deployment capability (SSH access to production servers). GitHub's 2025 industry consensus is 'Default to GitHub-hosted unless you need VPC access, specialized hardware, or compliance requirements.' Our build phase has ZERO such requirements - it's pure pnpm install + TypeScript compilation + Docker builds. Our deployment phase DOES require SSH access to DigitalOcean droplets. Perfect use case for hybrid approach. Validation: Foundation Health workflow run 20016102723 proved the strategy with 100% success - api-gateway built in 2m 1s, mcp-server in 1m 57s, web-dashboard in 2m 33s (vs previous 20+ minute timeout). Cost optimization: Downsizing self-hosted runner from 8-core to 4-core ($96→$48/month) achieves 50% savings since it only handles sequential deployment (no concurrency needed).",
       "status": "implemented",
       "category": "infrastructure",
       "impact": "critical",
@@ -1978,14 +1978,14 @@
             "Reduces contention per runner"
           ],
           "cons": [
-            "Cost multiplication: 4 runners \u00d7 $96/month = $384/month",
+            "Cost multiplication: 4 runners × $96/month = $384/month",
             "Maintenance burden multiplied by 4",
             "Still slower than GitHub-hosted",
             "Complex orchestration",
             "Cache synchronization issues",
             "Security patching on 4 servers"
           ],
-          "estimatedCost": "$384/month (4\u00d7 current cost)",
+          "estimatedCost": "$384/month (4× current cost)",
           "rejectionReason": "Alternative was rejected"
         }
       ],
@@ -2021,7 +2021,7 @@
       "timestamp": "2025-12-07T13:00:00Z",
       "title": "Enterprise CI/CD Transformation - Nx Optimization, E2E Resilience, Build Once Deploy Many",
       "context": "Critical production deployment failures blocking release pipeline with three systemic issues: (1) Build timeouts at 45+ minutes using monolithic `pnpm nx run-many --all` approach, (2) E2E test failures from flaky execution and environment validation, (3) Deployment workflow using legacy monolithic approach instead of Phase 3 matrix architecture. Industry research identified 2025 best practices: Nx distributed caching (60-80% speedup), Playwright multi-level retries for 99%+ reliability, GitHub Actions matrix strategies with blue/green deployments.",
-      "decision": "Implement comprehensive enterprise CI/CD transformation with three core solutions: (1) Nx build optimization - increase parallel execution 3\u21926, enable daemon process, configure persistent cache at /opt/nx-cache, (2) E2E test resilience - multi-level retry strategy with 2 test retries, video/trace on first retry only, 1 worker for resource isolation, comprehensive reporting, (3) Enterprise deployment workflow - Build Once Deploy Many pattern with parallel matrix builds, blue/green zero-downtime deployment, multi-phase validation gates, automatic rollback.",
+      "decision": "Implement comprehensive enterprise CI/CD transformation with three core solutions: (1) Nx build optimization - increase parallel execution 3→6, enable daemon process, configure persistent cache at /opt/nx-cache, (2) E2E test resilience - multi-level retry strategy with 2 test retries, video/trace on first retry only, 1 worker for resource isolation, comprehensive reporting, (3) Enterprise deployment workflow - Build Once Deploy Many pattern with parallel matrix builds, blue/green zero-downtime deployment, multi-phase validation gates, automatic rollback.",
       "rationale": "The selected approach aligns with enterprise principles of addressing root causes rather than symptoms, leveraging industry best practices from 2025 research, and utilizing existing strategic investments (Phase 3 matrix workflow, blue/green infrastructure, documented E2E network idle fix). Incremental patches would perpetuate the 45-minute build timeout crisis and flaky test execution, undermining production confidence and deployment velocity.",
       "status": "implemented",
       "impact": "high",
@@ -2173,7 +2173,7 @@
       "decisionId": "d-2025-12-04-global-multi-tenant-architecture",
       "timestamp": "2025-12-04T00:00:00Z",
       "title": "Global Multi-Tenant Architecture Framework for March 2025 Canada Pilot",
-      "context": "Establish foundation for global construction platform with multi-tenant capabilities, data sovereignty compliance (GDPR, PIPAA, SOC2, PIPEDA), and job.site subdomain provisioning. Business requirements: (1) Shared servers for standard customers with appropriate data backend isolation, (2) Full separate tenant applications for compliance-driven customers (GDPR, HIPAA, SOC2), (3) job.site subdomain feature allowing customers to visit website \u2192 view demo \u2192 sign up \u2192 provision tenant with URL pattern [project_name].job.site, (4) March 2025 Canada pilot requiring PIPEDA compliance with Toronto data residency. Current infrastructure: 4 droplets (runner 16GB $96/mo, staging 4GB $24/mo, production 2x8GB $96/mo) totaling ~$228/month. Need scalable architecture from 0 to global expansion without premature infrastructure provisioning.",
+      "context": "Establish foundation for global construction platform with multi-tenant capabilities, data sovereignty compliance (GDPR, PIPAA, SOC2, PIPEDA), and job.site subdomain provisioning. Business requirements: (1) Shared servers for standard customers with appropriate data backend isolation, (2) Full separate tenant applications for compliance-driven customers (GDPR, HIPAA, SOC2), (3) job.site subdomain feature allowing customers to visit website → view demo → sign up → provision tenant with URL pattern [project_name].job.site, (4) March 2025 Canada pilot requiring PIPEDA compliance with Toronto data residency. Current infrastructure: 4 droplets (runner 16GB $96/mo, staging 4GB $24/mo, production 2x8GB $96/mo) totaling ~$228/month. Need scalable architecture from 0 to global expansion without premature infrastructure provisioning.",
       "decision": "Implement three-tier multi-tenant architecture: (1) Schema-Per-Tenant for MVP and standard customers (Feb 2025), (2) Database-Per-Tenant for Canada Pilot and compliance-driven customers (Mar 2025), (3) Dedicated Infrastructure framework for future enterprise customers (Q3 2025+). job.site subdomain provisioning service (port 4003) for dynamic DNS, SSL automation, and tenant isolation.",
       "rationale": "Three-tier approach balances cost efficiency, compliance requirements, and scalability. Schema-per-tenant provides $0 incremental cost for initial 10-50 customers, enabling rapid customer acquisition. Database-per-tenant enables March 2025 Canada pilot with PIPEDA compliance (Toronto TOR1 data residency, 7-year audit retention, cross-border data restrictions). Dedicated infrastructure framework establishes future path for enterprise customers without premature provisioning. Created comprehensive 1000+ line strategic framework (evidence/2025-12/global-multi-tenant-architecture-framework-2025-12-04.md), Terraform tenant provisioning modules (infrastructure/terraform/modules/tenant/), and Canada pilot configuration (infrastructure/terraform/tenants/canada/) as commented stubs ready for execution. Subdomain provisioner service already planned in architecture-roadmap.json (port 4003, deliverable p5b-d19) - will be enhanced with multi-tenant provisioning logic.",
       "status": "approved",
@@ -2296,7 +2296,7 @@
         {
           "timestamp": "2025-12-04T00:00:00Z",
           "author": "claude-code",
-          "note": "IMPLEMENTATION ROADMAP: Phase 1 (Dec 2024) - Framework documented \u2705. Phase 2 (Jan 2025) - Development environment. Phase 3 (Feb 2025) - Schema-per-tenant RLS implementation. Phase 4 (Mar 2025) - Canada pilot database-per-tenant provisioning. Phase 5 (Q2-Q3 2025) - Global expansion (EU, UK, APAC)."
+          "note": "IMPLEMENTATION ROADMAP: Phase 1 (Dec 2024) - Framework documented ✅. Phase 2 (Jan 2025) - Development environment. Phase 3 (Feb 2025) - Schema-per-tenant RLS implementation. Phase 4 (Mar 2025) - Canada pilot database-per-tenant provisioning. Phase 5 (Q2-Q3 2025) - Global expansion (EU, UK, APAC)."
         }
       ]
     },
@@ -3028,7 +3028,7 @@
       "title": "Speckle BIM Viewer Environment Configuration - Webpack DefinePlugin, CORS, and Build-Time Variable Injection",
       "context": "After successful Speckle server setup and IFC file conversion (stream ba889eb497, object 9f901ec5b2eb38ff69552254ab6211c0), the BIM viewer and role switcher were non-functional. OAuth worked, but environment variables (REACT_APP_DEMO_SPECKLE_STREAM_ID, REACT_APP_DEMO_SPECKLE_OBJECT_ID, REACT_APP_SPECKLE_FRONTEND_PORT) were not being injected into the React build. Root causes: (1) NX Webpack doesn't automatically inject REACT_APP_ variables like Create React App, (2) CORS not configured for cross-origin requests to API Gateway and Speckle server, (3) Environment variable naming confusion between MCP server URL and Speckle frontend URL.",
       "decision": "Enterprise Build-Time Variable Injection with CORS Configuration",
-      "rationale": "User explicitly stated: 'please slow down, this is enterprise work built for scaling, no patches, no quick fixes' and 'We need to make sure we are addressing these build issues, rebuild if necessary. pause and do analysis if needed to properly apply enterprise core solutions'. Enterprise solution required four coordinated fixes: (1) Added webpack.DefinePlugin to apps/web-dashboard/webpack.config.cjs (lines 18-28) to inject REACT_APP_ environment variables during build, matching Create React App behavior. (2) Updated apps/web-dashboard/Dockerfile to accept build args (ARG) and convert to environment variables (ENV) for build-time availability. (3) Updated docker-compose.development.yml to pass environment variables as build args. (4) Added CORS middleware to apps/api-gateway/src/main.ts (lines 351-364) allowing cross-origin requests from localhost:3000 and localhost:8080. (5) Added CORS_ORIGIN to Speckle server in docker-compose.development.yml. (6) Fixed environment variable naming confusion: REACT_APP_SPECKLE_SERVER_URL \u2192 REACT_APP_SPECKLE_FRONTEND_PORT to clarify that speckleServerUrl in config.ts points to MCP server (localhost:3002), not Speckle frontend (localhost:8080). Full rebuild verified environment variables present in bundle (grep confirmed stream ID ba889eb497 in main.d545acc20aaeb18d.js).",
+      "rationale": "User explicitly stated: 'please slow down, this is enterprise work built for scaling, no patches, no quick fixes' and 'We need to make sure we are addressing these build issues, rebuild if necessary. pause and do analysis if needed to properly apply enterprise core solutions'. Enterprise solution required four coordinated fixes: (1) Added webpack.DefinePlugin to apps/web-dashboard/webpack.config.cjs (lines 18-28) to inject REACT_APP_ environment variables during build, matching Create React App behavior. (2) Updated apps/web-dashboard/Dockerfile to accept build args (ARG) and convert to environment variables (ENV) for build-time availability. (3) Updated docker-compose.development.yml to pass environment variables as build args. (4) Added CORS middleware to apps/api-gateway/src/main.ts (lines 351-364) allowing cross-origin requests from localhost:3000 and localhost:8080. (5) Added CORS_ORIGIN to Speckle server in docker-compose.development.yml. (6) Fixed environment variable naming confusion: REACT_APP_SPECKLE_SERVER_URL → REACT_APP_SPECKLE_FRONTEND_PORT to clarify that speckleServerUrl in config.ts points to MCP server (localhost:3002), not Speckle frontend (localhost:8080). Full rebuild verified environment variables present in bundle (grep confirmed stream ID ba889eb497 in main.d545acc20aaeb18d.js).",
       "status": "implemented",
       "category": "infrastructure",
       "impact": "critical",
@@ -3155,9 +3155,9 @@
       "decisionId": "d-2025-11-18-staging-validation-workflow-health",
       "timestamp": "2025-11-18T18:05:00Z",
       "title": "Staging Deployment Validation & Workflow Health Assessment - Production Readiness Confirmed",
-      "context": "Staging deployment Run #19475435393 executing after Phase 1 composite action migration (v2.4.0). Need to validate deployment health, assess Foundation Health failures on main branch (5 consecutive failures), analyze develop\u2192main diff safety, and confirm production readiness. Enterprise strategy requires full workflow stabilization and alignment before production deployment.",
+      "context": "Staging deployment Run #19475435393 executing after Phase 1 composite action migration (v2.4.0). Need to validate deployment health, assess Foundation Health failures on main branch (5 consecutive failures), analyze develop→main diff safety, and confirm production readiness. Enterprise strategy requires full workflow stabilization and alignment before production deployment.",
       "decision": "Comprehensive Staging Validation & Root Cause Analysis",
-      "rationale": "Conducted full enterprise assessment. Staging deployment Run #19475435393 achieved 100% infrastructure success: Web Dashboard (200 OK), API Gateway (200 OK), MCP Server (200 OK). File permission fix validated (755 dirs, 644 files). Build pipeline 100% success across all phases. Foundation Health failures on main caused by OAuth secret naming mismatch (main uses deprecated GOOGLE_CLIENT_ID, develop uses normalized GOOGLE_CLIENT_ID_DEVELOPMENT). Validation composite action correctly detecting missing secrets - working as designed. Develop\u2192main diff analysis: only 3 documentation files added, zero breaking changes. E2E OAuth timeout identified as test environment timing issue, not infrastructure blocker. Production readiness confirmed: staging infrastructure 100% healthy, deployment pipeline validated, atomic deployment process working (4m21s). No infrastructure blockers identified.",
+      "rationale": "Conducted full enterprise assessment. Staging deployment Run #19475435393 achieved 100% infrastructure success: Web Dashboard (200 OK), API Gateway (200 OK), MCP Server (200 OK). File permission fix validated (755 dirs, 644 files). Build pipeline 100% success across all phases. Foundation Health failures on main caused by OAuth secret naming mismatch (main uses deprecated GOOGLE_CLIENT_ID, develop uses normalized GOOGLE_CLIENT_ID_DEVELOPMENT). Validation composite action correctly detecting missing secrets - working as designed. Develop→main diff analysis: only 3 documentation files added, zero breaking changes. E2E OAuth timeout identified as test environment timing issue, not infrastructure blocker. Production readiness confirmed: staging infrastructure 100% healthy, deployment pipeline validated, atomic deployment process working (4m21s). No infrastructure blockers identified.",
       "status": "implemented",
       "category": "infrastructure",
       "impact": "critical",
@@ -3170,7 +3170,7 @@
           ],
           "cons": [
             "Unknown Foundation Health root cause on main",
-            "Potential breaking changes in develop\u2192main diff",
+            "Potential breaking changes in develop→main diff",
             "No validation of recent infrastructure fixes",
             "Risk of production deployment failure"
           ],
@@ -3182,7 +3182,7 @@
           "pros": [
             "Validates all infrastructure services operational",
             "Identifies Foundation Health root cause",
-            "Confirms develop\u2192main diff safety",
+            "Confirms develop→main diff safety",
             "Documents production readiness blockers",
             "Enterprise-grade evidence trail",
             "Prevents production incidents"
@@ -3212,7 +3212,7 @@
         "GitHub Actions Run #19475435393",
         "Live infrastructure health checks (curl staging.ectropy.ai)",
         "Foundation Health workflow analysis (.github/workflows/foundation.yml)",
-        "Develop\u2192main diff analysis (git diff develop...main)",
+        "Develop→main diff analysis (git diff develop...main)",
         "Infrastructure Catalog v2.5.0",
         "OAuth validation composite action logs"
       ],
@@ -3235,7 +3235,7 @@
         {
           "timestamp": "2025-11-18T18:05:00Z",
           "author": "claude-code",
-          "note": "Staging deployment successful. All services operational. Foundation Health failures on main are expected (OAuth secret naming mismatch, will be resolved on merge). Develop\u2192main merge safe with zero breaking changes. Production deployment approved from infrastructure perspective."
+          "note": "Staging deployment successful. All services operational. Foundation Health failures on main are expected (OAuth secret naming mismatch, will be resolved on merge). Develop→main merge safe with zero breaking changes. Production deployment approved from infrastructure perspective."
         },
         {
           "timestamp": "2025-11-18T18:05:00Z",
@@ -3250,7 +3250,7 @@
       "title": "SSH Composite Action Migration Reversal - Trap Handler Incompatibility",
       "context": "Created .github/actions/ssh-deploy composite action in v2.2.0 with plan to migrate deploy-staging, deploy-production, hotfix, and rollback workflows. Composite action uses trap handlers (EXIT/INT/TERM) for guaranteed SSH key cleanup. Enterprise research during v2.3.0 composite action migration validation revealed critical incompatibility with multi-step SSH workflows.",
       "decision": "Abandon ssh-deploy Migration (Research-Validated)",
-      "rationale": "Enterprise best practices research for v2.3.0 composite action migration revealed trap handlers in composite actions fire at END of action, not end of job. Deploy-staging.yml has 6+ sequential SSH steps requiring persistent SSH keys throughout job. Migrating to ssh-deploy would break all deployment workflows. Current pattern (manual SSH setup + if: always() cleanup) is correct and working. SSH-deploy composite action validated as CORRECT design for single-command SSH deployments (e.g., hotfix, rollback candidates) but INCOMPATIBLE with multi-step workflows. Research evidence documented in COMPOSITE-ACTION-MIGRATION-VALIDATION-2025-11-18.md. 75% of Node.js jobs use self-hosted runners requiring specialized patterns. Enterprise rigor: research \u2192 validate \u2192 execute only when safe.",
+      "rationale": "Enterprise best practices research for v2.3.0 composite action migration revealed trap handlers in composite actions fire at END of action, not end of job. Deploy-staging.yml has 6+ sequential SSH steps requiring persistent SSH keys throughout job. Migrating to ssh-deploy would break all deployment workflows. Current pattern (manual SSH setup + if: always() cleanup) is correct and working. SSH-deploy composite action validated as CORRECT design for single-command SSH deployments (e.g., hotfix, rollback candidates) but INCOMPATIBLE with multi-step workflows. Research evidence documented in COMPOSITE-ACTION-MIGRATION-VALIDATION-2025-11-18.md. 75% of Node.js jobs use self-hosted runners requiring specialized patterns. Enterprise rigor: research → validate → execute only when safe.",
       "status": "implemented",
       "category": "architecture",
       "impact": "high",
@@ -3350,7 +3350,7 @@
       "title": "Evidence Directory Automation - Template-Driven Knowledge Management",
       "context": "Evidence directory had 702+ fragmented files across root and subdirectories with inconsistent structure. No machine-readable format. Manual session documentation taking 45 minutes per session with high error rate and drift risk. Sessions not queryable by MCP GraphQL layer, limiting decision intelligence capabilities.",
       "decision": "Template-Driven Automation with MCP Integration",
-      "rationale": "84% time reduction (45\u21927 min) with 1,689% ROI. Organized 152 sessions (702+ files) into standardized structure. Generated evidence.json for 150 sessions, synced 19 critical sessions to MCP (29\u219248 GraphQL queryable nodes). Scripts: create-evidence-session.sh (session creation), evidence-to-json.js (README\u2192JSON), sync-to-mcp.js (MCP integration), cleanup-october.sh + cleanup-all-evidence.sh (organization). Automated validation prevents drift. Tiered retention policies (90/180/365 days by category) enable intelligent archival.",
+      "rationale": "84% time reduction (45→7 min) with 1,689% ROI. Organized 152 sessions (702+ files) into standardized structure. Generated evidence.json for 150 sessions, synced 19 critical sessions to MCP (29→48 GraphQL queryable nodes). Scripts: create-evidence-session.sh (session creation), evidence-to-json.js (README→JSON), sync-to-mcp.js (MCP integration), cleanup-october.sh + cleanup-all-evidence.sh (organization). Automated validation prevents drift. Tiered retention policies (90/180/365 days by category) enable intelligent archival.",
       "status": "implemented",
       "category": "infrastructure",
       "impact": "critical",
@@ -3378,7 +3378,7 @@
         {
           "option": "Template-Driven Automation with MCP Integration",
           "pros": [
-            "84% time savings (45\u21927 min per session)",
+            "84% time savings (45→7 min per session)",
             "100% structure consistency",
             "GraphQL queryable via evidence.json",
             "Automated validation",
@@ -3526,7 +3526,7 @@
         {
           "timestamp": "2025-11-15T00:00:00Z",
           "author": "erik-luhtech",
-          "note": "Evidence.json structure validated across 150 sessions. Schema includes full session lifecycle (context\u2192approach\u2192outcome\u2192evidence\u2192relationships\u2192retention). MCP integration tested with 48 queryable nodes."
+          "note": "Evidence.json structure validated across 150 sessions. Schema includes full session lifecycle (context→approach→outcome→evidence→relationships→retention). MCP integration tested with 48 queryable nodes."
         }
       ]
     },
@@ -3662,7 +3662,7 @@
             "New database service required (+1 service)",
             "GPL v3 license (copyleft concerns)",
             "Java-based (stack fragmentation)",
-            "Data migration required (JSON \u2192 graph)",
+            "Data migration required (JSON → graph)",
             "+$24-65/month infrastructure cost",
             "15-20 days development time",
             "Complex OSS distribution"
@@ -3697,7 +3697,7 @@
         {
           "timestamp": "2025-11-11T15:30:00Z",
           "author": "erik-luhtech",
-          "note": "Decision made after comprehensive analysis. Apollo provides immediate value, Neo4j remains option for Phase 6+ if graph complexity justifies. Migration path: Apollo resolvers \u2192 Neo4j backend (incremental)."
+          "note": "Decision made after comprehensive analysis. Apollo provides immediate value, Neo4j remains option for Phase 6+ if graph complexity justifies. Migration path: Apollo resolvers → Neo4j backend (incremental)."
         }
       ]
     },
@@ -3707,7 +3707,7 @@
       "title": "OAuth Restoration - Fix Frontend-Backend Path Mismatch and Environment Variable Configuration",
       "context": "OAuth authentication was completely non-functional on staging.ectropy.ai for approximately one month. Users could not authenticate via Google OAuth, resulting in 404 errors on OAuth endpoints and redirect_uri_mismatch errors from Google. Staging environment was unusable for testing. Root causes: (1) Frontend requesting OAuth at /auth/*, backend serving at /api/auth/* (path migration not propagated to frontend), (2) Docker Compose used OAUTH_REDIRECT_URI but API Gateway config expected OAUTH_CALLBACK_URL, causing fallback to default localhost callback URL.",
       "decision": "Comprehensive Fix: Frontend Paths + Environment Variable + Google Console + Nginx Deployment",
-      "rationale": "OAuth is critical infrastructure (authentication success rate 0% \u2192 100%). Partial fixes would leave system broken. Four-part fix required: (1) Update frontend OAuth paths from /auth/* to /api/auth/* in config.ts:161,165 and useAuth.tsx:61,140,365,376, (2) Rename OAUTH_REDIRECT_URI to OAUTH_CALLBACK_URL in docker-compose.staging.yml:31 to match backend config schema, (3) Update Google Cloud Console redirect URIs to use /api/auth/google/callback, (4) Deploy web-dashboard bundle from Docker container to nginx filesystem. Comprehensive approach ensures OAuth flow works end-to-end and establishes deployment patterns for future fixes.",
+      "rationale": "OAuth is critical infrastructure (authentication success rate 0% → 100%). Partial fixes would leave system broken. Four-part fix required: (1) Update frontend OAuth paths from /auth/* to /api/auth/* in config.ts:161,165 and useAuth.tsx:61,140,365,376, (2) Rename OAUTH_REDIRECT_URI to OAUTH_CALLBACK_URL in docker-compose.staging.yml:31 to match backend config schema, (3) Update Google Cloud Console redirect URIs to use /api/auth/google/callback, (4) Deploy web-dashboard bundle from Docker container to nginx filesystem. Comprehensive approach ensures OAuth flow works end-to-end and establishes deployment patterns for future fixes.",
       "status": "implemented",
       "category": "infrastructure",
       "impact": "critical",
@@ -4279,7 +4279,7 @@
       "title": "Use Speckle for BIM Data Integration (Remove DXF Parser)",
       "context": "Need professional-grade BIM file support (IFC, Revit, Rhino, AutoCAD). DXF parser (dxf-parser) has webpack issues, limited format support, maintenance burden. Speckle provides industry-standard solution.",
       "decision": "Use Speckle Integration",
-      "rationale": "Professional-grade BIM support across all major formats (IFC, Revit, Rhino, AutoCAD). Industry standard with active development. DXF \u2192 IFC conversion is standard workflow. Removes webpack issues and maintenance burden.",
+      "rationale": "Professional-grade BIM support across all major formats (IFC, Revit, Rhino, AutoCAD). Industry standard with active development. DXF → IFC conversion is standard workflow. Removes webpack issues and maintenance burden.",
       "status": "implemented",
       "category": "architecture",
       "impact": "high",
@@ -4675,7 +4675,7 @@
       "timestamp": "2025-12-09T15:00:00Z",
       "title": "P1 CRITICAL: E2E Secret Validation Early Exit Bug Fix",
       "context": "Critical fix for E2E test pipeline failing at secret validation step with 20% success rate. Bash 'set -e' flag causing immediate exit on first missing secret, preventing comprehensive validation diagnostics and causing false positive pipeline failures.",
-      "decision": "{\"approach\":\"Remove 'set -e' flag while preserving 'set -uo pipefail'\",\"changes\":\"Line 2: set -euo pipefail \u2192 set -uo pipefail\",\"rationale\":\"Script already has proper error accumulation (MISSING/EMPTY arrays) and explicit exit at end with full diagnostics\",\"implementation\":\"Immediate (emergency P1 fix)\"}",
+      "decision": "{\"approach\":\"Remove 'set -e' flag while preserving 'set -uo pipefail'\",\"changes\":\"Line 2: set -euo pipefail → set -uo pipefail\",\"rationale\":\"Script already has proper error accumulation (MISSING/EMPTY arrays) and explicit exit at end with full diagnostics\",\"implementation\":\"Immediate (emergency P1 fix)\"}",
       "rationale": "The validation script should check ALL secrets and variables before failing, providing complete diagnostic information. Early exit on first error makes debugging difficult and causes unnecessary pipeline failures when optional secrets are missing but required ones are present.",
       "status": "implemented",
       "impact": "high",
@@ -4728,7 +4728,7 @@
         "Report: evidence/ENTERPRISE_FIXES_COMPLETED_2025-12-09.md (lines 80-127)",
         "Historical precedent: Identical fix in deployment validation (commit c835479f)",
         "Validation: E2E workflow run #20069664670 (4/4 shards passing)",
-        "Success rate: Before 20% \u2192 After 100%"
+        "Success rate: Before 20% → After 100%"
       ],
       "relatedDecisions": [
         "d-2025-12-09-production-readiness-go-decision"
@@ -4835,8 +4835,8 @@
     {
       "decisionId": "d-2026-03-20-job-site-subdomain-provisioning",
       "timestamp": "2026-03-20T00:00:00Z",
-      "title": "job.site Subdomain Provisioning \u2014 MVP Architecture and Slug Convention",
-      "context": "Every Ectropy construction project requires tenant isolation at the URL level. The architecture spec (p5b-d11, port 4003) calls for a subdomain-provisioner service. The Canadian Board Line Plant Project is the first real physical pilot and requires a live URL before handoff. The demo sequence must include a live provisioning event \u2014 the client watches their URL appear. A slug naming convention is needed to prevent future naming conflicts and establish the multi-tenant pattern across the platform. Canadian clients require PIPEDA compliance (TOR1 region).",
+      "title": "job.site Subdomain Provisioning — MVP Architecture and Slug Convention",
+      "context": "Every Ectropy construction project requires tenant isolation at the URL level. The architecture spec (p5b-d11, port 4003) calls for a subdomain-provisioner service. The Canadian Board Line Plant Project is the first real physical pilot and requires a live URL before handoff. The demo sequence must include a live provisioning event — the client watches their URL appear. A slug naming convention is needed to prevent future naming conflicts and establish the multi-tenant pattern across the platform. Canadian clients require PIPEDA compliance (TOR1 region).",
       "alternatives": [
         {
           "option": "Manual DNS bridge (Cloudflare A-record + nginx vhost, scripted)",
@@ -4856,7 +4856,7 @@
         {
           "option": "Subdomain Provisioner MVP (Cloudflare API + nginx writer + DB tenant)",
           "pros": [
-            "Live demo moment \u2014 client watches their URL provisioned",
+            "Live demo moment — client watches their URL provisioned",
             "Replicable for every future project",
             "Establishes canonical slug convention",
             "Proves multi-tenant enterprise architecture"
@@ -4921,8 +4921,8 @@
     {
       "decisionId": "d-2026-03-20-demo-bundle-cache-architecture",
       "timestamp": "2026-03-20T12:00:00Z",
-      "title": "Demo Bundle Cache Architecture \u2014 Project Type Namespacing and S3-Backed Templates",
-      "context": "DEC-005 established the subdomain provisioner MVP and the first tenant slug (inca-boardline-alberta.job.site). As that architecture was reviewed, a deeper pattern emerged: the slug is not merely a URL identifier \u2014 it is a project TYPE namespace. 'boardline' represents a reusable construction template (IFC files, seed decisions, voxel scenarios, authority cascade configuration) that any future board line plant client would need. Without a bundle architecture, each new client requires manual IFC upload, manual seed, and manual demo setup \u2014 not scalable. Additionally, partners (lumber companies, industrial contractors) will contribute their own project types as bundles. The demo must be architecturally identical to real projects \u2014 not a separate system. Self-serve users need a path to provision from templates without operator involvement.",
+      "title": "Demo Bundle Cache Architecture — Project Type Namespacing and S3-Backed Templates",
+      "context": "DEC-005 established the subdomain provisioner MVP and the first tenant slug (inca-boardline-alberta.job.site). As that architecture was reviewed, a deeper pattern emerged: the slug is not merely a URL identifier — it is a project TYPE namespace. 'boardline' represents a reusable construction template (IFC files, seed decisions, voxel scenarios, authority cascade configuration) that any future board line plant client would need. Without a bundle architecture, each new client requires manual IFC upload, manual seed, and manual demo setup — not scalable. Additionally, partners (lumber companies, industrial contractors) will contribute their own project types as bundles. The demo must be architecturally identical to real projects — not a separate system. Self-serve users need a path to provision from templates without operator involvement.",
       "alternatives": [
         {
           "option": "Hardcoded seed per tenant (current interim approach)",
@@ -4932,7 +4932,7 @@
             "Works for single pilot"
           ],
           "cons": [
-            "Not replicable \u2014 every new client requires manual work",
+            "Not replicable — every new client requires manual work",
             "Demo and real projects diverge architecturally",
             "Partners cannot contribute project types",
             "No self-serve path"
@@ -4943,7 +4943,7 @@
         {
           "option": "Demo Bundle Cache Architecture (this decision)",
           "pros": [
-            "Replicable \u2014 provisioner clones bundle per tenant",
+            "Replicable — provisioner clones bundle per tenant",
             "Demo is architecturally identical to real projects",
             "Partners contribute bundles to shared library",
             "Self-serve path: user picks type, provisioner clones bundle",
@@ -4959,8 +4959,8 @@
           "riskLevel": "medium"
         }
       ],
-      "decision": "Adopt the Demo Bundle Cache Architecture. Project types are namespaced as {instance}.{project-type}.job.site. The provisioner reads a bundle from DO Spaces (/project-bundles/{project-type}/) containing: manifest.json, IFC assets, Speckle stream config, and seed data (decisions, voxels, authority cascade). The provisioner clones the bundle per tenant. The demo instance is demo.{project-type}.job.site \u2014 architecturally identical to any client instance. The current seed script (seed-canadian-pilot-demo.ts) is the interim bridge until the bundle reader is built.",
-      "rationale": "The slug namespace makes every project type a reusable template. 'boardline' as a type means: Inca Alberta, every future board line plant client, and the live demo all provision from the same bundle \u2014 same IFC, same decision scenarios, same voxel layout, different tenant ID. Partners who want their project type on the platform contribute a bundle PR. Self-serve users pick a type and provision their instance. The demo is always live at demo.boardline.job.site as proof the platform works. This is the architecture that scales from one pilot to a global platform.",
+      "decision": "Adopt the Demo Bundle Cache Architecture. Project types are namespaced as {instance}.{project-type}.job.site. The provisioner reads a bundle from DO Spaces (/project-bundles/{project-type}/) containing: manifest.json, IFC assets, Speckle stream config, and seed data (decisions, voxels, authority cascade). The provisioner clones the bundle per tenant. The demo instance is demo.{project-type}.job.site — architecturally identical to any client instance. The current seed script (seed-canadian-pilot-demo.ts) is the interim bridge until the bundle reader is built.",
+      "rationale": "The slug namespace makes every project type a reusable template. 'boardline' as a type means: Inca Alberta, every future board line plant client, and the live demo all provision from the same bundle — same IFC, same decision scenarios, same voxel layout, different tenant ID. Partners who want their project type on the platform contribute a bundle PR. Self-serve users pick a type and provision their instance. The demo is always live at demo.boardline.job.site as proof the platform works. This is the architecture that scales from one pilot to a global platform.",
       "status": "approved",
       "category": "architecture",
       "impact": "critical",
@@ -4998,12 +4998,12 @@
       "decisionId": "d-2026-03-21-platform-architecture-server-tenant-mcp",
       "timestamp": "2026-03-21T00:00:00Z",
       "title": "Platform Architecture: Server Topology, Tenant Model, Template Library, and MCP Agent Split",
-      "context": "As the platform matured toward the Canadian pilot and multi-tenant production, several architectural questions required a single coherent decision: how servers are typed and named, how tenants are partitioned across tiers, where demo/template data lives, and most critically \u2014 how the MCP intelligence layer is split between construction-scoped SEPPA and platform-scoped governance tools. Without this decision, data drift between tenant spaces was producing incorrect SEPPA responses (surfacing codebase architecture decisions instead of construction PM decisions), and the template library had no clear home. The fork model for venture agents also needed to be established before other ventures built their own SEPPA instances.",
+      "context": "As the platform matured toward the Canadian pilot and multi-tenant production, several architectural questions required a single coherent decision: how servers are typed and named, how tenants are partitioned across tiers, where demo/template data lives, and most critically — how the MCP intelligence layer is split between construction-scoped SEPPA and platform-scoped governance tools. Without this decision, data drift between tenant spaces was producing incorrect SEPPA responses (surfacing codebase architecture decisions instead of construction PM decisions), and the template library had no clear home. The fork model for venture agents also needed to be established before other ventures built their own SEPPA instances.",
       "constraints": [
-        "ectropy-ai/platform is open core (Apache 2.0) \u2014 no LuhTech proprietary data or tooling",
+        "ectropy-ai/platform is open core (Apache 2.0) — no LuhTech proprietary data or tooling",
         "Construction tenant data must never cross tenant boundaries",
         "Platform governance data (.roadmap) must never be accessible to construction field users",
-        "Template library must be schema-level only at Stage 1 \u2014 no raw construction data",
+        "Template library must be schema-level only at Stage 1 — no raw construction data",
         "Data-level sharing (DAO/smart contracts) is explicitly deferred to a future decision"
       ],
       "alternatives": [
@@ -5014,7 +5014,7 @@
             "Simpler deployment"
           ],
           "cons": [
-            "Permission gates are fragile \u2014 a misconfiguration exposes platform data to tenants",
+            "Permission gates are fragile — a misconfiguration exposes platform data to tenants",
             "Cannot be open-sourced without leaking LuhTech proprietary tooling",
             "Conflates construction intelligence with platform governance permanently"
           ],
@@ -5024,9 +5024,9 @@
         {
           "option": "Three MCP agents in three repos with hard data domain separation (this decision)",
           "pros": [
-            "SEPPA in open core \u2014 forkable by ventures and community",
-            "Platform governance tools in private repos \u2014 LuhTech IP protected",
-            "Hard data boundary \u2014 construction tenant data physically cannot reach platform tools",
+            "SEPPA in open core — forkable by ventures and community",
+            "Platform governance tools in private repos — LuhTech IP protected",
+            "Hard data boundary — construction tenant data physically cannot reach platform tools",
             "Clean fork model for venture agents"
           ],
           "cons": [
@@ -5038,7 +5038,7 @@
         }
       ],
       "decision": "Adopt a three-MCP, three-repo, three-data-domain architecture. Four server types with explicit URL patterns. Three tenant tiers with distinct isolation models. Template library in DO Spaces at schema level only. Community sharing opted-in at schema level, curated before S3 promotion. Data-level sharing deferred to DAO/smart contract decision.",
-      "rationale": "Hard data domain separation between construction intelligence (tenant-scoped, open core) and platform governance (LuhTech-internal, private) is the only model that can be open-sourced safely, forked cleanly by ventures, and scaled to multi-tenant production without risk of cross-tenant data exposure. The template library in S3 avoids the antipattern of a 'demo tenant' in the DB \u2014 templates are schema artifacts, not tenant data. The fork model makes SEPPA in ectropy-ai/platform the canonical pattern for every venture intelligence agent.",
+      "rationale": "Hard data domain separation between construction intelligence (tenant-scoped, open core) and platform governance (LuhTech-internal, private) is the only model that can be open-sourced safely, forked cleanly by ventures, and scaled to multi-tenant production without risk of cross-tenant data exposure. The template library in S3 avoids the antipattern of a 'demo tenant' in the DB — templates are schema artifacts, not tenant data. The fork model makes SEPPA in ectropy-ai/platform the canonical pattern for every venture intelligence agent.",
       "status": "approved",
       "category": "architecture",
       "impact": "critical",
@@ -5053,7 +5053,7 @@
         "console.ectropy.ai"
       ],
       "evidence": [
-        "Session conversation 2026-03-21 \u2014 strategic alignment discussion",
+        "Session conversation 2026-03-21 — strategic alignment discussion",
         "LUHTECH-DEC-005-JOB-SITE-PROVISIONING-2026-03-20.md",
         ".roadmap/evidence/2026-03/BIM-VIEWER-LIVE-2026-03-20.md"
       ],
@@ -5108,11 +5108,11 @@
         },
         "mcpAgents": {
           "mcpConstruction": {
-            "name": "SEPPA \u2014 Construction Intelligence",
+            "name": "SEPPA — Construction Intelligence",
             "repo": "ectropy-ai/platform (open core, Apache 2.0)",
             "path": "apps/mcp-server/",
-            "auth": "tenantId from JWT \u2014 hard RLS boundary",
-            "dataScope": "pmDecision, Voxel, Inspection, AuthorityLevel \u2014 scoped to one tenant+project",
+            "auth": "tenantId from JWT — hard RLS boundary",
+            "dataScope": "pmDecision, Voxel, Inspection, AuthorityLevel — scoped to one tenant+project",
             "cannotAccess": [
               ".roadmap files",
               "venture data",
@@ -5125,14 +5125,14 @@
             ],
             "forkModel": "canonical pattern for all venture intelligence agents",
             "forks": [
-              "jobsitecontrol \u2014 edge-aware, offline-capable",
-              "qullqa \u2014 cloud-first, BYOD",
-              "viiva \u2014 manufacturing extension",
-              "hilja \u2014 sensor layer"
+              "jobsitecontrol — edge-aware, offline-capable",
+              "qullqa — cloud-first, BYOD",
+              "viiva — manufacturing extension",
+              "hilja — sensor layer"
             ]
           },
           "mcpEctropyBusiness": {
-            "name": "Code Guidance Agent \u2014 Ectropy Platform",
+            "name": "Code Guidance Agent — Ectropy Platform",
             "repo": "luh-tech/Ectropy-Business (private)",
             "path": "apps/platform-mcp/",
             "auth": "isPlatformAdmin = true",
@@ -5142,7 +5142,7 @@
               "construction tenant data"
             ],
             "surfaces": [
-              "console.ectropy.ai \u2014 developer mode"
+              "console.ectropy.ai — developer mode"
             ]
           },
           "mcpLuhtechPortfolio": {
@@ -5156,20 +5156,20 @@
               "construction tenant data"
             ],
             "surfaces": [
-              "console.ectropy.ai \u2014 portfolio mode",
+              "console.ectropy.ai — portfolio mode",
               "dash.luh.tech",
               "invest.luh.tech"
             ],
             "childAgents": [
-              "Dashboard Agent \u2014 venture KPIs \u2014 dash.luh.tech",
-              "Dataroom Agent \u2014 investor data \u2014 invest.luh.tech",
-              "Venture Agent \u2014 cross-portfolio analysis \u2014 CEO tools"
+              "Dashboard Agent — venture KPIs — dash.luh.tech",
+              "Dataroom Agent — investor data — invest.luh.tech",
+              "Venture Agent — cross-portfolio analysis — CEO tools"
             ]
           }
         },
         "templateLibrary": {
           "location": "DO Spaces /project-bundles/",
-          "scope": "schema-level only \u2014 no raw construction data",
+          "scope": "schema-level only — no raw construction data",
           "contents": [
             "manifest.json",
             "schema/voxel-zones.json",
@@ -5184,18 +5184,18 @@
             "biotech (future)",
             "community (curated opt-ins)"
           ],
-          "buildFlow": "luh.tech team builds on template server \u2192 validates \u2192 exports bundle to S3"
+          "buildFlow": "luh.tech team builds on template server → validates → exports bundle to S3"
         },
         "communitySharing": {
           "stage1": {
-            "scope": "Template-level only \u2014 voxel zone patterns, decision type configs, authority cascade",
+            "scope": "Template-level only — voxel zone patterns, decision type configs, authority cascade",
             "mechanism": "opt-in RLS per tenant, reviewed by luh.tech before S3 promotion",
             "dataDoesNotShare": "actual decisions, voxel events, construction site data"
           },
           "stage2": {
-            "status": "DEFERRED \u2014 separate decision required",
+            "status": "DEFERRED — separate decision required",
             "mechanism": "DAO governance and smart contracts",
-            "purpose": "trustless, incentivized knowledge network \u2014 Open Library at network scale"
+            "purpose": "trustless, incentivized knowledge network — Open Library at network scale"
           }
         }
       }
@@ -5203,7 +5203,7 @@
     {
       "decisionId": "DEC-008",
       "timestamp": "2026-03-25T00:00:00Z",
-      "title": "VoxelDecisionSurface \u2014 Speckle Extension with ObjectLayers.OVERLAY",
+      "title": "VoxelDecisionSurface — Speckle Extension with ObjectLayers.OVERLAY",
       "context": "VoxelOverlay.tsx (820 lines) called scene.add(mesh) + requestRender() but mesh.layers was never set. Speckle renderer executes separate render passes per ObjectLayers layer. A mesh on default layer 0 is invisible to the OVERLAY render pass. Voxel cubes never rendered despite all wiring being correct.",
       "constraints": [
         "Must use Speckle Extension API for lifecycle management",
@@ -5228,7 +5228,7 @@
       "rationale": "ObjectLayers.OVERLAY (4) is the correct layer for non-BIM overlay objects. Extension base class provides clean lifecycle. MeshBasicMaterial correct for status-encoded color. depthTest:false ensures cubes visible. Type extraction eliminates mixed-concern file and makes VoxelData importable without pulling in Three.js.",
       "status": "APPROVED",
       "category": "architecture",
-      "impact": "Gate 3 \u2014 voxel overlay on BIM canvas",
+      "impact": "Gate 3 — voxel overlay on BIM canvas",
       "approvedBy": "Erik Luhtala",
       "impactedDeliverables": [
         "VoxelDecisionSurfaceExtension.ts (new)",
@@ -5294,7 +5294,7 @@
     },
     {
       "id": "DEC-015",
-      "title": "Viewer Session Token \u2014 SOC2-Aligned BIM Geometry Authentication",
+      "title": "Viewer Session Token — SOC2-Aligned BIM Geometry Authentication",
       "date": "2026-04-02",
       "status": "IMPLEMENTED",
       "author": "erik@luh.tech",
@@ -5333,7 +5333,7 @@
             "production": "ECTROPY_PROD_VIEWER_TOKEN_SECRET in Ectropy/Production"
           },
           "github": "VIEWER_TOKEN_SECRET in staging env, production env, and repo-level",
-          "rotation": "openssl rand -base64 48 \u2192 BW \u2192 GitHub via gh secret set \u2192 Spaces \u2192 docker compose up -d --no-deps api-gateway"
+          "rotation": "openssl rand -base64 48 → BW → GitHub via gh secret set → Spaces → docker compose up -d --no-deps api-gateway"
         }
       },
       "alternatives": [
@@ -5406,18 +5406,18 @@
       "author": "erik@luh.tech",
       "dependsOn": "none",
       "supersedes": "none",
-      "summary": "Formalized five-tier environment model: (1) Local Mac/OrbStack \u2014 individual dev, (2) Mac Mini \u2014 full container pipeline validation, (3) ectropy-development 64.23.157.16 \u2014 agent pipeline + console, (4) ectropy-staging 143.198.108.161 \u2014 integration with Watchtower auto-deploy, (5) production blue+green \u2014 live traffic with workflow_dispatch only. Branch contract: feature/* \u2192 Mac Mini \u2192 develop \u2192 staging \u2192 main \u2192 production.",
+      "summary": "Formalized five-tier environment model: (1) Local Mac/OrbStack — individual dev, (2) Mac Mini — full container pipeline validation, (3) ectropy-development 64.23.157.16 — agent pipeline + console, (4) ectropy-staging 143.198.108.161 — integration with Watchtower auto-deploy, (5) production blue+green — live traffic with workflow_dispatch only. Branch contract: feature/* → Mac Mini → develop → staging → main → production.",
       "alternatives": []
     },
     {
       "id": "DEC-026",
-      "title": "/objects/single auth strategy \u2014 requireAuth over requireViewerToken",
+      "title": "/objects/single auth strategy — requireAuth over requireViewerToken",
       "date": "2026-04-08",
       "status": "IMPLEMENTED",
       "author": "erik@luh.tech",
       "dependsOn": "DEC-015",
       "supersedes": "none",
-      "summary": "SpeckleLoader v2.28.0 ObjectLoader2 does not propagate authToken into fetch transport headers. requireViewerToken on /objects/single would always reject browser requests since no Authorization header is sent. Fixed by replacing requireViewerToken with requireAuth (session cookie) on /objects/single route in both /api/speckle router (line 933) and speckleRootProxy (line 1188). Service token injection via getSpeckleToken() preserved on all routes. DEC-015 VST architecture remains correct \u2014 viewer_token generated and returned per stream, available for future SDK upgrade.",
+      "summary": "SpeckleLoader v2.28.0 ObjectLoader2 does not propagate authToken into fetch transport headers. requireViewerToken on /objects/single would always reject browser requests since no Authorization header is sent. Fixed by replacing requireViewerToken with requireAuth (session cookie) on /objects/single route in both /api/speckle router (line 933) and speckleRootProxy (line 1188). Service token injection via getSpeckleToken() preserved on all routes. DEC-015 VST architecture remains correct — viewer_token generated and returned per stream, available for future SDK upgrade.",
       "commits": [
         "3c223c5",
         "9bc5713"
@@ -5440,21 +5440,21 @@
     },
     {
       "id": "DEC-028",
-      "title": "Stream ACL enforcement on /objects/single \u2014 SEC-001",
+      "title": "Stream ACL enforcement on /objects/single — SEC-001",
       "date": "2026-04-09",
       "status": "IMPLEMENTED",
       "author": "erik@luh.tech",
       "dependsOn": "DEC-015",
       "supersedes": "3c223c5",
-      "summary": "/objects/:streamId/:objectId/single was using requireAuth only \u2014 no stream-scoping. Any authenticated platform user could fetch objects from any stream regardless of project_roles. Fix: chain requireAuth + requireStreamAccess (authorization.middleware.ts:350-445). Auth chain: session cookie \u2192 stream ACL via speckle_streams + project_roles \u2192 handler fetches service token for upstream Speckle call. /graphql stays requireAuth (ObjectLoader2 GraphQL queries use session cookies, not VST). Contract tests added for 401/403/200 on /objects/single.",
+      "summary": "/objects/:streamId/:objectId/single was using requireAuth only — no stream-scoping. Any authenticated platform user could fetch objects from any stream regardless of project_roles. Fix: chain requireAuth + requireStreamAccess (authorization.middleware.ts:350-445). Auth chain: session cookie → stream ACL via speckle_streams + project_roles → handler fetches service token for upstream Speckle call. /graphql stays requireAuth (ObjectLoader2 GraphQL queries use session cookies, not VST). Contract tests added for 401/403/200 on /objects/single.",
       "routes": {
         "fixed": [
-          "router.get('/objects/:streamId/:objectId/single') \u2014 line 933",
-          "speckleRootProxy.get('/objects/:streamId/:objectId/single') \u2014 line 1188"
+          "router.get('/objects/:streamId/:objectId/single') — line 933",
+          "speckleRootProxy.get('/objects/:streamId/:objectId/single') — line 1188"
         ],
         "unchanged": [
-          "router.get('/objects/:streamId/:objectId') \u2014 requireViewerToken (correct)",
-          "speckleRootProxy.post('/graphql') \u2014 requireAuth (intentional)"
+          "router.get('/objects/:streamId/:objectId') — requireViewerToken (correct)",
+          "speckleRootProxy.post('/graphql') — requireAuth (intentional)"
         ]
       },
       "alternatives": [
@@ -5468,6 +5468,72 @@
           "rejected": true,
           "reason": "SpeckleLoader v2.28.0 ObjectLoader2 does not send VST in headers for /single requests. Would break BIM viewer."
         }
+      ]
+    },
+    {
+      "id": "DEC-029",
+      "title": "Three.js Version Pin at 0.149.0",
+      "date": "2026-04-14",
+      "status": "ACTIVE",
+      "author": "erik@luh.tech",
+      "dependsOn": "DEC-028",
+      "summary": "@speckle/viewer 2.28.0 npm dist contains runtime shader #include directives (uv2_pars_vertex, uv2_pars_fragment) AND references WebGLMultipleRenderTargets. Both features require Three.js < 0.150.0. Pinned to 0.149.0 via root pnpm.overrides.",
+      "versionBoundaries": {
+        "uv2ShaderChunks": "removed in 0.150.0",
+        "WebGLMultipleRenderTargets": "removed in 0.175.0 (class removed in 0.171.0, export alias removed in 0.175.0)",
+        "safeWindow": "0.140.0 – 0.149.0",
+        "pinned": "0.149.0"
+      },
+      "commits": [
+        "1ae72d0 (initial 0.170.0)",
+        "86666e3 (corrected 0.149.0)"
+      ],
+      "upgradePath": "DEC-030 (monorepo build) supersedes this pin. If Speckle publishes npm viewer > 2.28.0 with modern Three.js shader compatibility, upgrade directly and close both DEC-029 and DEC-030.",
+      "alternatives": [
+        {
+          "option": "Pin Three.js 0.170.0 (WebGLMultipleRenderTargets still present as deprecated alias)",
+          "rejected": true,
+          "reason": "uv2_* shader chunks removed in r150. Speckle viewer runtime shader compilation crashes with 'Can not resolve #include <uv2_pars_vertex>'."
+        },
+        {
+          "option": "Patch @speckle/viewer dist to remove WebGLMultipleRenderTargets import",
+          "rejected": true,
+          "reason": "Fragile — patch breaks on any viewer update. Monorepo build (DEC-030) is the sustainable path."
+        }
+      ]
+    },
+    {
+      "id": "DEC-030",
+      "title": "Speckle Viewer — Monorepo Source Build",
+      "date": "2026-04-14",
+      "status": "PLANNED",
+      "author": "erik@luh.tech",
+      "dependsOn": "DEC-029",
+      "summary": "@speckle/viewer npm package (2.28.0, published 2026-01-30) ships pre-built shader code with Three.js #include directives that require Three.js < 0.150.0. Speckle's own frontend (app.speckle.systems) uses the viewer from their monorepo workspace directly, not from npm. Their main branch has updated shaders compatible with modern Three.js, but no new npm version has been published.",
+      "solution": "Replace npm @speckle/viewer dependency with a local build from specklesystems/speckle-server monorepo packages/viewer. This aligns Ectropy with Speckle's own integration pattern.",
+      "unlocks": [
+        "Modern Three.js (0.175+, including WebGPU path)",
+        "Latest viewer extensions and bug fixes",
+        "Removal of DEC-029 version pin",
+        "Full SectionTool, MeasurementTool, Differ capabilities at latest quality"
+      ],
+      "implementationSteps": [
+        "Clone speckle-server, extract packages/viewer + packages/objectloader as git subtree or submodule",
+        "Build viewer locally, wire as workspace dependency",
+        "Update Three.js pin to match Speckle monorepo version",
+        "Validate all extensions: SectionTool, MeasurementTool, Differ, Filtering, BoxSelection",
+        "Remove pnpm.overrides for three once aligned"
+      ],
+      "risks": [
+        "Maintenance burden tracking Speckle monorepo updates",
+        "Build complexity increase (yarn to pnpm translation)",
+        "Potential API drift if Speckle makes breaking changes between npm publishes"
+      ],
+      "exitCriteria": [
+        "Viewer renders Maple Ridge with modern Three.js",
+        "All stock extensions functional",
+        "DEC-029 pin removed",
+        "CI green with new build path"
       ]
     }
   ]

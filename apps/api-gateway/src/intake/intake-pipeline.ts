@@ -162,13 +162,13 @@ export class IntakePipeline {
         skipped: result.rowsAffected === 0 && result.idempotencyKey === 'skipped',
         skipReason: result.idempotencyKey === 'skipped' ? result.warnings[0] : undefined,
       };
-    } catch {
+    } catch (err) {
       return {
         stageId: stage.stageId,
         success: false,
         rowsAffected: 0,
         durationMs: 0,
-        warnings: [],
+        warnings: [err instanceof Error ? err.message : String(err)],
         skipped: false,
       };
     }

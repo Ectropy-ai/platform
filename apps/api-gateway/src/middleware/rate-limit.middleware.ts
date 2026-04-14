@@ -11,7 +11,8 @@
 
 import rateLimit from 'express-rate-limit';
 import { RedisStore, type RedisReply } from 'rate-limit-redis';
-import Redis from 'ioredis';
+import type Redis from 'ioredis';
+import { createRedisClient } from '../config/redis.config.js';
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../../../../libs/shared/utils/src/logger.js';
 
@@ -41,22 +42,13 @@ async function getRateLimitRedisClient(): Promise<Redis | null> {
   if (!redisClient) {
     try {
       const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-      redisClient = new Redis(redisUrl, {
+      // Route through central factory — inherits keepAlive (30s TCP),
+      // retryStrategy, reconnectOnError, and standard error/close/ready
+      // observability handlers. See config/redis.config.ts.
+      redisClient = createRedisClient(redisUrl, {
         maxRetriesPerRequest: 10,
-        retryStrategy: (times) => {
-          if (times > 10) {
-            logger.error('Redis connection failed after 10 retries');
-            return null;
-          }
-          return Math.min(times * 100, 3000);
-        },
         lazyConnect: true,
       });
-
-      redisClient.on('error', (err) => {
-        logger.error('Redis client error:', err);
-      });
-
       await redisClient.connect();
       logger.info('Rate limiting using Redis store');
       return redisClient;

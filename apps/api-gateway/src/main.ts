@@ -35,8 +35,11 @@ logger.info('✅ Environment variables loaded');
 import '../../../src/config/event-emitter.config.js';
 logger.info('✅ EventEmitter configured');
 
+// Crash diagnostic uploader — writes to Spaces before process.exit(1)
+import { uploadCrashDiagnostic } from './crash-diagnostic.js';
+
 // CRITICAL: Global error handlers to prevent silent failures
-process.on('uncaughtException', (error: Error) => {
+process.on('uncaughtException', async (error: Error) => {
   // DIAGNOSTIC FIX (2026-03-06): Use console.error as backup — Winston drops
   // string metadata args in JSON format, making error details invisible.
   // Template literals ensure error details appear in the message field itself.
@@ -65,16 +68,62 @@ process.on('uncaughtException', (error: Error) => {
   logger.error(`Name: ${errName}`);
   logger.error(`Stack: ${errStack}`);
   logger.error('========================================');
+  await uploadCrashDiagnostic(
+    'uncaughtException',
+    `Error: ${errMsg}\nName: ${errName}\nStack: ${errStack}`,
+  ).catch(() => {});
   process.exit(1);
 });
 
 process.on(
   'unhandledRejection',
-  (reason: unknown, promise: Promise<unknown>) => {
-    const reasonStr =
+  async (reason: unknown, promise: Promise<unknown>) => {
+    // Tolerate known ioredis internal close-handler rejection.
+    // This is an ioredis 5.x bug where socket.once('close') creates
+    // an internal promise that escapes its own catch boundary — the
+    // rejection carries no command context (confirmed via enhanced
+    // crash diagnostic; reason object has only message+stack).
+    // We're already on ioredis@latest (5.10.1) with no upgrade path.
+    // TODO: remove when ioredis releases a fix or we switch libraries.
+    const isIoredisCloseRejection =
+      reason instanceof Error &&
+      reason.message === 'Connection is closed.' &&
+      reason.stack?.includes('ioredis') &&
+      reason.stack?.includes('event_handler.js');
+
+    if (isIoredisCloseRejection) {
+      await uploadCrashDiagnostic(
+        'unhandledRejection',
+        `[TOLERATED-IOREDIS-BUG] ${(reason as Error).stack}`,
+      ).catch(() => {});
+      logger.warn(
+        'Tolerated ioredis internal close-handler rejection',
+        { message: (reason as Error).message, uptime: process.uptime() },
+      );
+      return; // Do NOT process.exit(1)
+    }
+
+    // Base stack/message
+    const base =
       reason instanceof Error
         ? `${reason.name}: ${reason.message}\n${reason.stack}`
         : String(reason);
+
+    // Capture ALL enumerable + non-enumerable own properties of the reason
+    // object. ioredis attaches `command`, `args`, `previousErrors` here —
+    // this is how we identify which Redis command is rejecting.
+    let ownProps = '(no reason object)';
+    if (reason && typeof reason === 'object') {
+      try {
+        const propNames = Object.getOwnPropertyNames(reason);
+        const snapshot: Record<string, unknown> = {};
+        for (const n of propNames) snapshot[n] = (reason as any)[n];
+        ownProps = JSON.stringify(snapshot, null, 2);
+      } catch (e) {
+        ownProps = `(serialization failed: ${(e as Error).message})`;
+      }
+    }
+    const reasonStr = `${base}\n\n--- reason own-properties ---\n${ownProps}`;
     console.error('========================================');
     console.error('FATAL: Unhandled Promise Rejection');
     console.error(`Reason: ${reasonStr}`);
@@ -83,6 +132,8 @@ process.on(
     logger.error('FATAL: Unhandled Promise Rejection');
     logger.error(`Reason: ${reasonStr}`);
     logger.error('========================================');
+    await uploadCrashDiagnostic('unhandledRejection', reasonStr)
+      .catch(() => {});
     process.exit(1);
   }
 );
@@ -97,6 +148,7 @@ import {
 import {
   getRedisClient,
   closeRedisConnections,
+  attachHeartbeat,
 } from './config/redis.config.js';
 // DEPRECATED (2026-01-01): Legacy envalid config - will be removed after migration validation
 // Use @ectropy/shared/config instead
@@ -2737,13 +2789,22 @@ async function bootstrap(): Promise<void> {
     });
 
     // M5.2 ENTERPRISE: Initialize Redis Pub/Sub adapter for horizontal WebSocket scaling
-    if (redis) {
+    if (process.env.DISABLE_PUBSUB === 'true') {
+      logger.warn(
+        '⚠️  DISABLE_PUBSUB=true — pub/sub adapter skipped for diagnosis. Cross-instance WebSocket broadcasts will be local-only.',
+      );
+    } else if (redis) {
       logger.info(
         'Initializing Redis Pub/Sub adapter for WebSocket scaling...'
       );
       try {
         // Create a duplicate Redis client for subscribing (required by Redis Pub/Sub)
         const subClient = redis.duplicate();
+
+        // subClient bypasses createRedisClient factory — attach heartbeat
+        // manually. Subscribers are idle-by-design; without heartbeat, DO
+        // Redis LB culls the connection at ~60s → unhandledRejection.
+        attachHeartbeat(subClient, 'pubsub-subscriber');
 
         const instanceId = `api-gateway-${process.pid}-${Date.now()}`;
         initializeRedisPubSub({
@@ -2785,13 +2846,21 @@ async function bootstrap(): Promise<void> {
       redis,
       healthStatus
     );
-    process.on('SIGTERM', () => {
+    process.on('SIGTERM', async () => {
       logger.info('Received SIGTERM signal, initiating graceful shutdown...');
+      await uploadCrashDiagnostic(
+        'signal',
+        `[SIGTERM-RECEIVED] uptime=${process.uptime().toFixed(2)}s pid=${process.pid} ppid=${process.ppid}`,
+      ).catch(() => {});
       cleanupRateLimiters(); // Close Redis connection for rate limiters
       gracefulShutdown('SIGTERM');
     });
-    process.on('SIGINT', () => {
+    process.on('SIGINT', async () => {
       logger.info('Received SIGINT signal, initiating graceful shutdown...');
+      await uploadCrashDiagnostic(
+        'signal',
+        `[SIGINT-RECEIVED] uptime=${process.uptime().toFixed(2)}s pid=${process.pid} ppid=${process.ppid}`,
+      ).catch(() => {});
       cleanupRateLimiters(); // Close Redis connection for rate limiters
       gracefulShutdown('SIGINT');
     });

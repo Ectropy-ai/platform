@@ -68,6 +68,32 @@ export function parseRedisUrl(redisUrl: string): {
 }
 
 /**
+ * Attaches a 30-second PING heartbeat to a Redis client.
+ * Prevents DO managed Redis LB from culling idle TCP
+ * connections. Required for all clients — including
+ * redis.duplicate() instances which bypass the factory.
+ *
+ * PING is allowed in SUBSCRIBE mode per Redis protocol,
+ * so this is safe for pub/sub subscriber clients.
+ *
+ * @param client - Any ioredis Redis instance
+ * @param context - Optional label for log messages
+ */
+export function attachHeartbeat(
+  client: Redis,
+  context = 'redis',
+): void {
+  const heartbeat = setInterval(() => {
+    client.ping().catch((err: Error) => {
+      logger.warn(`Redis heartbeat ping failed [${context}]`, {
+        error: err.message,
+      });
+    });
+  }, 30_000);
+  client.on('end', () => clearInterval(heartbeat));
+}
+
+/**
  * Create Redis client with proper configuration
  * Use this for ALL Redis connections (main, session, cache, rate limiter, queues)
  * 
@@ -87,6 +113,12 @@ export function createRedisClient(
     password,
     maxRetriesPerRequest: 3,
     connectTimeout: 10000, // 10 seconds
+    // Prevent DO managed Redis idle-timeout disconnect.
+    // Without this, DO LB culls idle TCP connections at
+    // ~60s → ioredis rejects pending commands as
+    // unhandledRejection → process.exit(1).
+    // Confirmed via diagnostics/runtime-unhandledRejection-*.txt.
+    keepAlive: 30000,
     retryStrategy: (times: number) => {
       if (times > 3) {
         logger.error('❌ Redis connection failed after 3 retries - giving up');
@@ -106,7 +138,10 @@ export function createRedisClient(
   };
   
   const client = new Redis(config);
-  
+
+  // Keep connection alive through DO Redis LB's ~60s idle cull.
+  attachHeartbeat(client, `${host}:${port}/${options.db || 0}`);
+
   // Event handlers for observability and preventing unhandled errors
   client.on('connect', () => {
     logger.info('✅ Redis client connected', { host, port, db: options.db || 0 });
