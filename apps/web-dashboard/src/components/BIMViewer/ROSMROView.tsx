@@ -580,7 +580,9 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
   const error = queryError
     ? (queryError instanceof Error
         ? queryError.message
-        : String(queryError))
+        : typeof queryError === 'object' && queryError !== null
+          ? (queryError as any).message || JSON.stringify(queryError)
+          : String(queryError))
     : null;
 
   // Local UI state
