@@ -405,8 +405,8 @@ export function useVoxels(options: UseVoxelsOptions = {}) {
     queryKey: voxelKeys.list(projectId || '', filters),
     queryFn: () => fetchVoxels(projectId!, filters),
     enabled: enabled && !!projectId,
-    staleTime: 60_000, // 60 seconds
-    refetchInterval: 60_000, // Auto-refresh every 60 seconds
+    staleTime: 300_000, // 5 minutes — voxels are not real-time data
+    refetchInterval: false, // Disabled — manual refresh only (prevents heap pressure)
     retry: false, // Do not retry on 429 — prevents rate limit cascade
   });
 
@@ -441,8 +441,8 @@ export function useVoxelAggregations(options: UseVoxelAggregationsOptions = {}) 
     queryKey: voxelKeys.aggregations(projectId || '', groupBy),
     queryFn: () => fetchVoxelAggregations(projectId!, groupBy),
     enabled: enabled && !!projectId,
-    staleTime: 120_000, // 2 minutes
-    refetchInterval: 120_000, // Auto-refresh every 2 minutes
+    staleTime: 300_000, // 5 minutes — aggregations are not real-time
+    refetchInterval: false, // Disabled — manual refresh only (prevents heap pressure)
     retry: false, // Do not retry on 429 — prevents rate limit cascade
   });
 
@@ -497,8 +497,8 @@ export function useVoxelActivity(options: UseVoxelActivityOptions = {}) {
     queryKey: voxelKeys.activity(projectId || '', limit),
     queryFn: () => fetchVoxelActivity(projectId!, limit),
     enabled: enabled && !!projectId,
-    staleTime: 60_000, // 60 seconds
-    refetchInterval: 60_000, // Auto-refresh every 60 seconds
+    staleTime: 300_000, // 5 minutes — activity is not real-time
+    refetchInterval: false, // Disabled — manual refresh only (prevents heap pressure)
     retry: false, // Do not retry on 429 — prevents rate limit cascade
   });
 
