@@ -27,7 +27,7 @@ import { config as configService } from './config';
 
 // Environment-based configuration with fallback
 const API_BASE_URL = configService.apiBaseUrl;
-const API_TIMEOUT = parseInt(process.env['REACT_APP_API_TIMEOUT'] || '10000');
+const API_TIMEOUT = parseInt(process.env['REACT_APP_API_TIMEOUT'] || '30000');
 const API_VERSION = process.env['REACT_APP_API_VERSION'] || 'v1';
 // Type definitions for API requests and responses
 export interface LoginRequest {
