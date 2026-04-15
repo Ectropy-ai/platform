@@ -74,6 +74,8 @@ export function ViewerPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentTab, setCurrentTab] = useState(0);
   const [viewerTabReady, setViewerTabReady] = useState(false);
+  // SHARED VIEWER: Store viewer instance for Coordination tab (eliminates duplicate Speckle load)
+  const [sharedViewer, setSharedViewer] = useState<IViewer | null>(null);
   const [selectedStream, setSelectedStream] = useState<SpeckleStream | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [streamRefreshTrigger, setStreamRefreshTrigger] = useState(0);
@@ -370,6 +372,7 @@ export function ViewerPage() {
    */
   const handleViewerReady = useCallback((viewer: IViewer) => {
     setViewerTabReady(true);
+    setSharedViewer(viewer);
     if (boxGenTriggeredRef.current) return;
     boxGenTriggeredRef.current = true;
     const ext = viewer.getExtension(
@@ -600,6 +603,7 @@ export function ViewerPage() {
                   serverUrl={config.speckleApiUrl}
                   viewerToken={selectedStream?.viewer_token}
                   isActive={currentTab === 1 && viewerTabReady}
+                  sharedViewer={sharedViewer}
                   stakeholderRole={
                     (['architect', 'engineer', 'contractor', 'owner'].includes(projectRole || '')
                       ? projectRole
