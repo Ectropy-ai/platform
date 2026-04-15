@@ -122,6 +122,8 @@ export interface ROSMROViewProps {
   userAuthority?: AuthorityLevel;
   /** Whether this tab is currently visible — defers BIM mount until active */
   isActive?: boolean;
+  /** Shared Speckle viewer from Viewer tab — eliminates duplicate load */
+  sharedViewer?: IViewer | null;
 }
 
 interface VoxelAggregation {
@@ -516,6 +518,7 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
   userName,
   userAuthority = 3, // Default to PM level
   isActive = true,
+  sharedViewer,
 }) => {
   // SPRINT 5: Use React Query hooks for real data (2026-01-24)
   // Replaces local state + useEffect with centralized data fetching
@@ -580,7 +583,9 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
   const error = queryError
     ? (queryError instanceof Error
         ? queryError.message
-        : String(queryError))
+        : typeof queryError === 'object' && queryError !== null
+          ? (queryError as any).message || JSON.stringify(queryError)
+          : String(queryError))
     : null;
 
   // Local UI state
@@ -626,6 +631,13 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
         { ext: !!ext, pid, currentStreamId, currentObjectId });
     }
   }, []);
+
+  // SHARED VIEWER: Wire voxel extension to shared viewer from Viewer tab
+  useEffect(() => {
+    if (!sharedViewer) return;
+    console.log('[ROSMROView] Wiring shared viewer to voxel extension');
+    handleViewerReady(sharedViewer);
+  }, [sharedViewer, handleViewerReady]);
 
   // DEC-008: Sync voxel data to extension when data loads/changes
   useEffect(() => {
@@ -799,8 +811,8 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
       <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 600 }}>
         {/* 3D Viewer */}
         <Box sx={{ flex: 1, position: 'relative' }}>
-          {/* BIM Mesh Viewer — always mounted to preserve voxelExt state (DEC-017) */}
-          {hasBeenActive && (
+          {/* BIM Mesh Viewer — skip when sharedViewer provided (uses Viewer tab's instance) */}
+          {hasBeenActive && !sharedViewer && (
             <div style={{
               visibility: viewState.showMesh ? 'visible' : 'hidden',
               height: viewState.showMesh ? '100%' : '0',
@@ -1072,6 +1084,7 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
         open={seppaOpen}
         onClose={() => setSeppaOpen(false)}
         projectId={projectId}
+        viewerReady={!!sharedViewer}
         selectedVoxelId={selectedVoxel?.id}
         selectedVoxelData={
           selectedVoxel

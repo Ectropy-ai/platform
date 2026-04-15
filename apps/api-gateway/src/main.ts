@@ -297,6 +297,7 @@ import { DAORoutes } from './routes/dao.routes.js';
 import { ManufacturerRoutes } from './routes/manufacturer.routes.js';
 import { createIFCRoutes } from './routes/ifc.routes.js';
 import speckleEnterpriseRoutes, { speckleRootProxy } from './routes/speckle.routes.enterprise.js';
+import speckleAuthInternalRoute from './routes/internal/speckle-auth.route.js';
 import aiRoutes from './routes/ai.routes.js';
 import { AdminRoutes } from './routes/admin.routes.js';
 import { ConsoleRoutes } from './routes/console/index.js';
@@ -1296,6 +1297,13 @@ async function bootstrap(): Promise<void> {
     // ENTERPRISE FIX (2026-03-05): Converted from dynamic import to static import
     // ROOT CAUSE: await import() created webpack chunk that failed to load in Docker
     try {
+      // DEC-031: Internal auth endpoint for nginx auth_request subrequest
+      // Validates Bearer VST or session cookie for Speckle data-plane access.
+      // Must be mounted BEFORE /api/speckle/* so nginx can call it without
+      // being rejected by downstream auth middleware.
+      app.use('/internal/speckle-auth', speckleAuthInternalRoute);
+      logger.info('✅ DEC-031 speckle-auth internal endpoint mounted');
+
       if (speckleEnterpriseRoutes) {
         app.use(
           '/api/speckle',
