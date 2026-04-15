@@ -214,18 +214,29 @@ export class VoxelRoutes {
           ? String(req.query.statuses).split(',')
           : undefined;
         const level = req.query.level ? String(req.query.level) : undefined;
-        const limit = Math.min(10000, parseInt(String(req.query.limit || '1000')));
+        const limit = Math.min(5000, parseInt(String(req.query.limit || '2000')));
+        const offset = Math.max(0, parseInt(String(req.query.offset || '0')));
 
         const voxels = await this.getProjectVoxels(projectId, {
           systems,
           statuses,
           level,
           limit,
+          offset,
         });
+
+        // True total count for pagination metadata
+        const totalResult = await this.db.query(
+          'SELECT COUNT(*) as count FROM voxels WHERE project_id = $1',
+          [projectId]
+        );
+        const total = parseInt(totalResult.rows[0]?.count) || 0;
 
         res.json({
           voxels,
-          total: voxels.length,
+          total,
+          limit,
+          offset,
         });
       })
     );
@@ -712,6 +723,7 @@ export class VoxelRoutes {
       statuses?: string[];
       level?: string;
       limit?: number;
+      offset?: number;
     }
   ): Promise<VoxelData[]> {
     try {
@@ -738,8 +750,10 @@ export class VoxelRoutes {
         paramIndex++;
       }
 
-      const limit = filters.limit || 1000;
+      const limit = filters.limit || 2000;
+      const offset = filters.offset || 0;
       params.push(limit);
+      params.push(offset);
 
       const query = `
         SELECT
@@ -762,7 +776,7 @@ export class VoxelRoutes {
         FROM voxels v
         WHERE ${conditions.join(' AND ')}
         ORDER BY v.level, v.voxel_id
-        LIMIT $${paramIndex}
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
       `;
 
       const result = await this.db.query(query, params);

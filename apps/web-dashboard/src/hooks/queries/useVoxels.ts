@@ -157,7 +157,7 @@ async function fetchVoxels(
     if (filters?.level) {
       params.set('level', filters.level);
     }
-    params.set('limit', String(filters?.limit ?? 10000));
+    params.set('limit', String(filters?.limit ?? 2000));
 
     const queryString = params.toString();
     const url = `/api/v1/projects/${projectId}/voxels${queryString ? `?${queryString}` : ''}`;
