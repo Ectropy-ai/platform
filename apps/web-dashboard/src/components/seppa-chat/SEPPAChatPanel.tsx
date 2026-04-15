@@ -91,6 +91,8 @@ interface SEPPAChatPanelProps {
   userId: string;
   /** User display name */
   userName?: string;
+  /** Gateway idle signal — defer init until viewer is done loading Speckle (prevents race condition) */
+  viewerReady?: boolean;
 }
 
 // ============================================================================
@@ -106,6 +108,7 @@ const SEPPAChatPanel: React.FC<SEPPAChatPanelProps> = ({
   userAuthority = 3,
   userId,
   userName,
+  viewerReady = true,
 }) => {
   // State
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -127,6 +130,8 @@ const SEPPAChatPanel: React.FC<SEPPAChatPanelProps> = ({
 
   /**
    * Check service status on mount
+   * Deferred until viewerReady to avoid racing with Speckle NDJSON streaming
+   * that saturates the api-gateway event loop.
    */
   useEffect(() => {
     const checkStatus = async () => {
@@ -140,10 +145,10 @@ const SEPPAChatPanel: React.FC<SEPPAChatPanelProps> = ({
       }
     };
 
-    if (open) {
+    if (open && viewerReady) {
       checkStatus();
     }
-  }, [open]);
+  }, [open, viewerReady]);
 
   /**
    * Initialize with welcome message

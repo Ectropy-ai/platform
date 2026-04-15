@@ -1084,6 +1084,7 @@ export const ROSMROView: React.FC<ROSMROViewProps> = ({
         open={seppaOpen}
         onClose={() => setSeppaOpen(false)}
         projectId={projectId}
+        viewerReady={!!sharedViewer}
         selectedVoxelId={selectedVoxel?.id}
         selectedVoxelData={
           selectedVoxel

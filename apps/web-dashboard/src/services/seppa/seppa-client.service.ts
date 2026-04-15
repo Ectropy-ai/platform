@@ -310,34 +310,43 @@ class SEPPAAssistantService {
   }
 
   /**
-   * Get service status
+   * Get service status with exponential backoff retry
+   * Retries on failure because api-gateway can be temporarily saturated by Speckle NDJSON streaming.
    */
-  async getStatus(): Promise<{
+  async getStatus(maxRetries = 3): Promise<{
     success: boolean;
     data?: ServiceStatus;
     error?: string;
   }> {
-    try {
-      const response = await apiClient.get<{ success: boolean; data: ServiceStatus }>(
-        `${this.baseURL}/status`
-      );
+    let lastError = 'Unknown error';
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await apiClient.get<{ success: boolean; data: ServiceStatus }>(
+          `${this.baseURL}/status`
+        );
 
-      if (response.success && response.data) {
-        return { success: true, data: response.data.data };
+        if (response.success && response.data) {
+          return { success: true, data: response.data.data };
+        }
+
+        lastError = response.error || 'Failed to get status';
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: { message?: string } }; message?: string };
+        lastError = err.response?.data?.message || err.message || 'Unknown error';
+        if (attempt === maxRetries) {
+          console.warn(`[SEPPA Client] getStatus failed after ${maxRetries + 1} attempts:`, lastError);
+        }
       }
 
-      return {
-        success: false,
-        error: response.error || 'Failed to get status',
-      };
-    } catch (error: unknown) {
-      console.error('[SEPPA Client] Get status error:', error);
-      const err = error as { response?: { data?: { message?: string } }; message?: string };
-      return {
-        success: false,
-        error: err.response?.data?.message || err.message || 'Unknown error',
-      };
+      if (attempt < maxRetries) {
+        // Exponential backoff: 2s, 4s, 8s
+        const delay = Math.pow(2, attempt + 1) * 1000;
+        console.log(`[SEPPA Client] getStatus attempt ${attempt + 1} failed, retrying in ${delay / 1000}s`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
+
+    return { success: false, error: lastError };
   }
 }
 
