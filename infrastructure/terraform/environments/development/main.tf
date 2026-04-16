@@ -100,7 +100,7 @@ resource "digitalocean_firewall" "development" {
 # ============================================================================
 
 module "development_compose_upload" {
-  source = "../../../../terraform/modules/config-upload"
+  source = "../../modules/config-upload"
 
   config_file_path = "${path.module}/../../../../docker-compose.development.yml"
   config_type      = "compose"
@@ -128,7 +128,7 @@ module "development_compose_upload" {
 # ============================================================================
 
 module "development_nginx_main_upload" {
-  source = "../../../../terraform/modules/config-upload"
+  source = "../../modules/config-upload"
 
   config_file_path = "${path.module}/../../../../infrastructure/nginx/main.conf"
   config_type      = "nginx"
@@ -152,7 +152,7 @@ module "development_nginx_main_upload" {
 }
 
 module "development_nginx_site_upload" {
-  source = "../../../../terraform/modules/config-upload"
+  source = "../../modules/config-upload"
 
   config_file_path = "${path.module}/../../../../infrastructure/nginx/development.conf"
   config_type      = "nginx"
@@ -241,7 +241,7 @@ ENV
 }
 
 module "development_env_upload" {
-  source = "../../../../terraform/modules/config-upload"
+  source = "../../modules/config-upload"
 
   config_content  = local_file.development_env.content
   config_filename = ".env.development"

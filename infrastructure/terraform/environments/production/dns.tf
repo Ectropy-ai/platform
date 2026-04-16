@@ -56,12 +56,12 @@ resource "cloudflare_record" "production" {
   count = local.cloudflare_enabled ? 1 : 0
 
   zone_id         = var.cloudflare_zone_id
-  name            = "@"                                     # Root domain: ectropy.ai
+  name            = "@" # Root domain: ectropy.ai
   content         = digitalocean_loadbalancer.production.ip
   type            = "A"
-  ttl             = 1       # Auto (Cloudflare manages TTL when proxied)
-  proxied         = true    # Cloudflare Full (Strict) — Origin Certificate on LB
-  allow_overwrite = true    # Adopt pre-existing record into Terraform state
+  ttl             = 1    # Auto (Cloudflare manages TTL when proxied)
+  proxied         = true # Cloudflare Full (Strict) — Origin Certificate on LB
+  allow_overwrite = true # Adopt pre-existing record into Terraform state
   comment         = "Production LB - Cloudflare proxied, managed by Terraform"
 }
 

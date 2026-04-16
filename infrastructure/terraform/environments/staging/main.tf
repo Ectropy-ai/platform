@@ -16,7 +16,7 @@
 # Security: Zero cross-environment connectivity
 
 module "staging_vpc" {
-  source = "../../../../terraform/modules/vpc"
+  source = "../../modules/vpc"
 
   project_name = var.project_name
   environment  = "staging"
@@ -306,7 +306,7 @@ resource "digitalocean_firewall" "staging" {
 # Pattern: Upload to S3, config-sync systemd service pulls to droplet
 
 module "staging_compose_upload" {
-  source = "../../../../terraform/modules/config-upload"
+  source = "../../modules/config-upload"
 
   # Config file to upload
   config_file_path = "${path.module}/../../../../docker-compose.staging.yml"
@@ -347,7 +347,7 @@ module "staging_compose_upload" {
 # docker-compose.staging.yml mounts these at ./infrastructure/nginx/ (relative to /opt/ectropy/)
 
 module "staging_nginx_main_upload" {
-  source = "../../../../terraform/modules/config-upload"
+  source = "../../modules/config-upload"
 
   config_file_path = "${path.module}/../../../../infrastructure/nginx/main.conf"
   config_type      = "nginx"
@@ -373,7 +373,7 @@ module "staging_nginx_main_upload" {
 }
 
 module "staging_nginx_site_upload" {
-  source = "../../../../terraform/modules/config-upload"
+  source = "../../modules/config-upload"
 
   config_file_path = "${path.module}/../../../../infrastructure/nginx/ectropy-staging.conf"
   config_type      = "nginx"
@@ -508,7 +508,7 @@ ENV
 
 # Upload .env file to DigitalOcean Spaces (zero-SSH pattern)
 module "staging_env_upload" {
-  source = "../../../../terraform/modules/config-upload"
+  source = "../../modules/config-upload"
 
   # Config content to upload (Terraform-generated .env) - ROOT CAUSE #4 FIX
   # Use config_content instead of config_file_path because local_file.staging_env creates

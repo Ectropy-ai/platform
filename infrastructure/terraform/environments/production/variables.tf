@@ -179,12 +179,22 @@ variable "redis_password" {
   description = "Redis authentication password"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.redis_password) >= 16
+    error_message = "redis_password must be at least 16 characters"
+  }
 }
 
 variable "encryption_key" {
   description = "General purpose encryption key (AES-256)"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.encryption_key) >= 32
+    error_message = "encryption_key must be at least 32 characters"
+  }
 }
 
 # ============================================================================
@@ -195,12 +205,22 @@ variable "mcp_api_key" {
   description = "MCP service API key"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.mcp_api_key) >= 32
+    error_message = "mcp_api_key must be at least 32 characters"
+  }
 }
 
 variable "openai_api_key" {
-  description = "OpenAI/Anthropic API key"
+  description = "OpenAI API key"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = can(regex("^sk-", var.openai_api_key))
+    error_message = "openai_api_key must start with 'sk-'"
+  }
 }
 
 # ============================================================================
@@ -236,6 +256,11 @@ variable "speckle_admin_password" {
   description = "Speckle admin account password"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.speckle_admin_password) >= 16 && can(regex("[A-Z]", var.speckle_admin_password)) && can(regex("[0-9]", var.speckle_admin_password))
+    error_message = "speckle_admin_password must be at least 16 chars with uppercase and digit"
+  }
 }
 
 variable "speckle_session_secret" {
@@ -253,12 +278,22 @@ variable "minio_access_key" {
   description = "MinIO S3-compatible storage access key"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.minio_access_key) >= 16
+    error_message = "minio_access_key must be at least 16 characters"
+  }
 }
 
 variable "minio_secret_key" {
   description = "MinIO S3-compatible storage secret key"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.minio_secret_key) >= 32
+    error_message = "minio_secret_key must be at least 32 characters"
+  }
 }
 
 # ============================================================================
@@ -284,7 +319,7 @@ variable "spaces_secret_access_key" {
 }
 
 # ============================================================================
-# Docker Registry (DOCR Authentication)
+# Docker Registry (DOCR Authentication — used by cloud-init, not .env)
 # ============================================================================
 
 variable "docr_config_json" {
@@ -406,10 +441,93 @@ variable "resend_api_key" {
   sensitive   = true
 }
 
-variable "watchtower_http_api_token" {
-  description = "Watchtower HTTP API token for container updates"
+# ============================================================================
+# External AI APIs (DEC-032 Stream 1)
+# ============================================================================
+
+variable "anthropic_api_key" {
+  description = "Anthropic Claude API key for SEPPA AI assistant"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = can(regex("^sk-ant-", var.anthropic_api_key))
+    error_message = "anthropic_api_key must start with 'sk-ant-'"
+  }
+}
+
+variable "qdrant_api_key" {
+  description = "Qdrant vector database API key"
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.qdrant_api_key) >= 32
+    error_message = "qdrant_api_key must be at least 32 characters"
+  }
+}
+
+# ============================================================================
+# Database Admin (DEC-032 Stream 1)
+# ============================================================================
+
+variable "db_admin_password" {
+  description = "PostgreSQL doadmin password for Speckle DB init and migrations"
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.db_admin_password) >= 16 && can(regex("[A-Z]", var.db_admin_password)) && can(regex("[0-9]", var.db_admin_password))
+    error_message = "db_admin_password must be at least 16 chars with uppercase and digit"
+  }
+}
+
+# ============================================================================
+# Speckle Extended Config (DEC-032 Stream 1)
+# ============================================================================
+
+variable "speckle_admin_email" {
+  description = "Speckle admin user email address"
+  type        = string
+  default     = "speckle-admin@ectropy.ai"
+
+  validation {
+    condition     = can(regex("^[^@]+@[^@]+\\.[^@]+$", var.speckle_admin_email))
+    error_message = "speckle_admin_email must be a valid email address"
+  }
+}
+
+variable "speckle_server_url" {
+  description = "Speckle server internal URL (container-to-container)"
+  type        = string
+  default     = "http://ectropy-speckle-server:3000"
+
+  validation {
+    condition     = can(regex("^https?://", var.speckle_server_url))
+    error_message = "speckle_server_url must start with http:// or https://"
+  }
+}
+
+variable "minio_public_url" {
+  description = "MinIO public URL for S3-compatible storage access"
+  type        = string
+  default     = "https://ectropy.ai/minio"
+
+  validation {
+    condition     = can(regex("^https://", var.minio_public_url))
+    error_message = "minio_public_url must start with https://"
+  }
+}
+
+variable "resend_from_email" {
+  description = "Sender email address for Resend email service"
+  type        = string
+  default     = "noreply@ectropy.ai"
+
+  validation {
+    condition     = can(regex("^[^@]+@[^@]+\\.[^@]+$", var.resend_from_email))
+    error_message = "resend_from_email must be a valid email address"
+  }
 }
 
 # ============================================================================

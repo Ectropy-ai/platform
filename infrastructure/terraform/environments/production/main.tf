@@ -16,7 +16,7 @@
 # Security: Zero cross-environment connectivity, SOC 2/ISO 27001/PCI DSS compliance
 
 module "production_vpc" {
-  source = "../../../../terraform/modules/vpc"
+  source = "../../modules/vpc"
 
   project_name = var.project_name
   environment  = "production"
@@ -444,7 +444,7 @@ resource "digitalocean_spaces_bucket" "production_configs" {
 # ============================================================================
 
 module "production_compose_upload" {
-  source = "../../../../terraform/modules/config-upload"
+  source = "../../modules/config-upload"
 
   config_file_path = "${path.module}/../../../../docker-compose.deploy.yml"
   config_type      = "compose"
@@ -475,7 +475,7 @@ module "production_compose_upload" {
 # ============================================================================
 
 module "production_nginx_main_upload" {
-  source = "../../../../terraform/modules/config-upload"
+  source = "../../modules/config-upload"
 
   config_file_path = "${path.module}/../../../../infrastructure/nginx/main.conf"
   config_type      = "nginx"
@@ -502,7 +502,7 @@ module "production_nginx_main_upload" {
 }
 
 module "production_nginx_site_upload" {
-  source = "../../../../terraform/modules/config-upload"
+  source = "../../modules/config-upload"
 
   config_file_path = "${path.module}/../../../../infrastructure/nginx/ectropy-production.conf"
   config_type      = "nginx"
@@ -541,13 +541,12 @@ NODE_ENV=production
 VERSION=${var.app_version}
 
 # Database Configuration (Managed PostgreSQL)
-DATABASE_URL=postgresql://doadmin:${urlencode(var.database_password)}@${var.database_host}:${var.database_port}/${var.database_name}?sslmode=require
+DATABASE_URL=postgresql://${var.database_user}:${urlencode(var.database_password)}@${var.database_host}:${var.database_port}/${var.database_name}?sslmode=require
 DATABASE_HOST=${var.database_host}
 DATABASE_PORT=${var.database_port}
 DATABASE_NAME=${var.database_name}
 DATABASE_USER=${var.database_user}
 DATABASE_PASSWORD=${var.database_password}
-DATABASE_SSL=true
 
 # Authentication & Security
 JWT_SECRET=${var.jwt_secret}
@@ -563,6 +562,8 @@ ENCRYPTION_KEY=${var.encryption_key}
 # External APIs
 MCP_API_KEY=${var.mcp_api_key}
 OPENAI_API_KEY=${var.openai_api_key}
+ANTHROPIC_API_KEY=${var.anthropic_api_key}
+QDRANT_API_KEY=${var.qdrant_api_key}
 
 # Service URLs
 API_URL=${var.api_url}
@@ -570,16 +571,19 @@ FRONTEND_URL=${var.frontend_url}
 
 # Speckle BIM Integration
 SPECKLE_SERVER_TOKEN=${var.speckle_server_token}
+SPECKLE_SERVER_URL=${var.speckle_server_url}
+SPECKLE_ADMIN_EMAIL=${var.speckle_admin_email}
 SPECKLE_ADMIN_PASSWORD=${var.speckle_admin_password}
 SPECKLE_SESSION_SECRET=${var.speckle_session_secret}
 SPECKLE_PUBLIC_URL=https://ectropy.ai/speckle
 MINIO_ACCESS_KEY=${var.minio_access_key}
 MINIO_SECRET_KEY=${var.minio_secret_key}
+MINIO_PUBLIC_URL=${var.minio_public_url}
 
 # Speckle PostgreSQL — Managed DO Database (DEC-019)
 # All Speckle services connect to managed cluster with SSL
 # Eliminates local Docker postgres — survives droplet replacement
-POSTGRES_URL=${var.database_host}:${var.database_port}
+POSTGRES_URL=postgresql://doadmin:${urlencode(var.database_password)}@${var.database_host}:${var.database_port}/speckle?sslmode=require
 POSTGRES_USER=doadmin
 POSTGRES_PASSWORD=${var.database_password}
 POSTGRES_DB=speckle
@@ -588,16 +592,13 @@ PGSSLMODE=require
 PG_CONNECTION_STRING=postgres://doadmin:${urlencode(var.database_password)}@${var.database_host}:${var.database_port}/speckle?sslmode=require
 FILEIMPORT_QUEUE_POSTGRES_URL=postgres://doadmin:${urlencode(var.database_password)}@${var.database_host}:${var.database_port}/speckle?sslmode=require
 
+# Database Admin (Speckle DB init + migrations)
+DB_ADMIN_PASSWORD=${var.db_admin_password}
+MIGRATION_DATABASE_URL=postgresql://doadmin:${urlencode(var.db_admin_password)}@${var.database_host}:${var.database_port}/${var.database_name}?sslmode=require
+
 # Infrastructure Services
 RESEND_API_KEY=${var.resend_api_key}
-WATCHTOWER_HTTP_API_TOKEN=${var.watchtower_http_api_token}
-
-# Port Configuration
-CONSOLE_PORT=3004
-MCP_STDIO_PORT=3001
-
-# Docker Registry Configuration (DOCR Authentication)
-DOCR_CONFIG_JSON=${var.docr_config_json}
+RESEND_FROM_EMAIL=${var.resend_from_email}
 
 # Multi-Database Architecture (DatabaseManager)
 PLATFORM_DATABASE_URL=${var.platform_database_url}
@@ -624,18 +625,19 @@ ENV
 
 # Upload .env file to DigitalOcean Spaces (zero-SSH pattern)
 module "production_env_upload" {
-  source = "../../../../terraform/modules/config-upload"
+  source = "../../modules/config-upload"
 
-  config_content  = local_file.production_env.content
-  config_filename = ".env.production"
-  config_type     = "env"
-  environment     = "production"
+  config_content      = local_file.production_env.content
+  config_filename     = ".env.production"
+  config_type         = "env"
+  environment         = "production"
+  object_key_override = "production.env"
 
   spaces_bucket = var.spaces_bucket
   spaces_region = "sfo3"
 
   deployment_id     = "terraform-${plantimestamp()}"
-  create_backup     = true
+  create_backup     = false
   enable_encryption = true
   max_file_size_kb  = 100
 
