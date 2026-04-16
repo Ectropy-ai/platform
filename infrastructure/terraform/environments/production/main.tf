@@ -404,6 +404,33 @@ resource "digitalocean_reserved_ip" "production_green_isolated" {
 }
 
 # ============================================================================
+# Production Config Bucket (Spaces) — Versioned + Lifecycle
+# ============================================================================
+# DEC-032: Canonical .env storage. Config-sync on blue/green polls this bucket.
+# Versioning: Enabled — allows rollback to prior .env versions.
+# Lifecycle: Noncurrent versions expire after 30 days.
+
+resource "digitalocean_spaces_bucket" "production_configs" {
+  name   = "ectropy-production-configs"
+  region = "sfo3"
+  acl    = "private"
+
+  versioning {
+    enabled = true
+  }
+
+  lifecycle_rule {
+    id      = "cleanup-old-env-versions"
+    prefix  = ""
+    enabled = true
+
+    noncurrent_version_expiration {
+      days = 30
+    }
+  }
+}
+
+# ============================================================================
 # Zero-SSH Config Upload Modules (Replaces SSH-based GitOps)
 # ============================================================================
 # ARCHITECTURE FIX: Replaced 6 SSH-based deployment modules with 4 S3 uploads

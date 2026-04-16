@@ -72,6 +72,11 @@ variable "database_url" {
   description = "Full PostgreSQL connection URL (postgresql://user:pass@host:port/db?sslmode=require)"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = can(regex("^postgresql://", var.database_url))
+    error_message = "database_url must start with postgresql://"
+  }
 }
 
 variable "database_host" {
@@ -101,6 +106,11 @@ variable "database_password" {
   description = "PostgreSQL admin password for managed database"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.database_password) >= 16 && can(regex("[A-Z]", var.database_password)) && can(regex("[0-9]", var.database_password))
+    error_message = "database_password must be at least 16 chars with uppercase and digit"
+  }
 }
 
 # ============================================================================
@@ -143,12 +153,22 @@ variable "session_secret" {
 variable "google_client_id" {
   description = "Google OAuth 2.0 client ID (production)"
   type        = string
+
+  validation {
+    condition     = can(regex("\\.apps\\.googleusercontent\\.com$", var.google_client_id))
+    error_message = "google_client_id must end with .apps.googleusercontent.com"
+  }
 }
 
 variable "google_client_secret" {
   description = "Google OAuth 2.0 client secret (production)"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.google_client_secret) >= 24
+    error_message = "google_client_secret must be at least 24 characters"
+  }
 }
 
 # ============================================================================
@@ -205,6 +225,11 @@ variable "speckle_server_token" {
   description = "Speckle server authentication token (hexadecimal)"
   type        = string
   sensitive   = true
+
+  validation {
+    condition     = length(var.speckle_server_token) >= 40
+    error_message = "speckle_server_token must be at least 40 characters"
+  }
 }
 
 variable "speckle_admin_password" {
