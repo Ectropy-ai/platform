@@ -1,0 +1,893 @@
+# ARCHIVED 2026-04-16 DEC-032 Stream 4A
+# Deprecation: DEP-032-E01
+# Replacement: .github/workflows/deploy-production.yml (new)
+# Reason: SSH-heredoc pattern retired. New workflow uses
+#   TF-gated plan → apply via setup-terraform-vars composite
+#   action with workflow_dispatch-only trigger. No SSH deploy
+#   path remains in active workflows.
+#
+# Original file preserved unchanged below for historical reference.
+# ---
+################################################################################
+# ENTERPRISE PRODUCTION DEPLOYMENT WORKFLOW
+# Blue/Green deployment strategy with automated validation and rollback
+#
+# Trigger: Manual workflow_dispatch
+# Strategy: Blue/Green deployment with zero downtime
+# Rollback: Automatic on health check failure
+#
+# Deployment phases:
+#   1. Generate version & verify DOCR images (built by build-production-images.yml)
+#   2. Validate prerequisites
+#   3. Deploy to blue server (primary)
+#   4. Monitor and validate blue
+#   5. Deploy to green server (standby)
+#   6. Post-deployment validation
+################################################################################
+
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Deployment version tag (leave empty for auto-generated)'
+        required: false
+        type: string
+      skip_validation:
+        description: 'Skip prerequisite validation (emergency only)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  # ENTERPRISE FIX (2026-01-26): DigitalOcean Container Registry
+  REGISTRY: registry.digitalocean.com/ectropy-registry
+  IMAGE_NAME: ${{ github.repository }}
+  # ENTERPRISE FIX (2025-12-10): Use GitHub Variables for server configuration
+  # Eliminates hardcoded IPs, enables centralized infrastructure management
+  PROD_BLUE_IP: ${{ vars.PROD_BLUE_IP }}
+  PROD_GREEN_IP: ${{ vars.PROD_GREEN_IP }}
+  PROD_BLUE_DROPLET_ID: ${{ vars.PROD_BLUE_DROPLET_ID }}
+  PROD_GREEN_DROPLET_ID: ${{ vars.PROD_GREEN_DROPLET_ID }}
+  PROD_LB_ID: ${{ vars.PROD_LB_ID }}
+  # ENTERPRISE PATTERN (2025-12-15): Centralized database cluster ID management
+  # Aligns with industry best practices (Stripe, GitHub, Shopify pattern)
+  # Enables zero-downtime database migrations and DR scenarios
+  DATABASE_CLUSTER_ID: ${{ vars.DATABASE_CLUSTER_ID }}
+
+jobs:
+  ################################################################################
+  # Phase 1: Generate Version & Verify DOCR Images
+  # ENTERPRISE FIX (2026-03-05): Removed sequential build-images job
+  # Root Cause: 4 sequential Docker pushes in 1 job caused DOCR 401 token staleness
+  # Solution: build-production-images.yml (matrix strategy) builds on main merge
+  # This job now only generates version tag and verifies images exist in DOCR
+  ################################################################################
+  generate-version:
+    name: Generate Version & Verify Images
+    runs-on: ubuntu-latest
+    environment: production
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Generate version tag
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="v$(date +%Y.%m.%d-%H%M)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Generated version: $VERSION"
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Log in to DigitalOcean Container Registry
+        run: doctl registry login --expiry-seconds 600
+
+      - name: Verify all 3 images exist in DOCR with :latest tag
+        run: |
+          echo "Verifying all 3 production images exist in DOCR..."
+          FAILED=0
+
+          for SERVICE in api-gateway mcp-server web-dashboard; do
+            echo "Checking $SERVICE..."
+            # doctl list-tags --format Tag outputs multi-column rows, extract first column with awk
+            TAG_NAMES=$(doctl registry repository list-tags "$SERVICE" --format Tag --no-header 2>&1 | awk '{print $1}') || true
+            if echo "$TAG_NAMES" | grep -q "^latest$"; then
+              echo "  ✅ $SERVICE:latest exists"
+            else
+              echo "  ❌ $SERVICE:latest NOT FOUND in DOCR"
+              echo "  Available tags: $(echo "$TAG_NAMES" | head -5 | tr '\n' ' ')"
+              FAILED=1
+            fi
+          done
+
+          if [ "$FAILED" -eq 1 ]; then
+            echo ""
+            echo "ERROR: One or more images missing from DOCR."
+            echo "Ensure build-production-images.yml has run successfully on main branch."
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All 3 images verified in DOCR"
+
+  ################################################################################
+  # Phase 2: Validate Prerequisites
+  ################################################################################
+  validate-prerequisites:
+    name: Validate Prerequisites
+    runs-on: ubuntu-latest
+    environment: production
+    needs: generate-version
+    if: ${{ !inputs.skip_validation }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Run prerequisite validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DATABASE_CLUSTER_ID: ${{ vars.DATABASE_CLUSTER_ID }}
+          PROD_BLUE_IP: ${{ vars.PROD_BLUE_IP }}
+          PROD_GREEN_IP: ${{ vars.PROD_GREEN_IP }}
+        run: |
+          chmod +x scripts/deployment/validate-prerequisites.sh
+          ./scripts/deployment/validate-prerequisites.sh
+
+      # ENTERPRISE FIX (2025-12-15): ROOT CAUSE #40 - DigitalOcean Automated Backups Only
+      # Discovery: doctl does NOT support manual backup creation (no such command exists)
+      # Reality: DigitalOcean managed databases use AUTOMATED backups only
+      # Validation: Prerequisite check #6 verifies 8 backups exist for ectropy-production-db
+      # Enterprise benefit: Automated backups > manual (no human error, consistent schedule)
+      # Step removed - automated backups + validation check provide sufficient protection
+
+  ################################################################################
+  # Phase 3: Deploy to Blue Server
+  ################################################################################
+  deploy-blue:
+    name: Deploy to Blue Server
+    runs-on: ubuntu-latest
+    environment: production
+    # ENTERPRISE FIX (2026-03-08): 30-minute timeout prevents 6-hour default hang
+    # Root Cause (chain-9): speckle-db-init infinite loop caused 39+ minute freeze
+    timeout-minutes: 30
+    needs: [generate-version, validate-prerequisites]
+    if: ${{ always() && needs.generate-version.result == 'success' && (needs.validate-prerequisites.result == 'success' || needs.validate-prerequisites.result == 'skipped') }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      # ENTERPRISE FIX (2026-01-23): ROOT CAUSE #109 - webfactory/ssh-agent bypasses GitHub Actions masking
+      # DISCOVERY: GitHub Actions masks secrets at RUNNER level (ALL bash commands: echo, cat, printf)
+      # ROOT CAUSE: Masking intercepts ANY ${{ secrets.X }} reference before bash execution
+      # SOLUTION: Use official webfactory/ssh-agent action (no bash secret interpolation)
+      # PATTERN: Action receives secret directly from runner context (no masking layer)
+      # BLOCKED: 8+ days, 4 failed approaches (direct, HEREDOC, temp file, multi-step printf)
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      # ENTERPRISE FIX (2026-01-23): ROOT CAUSE #110 - Dynamic Firewall Access for CI/CD
+      # Problem: VPC firewall (6a834ab5) only allows SSH from 2 specific IPs, blocking GitHub Actions
+      # Root Cause: Terraform firewall ssh_source_addresses = ["184.176.86.176/32", "98.148.246.169/32"]
+      # Solution: Temporarily add runner IP to firewall, remove after deployment
+      # Pattern: Dynamic access for CI/CD while maintaining production security
+      # Alternative Rejected: Adding all GitHub Actions IP ranges (hundreds of CIDRs) defeats security purpose
+      - name: Add runner IP to firewall (temporary)
+        id: add-firewall-rule
+        run: |
+          # Get runner's public IP
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "Runner IP: $RUNNER_IP"
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+
+          # Get current firewall rules
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"  # ectropy-production-tf-managed
+          echo "Adding $RUNNER_IP/32 to firewall $FIREWALL_ID"
+
+          # Add temporary SSH access for runner
+          doctl compute firewall add-rules $FIREWALL_ID \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+
+          echo "✅ Temporary firewall rule added for CI/CD"
+
+      - name: Add SSH known hosts (with firewall propagation retry)
+        run: |
+          echo "Waiting 20s for DO firewall rule propagation..."
+          sleep 20
+          echo "Attempting ssh-keyscan with retry..."
+          for i in 1 2 3 4 5; do
+            echo "Attempt $i/5..."
+            if ssh-keyscan -T 10 -H ${{ vars.PROD_BLUE_IP }} >> ~/.ssh/known_hosts 2>&1; then
+              echo "ssh-keyscan succeeded on attempt $i"
+              break
+            fi
+            if [ $i -eq 5 ]; then
+              echo "ssh-keyscan failed after 5 attempts"
+              exit 1
+            fi
+            echo "Retrying in 10s..."
+            sleep 10
+          done
+
+      - name: Remove blue from load balancer
+        run: |
+          # ENTERPRISE FIX (2026-03-06): Droplet-ID Load Balancer Management
+          # Ground truth: Terraform main.tf:203-206 configures LB with droplet_ids (not tags)
+          # Previous tag-based approach conflicted: "only one target identifier can be specified"
+          # Fix: Use doctl compute load-balancer remove-droplets (matches Terraform LB config)
+          LB_ID="${{ vars.PROD_LB_ID }}"
+          DROPLET_ID="${{ vars.PROD_BLUE_DROPLET_ID }}"
+
+          echo "Removing blue droplet $DROPLET_ID from load balancer $LB_ID..."
+          doctl compute load-balancer remove-droplets "$LB_ID" --droplet-ids "$DROPLET_ID" || {
+            echo "⚠️ Remove failed (droplet may not be in LB) — continuing"
+          }
+
+          echo "Blue droplet removed from load balancer"
+
+      # ENTERPRISE FIX (2025-12-16): P0 CRITICAL - Static File Deployment Pattern
+      # Extract pre-built static files from Docker image and deploy to server
+      # Eliminates server-side rebuilds, ensures build consistency, 40% faster deployments
+      # Same pattern as staging (successfully deployed in Run #20284266092)
+      - name: Log in to DigitalOcean Container Registry
+        run: doctl registry login --expiry-seconds 3600
+
+      - name: Pull web-dashboard Docker image
+        run: |
+          docker pull ${{ env.REGISTRY }}/web-dashboard:latest
+          docker tag ${{ env.REGISTRY }}/web-dashboard:latest ectropy-web-dashboard:latest
+
+      - name: Extract static files from Docker image
+        run: |
+          echo "Extracting static files from web-dashboard Docker image"
+
+          # Create temporary container from image
+          CONTAINER_ID=$(docker create ectropy-web-dashboard:latest)
+          echo "Created temporary container: $CONTAINER_ID"
+
+          # Extract static files from /app/web (see apps/web-dashboard/Dockerfile:75)
+          mkdir -p ./static-files/dist/apps/web-dashboard
+          docker cp ${CONTAINER_ID}:/app/web ./static-files/dist/apps/web-dashboard/
+
+          # Cleanup temporary container
+          docker rm ${CONTAINER_ID}
+
+          # Flatten directory structure (web/ → web-dashboard/)
+          if [ -d "./static-files/dist/apps/web-dashboard/web" ]; then
+            mv ./static-files/dist/apps/web-dashboard/web/* ./static-files/dist/apps/web-dashboard/
+            rmdir ./static-files/dist/apps/web-dashboard/web
+          fi
+
+          # Verify extraction succeeded
+          if [ ! -f "./static-files/dist/apps/web-dashboard/index.html" ]; then
+            echo "ERROR: index.html not found after extraction"
+            exit 1
+          fi
+
+          echo "✅ Static files extracted successfully"
+          ls -la ./static-files/dist/apps/web-dashboard/
+
+      - name: Transfer static files to blue server
+        run: |
+          echo "Transferring static files to blue server (${{ vars.PROD_BLUE_IP }})"
+
+          # ENTERPRISE FIX (2025-12-17): Create directory structure before rsync
+          # Ensures /var/www/ectropy/dist/ exists for static file deployment
+          ssh -o StrictHostKeyChecking=no root@${{ vars.PROD_BLUE_IP }} \
+            "mkdir -p /var/www/ectropy/dist && echo '✅ Directory structure created'"
+
+          # Deploy pre-built static files via rsync
+          rsync -avz --delete \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            ./static-files/dist/ \
+            root@${{ vars.PROD_BLUE_IP }}:/var/www/ectropy/dist/
+
+          # Verify files on server
+          ssh -o StrictHostKeyChecking=no root@${{ vars.PROD_BLUE_IP }} \
+            "test -f /var/www/ectropy/dist/apps/web-dashboard/index.html && echo '✅ Static files verified on server' || (echo '❌ Static files missing on server' && exit 1)"
+
+      - name: Deploy to blue server
+        env:
+          VERSION: latest
+          DATABASE_URL: postgresql://${{ vars.DATABASE_USER }}:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}?sslmode=require
+          # ENTERPRISE FIX (2026-03-08): Admin credentials for prisma migrate deploy
+          # Application user (ectropy) lacks CREATE TABLE privilege on DO managed PostgreSQL 16.
+          # doadmin (DO's admin user) has full privileges for DDL operations.
+          # Entrypoint uses this for migrations, falls back to DATABASE_URL if unset.
+          MIGRATION_DATABASE_URL: postgresql://doadmin:${{ secrets.DB_ADMIN_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}?sslmode=require
+          # ENTERPRISE FIX (2025-12-18): P0 CRITICAL - Individual Database Variables
+          # Docker Compose requires both DATABASE_URL and individual components
+          DATABASE_HOST: ${{ vars.DATABASE_HOST }}
+          DATABASE_PORT: ${{ vars.DATABASE_PORT }}
+          DATABASE_NAME: ${{ vars.DATABASE_NAME }}
+          DATABASE_USER: ${{ vars.DATABASE_USER }}
+          DATABASE_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID_PRODUCTION }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET_PRODUCTION }}
+          # ENTERPRISE FIX (2025-12-19): Add production OAuth variants with _PRODUCTION suffix
+          # Docker Compose expects both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_ID_PRODUCTION
+          GOOGLE_CLIENT_ID_PRODUCTION: ${{ secrets.GOOGLE_CLIENT_ID_PRODUCTION }}
+          GOOGLE_CLIENT_SECRET_PRODUCTION: ${{ secrets.GOOGLE_CLIENT_SECRET_PRODUCTION }}
+          # ENTERPRISE FIX (2025-12-18): P0 CRITICAL - Redis Password for Session Store
+          # Provides password for Redis session management and caching
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          # ENTERPRISE FIX (2025-12-18): P0 CRITICAL - Encryption Key for Data Security
+          # Provides AES encryption key for sensitive data (PII, tokens, etc.)
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          # ENTERPRISE FIX (2025-12-18): P0 CRITICAL - MCP API Key for AI Orchestration
+          # Provides API key for MCP server authentication and tool access
+          MCP_API_KEY: ${{ secrets.MCP_API_KEY }}
+          # ENTERPRISE FIX (2025-12-17): P1 CRITICAL - OpenAI API Key for AI routes
+          # Provides API key for AI-powered construction analysis features
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # SEPPA AI Assistant - Anthropic Claude API key
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # ENTERPRISE FIX (2026-01-15): ROOT CAUSE #67 - Production Environment Validation
+          # Provides non-localhost URLs required by env-schema.ts production validation
+          # Root Cause: env-schema.ts:702-713 rejects localhost URLs in production
+          # Pattern: Use GitHub variables (not hardcoded) for environment-specific URLs
+          API_URL: ${{ vars.API_URL }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+          # ENTERPRISE FIX (2026-03-05): DOCR Authentication
+          # Provides DigitalOcean API token for pulling private container images from DOCR
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          # CRM Integration (Twenty CRM)
+          CRM_ENABLED: ${{ vars.CRM_ENABLED || 'false' }}
+          CRM_API_URL: ${{ vars.CRM_API_URL || '' }}
+          CRM_API_KEY: ${{ secrets.CRM_API_KEY }}
+          CRM_WEBHOOK_SECRET: ${{ secrets.CRM_WEBHOOK_SECRET }}
+          # Speckle BIM Integration
+          SPECKLE_SERVER_URL: ${{ vars.SPECKLE_SERVER_URL || 'http://ectropy-speckle-server:3000' }}
+          SPECKLE_SERVER_TOKEN: ${{ secrets.SPECKLE_SERVER_TOKEN }}
+          SPECKLE_ADMIN_EMAIL: ${{ secrets.SPECKLE_ADMIN_EMAIL || 'speckle-admin@ectropy.ai' }}
+          SPECKLE_ADMIN_PASSWORD: ${{ secrets.SPECKLE_ADMIN_PASSWORD }}
+          SPECKLE_SESSION_SECRET: ${{ secrets.SPECKLE_SESSION_SECRET }}
+          SPECKLE_PUBLIC_URL: ${{ vars.SPECKLE_PUBLIC_URL || 'https://ectropy.ai/speckle' }}
+          # MinIO S3-compatible storage
+          MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+          MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
+          MINIO_PUBLIC_URL: ${{ vars.MINIO_PUBLIC_URL || 'https://ectropy.ai/minio' }}
+          # Email Service - Resend
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ vars.RESEND_FROM_EMAIL || 'noreply@ectropy.ai' }}
+          # Multi-Database Architecture
+          PLATFORM_DATABASE_URL: ${{ secrets.PLATFORM_DATABASE_URL }}
+          SHARED_DATABASE_URL: ${{ secrets.SHARED_DATABASE_URL }}
+          # Qdrant Vector Database
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          # ENTERPRISE FIX (2026-03-08): Admin credentials for speckle-db-init DDL
+          # speckle-db-init uses doadmin to CREATE DATABASE speckle and GRANT privileges
+          DB_ADMIN_PASSWORD: ${{ secrets.DB_ADMIN_PASSWORD }}
+          # Speckle PostgreSQL — Managed DO Database (DEC-019)
+          # All Speckle services connect to managed cluster with SSL
+          POSTGRES_URL: postgresql://doadmin:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/speckle?sslmode=require
+          POSTGRES_USER: doadmin
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_DB: speckle
+          POSTGRES_PORT: ${{ vars.DATABASE_PORT }}
+          PGSSLMODE: require
+          PG_CONNECTION_STRING: postgresql://doadmin:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/speckle?sslmode=require
+          FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://doadmin:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/speckle?sslmode=require
+        run: |
+          chmod +x scripts/deployment/deploy-to-server.sh
+          ./scripts/deployment/deploy-to-server.sh blue --version "$VERSION"
+
+      - name: Validate blue server health
+        run: |
+          chmod +x scripts/deployment/validate-health.sh
+          ./scripts/deployment/validate-health.sh blue
+
+      # ENTERPRISE FIX (ROOT CAUSE #28 - 2025-12-19): Smoke tests disabled in production
+      # Smoke tests require pnpm/Node.js environment which isn't available in deployment runner
+      # Health checks (previous step) already validate service availability
+      # Smoke tests run in staging environment before production deployment
+      # - name: Run smoke tests
+      #   run: |
+      #     # ENTERPRISE FIX (2025-12-10): Use variable instead of hardcoded IP
+      #     BASE_URL=http://${{ vars.PROD_BLUE_IP }}:3000 pnpm playwright test tests/playwright/smoke.spec.ts
+
+      - name: Add blue to load balancer
+        if: success()
+        run: |
+          # ENTERPRISE FIX (2026-03-06): Droplet-ID Load Balancer Management
+          # Ground truth: Terraform main.tf:203-206 configures LB with droplet_ids (not tags)
+          # Fix: Use doctl compute load-balancer add-droplets (matches Terraform LB config)
+          LB_ID="${{ vars.PROD_LB_ID }}"
+          DROPLET_ID="${{ vars.PROD_BLUE_DROPLET_ID }}"
+
+          echo "Adding blue droplet $DROPLET_ID to load balancer $LB_ID..."
+          doctl compute load-balancer add-droplets "$LB_ID" --droplet-ids "$DROPLET_ID" || {
+            echo "⚠️ Add failed (droplet may already be in LB) — continuing"
+          }
+
+          echo "Blue droplet added to load balancer"
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          chmod +x scripts/deployment/rollback-server.sh
+          ./scripts/deployment/rollback-server.sh blue --strategy traffic
+
+      # ENTERPRISE FIX (2026-01-23): ROOT CAUSE #110 - Cleanup Temporary Firewall Rule
+      # Pattern: Always remove temporary CI/CD access (success or failure)
+      # Security: Ensures firewall returns to least-privilege state after deployment
+      - name: Remove runner IP from firewall (cleanup)
+        if: always() && steps.add-firewall-rule.outputs.runner_ip
+        run: |
+          RUNNER_IP="${{ steps.add-firewall-rule.outputs.runner_ip }}"
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+
+          echo "🧹 Removing temporary firewall rule for $RUNNER_IP"
+          doctl compute firewall remove-rules $FIREWALL_ID \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32" || true
+
+          echo "✅ Firewall cleaned up - production security restored"
+
+  ################################################################################
+  # Phase 4: Monitor Blue Server
+  ################################################################################
+  monitor-blue:
+    name: Monitor Blue Server
+    runs-on: ubuntu-latest
+    needs: deploy-blue
+    environment: production
+    # ENTERPRISE FIX (2026-03-08): 15-minute timeout for monitoring phase
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      # ENTERPRISE FIX (2026-03-05): Standardize on webfactory/ssh-agent
+      # Replaces base64-decode pattern (PROD_SSH_KEY_B64) for consistency with deploy-blue/deploy-green
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      # ENTERPRISE FIX (2026-03-07): Add runner IP to firewall for SSH access
+      # Same pattern as deploy-blue — each job runs on a different runner with a different IP
+      - name: Add runner IP to firewall (temporary)
+        id: add-firewall-rule
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "Runner IP: $RUNNER_IP"
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          echo "Adding $RUNNER_IP/32 to firewall $FIREWALL_ID"
+
+          doctl compute firewall add-rules $FIREWALL_ID \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+
+          echo "✅ Temporary firewall rule added for CI/CD"
+
+      - name: Add SSH known hosts (with firewall propagation retry)
+        run: |
+          echo "Waiting 20s for DO firewall rule propagation..."
+          sleep 20
+          echo "Attempting ssh-keyscan with retry..."
+          for host in ${{ vars.PROD_BLUE_IP }} ${{ vars.PROD_GREEN_IP }}; do
+            for i in 1 2 3 4 5; do
+              echo "Attempt $i/5 for $host..."
+              if ssh-keyscan -T 10 -H "$host" >> ~/.ssh/known_hosts 2>&1; then
+                echo "ssh-keyscan succeeded for $host on attempt $i"
+                break
+              fi
+              if [ $i -eq 5 ]; then
+                echo "ssh-keyscan failed for $host after 5 attempts"
+                exit 1
+              fi
+              echo "Retrying in 10s..."
+              sleep 10
+            done
+          done
+
+      - name: Monitor error rates
+        # ENTERPRISE FIX (ROOT CAUSE #36 - 2025-12-22): Enhanced Monitoring with Fallbacks
+        # - Script now validates bc availability and uses awk fallback
+        # - Validates SSH connectivity before monitoring
+        # - Implements HTTP-based fallback via load balancer if SSH unavailable
+        # - Enhanced error handling and diagnostics
+        # Monitoring remains non-blocking - observability not blocking deployment
+        continue-on-error: true
+        run: |
+          chmod +x scripts/deployment/monitor-errors.sh
+          ./scripts/deployment/monitor-errors.sh 10 --server blue
+
+      - name: Remove runner IP from firewall (cleanup)
+        if: always() && steps.add-firewall-rule.outputs.runner_ip
+        run: |
+          RUNNER_IP="${{ steps.add-firewall-rule.outputs.runner_ip }}"
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+
+          echo "🧹 Removing temporary firewall rule for $RUNNER_IP"
+          doctl compute firewall remove-rules $FIREWALL_ID \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32" || true
+
+          echo "✅ Firewall cleaned up"
+
+  ################################################################################
+  # Phase 5: Deploy to Green Server
+  ################################################################################
+  deploy-green:
+    name: Deploy to Green Server
+    runs-on: ubuntu-latest
+    environment: production
+    # ENTERPRISE FIX (2026-03-08): 30-minute timeout prevents 6-hour default hang
+    timeout-minutes: 30
+    needs: [generate-version, monitor-blue]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      # ENTERPRISE FIX (2026-01-23): ROOT CAUSE #109 - webfactory/ssh-agent bypasses GitHub Actions masking
+      # Same fix as deploy-blue (lines 176-190)
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      # ENTERPRISE FIX (2026-03-07): Add runner IP to firewall for SSH access
+      # Same pattern as deploy-blue — each job runs on a different runner with a different IP
+      - name: Add runner IP to firewall (temporary)
+        id: add-firewall-rule
+        run: |
+          RUNNER_IP=$(curl -s https://api.ipify.org)
+          echo "Runner IP: $RUNNER_IP"
+          echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+          echo "Adding $RUNNER_IP/32 to firewall $FIREWALL_ID"
+
+          doctl compute firewall add-rules $FIREWALL_ID \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32"
+
+          echo "✅ Temporary firewall rule added for CI/CD"
+
+      - name: Add SSH known hosts (with firewall propagation retry)
+        run: |
+          echo "Waiting 20s for DO firewall rule propagation..."
+          sleep 20
+          echo "Attempting ssh-keyscan with retry..."
+          for i in 1 2 3 4 5; do
+            echo "Attempt $i/5..."
+            if ssh-keyscan -T 10 -H ${{ vars.PROD_GREEN_IP }} >> ~/.ssh/known_hosts 2>&1; then
+              echo "ssh-keyscan succeeded on attempt $i"
+              break
+            fi
+            if [ $i -eq 5 ]; then
+              echo "ssh-keyscan failed after 5 attempts"
+              exit 1
+            fi
+            echo "Retrying in 10s..."
+            sleep 10
+          done
+
+      # ENTERPRISE FIX (2025-12-16): P0 CRITICAL - Static File Deployment Pattern (Green Server)
+      # Extract pre-built static files from Docker image and deploy to green server
+      - name: Log in to DigitalOcean Container Registry
+        run: doctl registry login --expiry-seconds 3600
+
+      - name: Pull web-dashboard Docker image
+        run: |
+          docker pull ${{ env.REGISTRY }}/web-dashboard:latest
+          docker tag ${{ env.REGISTRY }}/web-dashboard:latest ectropy-web-dashboard:latest
+
+      - name: Extract static files from Docker image
+        run: |
+          echo "Extracting static files from web-dashboard Docker image"
+
+          # Create temporary container from image
+          CONTAINER_ID=$(docker create ectropy-web-dashboard:latest)
+          echo "Created temporary container: $CONTAINER_ID"
+
+          # Extract static files from /app/web (see apps/web-dashboard/Dockerfile:75)
+          mkdir -p ./static-files/dist/apps/web-dashboard
+          docker cp ${CONTAINER_ID}:/app/web ./static-files/dist/apps/web-dashboard/
+
+          # Cleanup temporary container
+          docker rm ${CONTAINER_ID}
+
+          # Flatten directory structure (web/ → web-dashboard/)
+          if [ -d "./static-files/dist/apps/web-dashboard/web" ]; then
+            mv ./static-files/dist/apps/web-dashboard/web/* ./static-files/dist/apps/web-dashboard/
+            rmdir ./static-files/dist/apps/web-dashboard/web
+          fi
+
+          # Verify extraction succeeded
+          if [ ! -f "./static-files/dist/apps/web-dashboard/index.html" ]; then
+            echo "ERROR: index.html not found after extraction"
+            exit 1
+          fi
+
+          echo "✅ Static files extracted successfully"
+          ls -la ./static-files/dist/apps/web-dashboard/
+
+      - name: Transfer static files to green server
+        run: |
+          echo "Transferring static files to green server (${{ vars.PROD_GREEN_IP }})"
+
+          # ENTERPRISE FIX (2025-12-17): Create directory structure before rsync
+          # Ensures /var/www/ectropy/dist/ exists for static file deployment
+          ssh -o StrictHostKeyChecking=no root@${{ vars.PROD_GREEN_IP }} \
+            "mkdir -p /var/www/ectropy/dist && echo '✅ Directory structure created'"
+
+          # Deploy pre-built static files via rsync
+          rsync -avz --delete \
+            -e "ssh -o StrictHostKeyChecking=no" \
+            ./static-files/dist/ \
+            root@${{ vars.PROD_GREEN_IP }}:/var/www/ectropy/dist/
+
+          # Verify files on server
+          ssh -o StrictHostKeyChecking=no root@${{ vars.PROD_GREEN_IP }} \
+            "test -f /var/www/ectropy/dist/apps/web-dashboard/index.html && echo '✅ Static files verified on server' || (echo '❌ Static files missing on server' && exit 1)"
+
+      - name: Deploy to green server
+        env:
+          VERSION: latest
+          DATABASE_URL: postgresql://${{ vars.DATABASE_USER }}:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}?sslmode=require
+          # ENTERPRISE FIX (2026-03-08): Admin credentials for prisma migrate deploy
+          MIGRATION_DATABASE_URL: postgresql://doadmin:${{ secrets.DB_ADMIN_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/${{ vars.DATABASE_NAME }}?sslmode=require
+          # ENTERPRISE FIX (2025-12-18): P0 CRITICAL - Individual Database Variables
+          # Docker Compose requires both DATABASE_URL and individual components
+          DATABASE_HOST: ${{ vars.DATABASE_HOST }}
+          DATABASE_PORT: ${{ vars.DATABASE_PORT }}
+          DATABASE_NAME: ${{ vars.DATABASE_NAME }}
+          DATABASE_USER: ${{ vars.DATABASE_USER }}
+          DATABASE_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID_PRODUCTION }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET_PRODUCTION }}
+          # ENTERPRISE FIX (2025-12-19): Add production OAuth variants with _PRODUCTION suffix
+          # Docker Compose expects both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_ID_PRODUCTION
+          GOOGLE_CLIENT_ID_PRODUCTION: ${{ secrets.GOOGLE_CLIENT_ID_PRODUCTION }}
+          GOOGLE_CLIENT_SECRET_PRODUCTION: ${{ secrets.GOOGLE_CLIENT_SECRET_PRODUCTION }}
+          # ENTERPRISE FIX (2025-12-18): P0 CRITICAL - Redis Password for Session Store
+          # Provides password for Redis session management and caching
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          # ENTERPRISE FIX (2025-12-18): P0 CRITICAL - Encryption Key for Data Security
+          # Provides AES encryption key for sensitive data (PII, tokens, etc.)
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          # ENTERPRISE FIX (2025-12-18): P0 CRITICAL - MCP API Key for AI Orchestration
+          # Provides API key for MCP server authentication and tool access
+          MCP_API_KEY: ${{ secrets.MCP_API_KEY }}
+          # ENTERPRISE FIX (2025-12-17): P1 CRITICAL - OpenAI API Key for AI routes
+          # Provides API key for AI-powered construction analysis features
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # SEPPA AI Assistant - Anthropic Claude API key
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # ENTERPRISE FIX (2026-01-15): ROOT CAUSE #67 - Production Environment Validation
+          # Provides non-localhost URLs required by env-schema.ts production validation
+          # Root Cause: env-schema.ts:702-713 rejects localhost URLs in production
+          # Pattern: Use GitHub variables (not hardcoded) for environment-specific URLs
+          API_URL: ${{ vars.API_URL }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+          # ENTERPRISE FIX (2026-03-05): DOCR Authentication
+          # Provides DigitalOcean API token for pulling private container images from DOCR
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          # CRM Integration (Twenty CRM)
+          CRM_ENABLED: ${{ vars.CRM_ENABLED || 'false' }}
+          CRM_API_URL: ${{ vars.CRM_API_URL || '' }}
+          CRM_API_KEY: ${{ secrets.CRM_API_KEY }}
+          CRM_WEBHOOK_SECRET: ${{ secrets.CRM_WEBHOOK_SECRET }}
+          # Speckle BIM Integration
+          SPECKLE_SERVER_URL: ${{ vars.SPECKLE_SERVER_URL || 'http://ectropy-speckle-server:3000' }}
+          SPECKLE_SERVER_TOKEN: ${{ secrets.SPECKLE_SERVER_TOKEN }}
+          SPECKLE_ADMIN_EMAIL: ${{ secrets.SPECKLE_ADMIN_EMAIL || 'speckle-admin@ectropy.ai' }}
+          SPECKLE_ADMIN_PASSWORD: ${{ secrets.SPECKLE_ADMIN_PASSWORD }}
+          SPECKLE_SESSION_SECRET: ${{ secrets.SPECKLE_SESSION_SECRET }}
+          SPECKLE_PUBLIC_URL: ${{ vars.SPECKLE_PUBLIC_URL || 'https://ectropy.ai/speckle' }}
+          # MinIO S3-compatible storage
+          MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+          MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
+          MINIO_PUBLIC_URL: ${{ vars.MINIO_PUBLIC_URL || 'https://ectropy.ai/minio' }}
+          # Email Service - Resend
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ vars.RESEND_FROM_EMAIL || 'noreply@ectropy.ai' }}
+          # Multi-Database Architecture
+          PLATFORM_DATABASE_URL: ${{ secrets.PLATFORM_DATABASE_URL }}
+          SHARED_DATABASE_URL: ${{ secrets.SHARED_DATABASE_URL }}
+          # Qdrant Vector Database
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          # ENTERPRISE FIX (2026-03-08): Admin credentials for speckle-db-init DDL
+          # speckle-db-init uses doadmin to CREATE DATABASE speckle and GRANT privileges
+          DB_ADMIN_PASSWORD: ${{ secrets.DB_ADMIN_PASSWORD }}
+          # Speckle PostgreSQL — Managed DO Database (DEC-019)
+          # All Speckle services connect to managed cluster with SSL
+          POSTGRES_URL: postgresql://doadmin:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/speckle?sslmode=require
+          POSTGRES_USER: doadmin
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          POSTGRES_DB: speckle
+          POSTGRES_PORT: ${{ vars.DATABASE_PORT }}
+          PGSSLMODE: require
+          PG_CONNECTION_STRING: postgresql://doadmin:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/speckle?sslmode=require
+          FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://doadmin:${{ secrets.DB_PASSWORD }}@${{ vars.DATABASE_HOST }}:${{ vars.DATABASE_PORT }}/speckle?sslmode=require
+        run: |
+          chmod +x scripts/deployment/deploy-to-server.sh
+          ./scripts/deployment/deploy-to-server.sh green --version "$VERSION"
+
+      - name: Validate green server health
+        run: |
+          chmod +x scripts/deployment/validate-health.sh
+          ./scripts/deployment/validate-health.sh green
+
+      - name: Add green to load balancer
+        if: success()
+        run: |
+          # ENTERPRISE FIX (2026-03-06): Droplet-ID Load Balancer Management
+          # Ground truth: Terraform main.tf:203-206 configures LB with droplet_ids (not tags)
+          # Fix: Use doctl compute load-balancer add-droplets (matches Terraform LB config)
+          LB_ID="${{ vars.PROD_LB_ID }}"
+          DROPLET_ID="${{ vars.PROD_GREEN_DROPLET_ID }}"
+
+          echo "Adding green droplet $DROPLET_ID to load balancer $LB_ID..."
+          doctl compute load-balancer add-droplets "$LB_ID" --droplet-ids "$DROPLET_ID" || {
+            echo "⚠️ Add failed (droplet may already be in LB) — continuing"
+          }
+
+          echo "Green droplet added to load balancer"
+
+      - name: Remove runner IP from firewall (cleanup)
+        if: always() && steps.add-firewall-rule.outputs.runner_ip
+        run: |
+          RUNNER_IP="${{ steps.add-firewall-rule.outputs.runner_ip }}"
+          FIREWALL_ID="${{ vars.PROD_FIREWALL_ID }}"
+
+          echo "🧹 Removing temporary firewall rule for $RUNNER_IP"
+          doctl compute firewall remove-rules $FIREWALL_ID \
+            --inbound-rules "protocol:tcp,ports:22,address:$RUNNER_IP/32" || true
+
+          echo "✅ Firewall cleaned up"
+
+  ################################################################################
+  # Phase 6: Post-Deployment Validation
+  ################################################################################
+  post-deployment:
+    name: Post-Deployment Validation
+    runs-on: ubuntu-latest
+    needs: [generate-version, deploy-green]
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable Corepack and Install pnpm
+        run: |
+          corepack enable
+          PNPM_VERSION=$(node -p "require('./package.json').packageManager.split('@')[1].split('+')[0]")
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+          pnpm --version
+
+      - name: Install dependencies
+        env:
+          LUHTECH_PKG_READ: ${{ secrets.LUHTECH_PKG_READ }}
+        run: |
+          echo "📦 Installing dependencies..."
+          pnpm install --frozen-lockfile
+          echo "✅ Dependencies installed"
+
+      - name: Install Playwright browsers
+        run: |
+          echo "🎭 Installing Playwright browsers..."
+          pnpm exec playwright install --with-deps chromium
+          echo "✅ Playwright browsers installed"
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Validate load balancer (direct to LB)
+        run: |
+          echo "🔍 Validating production load balancer health (direct)..."
+
+          # ENTERPRISE FIX (2026-03-07): Curl LB IP directly — bypass Cloudflare DNS
+          # ROOT CAUSE: Cloudflare A record for ectropy.ai pointed to dead origin IP
+          # (143.198.247.160 — server decommissioned). Direct LB validation is
+          # independent of Cloudflare DNS configuration.
+          LB_IP=$(doctl compute load-balancer get "$PROD_LB_ID" --format IP --no-header)
+          echo "LB IP: $LB_IP"
+
+          # Layer 1: Static nginx health (no backend dependency)
+          echo "  Layer 1: LB health check..."
+          curl -sf "http://$LB_IP/lb-health" -H "Host: ectropy.ai"
+          echo "  ✅ LB health passed"
+
+          # Layer 2: Full application health (DB, Redis, services)
+          echo "  Layer 2: Application health check..."
+          curl -sf "http://$LB_IP/api/health" -H "Host: ectropy.ai" | head -c 200
+          echo ""
+          echo "  ✅ Application health passed"
+
+          # Layer 3: End-to-end through Cloudflare (informational — may fail if DNS stale)
+          echo "  Layer 3: Cloudflare end-to-end..."
+          if curl -sf "https://ectropy.ai/lb-health" > /dev/null 2>&1; then
+            echo "  ✅ Cloudflare → origin path healthy"
+          else
+            echo "  ⚠️ Cloudflare → origin path failing (DNS may need update to LB IP: $LB_IP)"
+            echo "  ℹ️ Infrastructure is healthy — this is a Cloudflare DNS configuration issue"
+          fi
+
+          echo "✅ Load balancer infrastructure validated"
+
+      - name: Run production smoke tests
+        env:
+          PLAYWRIGHT_BASE_URL: https://ectropy.ai
+          PLAYWRIGHT_ENV: production
+        run: |
+          echo "🧪 Running production smoke tests (enterprise validation)..."
+          echo "Target: $PLAYWRIGHT_BASE_URL"
+          echo "Environment: $PLAYWRIGHT_ENV"
+
+          # ENTERPRISE PATTERN: Use dedicated production smoke test configuration
+          # - Tests infrastructure, authentication, API, database, and Speckle integration
+          # - Read-only operations only (no database writes)
+          # - Fast execution (<2 minutes total)
+          # - Fail fast (no retries) - triggers rollback on failure
+
+          pnpm exec playwright test tests/smoke/production/ --config=playwright.config.production.ts
+
+          echo "✅ Production smoke tests passed - Deployment validated"
+
+      - name: Update deployment log
+        run: |
+          chmod +x scripts/deployment/update-deployment-log.sh
+          ./scripts/deployment/update-deployment-log.sh both "${{ needs.generate-version.outputs.version }}" success
+
+      - name: Send success notification
+        if: success()
+        run: |
+          chmod +x scripts/deployment/send-notification.sh
+          ./scripts/deployment/send-notification.sh success "Production deployment ${{ needs.generate-version.outputs.version }} completed successfully"
+
+      - name: Send failure notification
+        if: failure()
+        run: |
+          chmod +x scripts/deployment/send-notification.sh
+          ./scripts/deployment/send-notification.sh failed "Production deployment ${{ needs.generate-version.outputs.version }} failed during post-deployment validation"

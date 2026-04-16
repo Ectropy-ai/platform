@@ -186,6 +186,36 @@ inputs:
     required: false
     default: ''
 
+  # Database Admin (DEC-032 Stream 1)
+  db-admin-password:
+    description: 'DB_ADMIN_PASSWORD for Speckle DB init and migrations'
+    required: false
+    default: ''
+
+  # AI Services (DEC-032 Stream 1)
+  qdrant-api-key:
+    description: 'QDRANT_API_KEY for vector database'
+    required: false
+    default: ''
+
+  # Speckle Extended Config (DEC-032 Stream 1)
+  speckle-admin-email:
+    description: 'SPECKLE_ADMIN_EMAIL for admin user registration'
+    required: false
+    default: 'speckle-admin@ectropy.ai'
+  speckle-server-url:
+    description: 'SPECKLE_SERVER_URL for internal container-to-container'
+    required: false
+    default: 'http://ectropy-speckle-server:3000'
+  minio-public-url:
+    description: 'MINIO_PUBLIC_URL for S3-compatible storage access'
+    required: false
+    default: 'https://ectropy.ai/minio'
+  resend-from-email:
+    description: 'RESEND_FROM_EMAIL sender address for email service'
+    required: false
+    default: 'noreply@ectropy.ai'
+
 outputs:
   variables-set:
     description: 'Number of TF_VAR variables configured'
@@ -236,6 +266,12 @@ runs:
         INPUT_SHARED_DATABASE_URL: ${{ inputs.shared-database-url }}
         INPUT_ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         INPUT_VIEWER_TOKEN_SECRET: ${{ inputs.viewer-token-secret }}
+        INPUT_DB_ADMIN_PASSWORD: ${{ inputs.db-admin-password }}
+        INPUT_QDRANT_API_KEY: ${{ inputs.qdrant-api-key }}
+        INPUT_SPECKLE_ADMIN_EMAIL: ${{ inputs.speckle-admin-email }}
+        INPUT_SPECKLE_SERVER_URL: ${{ inputs.speckle-server-url }}
+        INPUT_MINIO_PUBLIC_URL: ${{ inputs.minio-public-url }}
+        INPUT_RESEND_FROM_EMAIL: ${{ inputs.resend-from-email }}
       run: |
         echo "Setting TF_VAR environment variables for $INPUT_ENVIRONMENT..."
 
@@ -368,6 +404,24 @@ runs:
 
         # Authentication (DEC-015 VST pattern)
         set_env_var "TF_VAR_viewer_token_secret" "$INPUT_VIEWER_TOKEN_SECRET"
+        : $((VAR_COUNT+=1))
+
+        # Database Admin (DEC-032 Stream 1)
+        set_env_var "TF_VAR_db_admin_password" "$INPUT_DB_ADMIN_PASSWORD"
+        : $((VAR_COUNT+=1))
+
+        # AI Services — Qdrant (DEC-032 Stream 1)
+        set_env_var "TF_VAR_qdrant_api_key" "$INPUT_QDRANT_API_KEY"
+        : $((VAR_COUNT+=1))
+
+        # Speckle Extended Config (DEC-032 Stream 1)
+        echo "TF_VAR_speckle_admin_email=$INPUT_SPECKLE_ADMIN_EMAIL" >> $GITHUB_ENV
+        : $((VAR_COUNT+=1))
+        echo "TF_VAR_speckle_server_url=$INPUT_SPECKLE_SERVER_URL" >> $GITHUB_ENV
+        : $((VAR_COUNT+=1))
+        echo "TF_VAR_minio_public_url=$INPUT_MINIO_PUBLIC_URL" >> $GITHUB_ENV
+        : $((VAR_COUNT+=1))
+        echo "TF_VAR_resend_from_email=$INPUT_RESEND_FROM_EMAIL" >> $GITHUB_ENV
         : $((VAR_COUNT+=1))
 
         echo "count=$VAR_COUNT" >> $GITHUB_OUTPUT
