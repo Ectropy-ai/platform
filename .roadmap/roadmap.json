@@ -23,7 +23,7 @@
     "codeReuse": 0,
     "platformProgress": "93%",
     "currentPhase": "5b",
-    "mission": "Ectropy exists to transform construction into a transparent, efficient, and sustainable industry — providing the world's first federated construction platform where every stakeholder can collaborate seamlessly while maintaining their preferred tools and workflows.",
+    "mission": "Ectropy exists to transform construction into a transparent, efficient, and sustainable industry \u2014 providing the world's first federated construction platform where every stakeholder can collaborate seamlessly while maintaining their preferred tools and workflows.",
     "vision": "Democratize construction technology through open-source infrastructure, enabling community-driven innovation and creating sustainable value for every contributor to the built environment.",
     "currentStage": "pre-seed",
     "overallProgress": 93,
@@ -48,7 +48,7 @@
           "bullets": [
             "28+ hours average decision latency at $13,210 per incident",
             "67% of projects exceed budgets with 83-day payment cycles",
-            "$1.6T in annual industry waste — the most avoidable number in construction"
+            "$1.6T in annual industry waste \u2014 the most avoidable number in construction"
           ]
         },
         {
@@ -66,7 +66,7 @@
     "differentiator": "Proactive decision attachment to physical space (voxels), 7-tier authority cascade, AI graph traversal, offline-first edge architecture",
     "businessModel": "Open-core: Apache 2.0 platform + commercial extensions + professional services",
     "traction": "92/100 production readiness score, 35/62 E2E tests passing in staging CI (fixture improvements in progress), 11 services operational on staging, decision lifecycle schemas validated (4 new schemas), Canadian pilot March 2026 ($50K verbal commitment), partner demo completed Dec 2025",
-    "ask": "Pre-seed $500K-$1M targeting Q2 2026. Pilot validation → 15-20 investor meetings → close. Use: 60% team, 15% infrastructure, 15% operations, 10% buffer.",
+    "ask": "Pre-seed $500K-$1M targeting Q2 2026. Pilot validation \u2192 15-20 investor meetings \u2192 close. Use: 60% team, 15% infrastructure, 15% operations, 10% buffer.",
     "technology": "Cloud-native platform: Next.js + TypeScript, PostgreSQL + PostGIS, Redis, Speckle Server (BIM federation), Docker Compose orchestration, 5-layer immutable architecture, 11 operational services, 24/39 MCP decision tools operational, Qdrant vector DB for RAG",
     "missionLine": "One truth. One goal. One team.",
     "mantra": "Changing the vector of global construction.",
@@ -80,7 +80,7 @@
   "features": [
     {
       "id": "box-architecture",
-      "name": "BOX — BIM + BOM + VOX Spatial Decision Container",
+      "name": "BOX \u2014 BIM + BOM + VOX Spatial Decision Container",
       "category": "data-platform",
       "description": "The fundamental unit of construction intelligence. Convergence of BIM geometry, BOM materials, and VOX spatial decision surface into a single addressable 3D cell. Three resolution tiers: COARSE (100mm), STANDARD (40mm), FINE (10mm). Parent-child hierarchy with PostGIS spatial index. Canonical schema defined in BOX-ARCHITECTURE-2026-03-26.docx.",
       "status": "in-progress",
@@ -92,6 +92,18 @@
       "targetQuarter": "q1_2026",
       "dependsOnFeatures": [
         "urn:luhtech:ectropy:feature:foundation-layer"
+      ],
+      "xaasServices": [
+        "CaaS",
+        "GaaS",
+        "MaaS"
+      ],
+      "xaasServicePrimary": "CaaS",
+      "personaRelevance": [
+        "gc",
+        "architect",
+        "super",
+        "owner"
       ]
     },
     {
@@ -103,7 +115,17 @@
       "priority": 3,
       "featureRef": ".roadmap/features/closeout/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:closeout",
-      "specVersion": "1.0.0"
+      "specVersion": "1.0.0",
+      "xaasServices": [
+        "GaaS",
+        "PaaS"
+      ],
+      "xaasServicePrimary": "GaaS",
+      "personaRelevance": [
+        "gc",
+        "owner",
+        "architect"
+      ]
     },
     {
       "id": "commissioning",
@@ -114,7 +136,18 @@
       "priority": 3,
       "featureRef": ".roadmap/features/commissioning/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:commissioning",
-      "specVersion": "1.0.0"
+      "specVersion": "1.0.0",
+      "xaasServices": [
+        "IaaS",
+        "GaaS"
+      ],
+      "xaasServicePrimary": "IaaS",
+      "personaRelevance": [
+        "gc",
+        "owner",
+        "architect",
+        "super"
+      ]
     },
     {
       "id": "contract-onboarding",
@@ -125,7 +158,16 @@
       "priority": 2,
       "featureRef": ".roadmap/features/contract-onboarding/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:contract-onboarding",
-      "specVersion": "1.0.0"
+      "specVersion": "1.0.0",
+      "xaasServices": [
+        "GaaS"
+      ],
+      "xaasServicePrimary": "GaaS",
+      "personaRelevance": [
+        "gc",
+        "owner",
+        "architect"
+      ]
     },
     {
       "id": "decision-lifecycle",
@@ -145,6 +187,18 @@
       "milestoneUrn": "urn:luhtech:ectropy:milestone:pilot-ready",
       "deliverableIds": [
         "p5b-decision-lifecycle"
+      ],
+      "xaasServices": [
+        "GaaS",
+        "AaaS"
+      ],
+      "xaasServicePrimary": "GaaS",
+      "personaRelevance": [
+        "gc",
+        "owner",
+        "architect",
+        "super",
+        "sub"
       ]
     },
     {
@@ -159,6 +213,17 @@
       "specVersion": "1.0.0",
       "dependsOnFeatures": [
         "urn:luhtech:ectropy:feature:decision-lifecycle"
+      ],
+      "xaasServices": [
+        "AaaS",
+        "GaaS"
+      ],
+      "xaasServicePrimary": "AaaS",
+      "personaRelevance": [
+        "gc",
+        "owner",
+        "architect",
+        "super"
       ]
     },
     {
@@ -170,7 +235,17 @@
       "priority": 2,
       "featureRef": ".roadmap/features/efas/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:efas",
-      "specVersion": "1.0.0"
+      "specVersion": "1.0.0",
+      "xaasServices": [
+        "AaaS",
+        "CaaS"
+      ],
+      "xaasServicePrimary": "AaaS",
+      "personaRelevance": [
+        "gc",
+        "owner",
+        "super"
+      ]
     },
     {
       "id": "foundation-layer",
@@ -181,7 +256,18 @@
       "priority": 1,
       "featureRef": ".roadmap/features/foundation-layer/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:foundation-layer",
-      "specVersion": "1.0.0"
+      "specVersion": "1.0.0",
+      "xaasServices": [
+        "EaaS",
+        "IaaS",
+        "RaaS"
+      ],
+      "xaasServicePrimary": "EaaS",
+      "personaRelevance": [
+        "gc",
+        "super",
+        "owner"
+      ]
     },
     {
       "id": "gaas-caas-paas",
@@ -195,6 +281,19 @@
       "specVersion": "1.0.0",
       "dependsOnFeatures": [
         "urn:luhtech:ectropy:feature:foundation-layer"
+      ],
+      "xaasServices": [
+        "GaaS",
+        "CaaS",
+        "PaaS"
+      ],
+      "xaasServicePrimary": "GaaS",
+      "personaRelevance": [
+        "gc",
+        "owner",
+        "architect",
+        "super",
+        "sub"
       ]
     },
     {
@@ -224,7 +323,15 @@
       "clientRepo": "ectropy-ai/platform",
       "clientPath": "apps/api-gateway/src/intake/ifc-extraction-client.ts",
       "halfBStatus": "NOT_STARTED",
-      "halfBNotes": "Python FastAPI + IfcOpenShell. Dockerfile + service registration in luh-tech/Ectropy-Business. See INTAKE-ARCHITECTURE-2026-03-27.md Part III."
+      "halfBNotes": "Python FastAPI + IfcOpenShell. Dockerfile + service registration in luh-tech/Ectropy-Business. See INTAKE-ARCHITECTURE-2026-03-27.md Part III.",
+      "xaasServices": [
+        "MaaS"
+      ],
+      "xaasServicePrimary": "MaaS",
+      "personaRelevance": [
+        "architect",
+        "gc"
+      ]
     },
     {
       "id": "ipd-governance",
@@ -235,7 +342,17 @@
       "priority": 2,
       "featureRef": ".roadmap/features/ipd-governance/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:ipd-governance",
-      "specVersion": "1.0.0"
+      "specVersion": "1.0.0",
+      "xaasServices": [
+        "GaaS",
+        "PaaS"
+      ],
+      "xaasServicePrimary": "GaaS",
+      "personaRelevance": [
+        "gc",
+        "owner",
+        "architect"
+      ]
     },
     {
       "id": "multi-tenant-foundation",
@@ -252,6 +369,14 @@
       ],
       "deliverableIds": [
         "p5b-d6"
+      ],
+      "xaasServices": [
+        "GaaS"
+      ],
+      "xaasServicePrimary": "GaaS",
+      "personaRelevance": [
+        "gc",
+        "owner"
       ]
     },
     {
@@ -267,6 +392,16 @@
       "targetQuarter": "q1_2026",
       "deliverableIds": [
         "p5b-d10"
+      ],
+      "xaasServices": [
+        "AaaS",
+        "HaaS"
+      ],
+      "xaasServicePrimary": "AaaS",
+      "personaRelevance": [
+        "gc",
+        "super",
+        "sub"
       ]
     },
     {
@@ -278,13 +413,21 @@
       "priority": 2,
       "featureRef": ".roadmap/features/platform-agent/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:platform-agent",
-      "specVersion": "1.0.0"
+      "specVersion": "1.0.0",
+      "xaasServices": [
+        "AaaS"
+      ],
+      "xaasServicePrimary": "AaaS",
+      "personaRelevance": [
+        "architect",
+        "owner"
+      ]
     },
     {
       "id": "project-intake-pipeline",
       "name": "Project Intake Pipeline",
       "category": "infrastructure",
-      "description": "Seven-stage pipeline (Tenant > Project > Team > IFC Ingestion > Contract+Takt > Decisions > SEPPA Context) driven by versioned bundle descriptors stored in DO Spaces. Three bundle types: DEMO (full pipeline), PILOT (stages 1-3+7), CI (fast baseline <60s). Replaces all direct DB seed scripts. The demo is the first customer — same code path as pilot provisioning.",
+      "description": "Seven-stage pipeline (Tenant > Project > Team > IFC Ingestion > Contract+Takt > Decisions > SEPPA Context) driven by versioned bundle descriptors stored in DO Spaces. Three bundle types: DEMO (full pipeline), PILOT (stages 1-3+7), CI (fast baseline <60s). Replaces all direct DB seed scripts. The demo is the first customer \u2014 same code path as pilot provisioning.",
       "status": "in-progress",
       "priority": 1,
       "featureRef": ".roadmap/features/project-intake-pipeline/FEATURE.json",
@@ -296,6 +439,15 @@
         "urn:luhtech:ectropy:feature:box-architecture",
         "urn:luhtech:ectropy:feature:ifc-extraction-service",
         "urn:luhtech:ectropy:feature:multi-tenant-foundation"
+      ],
+      "xaasServices": [
+        "CaaS",
+        "GaaS"
+      ],
+      "xaasServicePrimary": "CaaS",
+      "personaRelevance": [
+        "gc",
+        "owner"
       ]
     },
     {
@@ -307,7 +459,17 @@
       "priority": 2,
       "featureRef": ".roadmap/features/punch-list/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:punch-list",
-      "specVersion": "1.0.0"
+      "specVersion": "1.0.0",
+      "xaasServices": [
+        "IaaS",
+        "HaaS"
+      ],
+      "xaasServicePrimary": "IaaS",
+      "personaRelevance": [
+        "gc",
+        "super",
+        "sub"
+      ]
     },
     {
       "id": "rag-layer",
@@ -318,7 +480,17 @@
       "priority": 2,
       "featureRef": ".roadmap/features/eil/rag-layer/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:rag-layer",
-      "specVersion": "1.0.0"
+      "specVersion": "1.0.0",
+      "xaasServices": [
+        "AaaS"
+      ],
+      "xaasServicePrimary": "AaaS",
+      "personaRelevance": [
+        "gc",
+        "owner",
+        "architect",
+        "super"
+      ]
     },
     {
       "id": "ros-mro",
@@ -329,7 +501,18 @@
       "priority": 3,
       "featureRef": ".roadmap/features/ros-mro/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:ros-mro",
-      "specVersion": "1.0.0"
+      "specVersion": "1.0.0",
+      "xaasServices": [
+        "CaaS",
+        "EaaS"
+      ],
+      "xaasServicePrimary": "CaaS",
+      "personaRelevance": [
+        "gc",
+        "owner",
+        "architect",
+        "super"
+      ]
     },
     {
       "id": "seppa-agent",
@@ -344,6 +527,17 @@
       "dependsOnFeatures": [
         "urn:luhtech:ectropy:feature:rag-layer",
         "urn:luhtech:ectropy:feature:phone-agent"
+      ],
+      "xaasServices": [
+        "AaaS"
+      ],
+      "xaasServicePrimary": "AaaS",
+      "personaRelevance": [
+        "gc",
+        "owner",
+        "architect",
+        "super",
+        "sub"
       ]
     },
     {
@@ -355,7 +549,17 @@
       "priority": 3,
       "featureRef": ".roadmap/features/siltana/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:siltana",
-      "specVersion": "1.0.0"
+      "specVersion": "1.0.0",
+      "xaasServices": [
+        "RaaS",
+        "EaaS",
+        "IaaS"
+      ],
+      "xaasServicePrimary": "RaaS",
+      "personaRelevance": [
+        "owner",
+        "super"
+      ]
     },
     {
       "id": "user-management",
@@ -369,6 +573,14 @@
       "specVersion": "1.0.0",
       "dependsOnFeatures": [
         "urn:luhtech:ectropy:feature:multi-tenant-foundation"
+      ],
+      "xaasServices": [
+        "GaaS"
+      ],
+      "xaasServicePrimary": "GaaS",
+      "personaRelevance": [
+        "gc",
+        "owner"
       ]
     },
     {
@@ -380,7 +592,17 @@
       "priority": 3,
       "featureRef": ".roadmap/features/warranty-operations/FEATURE.json",
       "featureUrn": "urn:luhtech:ectropy:feature:warranty-operations",
-      "specVersion": "1.0.0"
+      "specVersion": "1.0.0",
+      "xaasServices": [
+        "IaaS",
+        "EaaS"
+      ],
+      "xaasServicePrimary": "IaaS",
+      "personaRelevance": [
+        "owner",
+        "super",
+        "architect"
+      ]
     }
   ],
   "flagshipFeatures": [
@@ -391,7 +613,7 @@
       "targetRelease": "2026-03-01",
       "pilot": "Canadian Plant Facility",
       "value": {
-        "perIncident": "$13,210 saved (28 hours → 10 seconds)",
+        "perIncident": "$13,210 saved (28 hours \u2192 10 seconds)",
         "perProject": "$1,336,680 net (108 incidents)",
         "roi": "1,485%"
       },
