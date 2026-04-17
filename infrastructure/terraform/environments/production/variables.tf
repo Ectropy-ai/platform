@@ -64,6 +64,17 @@ variable "app_version" {
   type        = string
 }
 
+variable "image_tag" {
+  description = "Container image tag consumed by compose. Format: {semver}-{short-sha}. Default 'latest' serves as sentinel for pre-Stream-6 and non-production use."
+  type        = string
+  default     = "latest"
+
+  validation {
+    condition     = length(var.image_tag) > 0
+    error_message = "Image tag cannot be empty."
+  }
+}
+
 # ============================================================================
 # Database Configuration (Managed PostgreSQL)
 # ============================================================================

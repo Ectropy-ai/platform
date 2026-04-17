@@ -539,6 +539,7 @@ resource "local_file" "production_env" {
   content = <<-ENV
 NODE_ENV=production
 VERSION=${var.app_version}
+IMAGE_TAG=${var.image_tag}
 
 # Database Configuration (Managed PostgreSQL)
 DATABASE_URL=postgresql://${var.database_user}:${urlencode(var.database_password)}@${var.database_host}:${var.database_port}/${var.database_name}?sslmode=require

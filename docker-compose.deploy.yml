@@ -47,7 +47,7 @@ services:
     networks:
       - ectropy-network
   api-gateway:
-    image: registry.digitalocean.com/ectropy-registry/api-gateway:latest
+    image: registry.digitalocean.com/ectropy-registry/api-gateway:${IMAGE_TAG:-latest}
     container_name: ectropy-api-gateway
     <<: *security-defaults
     # ENTERPRISE FIX (2025-12-19): P0 CRITICAL - Publish port for deployment health checks
@@ -134,7 +134,7 @@ services:
     networks:
       - ectropy-network
   web-dashboard:
-    image: registry.digitalocean.com/ectropy-registry/web-dashboard:latest
+    image: registry.digitalocean.com/ectropy-registry/web-dashboard:${IMAGE_TAG:-latest}
     <<: *security-defaults
     # NOTE: Build args (REACT_APP_*) now baked into CI/CD image build
     # See: .github/workflows/build-production-images.yml
@@ -169,7 +169,7 @@ services:
   # Image still published to DOCR by Ectropy-Business CI
 
   mcp-server:
-    image: registry.digitalocean.com/ectropy-registry/mcp-server:latest
+    image: registry.digitalocean.com/ectropy-registry/mcp-server:${IMAGE_TAG:-latest}
     container_name: ectropy-mcp
     <<: *security-defaults
     environment:

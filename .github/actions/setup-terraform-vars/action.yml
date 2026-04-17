@@ -43,6 +43,10 @@ inputs:
     description: 'Application version (resolved per environment)'
     required: false
     default: ''
+  image-tag:
+    description: 'Container image tag for compose (format: {semver}-{short-sha})'
+    required: false
+    default: 'latest'
   api-url:
     description: 'API URL (resolved per environment)'
     required: false
@@ -236,6 +240,7 @@ runs:
         INPUT_SSL_CERT_PRIVATE_KEY: ${{ inputs.ssl-cert-private-key }}
         INPUT_SSL_CERT_LEAF: ${{ inputs.ssl-cert-leaf }}
         INPUT_APP_VERSION: ${{ inputs.app-version }}
+        INPUT_IMAGE_TAG: ${{ inputs.image-tag }}
         INPUT_API_URL: ${{ inputs.api-url }}
         INPUT_FRONTEND_URL: ${{ inputs.frontend-url }}
         INPUT_DATABASE_URL: ${{ inputs.database-url }}
@@ -322,6 +327,9 @@ runs:
 
         # Application Configuration (non-sensitive, direct assignment OK)
         echo "TF_VAR_app_version=$INPUT_APP_VERSION" >> $GITHUB_ENV
+        : $((VAR_COUNT+=1))
+        # Container image tag (DEC-032 Stream 4B)
+        echo "TF_VAR_image_tag=$INPUT_IMAGE_TAG" >> $GITHUB_ENV
         : $((VAR_COUNT+=1))
         echo "TF_VAR_api_url=$INPUT_API_URL" >> $GITHUB_ENV
         : $((VAR_COUNT+=1))
