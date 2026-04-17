@@ -1,8 +1,11 @@
 name: Deploy Production Infrastructure
-# DEC-032 Day 2 v2 Stream 4A — TF-gated infrastructure pipeline
+# DEC-032 Day 2 v2 Stream 4A + Stream 5 reset
 # Replaces: archive/deploy-production-ssh.yml (DEP-032-E01)
 # Dispatch: manual workflow_dispatch with typed PRODUCTION confirm
-# Pattern: confirm → canary-pre → plan → approve → apply → health → canary-post
+# Pattern: confirm → canary-pre → plan (production env) →
+#   manual-approval (production-approval env, reviewer gate) →
+#   apply (production env) → health → canary-post
+# Two-gate approval: secrets scoped to production, apply gated by reviewer
 
 on:
   workflow_dispatch:
@@ -61,13 +64,13 @@ jobs:
           echo "n8n canary: 200"
 
   # ──────────────────────────────────────────────────────────────────
-  # Terraform Plan (production-plan env — no approval gate)
+  # Terraform Plan (production env — all secrets available)
   # ──────────────────────────────────────────────────────────────────
   terraform-plan:
     name: Terraform Plan
     needs: canary-pre
     runs-on: ubuntu-latest
-    environment: production-plan
+    environment: production
 
     outputs:
       plan_exitcode: ${{ steps.plan.outputs.exitcode }}
@@ -197,12 +200,26 @@ jobs:
           if-no-files-found: error
 
   # ──────────────────────────────────────────────────────────────────
-  # Terraform Apply (production env — REQUIRES REVIEWER APPROVAL)
+  # Gate: manual approval after plan review (production-approval env)
+  # ──────────────────────────────────────────────────────────────────
+  manual-approval:
+    name: Review Plan & Approve Apply
+    needs: terraform-plan
+    if: needs.terraform-plan.outputs.plan_exitcode == '2'
+    runs-on: ubuntu-latest
+    environment: production-approval
+    steps:
+      - name: Approval received
+        run: |
+          echo "Plan approval received."
+          echo "Proceeding to apply with reviewed plan."
+
+  # ──────────────────────────────────────────────────────────────────
+  # Terraform Apply (production env)
   # ──────────────────────────────────────────────────────────────────
   terraform-apply:
     name: Terraform Apply
-    needs: terraform-plan
-    if: needs.terraform-plan.outputs.plan_exitcode == '2'
+    needs: manual-approval
     runs-on: ubuntu-latest
     environment:
       name: production
