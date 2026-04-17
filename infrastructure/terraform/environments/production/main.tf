@@ -417,7 +417,7 @@ resource "digitalocean_reserved_ip" "production_green_isolated" {
 # Ref: PHASE-2A bucket drift resolution, 2026-04-17.
 import {
   to = digitalocean_spaces_bucket.production_configs
-  id = "ectropy-production-configs"
+  id = "sfo3,ectropy-production-configs"
 }
 
 resource "digitalocean_spaces_bucket" "production_configs" {
