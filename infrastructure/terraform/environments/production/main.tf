@@ -544,6 +544,7 @@ IMAGE_TAG=${var.image_tag}
 # Database Configuration (Managed PostgreSQL)
 DATABASE_URL=postgresql://${var.database_user}:${urlencode(var.database_password)}@${var.database_host_private}:${var.database_port}/${var.database_name}?sslmode=require
 DATABASE_HOST=${var.database_host}
+DATABASE_HOST_PRIVATE=${var.database_host_private}
 DATABASE_PORT=${var.database_port}
 DATABASE_NAME=${var.database_name}
 DATABASE_USER=${var.database_user}

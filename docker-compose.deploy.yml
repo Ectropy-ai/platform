@@ -387,18 +387,18 @@ services:
         echo "=========================================" &&
         echo "Waiting for external PostgreSQL (max 60s)..." &&
         ATTEMPT=0 &&
-        until psql "postgresql://doadmin:${DB_ADMIN_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/${DATABASE_NAME}?sslmode=require" -c "\q" 2>/dev/null; do
+        until psql "postgresql://doadmin:${DB_ADMIN_PASSWORD}@${DATABASE_HOST_PRIVATE}:${DATABASE_PORT:-25060}/${DATABASE_NAME}?sslmode=require" -c "\q" 2>/dev/null; do
           ATTEMPT=$$((ATTEMPT + 1)) &&
           if [ $$ATTEMPT -ge 30 ]; then echo "FATAL: PostgreSQL unreachable after 60s"; exit 1; fi &&
           echo "  Attempt $$ATTEMPT/30 - retrying in 2s..." &&
           sleep 2
         done &&
         echo "PostgreSQL ready. Creating Speckle database..." &&
-        psql "postgresql://doadmin:${DB_ADMIN_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/${DATABASE_NAME}?sslmode=require" -tc "SELECT 1 FROM pg_database WHERE datname = '\''speckle'\''" | grep -q 1 ||
-        psql "postgresql://doadmin:${DB_ADMIN_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/${DATABASE_NAME}?sslmode=require" -c "CREATE DATABASE speckle;" &&
+        psql "postgresql://doadmin:${DB_ADMIN_PASSWORD}@${DATABASE_HOST_PRIVATE}:${DATABASE_PORT:-25060}/${DATABASE_NAME}?sslmode=require" -tc "SELECT 1 FROM pg_database WHERE datname = '\''speckle'\''" | grep -q 1 ||
+        psql "postgresql://doadmin:${DB_ADMIN_PASSWORD}@${DATABASE_HOST_PRIVATE}:${DATABASE_PORT:-25060}/${DATABASE_NAME}?sslmode=require" -c "CREATE DATABASE speckle;" &&
         echo "Granting speckle database access to runtime user..." &&
-        psql "postgresql://doadmin:${DB_ADMIN_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/speckle?sslmode=require" -c "GRANT ALL PRIVILEGES ON DATABASE speckle TO ${DATABASE_USER};" &&
-        psql "postgresql://doadmin:${DB_ADMIN_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/speckle?sslmode=require" -c "GRANT ALL ON SCHEMA public TO ${DATABASE_USER};" &&
+        psql "postgresql://doadmin:${DB_ADMIN_PASSWORD}@${DATABASE_HOST_PRIVATE}:${DATABASE_PORT:-25060}/speckle?sslmode=require" -c "GRANT ALL PRIVILEGES ON DATABASE speckle TO ${DATABASE_USER};" &&
+        psql "postgresql://doadmin:${DB_ADMIN_PASSWORD}@${DATABASE_HOST_PRIVATE}:${DATABASE_PORT:-25060}/speckle?sslmode=require" -c "GRANT ALL ON SCHEMA public TO ${DATABASE_USER};" &&
         echo "Speckle database ready" &&
         echo "========================================="
       '
@@ -434,7 +434,7 @@ services:
       # Speckle knexfile.ts: when POSTGRES_USER+PASSWORD are set, it builds URI
       # without sslmode. So we pass a full connection string via POSTGRES_URL
       # and omit the individual vars to force the else-path (raw URI mode).
-      POSTGRES_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/speckle?sslmode=require
+      POSTGRES_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST_PRIVATE}:${DATABASE_PORT:-25060}/speckle?sslmode=require
       NODE_TLS_REJECT_UNAUTHORIZED: '0'
 
       # Redis configuration (internal Redis, separate DB index)
@@ -469,7 +469,7 @@ services:
       FRONTEND_ORIGIN: ${SPECKLE_PUBLIC_URL:-https://ectropy.ai/speckle}
 
       # File import queue
-      FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/speckle?sslmode=require
+      FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST_PRIVATE}:${DATABASE_PORT:-25060}/speckle?sslmode=require
       FF_NEXT_GEN_FILE_IMPORTER_ENABLED: 'true'
 
       # Trust proxy (nginx reverse proxy)
@@ -728,7 +728,7 @@ services:
     environment:
       LOG_LEVEL: warn
       LOG_PRETTY: 'false'
-      PG_CONNECTION_STRING: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/speckle?sslmode=require
+      PG_CONNECTION_STRING: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST_PRIVATE}:${DATABASE_PORT:-25060}/speckle?sslmode=require
       NODE_TLS_REJECT_UNAUTHORIZED: '0'
     depends_on:
       - speckle-server
@@ -759,10 +759,10 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
 
       # PostgreSQL configuration (full connection string — see speckle-server comment)
-      POSTGRES_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/speckle?sslmode=require
+      POSTGRES_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST_PRIVATE}:${DATABASE_PORT:-25060}/speckle?sslmode=require
       NODE_TLS_REJECT_UNAUTHORIZED: '0'
-      PG_CONNECTION_STRING: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/speckle?sslmode=require
-      FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST}:${DATABASE_PORT:-25060}/speckle?sslmode=require
+      PG_CONNECTION_STRING: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST_PRIVATE}:${DATABASE_PORT:-25060}/speckle?sslmode=require
+      FILEIMPORT_QUEUE_POSTGRES_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@${DATABASE_HOST_PRIVATE}:${DATABASE_PORT:-25060}/speckle?sslmode=require
     depends_on:
       - speckle-server
       - redis
