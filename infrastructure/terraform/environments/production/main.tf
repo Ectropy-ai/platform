@@ -410,6 +410,16 @@ resource "digitalocean_reserved_ip" "production_green_isolated" {
 # Versioning: Enabled — allows rollback to prior .env versions.
 # Lifecycle: Noncurrent versions expire after 30 days.
 
+
+# Import: bucket created out-of-band before TF managed it.
+# Brings existing ectropy-production-configs into state.
+# Remove block after successful apply; state retains the resource.
+# Ref: PHASE-2A bucket drift resolution, 2026-04-17.
+import {
+  to = digitalocean_spaces_bucket.production_configs
+  id = "ectropy-production-configs"
+}
+
 resource "digitalocean_spaces_bucket" "production_configs" {
   name   = "ectropy-production-configs"
   region = "sfo3"
