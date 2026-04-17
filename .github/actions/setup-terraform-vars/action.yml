@@ -62,7 +62,11 @@ inputs:
     required: false
     default: ''
   database-host:
-    description: 'DATABASE_HOST for PostgreSQL'
+    description: 'DATABASE_HOST public hostname for PostgreSQL (CI workflows)'
+    required: false
+    default: ''
+  database-host-private:
+    description: 'DATABASE_HOST_PRIVATE VPC-internal hostname for PostgreSQL (droplet containers)'
     required: false
     default: ''
   database-password:
@@ -245,6 +249,7 @@ runs:
         INPUT_FRONTEND_URL: ${{ inputs.frontend-url }}
         INPUT_DATABASE_URL: ${{ inputs.database-url }}
         INPUT_DATABASE_HOST: ${{ inputs.database-host }}
+        INPUT_DATABASE_HOST_PRIVATE: ${{ inputs.database-host-private }}
         INPUT_DATABASE_PASSWORD: ${{ inputs.database-password }}
         INPUT_JWT_SECRET: ${{ inputs.jwt-secret }}
         INPUT_JWT_REFRESH_SECRET: ${{ inputs.jwt-refresh-secret }}
@@ -340,6 +345,8 @@ runs:
         set_env_var "TF_VAR_database_url" "$INPUT_DATABASE_URL"
         : $((VAR_COUNT+=1))
         echo "TF_VAR_database_host=$INPUT_DATABASE_HOST" >> $GITHUB_ENV
+        : $((VAR_COUNT+=1))
+        echo "TF_VAR_database_host_private=$INPUT_DATABASE_HOST_PRIVATE" >> $GITHUB_ENV
         : $((VAR_COUNT+=1))
         set_env_var "TF_VAR_database_password" "$INPUT_DATABASE_PASSWORD"
         : $((VAR_COUNT+=1))

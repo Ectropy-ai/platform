@@ -542,7 +542,7 @@ VERSION=${var.app_version}
 IMAGE_TAG=${var.image_tag}
 
 # Database Configuration (Managed PostgreSQL)
-DATABASE_URL=postgresql://${var.database_user}:${urlencode(var.database_password)}@${var.database_host}:${var.database_port}/${var.database_name}?sslmode=require
+DATABASE_URL=postgresql://${var.database_user}:${urlencode(var.database_password)}@${var.database_host_private}:${var.database_port}/${var.database_name}?sslmode=require
 DATABASE_HOST=${var.database_host}
 DATABASE_PORT=${var.database_port}
 DATABASE_NAME=${var.database_name}
@@ -584,18 +584,18 @@ MINIO_PUBLIC_URL=${var.minio_public_url}
 # Speckle PostgreSQL — Managed DO Database (DEC-019)
 # All Speckle services connect to managed cluster with SSL
 # Eliminates local Docker postgres — survives droplet replacement
-POSTGRES_URL=postgresql://doadmin:${urlencode(var.database_password)}@${var.database_host}:${var.database_port}/speckle?sslmode=require
+POSTGRES_URL=postgresql://doadmin:${urlencode(var.database_password)}@${var.database_host_private}:${var.database_port}/speckle?sslmode=require
 POSTGRES_USER=doadmin
 POSTGRES_PASSWORD=${var.database_password}
 POSTGRES_DB=speckle
 POSTGRES_PORT=${var.database_port}
 PGSSLMODE=require
-PG_CONNECTION_STRING=postgres://doadmin:${urlencode(var.database_password)}@${var.database_host}:${var.database_port}/speckle?sslmode=require
-FILEIMPORT_QUEUE_POSTGRES_URL=postgres://doadmin:${urlencode(var.database_password)}@${var.database_host}:${var.database_port}/speckle?sslmode=require
+PG_CONNECTION_STRING=postgres://doadmin:${urlencode(var.database_password)}@${var.database_host_private}:${var.database_port}/speckle?sslmode=require
+FILEIMPORT_QUEUE_POSTGRES_URL=postgres://doadmin:${urlencode(var.database_password)}@${var.database_host_private}:${var.database_port}/speckle?sslmode=require
 
 # Database Admin (Speckle DB init + migrations)
 DB_ADMIN_PASSWORD=${var.db_admin_password}
-MIGRATION_DATABASE_URL=postgresql://doadmin:${urlencode(var.db_admin_password)}@${var.database_host}:${var.database_port}/${var.database_name}?sslmode=require
+MIGRATION_DATABASE_URL=postgresql://doadmin:${urlencode(var.db_admin_password)}@${var.database_host_private}:${var.database_port}/${var.database_name}?sslmode=require
 
 # Infrastructure Services
 RESEND_API_KEY=${var.resend_api_key}

@@ -91,8 +91,23 @@ variable "database_url" {
 }
 
 variable "database_host" {
-  description = "PostgreSQL host (managed database hostname)"
+  description = "Public hostname for managed PostgreSQL — used by CI workflows connecting from outside VPC"
   type        = string
+}
+
+variable "database_host_private" {
+  description = "VPC-internal private hostname for managed PostgreSQL — used by droplet application containers"
+  type        = string
+
+  validation {
+    condition     = length(var.database_host_private) > 0
+    error_message = "database_host_private must be provided."
+  }
+
+  validation {
+    condition     = can(regex("^private-", var.database_host_private))
+    error_message = "database_host_private must begin with 'private-' prefix."
+  }
 }
 
 variable "database_port" {

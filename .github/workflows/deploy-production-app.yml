@@ -201,6 +201,7 @@ jobs:
           frontend-url: ${{ vars.FRONTEND_URL }}
           database-url: ${{ secrets.DATABASE_URL }}
           database-host: ${{ vars.DATABASE_HOST }}
+          database-host-private: ${{ secrets.DATABASE_HOST_PRIVATE }}
           database-password: ${{ secrets.DB_PASSWORD }}
           jwt-secret: ${{ secrets.JWT_SECRET }}
           jwt-refresh-secret: ${{ secrets.JWT_REFRESH_SECRET }}
