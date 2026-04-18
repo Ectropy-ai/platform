@@ -1,0 +1,46 @@
+[Unit]
+Description=Config Restart (slow path — docker compose up when flagged)
+Documentation=https://github.com/luhtech/Ectropy/blob/main/.roadmap/PHASE_P3_ZERO_SSH_TERRAFORM_STRATEGY_2026-02-14.json
+After=network-online.target docker.service config-sync.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+
+# Environment Configuration
+Environment="SPACES_BUCKET=ectropy-staging-configs"
+Environment="SPACES_REGION=sfo3"
+Environment="CONFIG_DIR=/opt/ectropy"
+Environment="LOG_FILE=/var/log/config-sync.log"
+Environment="DOCKER_CONFIG=/opt/ectropy/.docker"
+
+# AWS Credentials (provided by cloud-init or manually configured)
+EnvironmentFile=-/etc/default/config-sync
+
+# Working Directory
+WorkingDirectory=/opt/ectropy
+
+# Execute sync script in RESTART-ONLY mode — consumes /run/config-sync/restart-needed
+# Triggered by config-restart.path watching the flag file on tmpfs
+ExecStart=/opt/ectropy/scripts/config-sync.sh --restart-only
+
+# Logging Configuration
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=config-restart
+
+# Security Settings (Fortune 500 Compliance)
+ProtectSystem=full
+ProtectHome=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+# Resource Limits — 600s budget for docker compose up on ~16 containers (cold cache)
+TimeoutStartSec=600s
+Restart=on-failure
+RestartSec=60s
+
+[Install]
+WantedBy=multi-user.target

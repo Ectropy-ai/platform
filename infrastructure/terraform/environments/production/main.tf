@@ -83,12 +83,14 @@ resource "digitalocean_droplet" "production_blue_isolated" {
   # Reference: FIVE_WHY_DEPLOY_WORKFLOW_ARCHITECTURE_FIX_2026-03-05.json (F8-F11)
   # ============================================================================
   user_data = templatefile("${path.module}/files/cloud-init-user-data.tftpl", {
-    spaces_access_key          = var.spaces_access_key_id
-    spaces_secret_key          = var.spaces_secret_access_key
-    docr_config_json           = var.docr_config_json
-    config_sync_script_base64  = base64encode(file("${path.module}/files/config-sync.sh"))
-    config_sync_service_base64 = base64encode(file("${path.module}/files/config-sync.service"))
-    config_sync_timer_base64   = base64encode(file("${path.module}/files/config-sync.timer"))
+    spaces_access_key             = var.spaces_access_key_id
+    spaces_secret_key             = var.spaces_secret_access_key
+    docr_config_json              = var.docr_config_json
+    config_sync_script_base64     = base64encode(file("${path.module}/files/config-sync.sh"))
+    config_sync_service_base64    = base64encode(file("${path.module}/files/config-sync.service"))
+    config_sync_timer_base64      = base64encode(file("${path.module}/files/config-sync.timer"))
+    config_restart_service_base64 = base64encode(file("${path.module}/files/config-restart.service"))
+    config_restart_path_base64    = base64encode(file("${path.module}/files/config-restart.path"))
   })
 
   lifecycle {
@@ -130,12 +132,14 @@ resource "digitalocean_droplet" "production_green_isolated" {
 
   # Same templatefile() pattern as blue droplet
   user_data = templatefile("${path.module}/files/cloud-init-user-data.tftpl", {
-    spaces_access_key          = var.spaces_access_key_id
-    spaces_secret_key          = var.spaces_secret_access_key
-    docr_config_json           = var.docr_config_json
-    config_sync_script_base64  = base64encode(file("${path.module}/files/config-sync.sh"))
-    config_sync_service_base64 = base64encode(file("${path.module}/files/config-sync.service"))
-    config_sync_timer_base64   = base64encode(file("${path.module}/files/config-sync.timer"))
+    spaces_access_key             = var.spaces_access_key_id
+    spaces_secret_key             = var.spaces_secret_access_key
+    docr_config_json              = var.docr_config_json
+    config_sync_script_base64     = base64encode(file("${path.module}/files/config-sync.sh"))
+    config_sync_service_base64    = base64encode(file("${path.module}/files/config-sync.service"))
+    config_sync_timer_base64      = base64encode(file("${path.module}/files/config-sync.timer"))
+    config_restart_service_base64 = base64encode(file("${path.module}/files/config-restart.service"))
+    config_restart_path_base64    = base64encode(file("${path.module}/files/config-restart.path"))
   })
 
   lifecycle {

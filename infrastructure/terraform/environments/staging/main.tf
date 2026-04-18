@@ -67,12 +67,14 @@ resource "digitalocean_droplet" "staging" {
   # Fortune 500 Compliance: Zero-SSH bootstrap with guaranteed credential deployment
   # ============================================================================
   user_data = templatefile("${path.module}/files/cloud-init-user-data.tftpl", {
-    spaces_access_key          = var.spaces_access_key_id
-    spaces_secret_key          = var.spaces_secret_access_key
-    docr_config_json           = var.docr_config_json
-    config_sync_script_base64  = base64encode(file("${path.module}/files/config-sync.sh"))
-    config_sync_service_base64 = base64encode(file("${path.module}/files/config-sync.service"))
-    config_sync_timer_base64   = base64encode(file("${path.module}/files/config-sync.timer"))
+    spaces_access_key             = var.spaces_access_key_id
+    spaces_secret_key             = var.spaces_secret_access_key
+    docr_config_json              = var.docr_config_json
+    config_sync_script_base64     = base64encode(file("${path.module}/files/config-sync.sh"))
+    config_sync_service_base64    = base64encode(file("${path.module}/files/config-sync.service"))
+    config_sync_timer_base64      = base64encode(file("${path.module}/files/config-sync.timer"))
+    config_restart_service_base64 = base64encode(file("${path.module}/files/config-restart.service"))
+    config_restart_path_base64    = base64encode(file("${path.module}/files/config-restart.path"))
   })
 
   # Lifecycle: Prevent unwanted changes for imported resources
@@ -83,8 +85,8 @@ resource "digitalocean_droplet" "staging" {
     prevent_destroy = false # Staging can be recreated for testing
     ignore_changes = [
       # user_data removed - must allow cloud-init changes for Phase P3 Zero-SSH
-      ssh_keys,  # Ignore ssh_keys for imported droplets (ForceNew attribute)
-      vpc_uuid   # VPC assignment cannot be changed after creation
+      ssh_keys, # Ignore ssh_keys for imported droplets (ForceNew attribute)
+      vpc_uuid  # VPC assignment cannot be changed after creation
     ]
   }
 }
@@ -321,11 +323,11 @@ module "staging_compose_upload" {
   deployment_id = "terraform-${plantimestamp()}"
 
   # Fortune 500 compliance features
-  create_backup     = true  # Backup before deployment
-  enable_encryption = true  # AES256 encryption at rest
+  create_backup     = true # Backup before deployment
+  enable_encryption = true # AES256 encryption at rest
 
   # File validation
-  max_file_size_kb = 1024  # 1MB limit for compose files
+  max_file_size_kb = 1024 # 1MB limit for compose files
 
   # Cost tracking and compliance tags
   tags = {
@@ -513,8 +515,8 @@ module "staging_env_upload" {
   # Config content to upload (Terraform-generated .env) - ROOT CAUSE #4 FIX
   # Use config_content instead of config_file_path because local_file.staging_env creates
   # the file during APPLY phase, but module locals evaluate during PLAN phase
-  config_content  = local_file.staging_env.content  # Content available during planning
-  config_filename = ".env.staging"                  # S3 object naming
+  config_content  = local_file.staging_env.content # Content available during planning
+  config_filename = ".env.staging"                 # S3 object naming
   config_type     = "env"
   environment     = "staging"
 
@@ -526,11 +528,11 @@ module "staging_env_upload" {
   deployment_id = "terraform-${plantimestamp()}"
 
   # Fortune 500 compliance features (CRITICAL for secrets)
-  create_backup     = true  # Backup before deployment
-  enable_encryption = true  # AES256 encryption at rest (REQUIRED for .env)
+  create_backup     = true # Backup before deployment
+  enable_encryption = true # AES256 encryption at rest (REQUIRED for .env)
 
   # File validation (environment files should be small)
-  max_file_size_kb = 100  # .env files typically < 10KB
+  max_file_size_kb = 100 # .env files typically < 10KB
 
   # Cost tracking and compliance tags
   tags = {

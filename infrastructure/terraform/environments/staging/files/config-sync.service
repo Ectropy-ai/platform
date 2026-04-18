@@ -1,5 +1,5 @@
 [Unit]
-Description=Config Sync from DigitalOcean Spaces (Zero-SSH Pattern)
+Description=Config Sync (fast path — pull from Spaces, flag restart if changed)
 Documentation=https://github.com/luhtech/Ectropy/blob/main/.roadmap/PHASE_P3_ZERO_SSH_TERRAFORM_STRATEGY_2026-02-14.json
 After=network-online.target docker.service
 Wants=network-online.target
@@ -9,6 +9,11 @@ PartOf=config-sync.timer
 Type=oneshot
 User=root
 Group=root
+
+# RuntimeDirectory: tmpfs /run/config-sync/ (flag-file handoff to config-restart.service)
+# Created by systemd before ExecStart; owned by root:root, mode 0755
+RuntimeDirectory=config-sync
+RuntimeDirectoryMode=0755
 
 # Environment Configuration
 Environment="SPACES_BUCKET=ectropy-staging-configs"
@@ -25,8 +30,9 @@ EnvironmentFile=-/etc/default/config-sync
 # Working Directory
 WorkingDirectory=/opt/ectropy
 
-# Execute sync script
-ExecStart=/opt/ectropy/scripts/config-sync.sh
+# Execute sync script in SYNC-ONLY mode (fast path, flag-based handoff)
+# Restart phase runs in config-restart.service (triggered by config-restart.path)
+ExecStart=/opt/ectropy/scripts/config-sync.sh --sync-only
 
 # Logging Configuration
 StandardOutput=journal
@@ -40,8 +46,8 @@ ProtectHome=yes
 NoNewPrivileges=yes
 PrivateTmp=yes
 
-# Resource Limits
-TimeoutStartSec=120s
+# Resource Limits — 60s budget for sync only (no docker compose up)
+TimeoutStartSec=60s
 Restart=on-failure
 RestartSec=60s
 

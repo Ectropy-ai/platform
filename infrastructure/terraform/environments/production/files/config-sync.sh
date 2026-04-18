@@ -430,10 +430,108 @@ check_deployment_lock() {
 }
 
 # ============================================================================
-# Main Execution
+# Main Execution — split modes (FU-14 part 2, 2026-04-17)
+# ============================================================================
+# --sync-only     : run SYNC phase only; touch /run/config-sync/restart-needed
+#                   if any *_changed flag is true; exit.
+# --restart-only  : take deployment lock; if flag file exists, run RESTART
+#                   phase + remove flag on success; else exit 0 silently.
+# full (default)  : run SYNC phase then RESTART phase in-process (legacy mode,
+#                   preserved for manual invocation / fallback).
+#
+# The split exists because `docker compose up -d` on ~16 containers can exceed
+# TimeoutStartSec=120s on a cold cache; mid-restart SIGTERMs leave services
+# in inconsistent states. Splitting lets the sync unit stay on a 60s budget
+# and the restart unit have a 600s budget, triggered by a path unit watching
+# the flag file.
 # ============================================================================
 
 main() {
+  local mode="${1:-full}"
+
+  # Shared flags: set by _main_sync_phase, read by _main_sync_only and
+  # _main_restart_phase. Declared at main() scope as globals (no local)
+  # so sibling helpers can observe them.
+  compose_changed=false
+  env_changed=false
+  nginx_changed=false
+
+  case "$mode" in
+    --sync-only)    _main_sync_only ;;
+    --restart-only) _main_restart_only ;;
+    ""|full)        _main_full ;;
+    *)
+      log_error "Unknown mode: $mode (expected --sync-only | --restart-only | full)"
+      exit 2
+      ;;
+  esac
+}
+
+_main_full() {
+  _main_sync_phase || return $?
+  _main_restart_phase || return $?
+  log_info "=========================================="
+  log_success "Config Sync Complete"
+  log_info "=========================================="
+}
+
+_main_sync_only() {
+  _main_sync_phase || return $?
+
+  # Signal restart needed if any config changed OR cold-start detected
+  if [[ "${compose_changed}" == "true" ]] || [[ "${env_changed}" == "true" ]] || [[ "${nginx_changed}" == "true" ]]; then
+    mkdir -p /run/config-sync
+    touch /run/config-sync/restart-needed
+    log_info "Flagged restart needed (/run/config-sync/restart-needed)"
+  else
+    log_info "No configuration changes detected; no restart flag set"
+  fi
+
+  log_info "=========================================="
+  log_success "Config Sync Complete (sync-only mode)"
+  log_info "=========================================="
+}
+
+_main_restart_only() {
+  log_info "=========================================="
+  log_info "Config Restart Started (restart-only mode)"
+  log_info "=========================================="
+
+  if [[ ! -f /run/config-sync/restart-needed ]]; then
+    log_info "No restart flag present; nothing to do"
+    return 0
+  fi
+
+  # Deploy Docker registry configuration (required for DOCR image pulls)
+  deploy_docker_config
+
+  # Respect deployment lock (CI/CD may be in progress)
+  if ! check_deployment_lock; then
+    log_info "Skipping restart due to deployment lock; flag retained for next cycle"
+    return 0
+  fi
+
+  # Guard against missing files — restart assumes sync phase already succeeded
+  if [[ ! -f "${COMPOSE_FILE}" ]] || [[ ! -f "${ENV_FILE}" ]]; then
+    log_error "Config files missing on disk (${COMPOSE_FILE} or ${ENV_FILE}); flag retained"
+    return 1
+  fi
+
+  log_info "Restart flag present — restarting services"
+  if restart_services; then
+    rm -f /run/config-sync/restart-needed
+    log_success "Restart complete; flag cleared"
+    log_info "=========================================="
+    log_success "Config Restart Complete"
+    log_info "=========================================="
+    return 0
+  else
+    log_error "restart_services failed; flag retained for retry"
+    return 1
+  fi
+}
+
+_main_sync_phase() {
   log_info "=========================================="
   log_info "Config Sync Started (Zero-SSH Pattern)"
   log_info "=========================================="
@@ -457,11 +555,6 @@ main() {
 
   # Ensure nginx config directory exists (docker-compose mounts ./infrastructure/nginx/)
   mkdir -p "${NGINX_DIR}"
-
-  # Track if any files changed
-  local compose_changed=false
-  local env_changed=false
-  local nginx_changed=false
 
   # Deploy nginx configs (must exist BEFORE docker compose up starts nginx container)
   if deploy_config_file "${NGINX_MAIN_KEY}" "${NGINX_MAIN_FILE}" "nginx-main"; then
@@ -496,37 +589,38 @@ main() {
     exit 1
   fi
 
-  # Restart services if any config changed
-  if [[ "${compose_changed}" == true ]] || [[ "${env_changed}" == true ]] || [[ "${nginx_changed}" == true ]]; then
-    log_info "Configuration changed, restarting services..."
+  # COLD-START DETECTION: if config files exist but no containers are running,
+  # flag restart. Safety net for droplet crash / systemd failure / first boot
+  # where file hashes matched pre-existing on-disk copies but services are dead.
+  # Without this, unchanged configs would leave services down indefinitely.
+  if [[ -f "${COMPOSE_FILE}" ]] && [[ -f "${ENV_FILE}" ]]; then
+    local running_containers
+    running_containers=$(docker compose -f "${COMPOSE_FILE}" ps -q 2>/dev/null | wc -l)
+    if [[ ${running_containers} -eq 0 ]]; then
+      log_warn "No Docker containers running but config files exist; flagging force-start"
+      compose_changed=true
+    fi
+  fi
 
+  return 0
+}
+
+_main_restart_phase() {
+  # Restart services if any config changed (includes cold-start flag from sync).
+  # Cold-start path: SYNC phase sets compose_changed=true when 0 containers + files exist.
+  if [[ "${compose_changed}" == "true" ]] || [[ "${env_changed}" == "true" ]] || [[ "${nginx_changed}" == "true" ]]; then
+    log_info "Configuration changed, restarting services..."
     if restart_services; then
       log_success "Deployment complete - services restarted successfully"
+      return 0
     else
       log_error "Deployment complete - service restart failed"
       exit 1
     fi
   else
     log_info "No configuration changes detected, skipping service restart"
+    return 0
   fi
-
-  # CRITICAL: Even if no configs changed, check if services are actually running.
-  # The first run may have downloaded files but failed to start Docker.
-  # Without this check, config-sync never retries starting services.
-  local running_containers=$(docker compose -f "${COMPOSE_FILE}" ps -q 2>/dev/null | wc -l)
-  if [[ ${running_containers} -eq 0 ]] && [[ -f "${COMPOSE_FILE}" ]] && [[ -f "${ENV_FILE}" ]]; then
-    log_warn "No Docker containers running but config files exist. Force-starting services..."
-    if restart_services; then
-      log_success "Services force-started successfully"
-    else
-      log_error "Failed to force-start services"
-      exit 1
-    fi
-  fi
-
-  log_info "=========================================="
-  log_success "Config Sync Complete"
-  log_info "=========================================="
 }
 
 # Execute main function

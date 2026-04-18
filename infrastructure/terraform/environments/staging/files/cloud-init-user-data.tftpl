@@ -99,6 +99,14 @@ echo "${config_sync_service_base64}" | base64 -d > /etc/systemd/system/config-sy
 echo "Deploying config-sync.timer (base64-encoded)..."
 echo "${config_sync_timer_base64}" | base64 -d > /etc/systemd/system/config-sync.timer
 
+# Deploy config-restart.service (base64-encoded) — slow-path restart unit (600s budget)
+echo "Deploying config-restart.service (base64-encoded)..."
+echo "${config_restart_service_base64}" | base64 -d > /etc/systemd/system/config-restart.service
+
+# Deploy config-restart.path (base64-encoded) — watches /run/config-sync/restart-needed
+echo "Deploying config-restart.path (base64-encoded)..."
+echo "${config_restart_path_base64}" | base64 -d > /etc/systemd/system/config-restart.path
+
 # ============================================================================
 # Create AWS credentials file for DigitalOcean Spaces
 # ============================================================================
@@ -132,6 +140,15 @@ systemctl start config-sync.timer
 
 # Verify timer is active
 systemctl status config-sync.timer --no-pager || true
+
+# Enable and start config-restart.path (flag watcher → triggers config-restart.service)
+echo "Enabling config-restart.path..."
+systemctl enable config-restart.path
+
+echo "Starting config-restart.path..."
+systemctl start config-restart.path
+
+systemctl status config-restart.path --no-pager || true
 
 echo "=== PHASE P3.8 COMPLETE: Zero-SSH Config Sync Service Active ==="
 echo "Config sync will poll S3 every 60 seconds for configuration changes"
