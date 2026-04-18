@@ -14,6 +14,11 @@ on:
         description: 'Type PRODUCTION to confirm infrastructure deployment'
         required: true
         type: string
+      replace_targets:
+        description: 'Resource addresses to force-replace (one per line). Leave empty for normal plan. Example: digitalocean_droplet.production_blue_isolated'
+        required: false
+        type: string
+        default: ''
 
 concurrency:
   group: production-infra
@@ -153,11 +158,42 @@ jobs:
           SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
         run: |
           set -o pipefail
+
+          # Build -replace= flags from replace_targets input (empty = normal plan)
+          REPLACE_FLAGS=()
+          REPLACE_COUNT=0
+          if [ -n "${{ inputs.replace_targets }}" ]; then
+            while IFS= read -r _addr; do
+              _addr="$(printf '%s' "$_addr" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+              [ -z "$_addr" ] && continue
+              if ! printf '%s' "$_addr" | grep -qE '^[a-zA-Z0-9_.\[\]\"-]+$'; then
+                echo "::error::Invalid resource address (disallowed chars): $_addr"
+                exit 1
+              fi
+              REPLACE_FLAGS+=("-replace=$_addr")
+              REPLACE_COUNT=$((REPLACE_COUNT + 1))
+            done <<< "${{ inputs.replace_targets }}"
+          fi
+
+          if [ "$REPLACE_COUNT" -gt 0 ]; then
+            {
+              echo "## ⚠️  FORCED REPLACEMENT — $REPLACE_COUNT resource(s)"
+              echo ""
+              echo "The following resources will be destroyed and recreated:"
+              echo ""
+              echo '```'
+              printf '%s\n' "${{ inputs.replace_targets }}" | sed '/^[[:space:]]*$/d'
+              echo '```'
+              echo ""
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
           terraform plan \
             -input=false \
             -detailed-exitcode \
             -out=tfplan \
             -no-color \
+            "${REPLACE_FLAGS[@]}" \
             2>&1 | tee plan_output.txt
 
           EXITCODE=${PIPESTATUS[0]}
