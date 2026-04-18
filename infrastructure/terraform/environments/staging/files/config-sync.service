@@ -13,6 +13,7 @@ Group=root
 # RuntimeDirectory: tmpfs /run/config-sync/ (flag-file handoff to config-restart.service)
 # Created by systemd before ExecStart; owned by root:root, mode 0755
 RuntimeDirectory=config-sync
+RuntimeDirectoryPreserve=yes
 RuntimeDirectoryMode=0755
 
 # Environment Configuration
