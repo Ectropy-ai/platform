@@ -68,7 +68,8 @@ echo "=== Installing Zero-SSH Config Sync Service ==="
 
 # Install AWS CLI for DigitalOcean Spaces access
 echo "Installing AWS CLI..."
-apt-get install -y awscli
+apt-get install -y python3-pip --no-install-recommends
+pip3 install boto3
 
 # Create scripts directory
 mkdir -p /opt/ectropy/scripts
@@ -136,7 +137,7 @@ echo "Config sync will poll S3 every 60 seconds for configuration changes"
 echo "Verifying Docker installation..."
 docker --version
 docker-compose --version
-echo "Verifying AWS CLI installation..."
-aws --version
+echo "Verifying boto3 installation..."
+python3 -c "import boto3; print(f'boto3 {boto3.__version__}')"
 
 echo "=== Production server provisioned successfully: $(date) ===" | tee /opt/ectropy/provisioned.txt

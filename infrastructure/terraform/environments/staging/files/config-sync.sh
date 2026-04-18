@@ -21,16 +21,16 @@ LOG_FILE="${LOG_FILE:-/var/log/config-sync.log}"
 BACKUP_DIR="${CONFIG_DIR}/backups"
 
 # S3 object keys (matches config-upload module paths)
-COMPOSE_KEY="staging/compose/docker-compose.staging.yml"
-ENV_KEY="staging/env/.env.staging"
+COMPOSE_KEY="${COMPOSE_KEY:-staging/compose/docker-compose.staging.yml}"
+ENV_KEY="${ENV_KEY:-staging/env/.env.staging}"
 
 # Local file paths
 COMPOSE_FILE="${CONFIG_DIR}/docker-compose.yml"
 ENV_FILE="${CONFIG_DIR}/.env"
 
 # Nginx config S3 keys (match config-upload module paths)
-NGINX_MAIN_KEY="staging/nginx/main.conf"
-NGINX_SITE_KEY="staging/nginx/ectropy-staging.conf"
+NGINX_MAIN_KEY="${NGINX_MAIN_KEY:-staging/nginx/main.conf}"
+NGINX_SITE_KEY="${NGINX_SITE_KEY:-staging/nginx/ectropy-staging.conf}"
 
 # Nginx local paths (match docker-compose.staging.yml volume mounts: ./infrastructure/nginx/)
 NGINX_DIR="${CONFIG_DIR}/infrastructure/nginx"
