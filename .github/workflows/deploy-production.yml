@@ -164,10 +164,14 @@ jobs:
           REPLACE_COUNT=0
           if [ -n "${{ inputs.replace_targets }}" ]; then
             while IFS= read -r _addr; do
+              # Normalize: strip CR (Windows line-endings), then trim whitespace
+              _addr="${_addr//$'\r'/}"
               _addr="$(printf '%s' "$_addr" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
               [ -z "$_addr" ] && continue
-              if ! printf '%s' "$_addr" | grep -qE '^[a-zA-Z0-9_.\[\]\"-]+$'; then
-                echo "::error::Invalid resource address (disallowed chars): $_addr"
+              # Allowlist check via tr -d: any residual char is disallowed
+              _bad="$(printf '%s' "$_addr" | LC_ALL=C tr -d 'a-zA-Z0-9_.[]"-')"
+              if [ -n "$_bad" ]; then
+                echo "::error::Invalid resource address (disallowed chars: $_bad): $_addr"
                 exit 1
               fi
               REPLACE_FLAGS+=("-replace=$_addr")
