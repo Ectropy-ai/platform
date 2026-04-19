@@ -1,6 +1,7 @@
 /**
- * @fileoverview IIFCExtractionService — converts raw IFC files into
- * structured ElementManifests consumed by the BOX voxelization engine.
+ * @fileoverview IIFCExtractionService — local service contract + error class.
+ * Data-shape types (BBox3D, StoreyRecord, IFCElement, ElementManifest) live
+ * in @ectropy/schemas per F-2 schema extraction (2026-04-18).
  *
  * Contract guarantees:
  *   - All elements have a non-empty guid
@@ -13,51 +14,21 @@
  *
  * @see INTAKE-ARCHITECTURE-2026-03-27.md — Part III
  * @see BOX-ARCHITECTURE-2026-03-26.docx — Section 2.2 BIM Fields
+ * @see ectropy-ai/schemas/types/ifc-extraction.types.ts
  */
 
-import type { IFCDiscipline, SystemType } from './bundle.types';
+import type { IFCDiscipline } from './bundle.types';
 
-export interface BBox3D {
-  min_x: number; max_x: number;
-  min_y: number; max_y: number;
-  min_z: number; max_z: number;
-}
+// Re-export the data-shape types for backward compatibility with existing consumers
+export type {
+  BBox3D,
+  StoreyRecord,
+  IFCElement,
+  ElementManifest,
+} from '@ectropy/schemas/types/ifc-extraction';
 
-export interface StoreyRecord {
-  name: string;
-  elevation: number;
-  z_min: number;
-  z_max: number;
-}
-
-export interface IFCElement {
-  /** IFC GlobalId — permanent identifier, unique within the building model. */
-  guid: string;
-  /** IFC entity type string e.g. 'IfcWall', 'IfcDuctSegment'. */
-  ifc_type: string;
-  /** Building system classification. */
-  system: SystemType;
-  /** Storey name from IfcBuildingStorey e.g. 'Level 1', 'Roof'. Never empty. */
-  level: string;
-  /** Storey elevation in metres above datum. */
-  level_elevation: number;
-  /** World-space bounding box in metres (Speckle coordinate system). */
-  bbox: BBox3D;
-  /** Additional IFC attributes (material, fire rating, grid ref, etc.). */
-  attributes: Record<string, unknown>;
-}
-
-export interface ElementManifest {
-  ifc_filename: string;
-  discipline: IFCDiscipline;
-  /** ISO 8601 timestamp of extraction. */
-  parsed_at: string;
-  storey_count: number;
-  /** Storeys ordered ascending by elevation. */
-  storeys: StoreyRecord[];
-  element_count: number;
-  elements: IFCElement[];
-}
+// Service contract — stays in platform (not a data shape, not a schema concern)
+import type { ElementManifest } from '@ectropy/schemas/types/ifc-extraction';
 
 export interface IIFCExtractionService {
   /**
@@ -74,6 +45,7 @@ export interface IIFCExtractionService {
   cacheManifest(sha256: string, manifest: ElementManifest): Promise<void>;
 }
 
+// Error class — stays in platform (runtime class, not a data shape)
 export class IFCParseError extends Error {
   constructor(
     public readonly ifcPath: string,

@@ -186,6 +186,7 @@
     "@apollo/server": "^5.0.0",
     "@aws-sdk/client-s3": "3.873.0",
     "@aws-sdk/client-secrets-manager": "3.873.0",
+    "@ectropy/schemas": "github:Ectropy-ai/schemas#6e0af671847b0929057a6dd51c38f56e4f7bf04b",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
     "@graphql-tools/schema": "^10.0.30",

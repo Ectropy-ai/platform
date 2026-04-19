@@ -71,6 +71,9 @@ importers:
       '@aws-sdk/client-secrets-manager':
         specifier: 3.873.0
         version: 3.873.0
+      '@ectropy/schemas':
+        specifier: github:Ectropy-ai/schemas#6e0af671847b0929057a6dd51c38f56e4f7bf04b
+        version: https://codeload.github.com/Ectropy-ai/schemas/tar.gz/6e0af671847b0929057a6dd51c38f56e4f7bf04b
       '@emotion/react':
         specifier: 11.14.0
         version: 11.14.0(@types/react@18.3.23)(react@18.3.1)
@@ -2557,6 +2560,10 @@ packages:
 
   '@dimforge/rapier3d-compat@0.12.0':
     resolution: {integrity: sha512-uekIGetywIgopfD97oDL5PfeezkFpNhwlzlaEYNOA0N6ghdsOvh/HYjSMek5Q2O1PYvRSDFcqFVJl4r4ZBwOow==}
+
+  '@ectropy/schemas@https://codeload.github.com/Ectropy-ai/schemas/tar.gz/6e0af671847b0929057a6dd51c38f56e4f7bf04b':
+    resolution: {tarball: https://codeload.github.com/Ectropy-ai/schemas/tar.gz/6e0af671847b0929057a6dd51c38f56e4f7bf04b}
+    version: 0.1.0
 
   '@emnapi/core@1.8.1':
     resolution: {integrity: sha512-AvT9QFpxK0Zd8J0jopedNm+w/2fIzvtPKPjqyw9jwvBaReTTqPBk9Hixaz7KbjimP+QNz605/XnjFcDAL2pqBg==}
@@ -16299,6 +16306,8 @@ snapshots:
       kuler: 2.0.0
 
   '@dimforge/rapier3d-compat@0.12.0': {}
+
+  '@ectropy/schemas@https://codeload.github.com/Ectropy-ai/schemas/tar.gz/6e0af671847b0929057a6dd51c38f56e4f7bf04b': {}
 
   '@emnapi/core@1.8.1':
     dependencies:
